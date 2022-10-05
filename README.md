@@ -8,11 +8,9 @@ Impersonator injects into the dapps just like Metamask, but gives you the freedo
 
 <ol>
   <li>
-    Visit the <a href="https://github.com/apoorvlathey/impersonator-extension/releases/latest">latest release</a> page and download <code>impersonator-extension-x.x.x.zip</code> file under Assets<br />
-      <img src="./.github/installation/assets.png" width="300rem" />
+    Download extension from the <a href="https://chrome.google.com/webstore/detail/impersonator/hgihfkmoibhccfdohjdbklmmcknjjmgl">Chrome Web Store</a>
   </li>
 
-  <li>Extract the zip file</li>
   <li> 
     <b>NOTE:</b> Extension should not be installed along with Metamask, here are 3 different ways to avoid it:<br/>
     <ol type="a">
@@ -28,19 +26,6 @@ Impersonator injects into the dapps just like Metamask, but gives you the freedo
         OR use a different browser.
       </li>
     </ol>
-  </li>
-  <br />
-  <li>
-    Open the Extensions setting page in your browser.<br />
-    <img src="./.github/installation/extensions-settings.png" width="250rem" />
-  </li>
-  <li>
-    Enable Developer mode from top-right. <br />
-    <img src="./.github/installation/developer-mode.png" />
-  </li>
-  <li>
-    Press "Load unpacked" and select the extracted folder <code>impersonator-extension-x.x.x</code><br />
-    <img src="./.github/installation/load-unpacked.png" width="300rem" />
   </li>
 </ol>
 
