@@ -56,7 +56,9 @@ module.exports = {
         },
         plugins: [
           ...webpackConfig.plugins,
-          new NodePolyfillPlugin(),
+          new NodePolyfillPlugin({
+            excludeAliases: ["console"],
+          }),
           new Dotenv(),
         ],
         resolve: {
