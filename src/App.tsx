@@ -273,7 +273,7 @@ function App() {
                     rounded="lg"
                     value={displayAddress}
                     onChange={(e) => {
-                      const _displayAddress = e.target.value;
+                      const _displayAddress = e.target.value.trim();
                       setDisplayAddress(_displayAddress);
                       setAddress(_displayAddress);
                       if (isAddressValid) {

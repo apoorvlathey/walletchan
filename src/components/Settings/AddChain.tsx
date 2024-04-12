@@ -90,7 +90,7 @@ function AddChain({ back }: { back: () => void }) {
             rounded="lg"
             value={rpc}
             onChange={(e) => {
-              setRpc(e.target.value);
+              setRpc(e.target.value.trim());
             }}
             onPaste={async (e) => {
               // auto-fetch chainId from rpc url
