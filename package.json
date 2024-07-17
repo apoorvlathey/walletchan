@@ -55,6 +55,7 @@
     ]
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.196"
+    "@types/chrome": "^0.0.196",
+    "web-ext": "^6"
   }
 }
