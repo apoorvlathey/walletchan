@@ -34,7 +34,9 @@
     "start": "craco start",
     "build": "craco build",
     "test": "craco test",
-    "eject": "craco eject"
+    "eject": "craco eject",
+    "chrome:run": "web-ext run --source-dir build --target chromium",
+    "firefox:run": "web-ext run --source-dir build --browser-console"
   },
   "eslintConfig": {
     "extends": [
