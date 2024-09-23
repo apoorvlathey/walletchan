@@ -29,3 +29,4 @@ yarn-error.log*
 
 # Firefox build artifacts
 web-ext-artifacts
+source.zip
