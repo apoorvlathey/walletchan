@@ -4,6 +4,11 @@
   "manifest_version": 3,
   "description": "Impersonator",
   "homepage_url": "https://impersonator.xyz",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "extension@impersonator.xyz"
+    }
+  },
   "action": {
     "default_title": "Impersonator",
     "default_icon": {
