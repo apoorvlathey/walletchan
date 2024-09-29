@@ -68,7 +68,7 @@ class ImpersonatorProvider extends EventEmitter {
         // @ts-ignore
         const chainId = Number(params[0].chainId as string);
 
-        const setChainIdPromise = new Promise((resolve, reject) => {
+        const setChainIdPromise = new Promise((resolve) => {
           // send message to content_script (inject.ts) to fetch corresponding RPC
           window.postMessage(
             {
