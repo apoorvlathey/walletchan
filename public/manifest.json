@@ -33,7 +33,7 @@
   "host_permissions": ["https://*/*", "http://*/*"],
   "web_accessible_resources": [
     {
-      "resources": ["static/js/impersonator.js"],
+      "resources": ["static/js/inpage.js"],
       "matches": ["file://*/*", "http://*/*", "https://*/*"]
     }
   ]
