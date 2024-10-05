@@ -6,7 +6,6 @@ export default defineConfig({
   ...sharedConfig,
   build: {
     ...sharedBuildConfig,
-
     outDir: "build/static/js",
     emptyOutDir: false,
     lib: {

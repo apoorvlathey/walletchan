@@ -4,15 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently 'yarn dev:web' 'yarn dev:inpage' 'yarn dev:inject'",
+    "dev": "yarn dev:web && concurrently 'yarn dev:inpage' 'yarn dev:inject'",
     "dev:web": "yarn build:web --mode development",
     "dev:inpage": "yarn build:inpage --mode development",
     "dev:inject": "yarn build:inject --mode development",
-    "build": "concurrently 'yarn build:web' 'yarn build:inpage' 'yarn build:inject'",
+    "build": "yarn build:web && concurrently 'yarn build:inpage' 'yarn build:inject'",
     "build:web": "vite build",
     "build:inpage": "vite build -c vite.config.inpage.ts",
     "build:inject": "vite build -c vite.config.inject.ts",
-    "watch": "concurrently 'yarn build:web --watch' 'yarn build:inpage --watch' 'yarn build:inject --watch'",
+    "watch": "yarn build:web --watch && concurrently 'yarn build:inpage --watch' 'yarn build:inject --watch'",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "chrome:run": "web-ext run --source-dir build --target chromium",
     "firefox:run": "web-ext run --source-dir build --browser-console"

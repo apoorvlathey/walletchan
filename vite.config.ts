@@ -46,9 +46,5 @@ export default defineConfig({
       host: "localhost",
     },
     origin: `http://localhost:3000`,
-
-    // fs: {
-    //   strict: false,
-    // },
   },
 });
