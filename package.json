@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "rm -rf ./build && vite build",
-    "watch": "vite build --watch",
+    "dev:web": "yarn build:web --mode development",
+    "dev:inpage": "yarn build:inpage --mode development",
+    "dev:inject": "yarn build:inject --mode development",
+    "build:web": "vite build",
+    "build:inpage": "vite build -c vite.config.inpage.ts",
+    "build:inject": "vite build -c vite.config.inject.ts",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview",
     "chrome:run": "web-ext run --source-dir build --target chromium",
     "firefox:run": "web-ext run --source-dir build --browser-console"
   },

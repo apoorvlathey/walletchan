@@ -1,11 +1,15 @@
-import { defineConfig } from "vite";
+import { BuildOptions, defineConfig } from "vite";
 import path from "path";
 import react from "@vitejs/plugin-react";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-// https://vitejs.dev/config/
-export default defineConfig({
+export const sharedConfig = {
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+    },
+  },
   plugins: [
     react(),
     tsconfigPaths(),
@@ -13,23 +17,23 @@ export default defineConfig({
       exclude: ["console"],
     }),
   ],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "src"),
-    },
+};
+
+export const sharedBuildConfig: BuildOptions = {
+  minify: "terser",
+  terserOptions: {
+    keep_classnames: true,
+    keep_fnames: true,
   },
+};
+export default defineConfig({
+  ...sharedConfig,
   build: {
+    ...sharedBuildConfig,
     outDir: "build",
-    minify: "terser",
-    terserOptions: {
-      keep_classnames: true,
-      keep_fnames: true,
-    },
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "index.html"),
-        inpage: path.resolve(__dirname, "src/chrome/impersonator.ts"),
-        inject: path.resolve(__dirname, "src/chrome/inject.ts"),
       },
       output: {
         entryFileNames: "static/js/[name].js",
@@ -37,8 +41,14 @@ export default defineConfig({
     },
   },
   server: {
-    fs: {
-      strict: false,
+    port: 3000,
+    hmr: {
+      host: "localhost",
     },
+    origin: `http://localhost:3000`,
+
+    // fs: {
+    //   strict: false,
+    // },
   },
 });
