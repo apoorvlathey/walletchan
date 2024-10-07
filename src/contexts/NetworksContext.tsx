@@ -18,7 +18,9 @@ export const NetworksContext = createContext<NetworkContextType>({
   setReloadRequired: () => {},
 });
 
-export const NetworksProvider: React.FunctionComponent = ({ children }) => {
+export const NetworksProvider: React.FunctionComponent<{
+  children: React.ReactNode;
+}> = ({ children }) => {
   const [networksInfo, setNetworksInfo] = useState<NetworksInfo>();
   const [reloadRequired, setReloadRequired] = useState(false);
 

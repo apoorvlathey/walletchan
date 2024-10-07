@@ -12,11 +12,11 @@ const init = async () => {
   };
   if (!isEnabled) return;
 
-  // inject impersonator.js into webpage
+  // inject inpage.js into webpage
   try {
     let script = document.createElement("script");
     script.setAttribute("type", "text/javascript");
-    script.src = chrome.runtime.getURL("/static/js/impersonator.js");
+    script.src = chrome.runtime.getURL("/static/js/inpage.js");
     script.onload = async function () {
       // @ts-ignore
       this.remove();

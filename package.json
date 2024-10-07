@@ -1,63 +1,53 @@
 {
   "name": "impersonator-extension",
-  "homepage": ".",
   "version": "0.1.2",
   "private": true,
-  "dependencies": {
-    "@chakra-ui/icons": "^1.0.15",
-    "@chakra-ui/react": "^1.6.6",
-    "@craco/craco": "^6.4.5",
-    "@emotion/react": "^11",
-    "@emotion/styled": "^11",
-    "@ethersproject/bytes": "^5.7.0",
-    "@ethersproject/logger": "^5.7.0",
-    "@ethersproject/providers": "^5.7.1",
-    "@testing-library/jest-dom": "^5.11.4",
-    "@testing-library/react": "^11.1.0",
-    "@testing-library/user-event": "^12.1.10",
-    "@types/jest": "^27.0.1",
-    "@types/node": "^16.7.2",
-    "@types/react": "^17.0.19",
-    "@types/react-dom": "^17.0.9",
-    "dotenv-webpack": "^8.0.1",
-    "framer-motion": "^4",
-    "node-polyfill-webpack-plugin": "^2.0.1",
-    "react": "^17.0.1",
-    "react-dom": "^17.0.1",
-    "react-scripts": "5.0.0",
-    "terser-webpack-plugin": "^5.3.6",
-    "ts-loader": "~8.2.0",
-    "typescript": "^4.3.5",
-    "web-vitals": "^0.2.4"
-  },
+  "type": "module",
   "scripts": {
-    "start": "craco start",
-    "build": "craco build",
-    "test": "craco test",
-    "eject": "craco eject",
+    "dev": "yarn dev:web && concurrently 'yarn dev:inpage' 'yarn dev:inject'",
+    "dev:web": "yarn build:web --mode development",
+    "dev:inpage": "yarn build:inpage --mode development",
+    "dev:inject": "yarn build:inject --mode development",
+    "build": "yarn build:web && concurrently 'yarn build:inpage' 'yarn build:inject'",
+    "build:web": "vite build",
+    "build:inpage": "vite build -c vite.config.inpage.ts",
+    "build:inject": "vite build -c vite.config.inject.ts",
+    "watch": "yarn build:web --watch && concurrently 'yarn build:inpage --watch' 'yarn build:inject --watch'",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "chrome:run": "web-ext run --source-dir build --target chromium",
     "firefox:run": "web-ext run --source-dir build --browser-console"
   },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+  "dependencies": {
+    "@chakra-ui/icons": "^2.2",
+    "@chakra-ui/react": "^2.9",
+    "@chakra-ui/theme-tools": "^2.2",
+    "@emotion/react": "^11.13",
+    "@emotion/styled": "^11.13",
+    "@ethersproject/address": "^5.7.0",
+    "@ethersproject/bytes": "^5.7.0",
+    "@ethersproject/logger": "^5.7.0",
+    "@ethersproject/providers": "^5.7.1",
+    "framer-motion": "^4.1.17",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.196",
-    "web-ext": "^6"
+    "@types/chrome": "^0.0.276",
+    "@types/node": "^20",
+    "@types/react": "^18.3",
+    "@types/react-dom": "^18.3",
+    "@typescript-eslint/eslint-plugin": "^6.7.0",
+    "@typescript-eslint/parser": "^6.7.0",
+    "@vitejs/plugin-react": "^4.0.4",
+    "concurrently": "^9.0.1",
+    "eslint": "^8.49.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.3",
+    "terser": "^5.34",
+    "typescript": "^4.9.5",
+    "vite": "^5.4",
+    "vite-plugin-node-polyfills": "^0.22",
+    "vite-tsconfig-paths": "^5.0",
+    "web-ext": "^8"
   }
 }
