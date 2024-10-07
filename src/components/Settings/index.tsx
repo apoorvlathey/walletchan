@@ -8,11 +8,12 @@ function Settings({ close }: { close: () => void }) {
       <HStack>
         <Text>Built by:</Text>
         <Link
+          textDecor={"underline"}
           onClick={() => {
-            chrome.tabs.create({ url: "https://twitter.com/apoorvlathey" });
+            chrome.tabs.create({ url: "https://twitter.com/apoorveth" });
           }}
         >
-          @apoorvlathey
+          Apoorv Lathey
         </Link>
       </HStack>
     </>
