@@ -1,8 +1,8 @@
-# Impersonator Extension
+# BankrWallet Extension
 
 <i><b>Log-in as ANY address on ALL dapps.</b></i><br />
 <br />
-Impersonator injects into the dapps just like Metamask, but gives you the freedom to set custom address which tricks the dapp into thinking you own that address.
+BankrWallet injects into the dapps just like Metamask, but gives you the freedom to set custom address which tricks the dapp into thinking you own that address.
 
 ## How to Install
 
@@ -19,7 +19,7 @@ Impersonator injects into the dapps just like Metamask, but gives you the freedo
         <img src="./.github/installation/browser-profile.png" width="300rem"/>
       </li>
       <li>
-        OR disable Metamask when using Impersonator <br />
+        OR disable Metamask when using Bankr Wallet <br />
         <img src="./.github/installation/disable-mm.png" width="300rem" />
       </li>
       <li>
@@ -31,7 +31,7 @@ Impersonator injects into the dapps just like Metamask, but gives you the freedo
 
 ## Using the Extension
 
-1. Click on 🕵️ icon in the extensions bar to open Impersonator popup <br />
+1. Click on 🕵️ icon in the extensions bar to open Bankr Wallet popup <br />
    <img src="./.github/usage/popup.png" width="300rem" />
 2. Open settings -> "Add Chain" button<br />
    Fill Chain Name, Paste RPC URL and the Chain Id would get auto filled. Press "Add Chain". <br />

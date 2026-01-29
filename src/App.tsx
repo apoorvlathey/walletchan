@@ -171,7 +171,7 @@ function App() {
           } else if (_chainName) {
             setChainName(_chainName);
           }
-        }
+        },
       );
     };
 
@@ -231,7 +231,7 @@ function App() {
         <Heading maxW={["302px", "4xl", "4xl", "4xl"]}>
           <HStack spacing={4}>
             <Image src="impersonatorLogo.png" w="2.2rem" />
-            <Text>Impersonator</Text>
+            <Text>BankrWallet</Text>
           </HStack>
         </Heading>
         <Spacer flex="1" />
