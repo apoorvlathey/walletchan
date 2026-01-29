@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { useUpdateEffect } from "@chakra-ui/react";
 import { NetworksInfo } from "@/types";
+import { DEFAULT_NETWORKS } from "@/constants/networks";
 
 type NetworkContextType = {
   networksInfo: NetworksInfo | undefined;
@@ -33,6 +34,9 @@ export const NetworksProvider: React.FunctionComponent<{
 
       if (storedNetworksInfo) {
         setNetworksInfo(storedNetworksInfo);
+      } else {
+        // Initialize with default networks if nothing stored
+        setNetworksInfo(DEFAULT_NETWORKS);
       }
     };
 

@@ -1,5 +1,4 @@
 import { EventEmitter } from "events";
-import { StaticJsonRpcProvider } from "@ethersproject/providers";
 import { hexValue } from "@ethersproject/bytes";
 import { Logger } from "@ethersproject/logger";
 
@@ -7,18 +6,69 @@ const logger = new Logger("ethers/5.7.0");
 
 type Window = Record<string, any>;
 
+// Allowed chain IDs: Ethereum, Polygon, Base, Unichain
+const ALLOWED_CHAIN_IDS = new Set([1, 137, 8453, 130]);
+
+const CHAIN_NAMES: Record<number, string> = {
+  1: "Ethereum",
+  137: "Polygon",
+  8453: "Base",
+  130: "Unichain",
+};
+
+// Pending transaction callbacks
+const pendingTxCallbacks = new Map<
+  string,
+  { resolve: (hash: string) => void; reject: (error: Error) => void }
+>();
+
+// Pending RPC request callbacks
+const pendingRpcCallbacks = new Map<
+  string,
+  { resolve: (result: any) => void; reject: (error: Error) => void }
+>();
+
+// Helper to make RPC calls through content script (to bypass page CSP)
+function rpcCall(rpcUrl: string, method: string, params: any[]): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const requestId = crypto.randomUUID();
+    pendingRpcCallbacks.set(requestId, { resolve, reject });
+
+    window.postMessage(
+      {
+        type: "i_rpcRequest",
+        msg: {
+          id: requestId,
+          rpcUrl,
+          method,
+          params,
+        },
+      },
+      "*"
+    );
+
+    // Timeout after 30 seconds
+    setTimeout(() => {
+      if (pendingRpcCallbacks.has(requestId)) {
+        pendingRpcCallbacks.delete(requestId);
+        reject(new Error("RPC request timeout"));
+      }
+    }, 30000);
+  });
+}
+
 class ImpersonatorProvider extends EventEmitter {
   isImpersonator = true;
   isMetaMask = true;
 
   private address: string;
-  private provider: StaticJsonRpcProvider;
+  private rpcUrl: string;
   private chainId: number;
 
   constructor(chainId: number, rpcUrl: string, address: string) {
     super();
 
-    this.provider = new StaticJsonRpcProvider(rpcUrl);
+    this.rpcUrl = rpcUrl;
     this.chainId = chainId;
     this.address = address;
   }
@@ -29,13 +79,18 @@ class ImpersonatorProvider extends EventEmitter {
   };
 
   setChainId = (chainId: number, rpcUrl: string) => {
-    this.provider = new StaticJsonRpcProvider(rpcUrl);
+    this.rpcUrl = rpcUrl;
 
     if (this.chainId !== chainId) {
       this.chainId = chainId;
       this.emit("chainChanged", hexValue(chainId));
     }
   };
+
+  // Helper to make RPC calls through the proxy
+  private async rpc(method: string, params: any[] = []): Promise<any> {
+    return rpcCall(this.rpcUrl, method, params);
+  }
 
   request(request: { method: string; params?: Array<any> }): Promise<any> {
     return this.send(request.method, request.params || []);
@@ -123,87 +178,78 @@ class ImpersonatorProvider extends EventEmitter {
         return throwUnsupported("personal_sign not supported");
       }
       case "eth_sendTransaction": {
-        break;
-      }
-      // unchanged from Eip1193Bridge
-      case "eth_gasPrice": {
-        const result = await this.provider.getGasPrice();
-        return result.toHexString();
-      }
-      case "eth_blockNumber": {
-        return await this.provider.getBlockNumber();
-      }
-      case "eth_getBalance": {
-        // @ts-ignore
-        const result = await this.provider.getBalance(params[0], params[1]);
-        return result.toHexString();
-      }
-      case "eth_getStorageAt": {
-        // @ts-ignore
-        return this.provider.getStorageAt(params[0], params[1], params[2]);
-      }
-      case "eth_getTransactionCount": {
-        const result = await this.provider.getTransactionCount(
-          // @ts-ignore
-          params[0],
-          // @ts-ignore
-          params[1]
-        );
-        return hexValue(result);
-      }
-      case "eth_getBlockTransactionCountByHash":
-      case "eth_getBlockTransactionCountByNumber": {
-        // @ts-ignore
-        const result = await this.provider.getBlock(params[0]);
-        return hexValue(result.transactions.length);
-      }
-      case "eth_getCode": {
-        // @ts-ignore
-        const result = await this.provider.getCode(params[0], params[1]);
-        return result;
-      }
-      case "eth_sendRawTransaction": {
-        // @ts-ignore
-        return await this.provider.sendTransaction(params[0]);
-      }
-      case "eth_call": {
-        // @ts-ignore
-        return await this.provider.call(params[0], params[1]);
-      }
-      case "estimateGas": {
-        // @ts-ignore
-        if (params[1] && params[1] !== "latest") {
-          throwUnsupported("estimateGas does not support blockTag");
+        // Validate chain ID
+        if (!ALLOWED_CHAIN_IDS.has(this.chainId)) {
+          return logger.throwError(
+            `Chain ${this.chainId} not supported. Supported chains: ${Array.from(
+              ALLOWED_CHAIN_IDS
+            )
+              .map((id) => CHAIN_NAMES[id] || id)
+              .join(", ")}`,
+            Logger.errors.UNSUPPORTED_OPERATION,
+            { method, params }
+          );
         }
-        // @ts-ignore
-        const result = await this.provider.estimateGas(params[0]);
-        return result.toHexString();
-      }
-      case "eth_getBlockByHash":
-      case "eth_getBlockByNumber": {
-        // @ts-ignore
-        if (params[1]) {
-          // @ts-ignore
-          return await this.provider.getBlockWithTransactions(params[0]);
-        } else {
-          // @ts-ignore
-          return await this.provider.getBlock(params[0]);
-        }
-      }
-      case "eth_getTransactionByHash": {
-        // @ts-ignore
-        return await this.provider.getTransaction(params[0]);
-      }
-      case "eth_getTransactionReceipt": {
-        // @ts-ignore
-        return await this.provider.getTransactionReceipt(params[0]);
-      }
-      case "eth_getUncleCountByBlockHash":
-      case "eth_getUncleCountByBlockNumber": {
-        coerce = hexValue;
-        break;
-      }
 
+        // @ts-ignore
+        const txParams = params[0] as {
+          to?: string;
+          data?: string;
+          value?: string;
+          gas?: string;
+          gasPrice?: string;
+        };
+
+        if (!txParams.to) {
+          return logger.throwError(
+            "eth_sendTransaction requires 'to' address",
+            Logger.errors.INVALID_ARGUMENT,
+            { method, params }
+          );
+        }
+
+        const txId = crypto.randomUUID();
+
+        return new Promise<string>((resolve, reject) => {
+          // Store callbacks for this transaction
+          pendingTxCallbacks.set(txId, { resolve, reject });
+
+          // Send transaction request to content script
+          window.postMessage(
+            {
+              type: "i_sendTransaction",
+              msg: {
+                id: txId,
+                from: this.address,
+                to: txParams.to,
+                data: txParams.data || "0x",
+                value: txParams.value || "0x0",
+                chainId: this.chainId,
+              },
+            },
+            "*"
+          );
+        });
+      }
+      // RPC methods - proxied through content script to bypass CSP
+      case "eth_gasPrice":
+      case "eth_blockNumber":
+      case "eth_getBalance":
+      case "eth_getStorageAt":
+      case "eth_getTransactionCount":
+      case "eth_getBlockTransactionCountByHash":
+      case "eth_getBlockTransactionCountByNumber":
+      case "eth_getCode":
+      case "eth_sendRawTransaction":
+      case "eth_call":
+      case "eth_estimateGas":
+      case "estimateGas":
+      case "eth_getBlockByHash":
+      case "eth_getBlockByNumber":
+      case "eth_getTransactionByHash":
+      case "eth_getTransactionReceipt":
+      case "eth_getUncleCountByBlockHash":
+      case "eth_getUncleCountByBlockNumber":
       case "eth_getTransactionByBlockHashAndIndex":
       case "eth_getTransactionByBlockNumberAndIndex":
       case "eth_getUncleByBlockHashAndIndex":
@@ -215,12 +261,15 @@ class ImpersonatorProvider extends EventEmitter {
       case "eth_getFilterChanges":
       case "eth_getFilterLogs":
       case "eth_getLogs":
-        break;
+      case "eth_feeHistory":
+      case "eth_maxPriorityFeePerGas": {
+        // Forward all RPC calls through the proxy
+        return await this.rpc(method, params || []);
+      }
     }
 
-    // @ts-ignore
-    const result = await this.provider.send(method, params);
-    return coerce(result);
+    // Default: forward to RPC
+    return await this.rpc(method, params || []);
   }
 }
 
@@ -266,6 +315,32 @@ window.addEventListener("message", (e: any) => {
         chainId,
         rpcUrl
       );
+      break;
+    }
+    case "sendTransactionResult": {
+      const txId = e.data.msg.id as string;
+      const callbacks = pendingTxCallbacks.get(txId);
+      if (callbacks) {
+        pendingTxCallbacks.delete(txId);
+        if (e.data.msg.success && e.data.msg.txHash) {
+          callbacks.resolve(e.data.msg.txHash);
+        } else {
+          callbacks.reject(new Error(e.data.msg.error || "Transaction failed"));
+        }
+      }
+      break;
+    }
+    case "rpcResponse": {
+      const requestId = e.data.msg.id as string;
+      const callbacks = pendingRpcCallbacks.get(requestId);
+      if (callbacks) {
+        pendingRpcCallbacks.delete(requestId);
+        if (e.data.msg.error) {
+          callbacks.reject(new Error(e.data.msg.error));
+        } else {
+          callbacks.resolve(e.data.msg.result);
+        }
+      }
       break;
     }
   }

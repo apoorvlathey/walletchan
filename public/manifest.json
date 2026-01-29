@@ -21,6 +21,10 @@
     "48": "./icons/icon48.png",
     "16": "./icons/icon16.png"
   },
+  "background": {
+    "service_worker": "static/js/background.js",
+    "type": "module"
+  },
   "content_scripts": [
     {
       "matches": ["file://*/*", "http://*/*", "https://*/*"],

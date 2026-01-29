@@ -56,19 +56,6 @@ function EditChain({
     setIsBtnLoading(false);
   };
 
-  const deleteChain = () => {
-    setNetworksInfo((_networksInfo) => {
-      // doing this to create a deep copy
-      const copy = { ..._networksInfo };
-      if (copy) {
-        delete copy[chainName];
-      }
-
-      back();
-      return copy;
-    });
-  };
-
   useEffect(() => {
     if (networksInfo) {
       setChainId(networksInfo[chainName].chainId.toString());
@@ -126,30 +113,20 @@ function EditChain({
             size="sm"
             rounded="lg"
             value={chainId}
-            onChange={(e) => {
-              setChainId(e.target.value);
-            }}
+            isReadOnly
+            bg="gray.700"
+            cursor="not-allowed"
           />
           <Center>
-            <HStack spacing="3">
-              <Button
-                size="sm"
-                maxW="6rem"
-                colorScheme="blue"
-                onClick={() => saveChain()}
-                isLoading={isBtnLoading}
-              >
-                Save
-              </Button>
-              <Button
-                size="sm"
-                maxW="6rem"
-                colorScheme="red"
-                onClick={() => deleteChain()}
-              >
-                Delete Chain
-              </Button>
-            </HStack>
+            <Button
+              size="sm"
+              maxW="6rem"
+              colorScheme="blue"
+              onClick={() => saveChain()}
+              isLoading={isBtnLoading}
+            >
+              Save
+            </Button>
           </Center>
         </Stack>
       </Box>

@@ -150,6 +150,77 @@ window.addEventListener("message", async (e) => {
       );
       break;
     }
+
+    case "i_sendTransaction": {
+      const { id, from, to, data, value, chainId } = e.data.msg as {
+        id: string;
+        from: string;
+        to: string;
+        data: string;
+        value: string;
+        chainId: number;
+      };
+
+      // Forward to background worker
+      chrome.runtime.sendMessage(
+        {
+          type: "sendTransaction",
+          tx: { from, to, data, value, chainId },
+          origin: window.location.origin,
+        },
+        (result: { success: boolean; txHash?: string; error?: string }) => {
+          // Send result back to impersonator.ts
+          window.postMessage(
+            {
+              type: "sendTransactionResult",
+              msg: {
+                id,
+                success: result.success,
+                txHash: result.txHash,
+                error: result.error,
+              },
+            },
+            "*"
+          );
+        }
+      );
+      break;
+    }
+
+    case "i_rpcRequest": {
+      const { id, rpcUrl, method, params } = e.data.msg as {
+        id: string;
+        rpcUrl: string;
+        method: string;
+        params: any[];
+      };
+
+      // Forward RPC request to background worker
+      chrome.runtime.sendMessage(
+        {
+          type: "rpcRequest",
+          id,
+          rpcUrl,
+          method,
+          params,
+        },
+        (response: { result?: any; error?: string }) => {
+          // Send result back to impersonator.ts
+          window.postMessage(
+            {
+              type: "rpcResponse",
+              msg: {
+                id,
+                result: response?.result,
+                error: response?.error,
+              },
+            },
+            "*"
+          );
+        }
+      );
+      break;
+    }
   }
 });
 
