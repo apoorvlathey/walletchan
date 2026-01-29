@@ -9,13 +9,19 @@ BankrWallet is a Chrome extension that allows users to impersonate blockchain ac
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                                  Dapp                                        │
-│                         (e.g., app.aave.com)                             │
+│                         (e.g., app.aave.com)                                │
+│                                                                             │
+│  Provider Discovery:                                                        │
+│    - EIP-6963: Listen for eip6963:announceProvider events (modern)          │
+│    - Legacy: Access window.ethereum directly                                │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼ eth_sendTransaction / RPC calls
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         Inpage Script (inpage.js)                           │
 │                         ImpersonatorProvider class                          │
+│                         - Announces via EIP-6963 events                     │
+│                         - Sets window.ethereum (legacy)                     │
 │                         - Intercepts wallet methods                         │
 │                         - Proxies RPC calls via postMessage                 │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -61,12 +67,88 @@ Only the following chains are supported for transaction signing:
 
 These are configured in `src/constants/networks.ts` and pre-populated on first install.
 
+## Provider Discovery (EIP-6963)
+
+BankrWallet implements [EIP-6963](https://eips.ethereum.org/EIPS/eip-6963) for multi-wallet discovery, allowing dapps to detect and display the wallet alongside other installed wallets.
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                  Dapp                                        │
+│                   1. Listens for eip6963:announceProvider                   │
+│                   2. Dispatches eip6963:requestProvider                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ▲
+                                    │ CustomEvent with provider detail
+                                    │
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Inpage Script (inpage.js)                           │
+│                                                                             │
+│  On init:                                                                   │
+│    1. Set window.ethereum (legacy support)                                  │
+│    2. Dispatch eip6963:announceProvider event                               │
+│                                                                             │
+│  On eip6963:requestProvider event:                                          │
+│    → Re-announce provider                                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Provider Info
+
+The wallet announces itself with the following EIP-6963 provider info:
+
+| Property | Value                                      |
+| -------- | ------------------------------------------ |
+| uuid     | Random UUIDv4 (generated per page session) |
+| name     | "Bankr Wallet"                             |
+| icon     | Data URI of wallet icon (128x128 PNG)      |
+| rdns     | "bot.bankr.wallet"                         |
+
+### Implementation Details
+
+`src/chrome/impersonator.ts`:
+
+```typescript
+// EIP-6963 provider info
+const providerInfo: EIP6963ProviderInfo = {
+  uuid: crypto.randomUUID(),
+  name: "Bankr Wallet",
+  icon: "data:image/png;base64,...",
+  rdns: "bot.bankr.wallet",
+};
+
+// Announce provider to dapps
+function announceProvider() {
+  const detail = Object.freeze({
+    info: Object.freeze({ ...providerInfo }),
+    provider: providerInstance,
+  });
+
+  window.dispatchEvent(
+    new CustomEvent("eip6963:announceProvider", { detail })
+  );
+}
+
+// Listen for dapp requests
+window.addEventListener("eip6963:requestProvider", announceProvider);
+```
+
+### Backward Compatibility
+
+The wallet maintains backward compatibility by:
+
+1. Setting `window.ethereum` for legacy dapps
+2. Announcing via EIP-6963 for modern dapps
+
+Dapps that support EIP-6963 will show Bankr Wallet in their wallet selection UI. Legacy dapps will still work via `window.ethereum`.
+
 ## File Structure
 
 ```
 src/
 ├── chrome/
-│   ├── impersonator.ts    # Inpage script - fake window.ethereum provider
+│   ├── impersonator.ts    # Inpage script - EIP-6963 provider + window.ethereum
 │   ├── inject.ts          # Content script - message bridge
 │   ├── background.ts      # Service worker - API calls, tx handling
 │   ├── crypto.ts          # AES-256-GCM encryption for API key
@@ -84,11 +166,34 @@ src/
 
 ## Transaction Flow
 
-### 1. Dapp Initiates Transaction
+### 1. Dapp Discovers & Connects to Wallet
+
+Modern dapps (EIP-6963):
 
 ```javascript
-// Dapp calls
-await window.ethereum.request({
+// Dapp listens for wallet announcements
+window.addEventListener("eip6963:announceProvider", (event) => {
+  const { info, provider } = event.detail;
+  // info.name === "Bankr Wallet"
+  // provider is the EIP-1193 provider
+});
+
+// Dapp requests wallets to announce
+window.dispatchEvent(new Event("eip6963:requestProvider"));
+```
+
+Legacy dapps:
+
+```javascript
+// Direct access to injected provider
+const provider = window.ethereum;
+```
+
+### 2. Dapp Initiates Transaction
+
+```javascript
+// Dapp calls (works with both EIP-6963 provider or window.ethereum)
+await provider.request({
   method: "eth_sendTransaction",
   params: [
     {
@@ -100,7 +205,7 @@ await window.ethereum.request({
 });
 ```
 
-### 2. Impersonator Validates & Forwards
+### 3. Impersonator Validates & Forwards
 
 `src/chrome/impersonator.ts`:
 
@@ -109,7 +214,7 @@ await window.ethereum.request({
 - Posts message to content script
 - Returns Promise that resolves when tx completes
 
-### 3. Content Script Bridges to Background
+### 4. Content Script Bridges to Background
 
 `src/chrome/inject.ts`:
 
@@ -117,7 +222,7 @@ await window.ethereum.request({
 - Forwards to background via `chrome.runtime.sendMessage`
 - Sends result back to inpage via `postMessage`
 
-### 4. Background Opens Confirmation Popup
+### 5. Background Opens Confirmation Popup
 
 `src/chrome/background.ts`:
 
@@ -126,7 +231,7 @@ await window.ethereum.request({
 - Creates pending transaction entry
 - Opens confirmation popup window (400x600)
 
-### 5. User Confirms Transaction
+### 6. User Confirms Transaction
 
 `src/pages/Confirmation.tsx`:
 
@@ -134,7 +239,7 @@ await window.ethereum.request({
 - If API key not cached: prompts for password
 - User clicks Confirm or Reject
 
-### 6. Background Submits to Bankr API
+### 7. Background Submits to Bankr API
 
 `src/chrome/bankrApi.ts`:
 
@@ -154,7 +259,7 @@ Submit this transaction:
 - Polls `GET /agent/job/{jobId}` every 2 seconds
 - Extracts transaction hash from response
 
-### 7. Result Returned to Dapp
+### 8. Result Returned to Dapp
 
 - Transaction hash extracted via regex: `/0x[a-fA-F0-9]{64}/`
 - Returned through the message chain back to dapp
