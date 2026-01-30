@@ -20,14 +20,12 @@ import { getChainConfig } from "@/constants/chainConfig";
 interface SignatureRequestConfirmationProps {
   sigRequest: PendingSignatureRequest;
   currentIndex: number;
-  totalTxCount: number;
-  totalSignatureCount: number;
+  totalCount: number;
   isInSidePanel: boolean;
   onBack: () => void;
   onCancelled: () => void;
   onCancelAll: () => void;
   onNavigate: (direction: "prev" | "next") => void;
-  onNavigateToTx: () => void;
 }
 
 // Copy button component
@@ -135,18 +133,13 @@ function formatSignatureData(method: string, params: any[]): { message: string; 
 function SignatureRequestConfirmation({
   sigRequest,
   currentIndex,
-  totalTxCount,
-  totalSignatureCount,
+  totalCount,
   isInSidePanel,
   onBack,
   onCancelled,
   onCancelAll,
   onNavigate,
-  onNavigateToTx,
 }: SignatureRequestConfirmationProps) {
-  const totalCount = totalTxCount + totalSignatureCount;
-  // Combined index: tx requests come first, then signature requests
-  const combinedIndex = totalTxCount + currentIndex;
   const { signature, origin, chainName, favicon } = sigRequest;
   const { message, rawData } = formatSignatureData(signature.method, signature.params);
 
@@ -187,15 +180,8 @@ function SignatureRequestConfirmation({
                 icon={<ChevronLeftIcon />}
                 variant="ghost"
                 size="xs"
-                isDisabled={combinedIndex === 0}
-                onClick={() => {
-                  // If at first signature request and there are tx requests, navigate to last tx
-                  if (currentIndex === 0 && totalTxCount > 0) {
-                    onNavigateToTx();
-                  } else {
-                    onNavigate("prev");
-                  }
-                }}
+                isDisabled={currentIndex === 0}
+                onClick={() => onNavigate("prev")}
                 color="text.secondary"
                 _hover={{ color: "text.primary", bg: "bg.muted" }}
                 minW="auto"
@@ -209,14 +195,14 @@ function SignatureRequestConfirmation({
                 py={1}
                 fontWeight="700"
               >
-                {combinedIndex + 1}/{totalCount}
+                {currentIndex + 1}/{totalCount}
               </Badge>
               <IconButton
                 aria-label="Next"
                 icon={<ChevronRightIcon />}
                 variant="ghost"
                 size="xs"
-                isDisabled={currentIndex === totalSignatureCount - 1}
+                isDisabled={currentIndex + 1 === totalCount}
                 onClick={() => onNavigate("next")}
                 color="text.secondary"
                 _hover={{ color: "text.primary", bg: "bg.muted" }}

@@ -35,15 +35,13 @@ const checkmarkDraw = keyframes`
 interface TransactionConfirmationProps {
   txRequest: PendingTxRequest;
   currentIndex: number;
-  totalTxCount: number;
-  totalSignatureCount: number;
+  totalCount: number;
   isInSidePanel: boolean;
   onBack: () => void;
   onConfirmed: () => void;
   onRejected: () => void;
   onRejectAll: () => void;
   onNavigate: (direction: "prev" | "next") => void;
-  onNavigateToSignature: () => void;
 }
 
 type ConfirmationState = "ready" | "submitting" | "sent" | "error";
@@ -90,17 +88,14 @@ function CopyButton({ value }: { value: string }) {
 function TransactionConfirmation({
   txRequest,
   currentIndex,
-  totalTxCount,
-  totalSignatureCount,
+  totalCount,
   isInSidePanel,
   onBack,
   onConfirmed,
   onRejected,
   onRejectAll,
   onNavigate,
-  onNavigateToSignature,
 }: TransactionConfirmationProps) {
-  const totalCount = totalTxCount + totalSignatureCount;
   const [state, setState] = useState<ConfirmationState>("ready");
   const [error, setError] = useState<string>("");
   const [toLabels, setToLabels] = useState<string[]>([]);
@@ -329,14 +324,7 @@ function TransactionConfirmation({
                 variant="ghost"
                 size="xs"
                 isDisabled={currentIndex + 1 === totalCount}
-                onClick={() => {
-                  // If at last tx request and there are signature requests, navigate to signatures
-                  if (currentIndex === totalTxCount - 1 && totalSignatureCount > 0) {
-                    onNavigateToSignature();
-                  } else {
-                    onNavigate("next");
-                  }
-                }}
+                onClick={() => onNavigate("next")}
                 color="text.secondary"
                 _hover={{ color: "text.primary", bg: "bg.muted" }}
                 minW="auto"

@@ -14,6 +14,7 @@ import { ArrowBackIcon, ChevronRightIcon } from "@chakra-ui/icons";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
 import { getChainConfig } from "@/constants/chainConfig";
+import { getCombinedRequests, CombinedRequest } from "@/App";
 
 interface PendingTxListProps {
   txRequests: PendingTxRequest[];
@@ -25,7 +26,8 @@ interface PendingTxListProps {
 }
 
 function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSelectSignature, onRejectAll }: PendingTxListProps) {
-  const totalCount = txRequests.length + signatureRequests.length;
+  const combinedRequests = getCombinedRequests(txRequests, signatureRequests);
+  const totalCount = combinedRequests.length;
 
   const formatTimestamp = (timestamp: number): string => {
     const now = Date.now();
@@ -86,76 +88,81 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
         </HStack>
 
         <VStack spacing={3} align="stretch">
-          {/* Transaction Requests */}
-          {txRequests.map((request, index) => {
-            const config = getChainConfig(request.tx.chainId);
-            return (
-              <Box
-                key={request.id}
-                bg="bauhaus.white"
-                border="3px solid"
-                borderColor="bauhaus.black"
-                boxShadow="4px 4px 0px 0px #121212"
-                p={3}
-                cursor="pointer"
-                onClick={() => onSelectTx(request)}
-                _hover={{
-                  transform: "translateY(-2px)",
-                  boxShadow: "6px 6px 0px 0px #121212",
-                }}
-                _active={{
-                  transform: "translate(2px, 2px)",
-                  boxShadow: "none",
-                }}
-                transition="all 0.2s ease-out"
-                position="relative"
-              >
-                {/* Corner decoration */}
+          {/* Combined Requests sorted by timestamp */}
+          {combinedRequests.map((item, index) => {
+            if (item.type === "tx") {
+              const request = item.request;
+              const config = getChainConfig(request.tx.chainId);
+              return (
                 <Box
-                  position="absolute"
-                  top="-3px"
-                  right="-3px"
-                  w="8px"
-                  h="8px"
-                  bg="bauhaus.blue"
-                  border="2px solid"
+                  key={request.id}
+                  bg="bauhaus.white"
+                  border="3px solid"
                   borderColor="bauhaus.black"
-                />
+                  boxShadow="4px 4px 0px 0px #121212"
+                  p={3}
+                  cursor="pointer"
+                  onClick={() => onSelectTx(request)}
+                  _hover={{
+                    transform: "translateY(-2px)",
+                    boxShadow: "6px 6px 0px 0px #121212",
+                  }}
+                  _active={{
+                    transform: "translate(2px, 2px)",
+                    boxShadow: "none",
+                  }}
+                  transition="all 0.2s ease-out"
+                  position="relative"
+                >
+                  {/* TX badge at top left */}
+                  <Badge
+                    position="absolute"
+                    top="-10px"
+                    left="-3px"
+                    fontSize="xs"
+                    bg="bauhaus.blue"
+                    color="white"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    px={1.5}
+                    zIndex={1}
+                  >
+                    TX
+                  </Badge>
 
-                <HStack justify="space-between">
-                  <HStack spacing={3} flex={1}>
-                    <Badge
-                      bg="bauhaus.black"
-                      color="bauhaus.white"
-                      fontSize="xs"
-                      minW="28px"
-                      textAlign="center"
-                      fontWeight="700"
-                    >
-                      #{index + 1}
-                    </Badge>
-                    <Box
-                      bg="bauhaus.white"
-                      border="2px solid"
-                      borderColor="bauhaus.black"
-                      p={1}
-                    >
-                      <Image
-                        src={
-                          request.favicon ||
-                          `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`
-                        }
-                        alt="favicon"
-                        boxSize="24px"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`;
-                        }}
-                      />
-                    </Box>
-                    <Box flex={1}>
-                      <HStack justify="space-between">
-                        <HStack spacing={2}>
+                  <HStack justify="space-between">
+                    <HStack spacing={3} flex={1}>
+                      <Badge
+                        bg="bauhaus.black"
+                        color="bauhaus.white"
+                        fontSize="xs"
+                        minW="28px"
+                        textAlign="center"
+                        fontWeight="700"
+                      >
+                        #{index + 1}
+                      </Badge>
+                      <Box
+                        bg="bauhaus.white"
+                        border="2px solid"
+                        borderColor="bauhaus.black"
+                        p={1}
+                      >
+                        <Image
+                          src={
+                            request.favicon ||
+                            `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`
+                          }
+                          alt="favicon"
+                          boxSize="24px"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`;
+                          }}
+                        />
+                      </Box>
+                      <Box flex={1}>
+                        <HStack justify="space-between">
                           <Text
                             fontSize="sm"
                             fontWeight="700"
@@ -164,128 +171,117 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
                           >
                             {new URL(request.origin).hostname}
                           </Text>
+                          <Text fontSize="xs" color="text.tertiary" fontWeight="500">
+                            {formatTimestamp(request.timestamp)}
+                          </Text>
+                        </HStack>
+                        <HStack spacing={2} mt={1}>
                           <Badge
                             fontSize="xs"
-                            bg="bauhaus.blue"
-                            color="white"
+                            bg={config.bg}
+                            color={config.text}
                             border="2px solid"
                             borderColor="bauhaus.black"
-                            px={1.5}
+                            px={2}
+                            py={0.5}
+                            display="flex"
+                            alignItems="center"
+                            gap={1}
                           >
-                            TX
+                            {config.icon && (
+                              <Image
+                                src={config.icon}
+                                alt={request.chainName}
+                                boxSize="10px"
+                              />
+                            )}
+                            {request.chainName}
                           </Badge>
+                          <Text fontSize="xs" color="text.tertiary" fontFamily="mono" fontWeight="500">
+                            {request.tx.to.slice(0, 6)}...{request.tx.to.slice(-4)}
+                          </Text>
                         </HStack>
-                        <Text fontSize="xs" color="text.tertiary" fontWeight="500">
-                          {formatTimestamp(request.timestamp)}
-                        </Text>
-                      </HStack>
-                      <HStack spacing={2} mt={1}>
-                        <Badge
-                          fontSize="xs"
-                          bg={config.bg}
-                          color={config.text}
-                          border="2px solid"
-                          borderColor="bauhaus.black"
-                          px={2}
-                          py={0.5}
-                          display="flex"
-                          alignItems="center"
-                          gap={1}
-                        >
-                          {config.icon && (
-                            <Image
-                              src={config.icon}
-                              alt={request.chainName}
-                              boxSize="10px"
-                            />
-                          )}
-                          {request.chainName}
-                        </Badge>
-                        <Text fontSize="xs" color="text.tertiary" fontFamily="mono" fontWeight="500">
-                          {request.tx.to.slice(0, 6)}...{request.tx.to.slice(-4)}
-                        </Text>
-                      </HStack>
+                      </Box>
+                    </HStack>
+                    <Box bg="bauhaus.black" p={1}>
+                      <ChevronRightIcon color="bauhaus.white" />
                     </Box>
                   </HStack>
-                  <Box bg="bauhaus.black" p={1}>
-                    <ChevronRightIcon color="bauhaus.white" />
-                  </Box>
-                </HStack>
-              </Box>
-            );
-          })}
-
-          {/* Signature Requests */}
-          {signatureRequests.map((request, index) => {
-            const config = getChainConfig(request.signature.chainId);
-            return (
-              <Box
-                key={request.id}
-                bg="bauhaus.white"
-                border="3px solid"
-                borderColor="bauhaus.black"
-                boxShadow="4px 4px 0px 0px #121212"
-                p={3}
-                cursor="pointer"
-                onClick={() => onSelectSignature(request)}
-                _hover={{
-                  transform: "translateY(-2px)",
-                  boxShadow: "6px 6px 0px 0px #121212",
-                }}
-                _active={{
-                  transform: "translate(2px, 2px)",
-                  boxShadow: "none",
-                }}
-                transition="all 0.2s ease-out"
-                position="relative"
-              >
-                {/* Corner decoration - triangle for signature */}
+                </Box>
+              );
+            } else {
+              const request = item.request;
+              const config = getChainConfig(request.signature.chainId);
+              return (
                 <Box
-                  position="absolute"
-                  top="-3px"
-                  right="-3px"
-                  w="0"
-                  h="0"
-                  borderLeft="6px solid transparent"
-                  borderRight="6px solid transparent"
-                  borderBottom="10px solid"
-                  borderBottomColor="bauhaus.red"
-                />
+                  key={request.id}
+                  bg="bauhaus.white"
+                  border="3px solid"
+                  borderColor="bauhaus.black"
+                  boxShadow="4px 4px 0px 0px #121212"
+                  p={3}
+                  cursor="pointer"
+                  onClick={() => onSelectSignature(request)}
+                  _hover={{
+                    transform: "translateY(-2px)",
+                    boxShadow: "6px 6px 0px 0px #121212",
+                  }}
+                  _active={{
+                    transform: "translate(2px, 2px)",
+                    boxShadow: "none",
+                  }}
+                  transition="all 0.2s ease-out"
+                  position="relative"
+                >
+                  {/* SIG badge at top left */}
+                  <Badge
+                    position="absolute"
+                    top="-10px"
+                    left="-3px"
+                    fontSize="xs"
+                    bg="bauhaus.red"
+                    color="white"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    px={1.5}
+                    zIndex={1}
+                  >
+                    SIG
+                  </Badge>
 
-                <HStack justify="space-between">
-                  <HStack spacing={3} flex={1}>
-                    <Badge
-                      bg="bauhaus.black"
-                      color="bauhaus.white"
-                      fontSize="xs"
-                      minW="28px"
-                      textAlign="center"
-                      fontWeight="700"
-                    >
-                      #{txRequests.length + index + 1}
-                    </Badge>
-                    <Box
-                      bg="bauhaus.white"
-                      border="2px solid"
-                      borderColor="bauhaus.black"
-                      p={1}
-                    >
-                      <Image
-                        src={
-                          request.favicon ||
-                          `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`
-                        }
-                        alt="favicon"
-                        boxSize="24px"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`;
-                        }}
-                      />
-                    </Box>
-                    <Box flex={1}>
-                      <HStack justify="space-between">
-                        <HStack spacing={2}>
+                  <HStack justify="space-between">
+                    <HStack spacing={3} flex={1}>
+                      <Badge
+                        bg="bauhaus.black"
+                        color="bauhaus.white"
+                        fontSize="xs"
+                        minW="28px"
+                        textAlign="center"
+                        fontWeight="700"
+                      >
+                        #{index + 1}
+                      </Badge>
+                      <Box
+                        bg="bauhaus.white"
+                        border="2px solid"
+                        borderColor="bauhaus.black"
+                        p={1}
+                      >
+                        <Image
+                          src={
+                            request.favicon ||
+                            `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`
+                          }
+                          alt="favicon"
+                          boxSize="24px"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`;
+                          }}
+                        />
+                      </Box>
+                      <Box flex={1}>
+                        <HStack justify="space-between">
                           <Text
                             fontSize="sm"
                             fontWeight="700"
@@ -294,55 +290,45 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
                           >
                             {new URL(request.origin).hostname}
                           </Text>
+                          <Text fontSize="xs" color="text.tertiary" fontWeight="500">
+                            {formatTimestamp(request.timestamp)}
+                          </Text>
+                        </HStack>
+                        <HStack spacing={2} mt={1}>
                           <Badge
                             fontSize="xs"
-                            bg="bauhaus.red"
-                            color="white"
+                            bg={config.bg}
+                            color={config.text}
                             border="2px solid"
                             borderColor="bauhaus.black"
-                            px={1.5}
+                            px={2}
+                            py={0.5}
+                            display="flex"
+                            alignItems="center"
+                            gap={1}
                           >
-                            SIG
+                            {config.icon && (
+                              <Image
+                                src={config.icon}
+                                alt={request.chainName}
+                                boxSize="10px"
+                              />
+                            )}
+                            {request.chainName}
                           </Badge>
+                          <Text fontSize="xs" color="text.tertiary" fontFamily="mono" fontWeight="500">
+                            {getMethodDisplayName(request.signature.method)}
+                          </Text>
                         </HStack>
-                        <Text fontSize="xs" color="text.tertiary" fontWeight="500">
-                          {formatTimestamp(request.timestamp)}
-                        </Text>
-                      </HStack>
-                      <HStack spacing={2} mt={1}>
-                        <Badge
-                          fontSize="xs"
-                          bg={config.bg}
-                          color={config.text}
-                          border="2px solid"
-                          borderColor="bauhaus.black"
-                          px={2}
-                          py={0.5}
-                          display="flex"
-                          alignItems="center"
-                          gap={1}
-                        >
-                          {config.icon && (
-                            <Image
-                              src={config.icon}
-                              alt={request.chainName}
-                              boxSize="10px"
-                            />
-                          )}
-                          {request.chainName}
-                        </Badge>
-                        <Text fontSize="xs" color="text.tertiary" fontFamily="mono" fontWeight="500">
-                          {getMethodDisplayName(request.signature.method)}
-                        </Text>
-                      </HStack>
+                      </Box>
+                    </HStack>
+                    <Box bg="bauhaus.black" p={1}>
+                      <ChevronRightIcon color="bauhaus.white" />
                     </Box>
                   </HStack>
-                  <Box bg="bauhaus.black" p={1}>
-                    <ChevronRightIcon color="bauhaus.white" />
-                  </Box>
-                </HStack>
-              </Box>
-            );
+                </Box>
+              );
+            }
           })}
         </VStack>
 

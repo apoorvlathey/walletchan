@@ -50,6 +50,24 @@ import { hasEncryptedApiKey } from "@/chrome/crypto";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
 
+// Combined request type for unified ordering
+export type CombinedRequest =
+  | { type: "tx"; request: PendingTxRequest }
+  | { type: "sig"; request: PendingSignatureRequest };
+
+// Helper to combine and sort requests by timestamp
+export function getCombinedRequests(
+  txRequests: PendingTxRequest[],
+  sigRequests: PendingSignatureRequest[]
+): CombinedRequest[] {
+  const combined: CombinedRequest[] = [
+    ...txRequests.map((r) => ({ type: "tx" as const, request: r })),
+    ...sigRequests.map((r) => ({ type: "sig" as const, request: r })),
+  ];
+  // Sort by timestamp ascending (oldest first)
+  return combined.sort((a, b) => a.request.timestamp - b.request.timestamp);
+}
+
 // Loading fallback component
 const LoadingFallback = () => (
   <Box
@@ -805,18 +823,18 @@ function App() {
 
   // Transaction confirmation view
   if (view === "txConfirm" && selectedTxRequest) {
-    const currentIndex = pendingRequests.findIndex(
-      (r) => r.id === selectedTxRequest.id
+    const combinedRequests = getCombinedRequests(pendingRequests, pendingSignatureRequests);
+    const currentIndex = combinedRequests.findIndex(
+      (r) => r.type === "tx" && r.request.id === selectedTxRequest.id
     );
-    const totalCount = pendingRequests.length + pendingSignatureRequests.length;
+    const totalCount = combinedRequests.length;
     return (
       <Suspense fallback={<LoadingFallback />}>
         <TransactionConfirmation
           key={selectedTxRequest.id}
           txRequest={selectedTxRequest}
           currentIndex={currentIndex >= 0 ? currentIndex : 0}
-          totalTxCount={pendingRequests.length}
-          totalSignatureCount={pendingSignatureRequests.length}
+          totalCount={totalCount}
           isInSidePanel={isInSidePanel}
           onBack={() => {
             if (totalCount > 1) {
@@ -829,20 +847,19 @@ function App() {
           onRejected={handleTxRejected}
           onRejectAll={handleRejectAll}
           onNavigate={(direction) => {
-            const currentIdx = pendingRequests.findIndex(
-              (r) => r.id === selectedTxRequest.id
+            const currentIdx = combinedRequests.findIndex(
+              (r) => r.type === "tx" && r.request.id === selectedTxRequest.id
             );
-            if (direction === "prev" && currentIdx > 0) {
-              setSelectedTxRequest(pendingRequests[currentIdx - 1]);
-            } else if (direction === "next" && currentIdx < pendingRequests.length - 1) {
-              setSelectedTxRequest(pendingRequests[currentIdx + 1]);
-            }
-          }}
-          onNavigateToSignature={() => {
-            if (pendingSignatureRequests.length > 0) {
-              setSelectedTxRequest(null);
-              setSelectedSignatureRequest(pendingSignatureRequests[0]);
-              setView("signatureConfirm");
+            const newIdx = direction === "prev" ? currentIdx - 1 : currentIdx + 1;
+            if (newIdx >= 0 && newIdx < combinedRequests.length) {
+              const nextRequest = combinedRequests[newIdx];
+              if (nextRequest.type === "tx") {
+                setSelectedTxRequest(nextRequest.request);
+              } else {
+                setSelectedTxRequest(null);
+                setSelectedSignatureRequest(nextRequest.request);
+                setView("signatureConfirm");
+              }
             }
           }}
         />
@@ -852,18 +869,18 @@ function App() {
 
   // Signature request confirmation view
   if (view === "signatureConfirm" && selectedSignatureRequest) {
-    const currentIndex = pendingSignatureRequests.findIndex(
-      (r) => r.id === selectedSignatureRequest.id
+    const combinedRequests = getCombinedRequests(pendingRequests, pendingSignatureRequests);
+    const currentIndex = combinedRequests.findIndex(
+      (r) => r.type === "sig" && r.request.id === selectedSignatureRequest.id
     );
-    const totalCount = pendingRequests.length + pendingSignatureRequests.length;
+    const totalCount = combinedRequests.length;
     return (
       <Suspense fallback={<LoadingFallback />}>
         <SignatureRequestConfirmation
           key={selectedSignatureRequest.id}
           sigRequest={selectedSignatureRequest}
           currentIndex={currentIndex >= 0 ? currentIndex : 0}
-          totalTxCount={pendingRequests.length}
-          totalSignatureCount={pendingSignatureRequests.length}
+          totalCount={totalCount}
           isInSidePanel={isInSidePanel}
           onBack={() => {
             setSelectedSignatureRequest(null);
@@ -876,20 +893,19 @@ function App() {
           onCancelled={handleSignatureCancelled}
           onCancelAll={handleCancelAllSignatures}
           onNavigate={(direction) => {
-            const currentIdx = pendingSignatureRequests.findIndex(
-              (r) => r.id === selectedSignatureRequest.id
+            const currentIdx = combinedRequests.findIndex(
+              (r) => r.type === "sig" && r.request.id === selectedSignatureRequest.id
             );
-            if (direction === "prev" && currentIdx > 0) {
-              setSelectedSignatureRequest(pendingSignatureRequests[currentIdx - 1]);
-            } else if (direction === "next" && currentIdx < pendingSignatureRequests.length - 1) {
-              setSelectedSignatureRequest(pendingSignatureRequests[currentIdx + 1]);
-            }
-          }}
-          onNavigateToTx={() => {
-            if (pendingRequests.length > 0) {
-              setSelectedSignatureRequest(null);
-              setSelectedTxRequest(pendingRequests[pendingRequests.length - 1]);
-              setView("txConfirm");
+            const newIdx = direction === "prev" ? currentIdx - 1 : currentIdx + 1;
+            if (newIdx >= 0 && newIdx < combinedRequests.length) {
+              const nextRequest = combinedRequests[newIdx];
+              if (nextRequest.type === "sig") {
+                setSelectedSignatureRequest(nextRequest.request);
+              } else {
+                setSelectedSignatureRequest(null);
+                setSelectedTxRequest(nextRequest.request);
+                setView("txConfirm");
+              }
             }
           }}
         />
