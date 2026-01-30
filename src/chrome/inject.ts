@@ -138,11 +138,22 @@ window.addEventListener("message", async (e) => {
       )) as { networksInfo: NetworksInfo | undefined };
 
       if (!networksInfo) {
+        // Send error back to impersonator
+        window.postMessage(
+          {
+            type: "switchEthereumChainError",
+            msg: {
+              chainId,
+              error: "Networks not configured",
+            },
+          },
+          "*"
+        );
         break;
       }
 
       let rpcUrl: string | undefined;
-      let chainName: string;
+      let chainName: string | undefined;
       for (const _chainName of Object.keys(networksInfo)) {
         if (networksInfo[_chainName].chainId === chainId) {
           rpcUrl = networksInfo[_chainName].rpcUrl;
@@ -151,11 +162,26 @@ window.addEventListener("message", async (e) => {
         }
       }
 
-      if (!rpcUrl) {
+      if (!rpcUrl || !chainName) {
+        // Chain not supported - send error back to impersonator
+        window.postMessage(
+          {
+            type: "switchEthereumChainError",
+            msg: {
+              chainId,
+              error: `Chain ${chainId} is not supported`,
+            },
+          },
+          "*"
+        );
         break;
       }
 
-      store.chainName = chainName!;
+      store.chainName = chainName;
+
+      // Save chainName to storage so popup/sidepanel reflects the change
+      await chrome.storage.sync.set({ chainName });
+
       // send message to switchEthereumChain with RPC, in impersonator.ts
       window.postMessage(
         {

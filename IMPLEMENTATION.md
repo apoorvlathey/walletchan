@@ -630,6 +630,61 @@ Inpage                    Content Script              Background
 
 The background worker is not subject to page CSP, so it can call any RPC endpoint.
 
+## Chain Switching
+
+The extension supports dapp-initiated chain switching via `wallet_switchEthereumChain`. Each tab maintains its own selected chain, and the popup/sidepanel reflects the chain for the currently active tab.
+
+### Dapp-Initiated Chain Switch
+
+When a dapp calls `wallet_switchEthereumChain`:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Dapp Chain Switch Flow                                  │
+│                                                                             │
+│  1. Dapp calls wallet_switchEthereumChain({ chainId: "0x2105" })            │
+│  2. Impersonator sends i_switchEthereumChain to content script              │
+│  3. Content script looks up chainId in networksInfo:                        │
+│     - If FOUND: Save chainName to storage, send switchEthereumChain         │
+│     - If NOT FOUND: Send switchEthereumChainError with error message        │
+│  4. Impersonator receives response:                                         │
+│     - Success: Updates provider chainId, emits chainChanged event           │
+│     - Error: Rejects promise with error (dapp can catch and handle)         │
+│  5. Popup/sidepanel storage listener detects chainName change               │
+│  6. Network dropdown updates to reflect new chain                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Unsupported Chain Handling
+
+If the dapp requests an unsupported chain ID:
+
+- Content script checks `networksInfo` for the chain
+- If not found, sends `switchEthereumChainError` message
+- Impersonator rejects the promise with error: `"Chain {chainId} is not supported"`
+- Dapp receives the error and can display appropriate UI
+
+### Per-Tab Chain State
+
+Each browser tab maintains its own chain selection:
+
+- **Content script store**: `store.chainName` holds the chain for that tab
+- **Storage sync**: When chain changes, `chainName` is saved to `chrome.storage.sync`
+- **Tab switching**: Popup listens for `chrome.tabs.onActivated` events
+- **State query**: On tab switch, popup queries new tab via `getInfo` message
+- **UI update**: Network dropdown updates to show the active tab's chain
+
+### Popup/Sidepanel Chain Sync
+
+The extension UI stays in sync with chain changes through multiple mechanisms:
+
+| Trigger | Mechanism | Description |
+| ------- | --------- | ----------- |
+| Dapp switches chain | `chrome.storage.onChanged` | Detects `chainName` storage updates |
+| User switches tabs | `chrome.tabs.onActivated` | Queries new tab's content script |
+| User selects chain | `useUpdateEffect` | Sends `setChainId` to content script |
+| Popup opens | `init()` | Queries current tab via `getInfo` |
+
 ## API Key Encryption
 
 The Bankr API key is encrypted using AES-256-GCM with PBKDF2 key derivation.
@@ -802,11 +857,12 @@ Build command: `pnpm build`
 
 ### Content Script → Inpage (postMessage)
 
-| Type                    | Description           |
-| ----------------------- | --------------------- |
-| `sendTransactionResult` | Transaction result    |
-| `rpcResponse`           | RPC call response     |
-| `switchEthereumChain`   | Chain switch response |
+| Type                       | Description                              |
+| -------------------------- | ---------------------------------------- |
+| `sendTransactionResult`    | Transaction result                       |
+| `rpcResponse`              | RPC call response                        |
+| `switchEthereumChain`      | Chain switch success (chainId, rpcUrl)   |
+| `switchEthereumChainError` | Chain switch error (unsupported chain)   |
 
 ### Content Script → Background (chrome.runtime)
 

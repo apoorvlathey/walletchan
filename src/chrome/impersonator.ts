@@ -147,7 +147,7 @@ class ImpersonatorProvider extends EventEmitter {
         // @ts-ignore
         const chainId = Number(params[0].chainId as string);
 
-        const setChainIdPromise = new Promise((resolve) => {
+        const setChainIdPromise = new Promise<null>((resolve, reject) => {
           // send message to content_script (inject.ts) to fetch corresponding RPC
           window.postMessage(
             {
@@ -184,6 +184,20 @@ class ImpersonatorProvider extends EventEmitter {
                   controller.abort();
 
                   resolve(null);
+                  break;
+                }
+                case "switchEthereumChainError": {
+                  const errorChainId = e.data.msg.chainId as number;
+                  // Only handle error for this specific chain switch request
+                  if (errorChainId === chainId) {
+                    controller.abort();
+                    reject(
+                      new Error(
+                        e.data.msg.error ||
+                          `Chain ${chainId} is not supported`
+                      )
+                    );
+                  }
                   break;
                 }
               }

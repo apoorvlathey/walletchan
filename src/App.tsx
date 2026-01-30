@@ -342,6 +342,47 @@ function App() {
     return () => chrome.runtime.onMessage.removeListener(handleMessage);
   }, []);
 
+  // Listen for storage changes (e.g., when dapp switches chain)
+  useEffect(() => {
+    const handleStorageChange = (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      areaName: string
+    ) => {
+      if (areaName === "sync" && changes.chainName) {
+        const newChainName = changes.chainName.newValue;
+        if (newChainName && newChainName !== chainName) {
+          setChainName(newChainName);
+        }
+      }
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
+  }, [chainName]);
+
+  // Listen for tab activation changes to update chain for current tab
+  useEffect(() => {
+    const handleTabActivated = (activeInfo: chrome.tabs.TabActiveInfo) => {
+      // Query the newly active tab for its chain info
+      chrome.tabs.sendMessage(
+        activeInfo.tabId,
+        { type: "getInfo" },
+        (store: { address: string; displayAddress: string; chainName: string }) => {
+          // Ignore errors (tab might not have content script injected)
+          if (chrome.runtime.lastError) {
+            return;
+          }
+          if (store?.chainName && store.chainName.length > 0) {
+            setChainName(store.chainName);
+          }
+        }
+      );
+    };
+
+    chrome.tabs.onActivated.addListener(handleTabActivated);
+    return () => chrome.tabs.onActivated.removeListener(handleTabActivated);
+  }, []);
+
   useUpdateEffect(() => {
     const updateChainId = async () => {
       if (networksInfo && chainName) {
