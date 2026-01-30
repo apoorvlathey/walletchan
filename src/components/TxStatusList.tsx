@@ -52,8 +52,8 @@ function TxStatusList({ maxItems = 5 }: TxStatusListProps) {
 
   return (
     <Box pt={4}>
-      <HStack justify="space-between" mb={2}>
-        <Text fontSize="sm" fontWeight="600" color="text.primary">
+      <HStack justify="space-between" mb={3}>
+        <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
           Recent Transactions
         </Text>
         {hasMore && (
@@ -69,19 +69,19 @@ function TxStatusList({ maxItems = 5 }: TxStatusListProps) {
 
       {history.length === 0 ? (
         <Box
-          bg="bg.subtle"
-          borderWidth="1px"
-          borderColor="border.default"
-          borderRadius="lg"
+          bg="bauhaus.white"
+          border="3px solid"
+          borderColor="bauhaus.black"
+          boxShadow="4px 4px 0px 0px #121212"
           p={4}
           textAlign="center"
         >
-          <Text fontSize="sm" color="text.tertiary">
+          <Text fontSize="sm" color="text.tertiary" fontWeight="500">
             No recent transactions
           </Text>
         </Box>
       ) : (
-        <VStack spacing={2} align="stretch">
+        <VStack spacing={3} align="stretch">
           {displayItems.map((tx) => (
             <TxStatusItem key={tx.id} tx={tx} />
           ))}
@@ -109,11 +109,10 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
       case "processing":
         return (
           <Badge
-            bg="info.bg"
-            color="info.solid"
-            borderWidth="1px"
-            borderColor="info.border"
-            borderRadius="full"
+            bg="bauhaus.blue"
+            color="white"
+            border="2px solid"
+            borderColor="bauhaus.black"
             px={2}
             py={0.5}
             fontSize="xs"
@@ -121,18 +120,17 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
             alignItems="center"
             gap={1}
           >
-            <Spinner size="xs" />
+            <Spinner size="xs" color="white" />
             Processing
           </Badge>
         );
       case "success":
         return (
           <Badge
-            bg="success.bg"
-            color="success.solid"
-            borderWidth="1px"
-            borderColor="success.border"
-            borderRadius="full"
+            bg="bauhaus.yellow"
+            color="bauhaus.black"
+            border="2px solid"
+            borderColor="bauhaus.black"
             px={2}
             py={0.5}
             fontSize="xs"
@@ -147,11 +145,10 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
       case "failed":
         return (
           <Badge
-            bg="error.bg"
-            color="error.solid"
-            borderWidth="1px"
-            borderColor="error.border"
-            borderRadius="full"
+            bg="bauhaus.red"
+            color="white"
+            border="2px solid"
+            borderColor="bauhaus.black"
             px={2}
             py={0.5}
             fontSize="xs"
@@ -178,23 +175,38 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
 
   return (
     <Box
-      bg="bg.subtle"
-      borderWidth="1px"
-      borderColor="border.default"
-      borderRadius="lg"
+      bg="bauhaus.white"
+      border="3px solid"
+      borderColor="bauhaus.black"
+      boxShadow="4px 4px 0px 0px #121212"
       p={3}
       _hover={{
-        bg: "bg.emphasis",
-        borderColor: "border.strong",
+        transform: "translateY(-1px)",
+        boxShadow: "5px 5px 0px 0px #121212",
       }}
-      transition="all 0.2s"
+      transition="all 0.2s ease-out"
+      position="relative"
     >
+      {/* Corner decoration based on status */}
+      <Box
+        position="absolute"
+        top="-3px"
+        right="-3px"
+        w="8px"
+        h="8px"
+        bg={tx.status === "success" ? "bauhaus.yellow" : tx.status === "failed" ? "bauhaus.red" : "bauhaus.blue"}
+        border="2px solid"
+        borderColor="bauhaus.black"
+        borderRadius={tx.status === "success" ? "full" : "0"}
+      />
+
       <HStack justify="space-between">
         <HStack spacing={3} flex={1}>
           <Box
-            bg="white"
-            p="2px"
-            borderRadius="md"
+            bg="bauhaus.white"
+            border="2px solid"
+            borderColor="bauhaus.black"
+            p={1}
             display="flex"
             alignItems="center"
             justifyContent="center"
@@ -205,8 +217,7 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
                 `https://www.google.com/s2/favicons?domain=${new URL(tx.origin).hostname}&sz=32`
               }
               alt="favicon"
-              boxSize="20px"
-              borderRadius="sm"
+              boxSize="18px"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.src = `https://www.google.com/s2/favicons?domain=${new URL(tx.origin).hostname}&sz=32`;
@@ -217,13 +228,13 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
             <HStack justify="space-between">
               <Text
                 fontSize="sm"
-                fontWeight="500"
+                fontWeight="700"
                 color="text.primary"
                 noOfLines={1}
               >
                 {new URL(tx.origin).hostname}
               </Text>
-              <Text fontSize="xs" color="text.tertiary">
+              <Text fontSize="xs" color="text.tertiary" fontWeight="500">
                 {formatTimeAgo(tx.createdAt)}
               </Text>
             </HStack>
@@ -232,9 +243,8 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
                 fontSize="xs"
                 bg={config.bg}
                 color={config.text}
-                borderWidth="1px"
-                borderColor={config.border}
-                borderRadius="full"
+                border="2px solid"
+                borderColor="bauhaus.black"
                 px={2}
                 py={0.5}
                 display="flex"
@@ -259,7 +269,7 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
             variant="ghost"
             color="text.secondary"
             onClick={handleViewTx}
-            _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+            _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
           />
         )}
       </HStack>
@@ -269,12 +279,11 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
         <Box
           mt={2}
           p={2}
-          bg="error.bg"
-          borderRadius="md"
-          borderWidth="1px"
-          borderColor="error.border"
+          bg="bauhaus.red"
+          border="2px solid"
+          borderColor="bauhaus.black"
         >
-          <Text fontSize="xs" color="text.secondary" noOfLines={2}>
+          <Text fontSize="xs" color="white" noOfLines={2} fontWeight="500">
             {tx.error}
           </Text>
         </Box>

@@ -77,18 +77,20 @@ function AddChain({ back }: { back: () => void }) {
           size="sm"
           onClick={back}
         />
-        <Heading size="sm" color="text.primary">
+        <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="tight">
           Add Chain
-        </Heading>
+        </Text>
         <Spacer />
       </HStack>
 
-      <Text fontSize="sm" color="text.secondary">
+      <Text fontSize="sm" color="text.secondary" fontWeight="500">
         Add a new network by entering its RPC URL and chain ID.
       </Text>
 
       <FormControl>
-        <FormLabel color="text.secondary">Name</FormLabel>
+        <FormLabel color="text.secondary" fontWeight="700" textTransform="uppercase" fontSize="xs">
+          Name
+        </FormLabel>
         <Input
           placeholder="e.g., Arbitrum"
           value={chainName}
@@ -99,60 +101,43 @@ function AddChain({ back }: { back: () => void }) {
             }
           }}
           isInvalid={isChainNameNotUnique}
-          bg="bg.subtle"
-          borderColor="border.default"
-          _hover={{ borderColor: "border.strong" }}
-          _focus={{
-            borderColor: "primary.500",
-            boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
-          }}
         />
         {isChainNameNotUnique && (
-          <Text fontSize="xs" color="error.solid" mt={1}>
+          <Text fontSize="xs" color="bauhaus.red" mt={1} fontWeight="700">
             Chain name already exists
           </Text>
         )}
       </FormControl>
 
       <FormControl>
-        <FormLabel color="text.secondary">RPC URL</FormLabel>
+        <FormLabel color="text.secondary" fontWeight="700" textTransform="uppercase" fontSize="xs">
+          RPC URL
+        </FormLabel>
         <Input
           placeholder="https://..."
           value={rpc}
           onChange={(e) => setRpc(e.target.value.trim())}
           onPaste={handleRpcPaste}
-          bg="bg.subtle"
-          borderColor="border.default"
-          _hover={{ borderColor: "border.strong" }}
-          _focus={{
-            borderColor: "primary.500",
-            boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
-          }}
         />
-        <Text fontSize="xs" color="text.tertiary" mt={1}>
+        <Text fontSize="xs" color="text.tertiary" mt={1} fontWeight="500">
           Paste RPC URL to auto-detect chain ID
         </Text>
       </FormControl>
 
       <FormControl>
-        <FormLabel color="text.secondary">Chain ID</FormLabel>
+        <FormLabel color="text.secondary" fontWeight="700" textTransform="uppercase" fontSize="xs">
+          Chain ID
+        </FormLabel>
         <Input
           placeholder="e.g., 42161"
           type="number"
           value={chainId}
           onChange={(e) => setChainId(e.target.value)}
-          bg="bg.subtle"
-          borderColor="border.default"
-          _hover={{ borderColor: "border.strong" }}
-          _focus={{
-            borderColor: "primary.500",
-            boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
-          }}
         />
       </FormControl>
 
       <Box display="flex" gap={2} pt={2}>
-        <Button variant="outline" flex={1} onClick={back}>
+        <Button variant="secondary" flex={1} onClick={back}>
           Cancel
         </Button>
         <Button

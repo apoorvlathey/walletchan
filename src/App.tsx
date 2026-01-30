@@ -12,10 +12,6 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
   Image,
   IconButton,
   Code,
@@ -25,7 +21,7 @@ import {
   Icon,
   Link,
 } from "@chakra-ui/react";
-import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon, LockIcon } from "@chakra-ui/icons";
+import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon, LockIcon, WarningIcon, InfoIcon } from "@chakra-ui/icons";
 
 // Sidepanel icon
 const SidePanelIcon = (props: any) => (
@@ -614,7 +610,9 @@ function App() {
         alignItems="center"
         justifyContent="center"
       >
-        <Text color="text.secondary">Loading...</Text>
+        <Text color="text.secondary" fontWeight="700" textTransform="uppercase" letterSpacing="wider">
+          Loading...
+        </Text>
       </Box>
     );
   }
@@ -642,17 +640,49 @@ function App() {
         justifyContent="center"
         p={6}
         textAlign="center"
+        position="relative"
       >
+        {/* Geometric decorations */}
+        <Box
+          position="absolute"
+          top={4}
+          left={4}
+          w="12px"
+          h="12px"
+          bg="bauhaus.red"
+          border="2px solid"
+          borderColor="bauhaus.black"
+        />
+        <Box
+          position="absolute"
+          top={4}
+          right={4}
+          w="12px"
+          h="12px"
+          bg="bauhaus.blue"
+          border="2px solid"
+          borderColor="bauhaus.black"
+          borderRadius="full"
+        />
+
         <VStack spacing={4}>
-          <Image src="impersonatorLogo.png" w="3rem" />
-          <Text fontSize="lg" fontWeight="600" color="text.primary">
+          <Box
+            bg="bauhaus.yellow"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="4px 4px 0px 0px #121212"
+            p={3}
+          >
+            <Image src="impersonatorLogo.png" w="3rem" />
+          </Box>
+          <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
             Complete Setup
           </Text>
-          <Text fontSize="sm" color="text.secondary">
+          <Text fontSize="sm" color="text.secondary" fontWeight="500">
             Please complete the setup in the new tab that just opened.
           </Text>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={async () => {
               // Re-open or focus onboarding tab
@@ -669,15 +699,16 @@ function App() {
             Open Setup Tab
           </Button>
           <HStack spacing={1} justify="center" mt={4}>
-            <Text fontSize="sm" color="text.tertiary">
+            <Text fontSize="sm" color="text.tertiary" fontWeight="500">
               Built by
             </Text>
             <Link
               display="flex"
               alignItems="center"
               gap={1}
-              color="primary.400"
-              _hover={{ color: "primary.500" }}
+              color="bauhaus.blue"
+              fontWeight="700"
+              _hover={{ color: "bauhaus.red" }}
               onClick={() => {
                 chrome.tabs.create({ url: "https://x.com/apoorveth" });
               }}
@@ -846,14 +877,30 @@ function App() {
       <Flex
         py={3}
         px={4}
-        bg="bg.subtle"
-        borderBottom="1px"
-        borderBottomColor="border.default"
+        bg="bauhaus.black"
         alignItems="center"
+        position="relative"
       >
+        {/* Decorative stripe */}
+        <Box
+          position="absolute"
+          bottom="0"
+          left="0"
+          right="0"
+          h="3px"
+          bg="bauhaus.red"
+        />
+
         <HStack spacing={2}>
-          <Image src="impersonatorLogo.png" w="1.8rem" />
-          <Text fontWeight="600" color="text.primary">
+          <Box
+            bg="bauhaus.white"
+            border="2px solid"
+            borderColor="bauhaus.black"
+            p={1}
+          >
+            <Image src="impersonatorLogo.png" w="1.5rem" />
+          </Box>
+          <Text fontWeight="900" color="bauhaus.white" textTransform="uppercase" letterSpacing="wider">
             BankrWallet
           </Text>
         </HStack>
@@ -865,6 +912,8 @@ function App() {
               icon={<LockIcon />}
               variant="ghost"
               size="sm"
+              color="bauhaus.white"
+              _hover={{ bg: "whiteAlpha.200" }}
               onClick={() => {
                 chrome.runtime.sendMessage({ type: "lockWallet" }, () => {
                   setView("unlock");
@@ -882,6 +931,8 @@ function App() {
                 icon={<SidePanelIcon />}
                 variant="ghost"
                 size="sm"
+                color="bauhaus.white"
+                _hover={{ bg: "whiteAlpha.200" }}
                 onClick={toggleSidePanelMode}
               />
             </Tooltip>
@@ -891,6 +942,8 @@ function App() {
             icon={<SettingsIcon />}
             variant="ghost"
             size="sm"
+            color="bauhaus.white"
+            _hover={{ bg: "whiteAlpha.200" }}
             onClick={() => setView("settings")}
           />
         </HStack>
@@ -900,38 +953,40 @@ function App() {
         <VStack spacing={4} align="stretch" flex="1">
           {/* Failed Transaction Error */}
           {failedTxError && (
-            <Alert
-              status="error"
-              borderRadius="lg"
-              bg="error.bg"
-              borderWidth="1px"
-              borderColor="error.border"
-              flexDirection="column"
-              alignItems="flex-start"
+            <Box
+              bg="bauhaus.red"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+              p={3}
+              position="relative"
             >
               <HStack w="full" justify="space-between" mb={2}>
                 <HStack>
-                  <AlertIcon color="error.solid" />
-                  <AlertTitle fontSize="sm" color="text.primary">
+                  <Box p={1} bg="bauhaus.black">
+                    <WarningIcon color="bauhaus.red" boxSize={4} />
+                  </Box>
+                  <Text fontSize="sm" color="white" fontWeight="700">
                     Transaction Failed
-                  </AlertTitle>
+                  </Text>
                 </HStack>
                 <Button
                   size="xs"
                   variant="ghost"
-                  color="text.secondary"
+                  color="white"
+                  _hover={{ bg: "whiteAlpha.200" }}
                   onClick={() => setFailedTxError(null)}
                 >
                   Dismiss
                 </Button>
               </HStack>
-              <Text fontSize="xs" color="text.secondary" mb={1}>
+              <Text fontSize="xs" color="whiteAlpha.800" mb={1} fontWeight="500">
                 {failedTxError.origin}
               </Text>
-              <AlertDescription fontSize="sm" color="text.primary">
+              <Text fontSize="sm" color="white" fontWeight="500">
                 {failedTxError.error}
-              </AlertDescription>
-            </Alert>
+              </Text>
+            </Box>
           )}
 
           {/* Pending Requests Banner */}
@@ -956,16 +1011,29 @@ function App() {
 
           {/* Address Display */}
           <Box
-            bg="bg.subtle"
-            borderRadius="lg"
-            borderWidth="1px"
-            borderColor="border.default"
+            bg="bauhaus.white"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="4px 4px 0px 0px #121212"
             px={4}
             py={3}
+            position="relative"
           >
+            {/* Corner decoration */}
+            <Box
+              position="absolute"
+              top="-3px"
+              right="-3px"
+              w="10px"
+              h="10px"
+              bg="bauhaus.blue"
+              border="2px solid"
+              borderColor="bauhaus.black"
+            />
+
             {address ? (
               <VStack align="stretch" spacing={1}>
-                <Text fontSize="xs" color="text.secondary">
+                <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                   Bankr Wallet Address
                 </Text>
                 <HStack justify="space-between">
@@ -973,9 +1041,11 @@ function App() {
                     <Code
                       fontSize="md"
                       fontFamily="mono"
-                      bg="transparent"
-                      color="text.primary"
-                      fontWeight="500"
+                      bg="bauhaus.black"
+                      color="bauhaus.white"
+                      px={2}
+                      py={1}
+                      fontWeight="700"
                     >
                       {truncateAddress(address)}
                     </Code>
@@ -984,9 +1054,9 @@ function App() {
                       icon={copied ? <CheckIcon /> : <CopyIcon />}
                       size="xs"
                       variant="ghost"
-                      color={copied ? "success.solid" : "text.secondary"}
+                      color={copied ? "bauhaus.yellow" : "text.secondary"}
                       onClick={handleCopyAddress}
-                      _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+                      _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
                     />
                   </HStack>
                   {chainName && networksInfo && (
@@ -1004,44 +1074,59 @@ function App() {
                           });
                         }
                       }}
-                      _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+                      _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
                     />
                   )}
                 </HStack>
               </VStack>
             ) : (
-              <Text color="text.tertiary" fontSize="sm" textAlign="center">
+              <Text color="text.tertiary" fontSize="sm" textAlign="center" fontWeight="500">
                 No address configured
               </Text>
             )}
           </Box>
 
           {/* Chain Selector */}
-          <Menu matchWidth>
+          <Menu matchWidth isLazy lazyBehavior="unmount">
             <MenuButton
               as={Button}
               w="full"
               variant="ghost"
-              rounded="lg"
-              bg="bg.subtle"
-              borderWidth="1px"
-              borderColor="border.default"
-              _hover={{ borderColor: "border.strong" }}
-              _active={{ bg: "bg.emphasis" }}
+              bg="bauhaus.white"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+              _hover={{
+                transform: "translateY(-2px)",
+                boxShadow: "6px 6px 0px 0px #121212",
+              }}
+              _active={{
+                transform: "translate(2px, 2px)",
+                boxShadow: "none",
+              }}
               rightIcon={<ChevronDownIcon />}
               textAlign="left"
-              fontWeight="normal"
+              fontWeight="700"
               h="auto"
               py={3}
+              borderRadius="0"
+              transition="all 0.2s ease-out"
             >
               {chainName && networksInfo ? (
                 <HStack spacing={2}>
                   {getChainConfig(networksInfo[chainName].chainId).icon && (
-                    <Image
-                      src={getChainConfig(networksInfo[chainName].chainId).icon}
-                      alt={chainName}
-                      boxSize="20px"
-                    />
+                    <Box
+                      bg="bauhaus.white"
+                      border="2px solid"
+                      borderColor="bauhaus.black"
+                      p={0.5}
+                    >
+                      <Image
+                        src={getChainConfig(networksInfo[chainName].chainId).icon}
+                        alt={chainName}
+                        boxSize="18px"
+                      />
+                    </Box>
                   )}
                   <Text color="text.primary">{chainName}</Text>
                 </HStack>
@@ -1049,15 +1134,25 @@ function App() {
                 <Text color="text.tertiary">Select Network</Text>
               )}
             </MenuButton>
-            <MenuList bg="bg.subtle" borderColor="border.default" py={1}>
+            <MenuList
+              bg="bauhaus.white"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+              borderRadius="0"
+              py={0}
+            >
               {networksInfo &&
                 Object.keys(networksInfo).map((_chainName, i) => {
                   const config = getChainConfig(networksInfo[_chainName].chainId);
                   return (
                     <MenuItem
                       key={i}
-                      bg="bg.subtle"
-                      _hover={{ bg: "bg.emphasis" }}
+                      bg="bauhaus.white"
+                      _hover={{ bg: "bg.muted" }}
+                      borderBottom={i < Object.keys(networksInfo).length - 1 ? "2px solid" : "none"}
+                      borderColor="bauhaus.black"
+                      py={3}
                       onClick={() => {
                         if (!chainName) {
                           setReloadRequired(true);
@@ -1067,13 +1162,20 @@ function App() {
                     >
                       <HStack spacing={2}>
                         {config.icon && (
-                          <Image
-                            src={config.icon}
-                            alt={_chainName}
-                            boxSize="20px"
-                          />
+                          <Box
+                            bg="bauhaus.white"
+                            border="2px solid"
+                            borderColor="bauhaus.black"
+                            p={0.5}
+                          >
+                            <Image
+                              src={config.icon}
+                              alt={_chainName}
+                              boxSize="18px"
+                            />
+                          </Box>
                         )}
-                        <Text color="text.primary">{_chainName}</Text>
+                        <Text color="text.primary" fontWeight="700">{_chainName}</Text>
                       </HStack>
                     </MenuItem>
                   );
@@ -1083,36 +1185,45 @@ function App() {
 
           {/* Reload Required Alert */}
           {reloadRequired && (
-            <Alert
-              status="warning"
-              rounded="lg"
-              bg="warning.bg"
-              borderWidth="1px"
-              borderColor="warning.border"
+            <Box
+              bg="bauhaus.yellow"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+              p={3}
             >
-              <AlertIcon color="warning.solid" />
-              <Box flex={1}>
-                <AlertTitle fontSize="sm" color="text.primary">
-                  Reload page required
-                </AlertTitle>
-                <AlertDescription fontSize="xs" color="text.secondary">
-                  To apply changes on the current site
-                </AlertDescription>
-              </Box>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={async () => {
-                  const tab = await currentTab();
-                  const url = tab.url!;
-                  chrome.tabs.create({ url });
-                  chrome.tabs.remove(tab.id!);
-                  setReloadRequired(false);
-                }}
-              >
-                Reload
-              </Button>
-            </Alert>
+              <HStack justify="space-between">
+                <HStack spacing={2}>
+                  <Box p={1} bg="bauhaus.black">
+                    <InfoIcon color="bauhaus.yellow" boxSize={4} />
+                  </Box>
+                  <Box>
+                    <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
+                      Reload page required
+                    </Text>
+                    <Text fontSize="xs" color="bauhaus.black" opacity={0.8} fontWeight="500">
+                      To apply changes on the current site
+                    </Text>
+                  </Box>
+                </HStack>
+                <Button
+                  size="sm"
+                  bg="bauhaus.black"
+                  color="bauhaus.yellow"
+                  _hover={{ opacity: 0.9 }}
+                  _active={{ transform: "translate(2px, 2px)" }}
+                  onClick={async () => {
+                    const tab = await currentTab();
+                    const url = tab.url!;
+                    chrome.tabs.create({ url });
+                    chrome.tabs.remove(tab.id!);
+                    setReloadRequired(false);
+                  }}
+                >
+                  Reload
+                </Button>
+              </HStack>
+            </Box>
           )}
 
           {/* Transaction Status List */}
@@ -1123,15 +1234,16 @@ function App() {
 
           {/* Footer */}
           <HStack spacing={1} justify="center" pt={2}>
-            <Text fontSize="sm" color="text.tertiary">
+            <Text fontSize="sm" color="text.tertiary" fontWeight="500">
               Built by
             </Text>
             <Link
               display="flex"
               alignItems="center"
               gap={1}
-              color="primary.400"
-              _hover={{ color: "primary.500" }}
+              color="bauhaus.blue"
+              fontWeight="700"
+              _hover={{ color: "bauhaus.red" }}
               onClick={() => {
                 chrome.tabs.create({ url: "https://x.com/apoorveth" });
               }}

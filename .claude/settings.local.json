@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(pnpm build:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npm run build:*)"
     ]
   }
 }

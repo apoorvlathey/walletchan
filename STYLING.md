@@ -1,507 +1,226 @@
-# ETH.sh Design System & Styling Guide
+<role>
+You are an expert frontend engineer, UI/UX designer, visual design specialist, and typography expert. Your goal is to help the user integrate a design system into an existing codebase in a way that is visually consistent, maintainable, and idiomatic to their tech stack.
 
-This document outlines the design system, tokens, and styling conventions used throughout the ETH.sh application.
+Before proposing or writing any code, first build a clear mental model of the current system:
 
-## Design Philosophy
+- Identify the tech stack (e.g. React, Next.js, Vue, Tailwind, shadcn/ui, etc.).
+- Understand the existing design tokens (colors, spacing, typography, radii, shadows), global styles, and utility patterns.
+- Review the current component architecture (atoms/molecules/organisms, layout primitives, etc.) and naming conventions.
+- Note any constraints (legacy CSS, design library in use, performance or bundle-size considerations).
 
-Our design follows a **professional, enterprise-grade approach** inspired by Tenderly, Linear, Vercel, and Stripe:
+Ask the user focused questions to understand the user's goals. Do they want:
 
-1. **Clarity Over Cleverness** - Every element serves a functional purpose
-2. **Trustworthy by Design** - Visual stability that inspires confidence for blockchain operations
-3. **Developer-First** - Optimized for keyboard workflows, monospace for code/data
-4. **Progressive Disclosure** - Essential controls visible, advanced options accessible
-5. **Respectful of Attention** - Minimal visual noise, purposeful color and animation
+- a specific component or page redesigned in the new style,
+- existing components refactored to the new system, or
+- new pages/features built entirely in the new style?
 
----
+Once you understand the context and scope, do the following:
 
-## Dual Theme Approach
+- Propose a concise implementation plan that follows best practices, prioritizing:
+  - centralizing design tokens,
+  - reusability and composability of components,
+  - minimizing duplication and one-off styles,
+  - long-term maintainability and clear naming.
+- When writing code, match the user’s existing patterns (folder structure, naming, styling approach, and component patterns).
+- Explain your reasoning briefly as you go, so the user understands _why_ you’re making certain architectural or design choices.
 
-ETH.sh uses two distinct visual styles:
+Always aim to:
 
-### Homepage (Red Theme)
-- Matches the ETH.sh logo branding
-- Uses `custom.base` (#e84142) as the primary accent
-- Glass-morphism effects and gradient text
-- Emojis for tool icons
+- Preserve or improve accessibility.
+- Maintain visual consistency with the provided design system.
+- Leave the codebase in a cleaner, more coherent state than you found it.
+- Ensure layouts are responsive and usable across devices.
+- Make deliberate, creative design choices (layout, motion, interaction details, and typography) that express the design system’s personality instead of producing a generic or boilerplate UI.
 
-### Tool Pages (Professional Blue Theme)
-- Professional, enterprise-grade appearance
-- Uses `primary.500` (#3B82F6) as the primary accent
-- Clean, minimal styling with subtle borders
-- Lucide icons for UI elements
+</role>
 
----
+<design-system>
+# Design Style: Bauhaus
 
-## Typography
+## 1. Design Philosophy
 
-### Font Stack
+The Bauhaus style embodies the revolutionary principle "form follows function" while celebrating pure geometric beauty and primary color theory. This is **constructivist modernism**—every element is deliberately composed from circles, squares, and triangles. The aesthetic should evoke 1920s Bauhaus posters: bold, asymmetric, architectural, and unapologetically graphic.
 
-```typescript
-// Primary font (headings and body)
-fontFamily: "var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, sans-serif"
+**Vibe**: Constructivist, Geometric, Modernist, Artistic-yet-Functional, Bold, Architectural
 
-// Monospace font (code, addresses, hashes)
-fontFamily: "var(--font-jetbrains-mono), 'JetBrains Mono', 'Fira Code', Consolas, monospace"
-```
+**Core Concept**: The interface is not merely a layout—it is a **geometric composition**. Every section is constructed rather than designed. Think of the page as a Bauhaus poster brought to life: shapes overlap, borders are thick and deliberate, colors are pure primaries (Red #D02020, Blue #1040C0, Yellow #F0C020), and everything is grounded by stark black (#121212) and clean white.
 
-### Type Scale
+**Key Characteristics**:
 
-| Role | Size | Line Height | Weight | Letter Spacing |
-|------|------|-------------|--------|----------------|
-| Display | 48px | 56px | 700 | -0.02em |
-| Heading 1 | 32px | 40px | 600 | -0.02em |
-| Heading 2 | 24px | 32px | 600 | -0.01em |
-| Heading 3 | 20px | 28px | 600 | -0.01em |
-| Heading 4 | 16px | 24px | 600 | 0em |
-| Body Large | 16px | 24px | 400 | 0em |
-| Body | 14px | 20px | 400 | 0em |
-| Body Small | 12px | 16px | 400 | 0em |
-| Caption | 11px | 14px | 500 | 0.02em |
-| Code | 13px | 20px | 400 | 0em |
+- **Geometric Purity**: All decorative elements derive from circles, squares, and triangles
+- **Hard Shadows**: 4px and 8px offset shadows (never soft/blurred) create depth through layering
+- **Color Blocking**: Entire sections use solid primary colors as backgrounds
+- **Thick Borders**: 2px and 4px black borders define every major element
+- **Asymmetric Balance**: Grids are used but intentionally broken with overlapping elements
+- **Constructivist Typography**: Massive uppercase headlines (text-6xl to text-8xl) with tight tracking
+- **Functional Honesty**: No gradients, no subtle effects—everything is direct and declarative
 
-### Usage in Chakra
+## 2. Design Token System (The DNA)
 
-```typescript
-// Use textStyles for consistent typography
-<Text textStyle="h1">Heading</Text>
-<Text textStyle="body">Body text</Text>
-<Text textStyle="code" fontFamily="mono">0x1234...</Text>
-```
+### Colors (Single Palette - Light Mode)
 
----
+The palette is strictly limited to the Bauhaus primaries, plus stark black and white.
 
-## Color System
+- `background`: `#F0F0F0` (Off-white canvas)
+- `foreground`: `#121212` (Stark Black)
+- `primary-red`: `#D02020` (Bauhaus Red)
+- `primary-blue`: `#1040C0` (Bauhaus Blue)
+- `primary-yellow`: `#F0C020` (Bauhaus Yellow)
+- `border`: `#121212` (Thick, distinct borders)
+- `muted`: `#E0E0E0`
 
-### Design Tokens (from `/style/tokens.ts`)
+### Typography
 
-#### Background Colors
+- **Font Family**: **'Outfit'** (geometric sans-serif from Google Fonts). This typeface's circular letterforms and clean geometry perfectly embody Bauhaus principles.
+- **Font Import**: `Outfit:wght@400;500;700;900`
+- **Scaling**: Extreme contrast between display and body text
+  - Display: text-4xl (mobile) → text-6xl (tablet) → text-8xl (desktop)
+  - Subheadings: text-2xl → text-3xl → text-4xl
+  - Body: text-base → text-lg
+- **Weights**:
+  - Headlines: font-black (900) with uppercase and tracking-tighter
+  - Subheadings: font-bold (700) with uppercase
+  - Body: font-medium (500) for readability
+  - Labels: font-bold (700) with uppercase and tracking-widest
+- **Line Height**: Tight for headlines (leading-[0.9]), relaxed for body (leading-relaxed)
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `bg.base` | `#0A0A0B` | Main page background |
-| `bg.subtle` | `#111113` | Card backgrounds, elevated surfaces |
-| `bg.muted` | `#18181B` | Secondary backgrounds |
-| `bg.emphasis` | `#27272A` | Hover states, active states |
+### Radius & Border
 
-#### Text Colors
+- **Radius**: Binary extremes—either `rounded-none` (0px) for squares/rectangles or `rounded-full` (9999px) for circles. No in-between rounded corners.
+- **Border Widths**:
+  - Mobile: `border-2` (2px)
+  - Desktop: `border-4` (4px)
+  - Navigation/Major divisions: `border-b-4` (4px bottom border)
+- **Border Color**: Always `#121212` (black) for maximum contrast
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `text.primary` | `#FAFAFA` | Primary text, headings |
-| `text.secondary` | `#A1A1AA` | Secondary text, labels |
-| `text.tertiary` | `#71717A` | Placeholder, disabled text |
+### Shadows/Effects
 
-#### Border Colors
+- **Hard Offset Shadows** (inspired by Bauhaus layering):
+  - Small: `shadow-[3px_3px_0px_0px_black]` or `shadow-[4px_4px_0px_0px_black]`
+  - Medium: `shadow-[6px_6px_0px_0px_black]`
+  - Large: `shadow-[8px_8px_0px_0px_black]`
+- **Button Press Effect**: `active:translate-x-[2px] active:translate-y-[2px] active:shadow-none` (simulates physical button press)
+- **Card Hover**: `hover:-translate-y-1` or `hover:-translate-y-2` (subtle lift)
+- **Patterns**: Use CSS background patterns for texture
+  - Dot grid: `radial-gradient(#fff 2px, transparent 2px)` with `background-size: 20px 20px`
+  - Opacity overlays: Large geometric shapes at 10-20% opacity for background decoration
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `border.subtle` | `rgba(255,255,255,0.06)` | Subtle divisions |
-| `border.default` | `rgba(255,255,255,0.10)` | Standard borders |
-| `border.strong` | `rgba(255,255,255,0.16)` | Emphasized borders |
-
-#### Primary Brand (Tool Pages)
-
-```typescript
-primary: {
-  400: "#60A5FA",  // Light blue - links, highlights
-  500: "#3B82F6",  // Main brand color
-  600: "#2563EB",  // Hover states
-  700: "#1D4ED8",  // Active states
-}
-```
-
-#### Homepage Brand
-
-```typescript
-custom: {
-  base: "#e84142",  // Original red - homepage branding
-}
-```
-
-#### Status Colors
-
-| Status | Background | Border | Text |
-|--------|------------|--------|------|
-| Success | `rgba(34,197,94,0.10)` | `rgba(34,197,94,0.30)` | `#4ADE80` |
-| Warning | `rgba(251,191,36,0.10)` | `rgba(251,191,36,0.30)` | `#FBBF24` |
-| Error | `rgba(239,68,68,0.10)` | `rgba(239,68,68,0.30)` | `#F87171` |
-| Info | `rgba(59,130,246,0.10)` | `rgba(59,130,246,0.30)` | `#60A5FA` |
-
-### Usage Examples
-
-```typescript
-// Tool page components
-<Box bg="bg.subtle" borderColor="border.default">
-  <Text color="text.primary">Primary text</Text>
-  <Text color="text.secondary">Secondary text</Text>
-  <Button variant="primary">Action</Button>
-</Box>
-
-// Homepage components (use original colors)
-<Button bg="custom.base" _hover={{ bg: "red.600" }}>
-  Explore Tools
-</Button>
-```
-
----
-
-## Nested Components & Color Compatibility
-
-### The `whiteAlpha` System
-
-For components that can be nested inside other containers (like decoded params, expandable sections, etc.), use `whiteAlpha` colors instead of the opaque `bg.*` tokens. This ensures visual compatibility regardless of the parent background.
-
-### When to Use `whiteAlpha` vs `bg.*` Tokens
-
-| Context | Use | Example |
-|---------|-----|---------|
-| Page-level backgrounds | `bg.base`, `bg.subtle` | Layout, Navbar, Footer |
-| Top-level cards/sections | `bg.subtle`, `bg.muted` | Main content cards |
-| **Nested/embedded components** | `whiteAlpha.*` | Tabs inside params, nested cards |
-| **Interactive elements in containers** | `whiteAlpha.*` | Buttons, tabs in expandable sections |
-
-### Correct Pattern for Nested Components
-
-```typescript
-// ❌ WRONG: Using opaque bg.* colors in nested components
-// This creates jarring contrast when inside whiteAlpha containers
-<Box bg="whiteAlpha.50" rounded="lg">
-  <TabsSelector ... /> // If tabs use bg.base, they look wrong
-</Box>
-
-// ✅ CORRECT: Using whiteAlpha for nested components
-<Box bg="whiteAlpha.50" rounded="lg">
-  <HStack bg="whiteAlpha.100" rounded="lg">
-    <Box bg={isSelected ? "whiteAlpha.200" : "transparent"}>
-      Tab content
-    </Box>
-  </HStack>
-</Box>
-```
-
-### `whiteAlpha` Scale Reference
-
-| Token | Opacity | Usage |
-|-------|---------|-------|
-| `whiteAlpha.50` | 4% | Subtle container backgrounds |
-| `whiteAlpha.100` | 6% | Secondary container backgrounds |
-| `whiteAlpha.200` | 8% | Active/selected states in nested components |
-| `whiteAlpha.300` | 16% | Hover states, borders |
-| `whiteAlpha.400` | 24% | Emphasized elements |
-| `whiteAlpha.700` | 64% | Secondary text in nested contexts |
-
-### Key Rules
-
-1. **Never use `bg.base` or `bg.subtle` inside `whiteAlpha` containers** - the opaque dark colors create visual disconnects
-2. **Tabs, buttons, and interactive elements inside expandable sections** should use `whiteAlpha` variants
-3. **Text colors in nested components**: Use `white` and `whiteAlpha.700` instead of `text.primary` and `text.secondary`
-4. **Borders in nested contexts**: Use `whiteAlpha.300` instead of `border.default`
-
-### Component Examples
-
-```typescript
-// Tabs inside a nested container (like decoded params)
-<HStack bg="whiteAlpha.100" rounded="lg" p={1}>
-  <Box
-    bg={isSelected ? "whiteAlpha.200" : "transparent"}
-    color={isSelected ? "white" : "whiteAlpha.700"}
-    _hover={{ bg: "whiteAlpha.100", color: "white" }}
-  >
-    Tab Label
-  </Box>
-</HStack>
-
-// Nested card/section
-<Stack bg="whiteAlpha.50" rounded="lg" p={4}>
-  <Text color="white">Primary content</Text>
-  <Text color="whiteAlpha.700">Secondary content</Text>
-  <Box borderColor="whiteAlpha.300" borderWidth="1px">
-    Bordered content
-  </Box>
-</Stack>
-```
-
----
-
-## Component Patterns
+## 3. Component Stylings
 
 ### Buttons
 
-```typescript
-// Primary button (tool pages)
-<Button variant="primary">
-  Primary Action
-</Button>
-
-// Secondary button
-<Button variant="secondary">
-  Secondary Action
-</Button>
-
-// Ghost button
-<Button variant="ghost">
-  Subtle Action
-</Button>
-
-// Homepage red button
-<Button bg="custom.base" color="white" _hover={{ bg: "red.600" }}>
-  Explore Tools
-</Button>
-```
-
-### Input Fields
-
-Always use the `InputField` component for consistent styling and copy functionality:
-
-```typescript
-import { InputField } from "@/components/InputField";
-
-<InputField
-  placeholder="Enter value"
-  value={value}
-  onChange={handleChange}
-  isInvalid={hasError}
-/>
-```
-
-Input styling is handled automatically:
-- Background: `bg.subtle`
-- Border: `border.default`, hover: `border.strong`
-- Focus: `primary.500` border with ring
-- Error: `error.solid` border with ring
+- **Variants**:
+  - **Primary** (Red): `bg-[#D02020] text-white border-2 border-black shadow-[4px_4px_0px_0px_black]`
+  - **Secondary** (Blue): `bg-[#1040C0] text-white border-2 border-black shadow-[4px_4px_0px_0px_black]`
+  - **Yellow**: `bg-[#F0C020] text-black border-2 border-black shadow-[4px_4px_0px_0px_black]`
+  - **Outline**: `bg-white text-black border-2 border-black shadow-[4px_4px_0px_0px_black]`
+  - **Ghost**: `border-none text-black hover:bg-gray-200`
+- **Shapes**: Either `rounded-none` (square) or `rounded-full` (pill). Use shape variants deliberately.
+- **States**:
+  - Hover: Slight opacity change (`hover:bg-[color]/90`)
+  - Active: Button "presses down" (`active:translate-x-[2px] active:translate-y-[2px] active:shadow-none`)
+  - Focus: 2px offset ring
+- **Typography**: Uppercase, font-bold, tracking-wider
 
 ### Cards
 
-```typescript
-import { Card } from "@/components/Card";
+- **Base Style**: White background, `border-4 border-black`, `shadow-[8px_8px_0px_0px_black]`
+- **Decoration**: Small geometric shape in top-right corner (8px x 8px):
+  - Circle: `rounded-full bg-[primary-color]`
+  - Square: `rounded-none bg-[primary-color]`
+  - Triangle: CSS clip-path `polygon(50% 0%, 0% 100%, 100% 100%)`
+- **Hover**: `hover:-translate-y-1` (subtle lift effect)
+- **Content Hierarchy**: Large bold titles, medium body text, generous padding
 
-// Elevated card (default)
-<Card>Content</Card>
+### Accordion (FAQ)
 
-// Interactive card
-<Card variant="interactive">Clickable content</Card>
+- **Closed State**: White background, `border-4 border-black`, `shadow-[4px_4px_0px_0px_black]`
+- **Open State**: Red background (`bg-[#D02020]`), white text for header
+- **Expanded Content**: Light yellow background (`bg-[#FFF9C4]`), black text, `border-t-4 border-black`
+- **Icon**: ChevronDown with `rotate-180` when open
 
-// Outline card
-<Card variant="outline">Outlined content</Card>
-```
+## 4. Layout & Spacing
 
-### Tabs
+- **Container Width**: `max-w-7xl` for main content sections (creates poster-like breadth)
+- **Section Padding**:
+  - Mobile: `py-12 px-4`
+  - Tablet: `py-16 px-6`
+  - Desktop: `py-24 px-8`
+- **Grid Systems**:
+  - Stats: 1-column (mobile) → 2-column (tablet) → 4-column (desktop) with `divide-y` and `divide-x` borders
+  - Features: 1-column → 2-column → 3-column with 8px gaps
+  - Pricing: 1-column → 3-column (center elevated on desktop)
+- **Spacing Scale**: Consistent use of 4px, 8px, 12px, 16px, 24px
+- **Section Dividers**: Every section has `border-b-4 border-black` creating strong horizontal rhythm
 
-```typescript
-import TabsSelector from "@/components/Tabs/TabsSelector";
+## 5. Non-Genericness (Bold Choices)
 
-<TabsSelector
-  tabs={["Tab 1", "Tab 2", "Tab 3"]}
-  selectedTabIndex={selectedIndex}
-  setSelectedTabIndex={setSelectedIndex}
-/>
-```
+**This design MUST NOT look like generic Tailwind or Bootstrap. The following are mandatory:**
 
-### Select
+- **Color Blocking**: Entire sections use solid primary colors as backgrounds:
+  - Hero right panel: Blue (`bg-[#1040C0]`)
+  - Stats section: Yellow (`bg-[#F0C020]`)
+  - Blog section: Blue (`bg-[#1040C0]`)
+  - Benefits section: Red (`bg-[#D02020]`)
+  - Final CTA: Yellow (`bg-[#F0C020]`)
+  - Footer: Near-black (`bg-[#121212]`)
 
-```typescript
-import { DarkSelect } from "@/components/DarkSelect";
+- **Geometric Logo**: Navigation features three geometric shapes (circle, square, triangle) in primary colors forming the brand identity
 
-<DarkSelect
-  placeholder="Select option"
-  options={options}
-  selectedOption={selected}
-  setSelectedOption={setSelected}
-/>
-```
+- **Geometric Compositions**: Use abstract compositions of overlapping shapes:
+  - Hero right panel: Overlapping circle, rotated square, and centered square with triangle
+  - Product Detail: Abstract geometric "face" constructed from circles, squares, and diagonal line
+  - Final CTA: Large decorative shapes (circle and rotated square) at 50% opacity in corners
 
----
+- **Rotated Elements**: Deliberate 45° rotation on:
+  - Every 3rd shape in repeating patterns
+  - Step numbers in "How It Works" (counter-rotate inner content)
+  - Decorative background shapes
 
-## Layout System
+- **Image Treatments**:
+  - Blog images: Alternate between `rounded-full` and `rounded-none`, grayscale filter with `hover:grayscale-0`
+  - Testimonial avatars: Circular crop with `rounded-full` and grayscale filter
 
-### Container Widths
+- **Unique Decorations**: Small geometric shapes (8px-16px) as corner decorations on cards, using the three primary colors in rotation
 
-| Token | Width | Usage |
-|-------|-------|-------|
-| `container.sm` | 640px | Narrow content |
-| `container.md` | 768px | Standard tools |
-| `container.lg` | 1024px | Wide tools |
-| `container.xl` | 1280px | Homepage, grids |
+## 6. Icons & Imagery
 
-### Spacing Scale
+- **Icon Library**: `lucide-react` (Circle, Square, Triangle, Check, Quote, ArrowRight, ChevronDown)
+- **Icon Style**:
+  - Stroke width: 2px (default) or 3px (emphasis)
+  - Size: h-6 w-6 to h-8 w-8
+  - Color: Match section accent color or white on colored backgrounds
+- **Icon Integration**: Icons placed inside bordered geometric containers:
+  - Features: Icon in white bordered box with shadow
+  - Benefits: Check icon in yellow circular badge
+  - Stats: Numbers in geometric shapes (circle/square/rotated square)
+- **Image Treatment**: All images use grayscale filter by default, color on hover
 
-```
-4px, 8px, 12px, 16px, 20px, 24px, 32px, 40px, 48px, 64px, 80px, 96px
-```
+## 7. Responsive Strategy
 
-### Page Layout Pattern
+- **Mobile-First Approach**: Start with single-column layouts, expand to grids on larger screens
+- **Breakpoints**:
+  - Mobile: < 640px (sm)
+  - Tablet: 640px - 1024px (sm to lg)
+  - Desktop: > 1024px (lg+)
+- **Typography Scaling**: All text uses responsive classes (text-4xl sm:text-6xl lg:text-8xl)
+- **Border/Shadow Scaling**: Reduce border and shadow sizes on mobile (border-2 → border-4, shadow-[3px] → shadow-[8px])
+- **Navigation**: Hamburger menu button on mobile (< 768px), full nav on desktop
+- **Grid Adaptations**:
+  - Stats: 1 col → 2 col (sm) → 4 col (lg)
+  - Features: 1 col → 2 col (md) → 3 col (lg)
+  - How It Works: 1 col → 2 col (sm) → 4 col (md), hide connecting line on mobile
 
-```typescript
-// Tool pages use the Layout component
-import { Layout } from "@/components/Layout";
+## 8. Animation & Micro-Interactions
 
-<Layout>
-  <Box maxW="container.lg" mx="auto">
-    {/* Page content */}
-  </Box>
-</Layout>
-```
-
-### Standard Page Header
-
-```typescript
-<Box mb={8} textAlign="center">
-  <Heading size="xl" color="text.primary" mb={4}>
-    Page Title
-  </Heading>
-  <Text color="text.secondary" maxW="600px" mx="auto">
-    Clear, concise description
-  </Text>
-</Box>
-```
-
----
-
-## Icons
-
-### Library: Lucide React
-
-```typescript
-import { Code2, Search, ArrowLeftRight } from "lucide-react";
-```
-
-### Icon Sizes
-
-| Token | Size | Usage |
-|-------|------|-------|
-| `sm` | 16px | Buttons, inputs |
-| `md` | 20px | List items |
-| `lg` | 24px | Section headers |
-| `xl` | 32px | Page headers |
-
-### Icon Colors
-
-```typescript
-// Tool pages - use primary blue
-<Icon as={Code2} size={20} color="var(--chakra-colors-primary-400)" />
-
-// Navbar/Footer - use text.secondary
-<Github size={22} color="var(--chakra-colors-text-secondary)" />
-```
-
----
-
-## Animation & Motion
-
-### Timing
-
-| Duration | Usage |
-|----------|-------|
-| 100ms | Button states, toggles |
-| 200ms | Standard transitions |
-| 300ms | Panel transitions |
-| 500ms | Page transitions |
-
-### Standard Hover Effect
-
-```typescript
-_hover={{
-  transform: "translateY(-2px)",
-  boxShadow: "lg",
-  borderColor: "primary.500",
-}}
-transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-```
-
----
-
-## Simplicity Principles
-
-### When to Keep It Simple
-
-- **One input per line** for converter tools
-- **Single color scheme** within individual tools
-- **Minimal sectioning** - don't break simple workflows
-- **Linear flow** - users should scan vertically
-
-### When Complex Layouts Are Appropriate
-
-- Multi-step configuration processes
-- Tools with distinct input/output phases
-- Dashboard-style interfaces with different data types
-
----
-
-## Copy Functionality
-
-### Always Include Copy Buttons
-
-- All input fields should have copy functionality
-- All output/readonly fields should have copy functionality
-- Hash outputs and address results are prime candidates
-- Use the `InputField` component for consistency
-
-```typescript
-// InputField includes copy button automatically
-<InputField
-  placeholder="Result"
-  value={result}
-  onChange={() => {}}
-  isReadOnly
-/>
-```
-
----
-
-## Accessibility
-
-### Requirements (WCAG 2.1 AA)
-
-- **Contrast:** 4.5:1 minimum for text
-- **Focus:** Visible 2px primary-500 outline
-- **Keyboard:** All elements focusable, logical tab order
-- **Motion:** Respect `prefers-reduced-motion`
-- **Forms:** Labels linked, errors announced
-
-### Focus States
-
-```typescript
-_focusVisible={{
-  outline: "none",
-  boxShadow: "0 0 0 3px rgba(59,130,246,0.4)",
-}}
-```
-
----
-
-## File Reference
-
-| File | Purpose |
-|------|---------|
-| `/style/tokens.ts` | Design tokens (colors, typography, spacing) |
-| `/style/theme.ts` | Chakra UI theme configuration |
-| `/app/IndexLayout.tsx` | Font loading (Inter, JetBrains Mono) |
-| `/components/InputField.tsx` | Standard input with copy functionality |
-| `/components/DarkButton.tsx` | Button component |
-| `/components/DarkSelect.tsx` | Select dropdown |
-| `/components/Card.tsx` | Card component |
-| `/components/Tabs/` | Tab components |
-| `/components/Layout.tsx` | Main layout wrapper |
-| `/components/Navbar.tsx` | Navigation bar |
-| `/components/Footer.tsx` | Footer |
-
----
-
-## Migration from Old Styles
-
-If updating old components, use these mappings:
-
-| Old | New |
-|-----|-----|
-| `bg="bg.900"` | `bg="bg.base"` |
-| `bg="whiteAlpha.50"` | `bg="bg.subtle"` |
-| `bg="whiteAlpha.100"` | `bg="bg.muted"` |
-| `borderColor="whiteAlpha.200"` | `borderColor="border.default"` |
-| `color="gray.100"` | `color="text.primary"` |
-| `color="gray.300"` | `color="text.secondary"` |
-| `color="gray.400"` / `gray.500"` | `color="text.tertiary"` |
-| `color="blue.400"` | `color="primary.400"` |
-
----
-
-_This guide should be referenced when creating new components or modifying existing ones to ensure visual consistency across the ETH.sh application._
+- **Feel**: Mechanical, snappy, geometric (no soft organic movement)
+- **Transition Duration**: `duration-200` or `duration-300` (fast and decisive)
+- **Easing**: `ease-out` (mechanical feel)
+- **Interactions**:
+  - Button press: Translate and remove shadow (`active:translate-x-[2px] active:translate-y-[2px] active:shadow-none`)
+  - Card hover: Lift upward (`hover:-translate-y-1` or `hover:-translate-y-2`)
+  - Accordion: ChevronDown rotation (`rotate-180`) and content reveal with max-height transition
+  - Icon hover: Scale up on grouped shapes (`group-hover:scale-110`)
+  - Link hover: Color change to accent color
+- **Background Patterns**: Static (no animation on patterns)
+  </design-system>

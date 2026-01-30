@@ -1,5 +1,5 @@
-/* Fallback font import for environments where HTML link fails */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap");
+/* Bauhaus Design System - Outfit geometric sans-serif font */
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap");
 
 html {
   width: 360px;
@@ -10,7 +10,7 @@ body {
   width: 100%;
   height: 100%;
   margin: 0;
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+  font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

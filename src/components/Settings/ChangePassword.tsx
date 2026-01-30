@@ -13,12 +13,10 @@ import {
   InputGroup,
   InputRightElement,
   IconButton,
-  Alert,
-  AlertIcon,
   Spacer,
   useToast,
 } from "@chakra-ui/react";
-import { ViewIcon, ViewOffIcon, ArrowBackIcon } from "@chakra-ui/icons";
+import { ViewIcon, ViewOffIcon, ArrowBackIcon, InfoIcon } from "@chakra-ui/icons";
 import { loadDecryptedApiKey, saveEncryptedApiKey } from "@/chrome/crypto";
 
 interface ChangePasswordProps {
@@ -119,18 +117,20 @@ function ChangePassword({ onComplete, onCancel }: ChangePasswordProps) {
           size="sm"
           onClick={onCancel}
         />
-        <Heading size="sm" color="text.primary">
+        <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="tight">
           Change Password
-        </Heading>
+        </Text>
         <Spacer />
       </HStack>
 
-      <Text fontSize="sm" color="text.secondary">
+      <Text fontSize="sm" color="text.secondary" fontWeight="500">
         Enter your current password and choose a new one.
       </Text>
 
       <FormControl isInvalid={!!errors.currentPassword}>
-        <FormLabel color="text.secondary">Current Password</FormLabel>
+        <FormLabel color="text.secondary" fontWeight="700" textTransform="uppercase" fontSize="xs">
+          Current Password
+        </FormLabel>
         <InputGroup>
           <Input
             type={showCurrentPassword ? "text" : "password"}
@@ -138,13 +138,6 @@ function ChangePassword({ onComplete, onCancel }: ChangePasswordProps) {
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             pr="3rem"
-            bg="bg.subtle"
-            borderColor="border.default"
-            _hover={{ borderColor: "border.strong" }}
-            _focus={{
-              borderColor: "primary.500",
-              boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
-            }}
           />
           <InputRightElement>
             <IconButton
@@ -157,13 +150,15 @@ function ChangePassword({ onComplete, onCancel }: ChangePasswordProps) {
             />
           </InputRightElement>
         </InputGroup>
-        <FormErrorMessage color="error.solid">
+        <FormErrorMessage color="bauhaus.red" fontWeight="700">
           {errors.currentPassword}
         </FormErrorMessage>
       </FormControl>
 
       <FormControl isInvalid={!!errors.newPassword}>
-        <FormLabel color="text.secondary">New Password</FormLabel>
+        <FormLabel color="text.secondary" fontWeight="700" textTransform="uppercase" fontSize="xs">
+          New Password
+        </FormLabel>
         <InputGroup>
           <Input
             type={showNewPassword ? "text" : "password"}
@@ -171,13 +166,6 @@ function ChangePassword({ onComplete, onCancel }: ChangePasswordProps) {
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             pr="3rem"
-            bg="bg.subtle"
-            borderColor="border.default"
-            _hover={{ borderColor: "border.strong" }}
-            _focus={{
-              borderColor: "primary.500",
-              boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
-            }}
           />
           <InputRightElement>
             <IconButton
@@ -190,47 +178,45 @@ function ChangePassword({ onComplete, onCancel }: ChangePasswordProps) {
             />
           </InputRightElement>
         </InputGroup>
-        <FormErrorMessage color="error.solid">
+        <FormErrorMessage color="bauhaus.red" fontWeight="700">
           {errors.newPassword}
         </FormErrorMessage>
       </FormControl>
 
       <FormControl isInvalid={!!errors.confirmPassword}>
-        <FormLabel color="text.secondary">Confirm New Password</FormLabel>
+        <FormLabel color="text.secondary" fontWeight="700" textTransform="uppercase" fontSize="xs">
+          Confirm New Password
+        </FormLabel>
         <Input
           type={showNewPassword ? "text" : "password"}
           placeholder="Confirm new password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          bg="bg.subtle"
-          borderColor="border.default"
-          _hover={{ borderColor: "border.strong" }}
-          _focus={{
-            borderColor: "primary.500",
-            boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
-          }}
         />
-        <FormErrorMessage color="error.solid">
+        <FormErrorMessage color="bauhaus.red" fontWeight="700">
           {errors.confirmPassword}
         </FormErrorMessage>
       </FormControl>
 
-      <Alert
-        status="info"
-        borderRadius="md"
-        fontSize="sm"
-        bg="info.bg"
-        borderWidth="1px"
-        borderColor="info.border"
+      <Box
+        bg="bauhaus.blue"
+        border="3px solid"
+        borderColor="bauhaus.black"
+        boxShadow="4px 4px 0px 0px #121212"
+        p={3}
       >
-        <AlertIcon color="info.solid" />
-        <Text color="text.primary">
-          You will need to unlock again after changing your password.
-        </Text>
-      </Alert>
+        <HStack spacing={2}>
+          <Box p={1} bg="bauhaus.black">
+            <InfoIcon color="bauhaus.blue" boxSize={4} />
+          </Box>
+          <Text color="white" fontSize="sm" fontWeight="700">
+            You will need to unlock again after changing your password.
+          </Text>
+        </HStack>
+      </Box>
 
       <Box display="flex" gap={2} pt={2}>
-        <Button variant="outline" flex={1} onClick={onCancel}>
+        <Button variant="secondary" flex={1} onClick={onCancel}>
           Cancel
         </Button>
         <Button

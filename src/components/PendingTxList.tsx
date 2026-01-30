@@ -6,7 +6,6 @@ import {
   IconButton,
   Badge,
   Image,
-  Heading,
   Spacer,
   Button,
 } from "@chakra-ui/react";
@@ -59,6 +58,7 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
   return (
     <Box p={4} minH="100%" bg="bg.base">
       <VStack spacing={4} align="stretch">
+        {/* Header */}
         <HStack>
           <IconButton
             aria-label="Back"
@@ -67,75 +67,97 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
             size="sm"
             onClick={onBack}
           />
-          <Heading size="sm" color="text.primary">
+          <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="tight">
             Pending Requests
-          </Heading>
+          </Text>
           <Spacer />
           <Badge
-            bg="warning.bg"
-            color="warning.solid"
-            borderWidth="1px"
-            borderColor="warning.border"
-            borderRadius="full"
-            px={2}
+            bg="bauhaus.yellow"
+            color="bauhaus.black"
+            border="2px solid"
+            borderColor="bauhaus.black"
+            px={3}
+            py={1}
+            fontWeight="700"
           >
             {totalCount}
           </Badge>
         </HStack>
 
-        <VStack spacing={2} align="stretch">
+        <VStack spacing={3} align="stretch">
           {/* Transaction Requests */}
           {txRequests.map((request, index) => {
             const config = getChainConfig(request.tx.chainId);
             return (
               <Box
                 key={request.id}
-                bg="bg.subtle"
-                borderWidth="1px"
-                borderColor="border.default"
-                borderRadius="lg"
+                bg="bauhaus.white"
+                border="3px solid"
+                borderColor="bauhaus.black"
+                boxShadow="4px 4px 0px 0px #121212"
                 p={3}
                 cursor="pointer"
                 onClick={() => onSelectTx(request)}
                 _hover={{
-                  bg: "bg.emphasis",
-                  borderColor: "border.strong",
+                  transform: "translateY(-2px)",
+                  boxShadow: "6px 6px 0px 0px #121212",
                 }}
-                transition="all 0.2s"
+                _active={{
+                  transform: "translate(2px, 2px)",
+                  boxShadow: "none",
+                }}
+                transition="all 0.2s ease-out"
+                position="relative"
               >
+                {/* Corner decoration */}
+                <Box
+                  position="absolute"
+                  top="-3px"
+                  right="-3px"
+                  w="8px"
+                  h="8px"
+                  bg="bauhaus.blue"
+                  border="2px solid"
+                  borderColor="bauhaus.black"
+                />
+
                 <HStack justify="space-between">
                   <HStack spacing={3} flex={1}>
                     <Badge
-                      bg="bg.muted"
-                      color="text.secondary"
+                      bg="bauhaus.black"
+                      color="bauhaus.white"
                       fontSize="xs"
-                      minW="24px"
+                      minW="28px"
                       textAlign="center"
-                      borderRadius="md"
+                      fontWeight="700"
                     >
                       #{index + 1}
                     </Badge>
-                    <Image
-                      src={
-                        request.favicon ||
-                        `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`
-                      }
-                      alt="favicon"
-                      boxSize="28px"
-                      borderRadius="md"
-                      bg="white"
+                    <Box
+                      bg="bauhaus.white"
+                      border="2px solid"
+                      borderColor="bauhaus.black"
                       p={1}
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`;
-                      }}
-                    />
+                    >
+                      <Image
+                        src={
+                          request.favicon ||
+                          `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`
+                        }
+                        alt="favicon"
+                        boxSize="24px"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`;
+                        }}
+                      />
+                    </Box>
                     <Box flex={1}>
                       <HStack justify="space-between">
                         <HStack spacing={2}>
                           <Text
                             fontSize="sm"
-                            fontWeight="500"
+                            fontWeight="700"
                             color="text.primary"
                             noOfLines={1}
                           >
@@ -143,17 +165,16 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
                           </Text>
                           <Badge
                             fontSize="xs"
-                            bg="primary.500"
+                            bg="bauhaus.blue"
                             color="white"
-                            borderRadius="full"
+                            border="2px solid"
+                            borderColor="bauhaus.black"
                             px={1.5}
-                            py={0}
-                            textTransform="uppercase"
                           >
                             TX
                           </Badge>
                         </HStack>
-                        <Text fontSize="xs" color="text.tertiary">
+                        <Text fontSize="xs" color="text.tertiary" fontWeight="500">
                           {formatTimestamp(request.timestamp)}
                         </Text>
                       </HStack>
@@ -162,9 +183,8 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
                           fontSize="xs"
                           bg={config.bg}
                           color={config.text}
-                          borderWidth="1px"
-                          borderColor={config.border}
-                          borderRadius="full"
+                          border="2px solid"
+                          borderColor="bauhaus.black"
                           px={2}
                           py={0.5}
                           display="flex"
@@ -180,13 +200,15 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
                           )}
                           {request.chainName}
                         </Badge>
-                        <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
+                        <Text fontSize="xs" color="text.tertiary" fontFamily="mono" fontWeight="500">
                           {request.tx.to.slice(0, 6)}...{request.tx.to.slice(-4)}
                         </Text>
                       </HStack>
                     </Box>
                   </HStack>
-                  <ChevronRightIcon color="text.tertiary" />
+                  <Box bg="bauhaus.black" p={1}>
+                    <ChevronRightIcon color="bauhaus.white" />
+                  </Box>
                 </HStack>
               </Box>
             );
@@ -198,52 +220,74 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
             return (
               <Box
                 key={request.id}
-                bg="bg.subtle"
-                borderWidth="1px"
-                borderColor="border.default"
-                borderRadius="lg"
+                bg="bauhaus.white"
+                border="3px solid"
+                borderColor="bauhaus.black"
+                boxShadow="4px 4px 0px 0px #121212"
                 p={3}
                 cursor="pointer"
                 onClick={() => onSelectSignature(request)}
                 _hover={{
-                  bg: "bg.emphasis",
-                  borderColor: "border.strong",
+                  transform: "translateY(-2px)",
+                  boxShadow: "6px 6px 0px 0px #121212",
                 }}
-                transition="all 0.2s"
+                _active={{
+                  transform: "translate(2px, 2px)",
+                  boxShadow: "none",
+                }}
+                transition="all 0.2s ease-out"
+                position="relative"
               >
+                {/* Corner decoration - triangle for signature */}
+                <Box
+                  position="absolute"
+                  top="-3px"
+                  right="-3px"
+                  w="0"
+                  h="0"
+                  borderLeft="6px solid transparent"
+                  borderRight="6px solid transparent"
+                  borderBottom="10px solid"
+                  borderBottomColor="bauhaus.red"
+                />
+
                 <HStack justify="space-between">
                   <HStack spacing={3} flex={1}>
                     <Badge
-                      bg="bg.muted"
-                      color="text.secondary"
+                      bg="bauhaus.black"
+                      color="bauhaus.white"
                       fontSize="xs"
-                      minW="24px"
+                      minW="28px"
                       textAlign="center"
-                      borderRadius="md"
+                      fontWeight="700"
                     >
                       #{txRequests.length + index + 1}
                     </Badge>
-                    <Image
-                      src={
-                        request.favicon ||
-                        `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`
-                      }
-                      alt="favicon"
-                      boxSize="28px"
-                      borderRadius="md"
-                      bg="white"
+                    <Box
+                      bg="bauhaus.white"
+                      border="2px solid"
+                      borderColor="bauhaus.black"
                       p={1}
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`;
-                      }}
-                    />
+                    >
+                      <Image
+                        src={
+                          request.favicon ||
+                          `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`
+                        }
+                        alt="favicon"
+                        boxSize="24px"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`;
+                        }}
+                      />
+                    </Box>
                     <Box flex={1}>
                       <HStack justify="space-between">
                         <HStack spacing={2}>
                           <Text
                             fontSize="sm"
-                            fontWeight="500"
+                            fontWeight="700"
                             color="text.primary"
                             noOfLines={1}
                           >
@@ -251,17 +295,16 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
                           </Text>
                           <Badge
                             fontSize="xs"
-                            bg="warning.solid"
-                            color="bg.base"
-                            borderRadius="full"
+                            bg="bauhaus.red"
+                            color="white"
+                            border="2px solid"
+                            borderColor="bauhaus.black"
                             px={1.5}
-                            py={0}
-                            textTransform="uppercase"
                           >
                             SIG
                           </Badge>
                         </HStack>
-                        <Text fontSize="xs" color="text.tertiary">
+                        <Text fontSize="xs" color="text.tertiary" fontWeight="500">
                           {formatTimestamp(request.timestamp)}
                         </Text>
                       </HStack>
@@ -270,9 +313,8 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
                           fontSize="xs"
                           bg={config.bg}
                           color={config.text}
-                          borderWidth="1px"
-                          borderColor={config.border}
-                          borderRadius="full"
+                          border="2px solid"
+                          borderColor="bauhaus.black"
                           px={2}
                           py={0.5}
                           display="flex"
@@ -288,13 +330,15 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
                           )}
                           {request.chainName}
                         </Badge>
-                        <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
+                        <Text fontSize="xs" color="text.tertiary" fontFamily="mono" fontWeight="500">
                           {getMethodDisplayName(request.signature.method)}
                         </Text>
                       </HStack>
                     </Box>
                   </HStack>
-                  <ChevronRightIcon color="text.tertiary" />
+                  <Box bg="bauhaus.black" p={1}>
+                    <ChevronRightIcon color="bauhaus.white" />
+                  </Box>
                 </HStack>
               </Box>
             );
@@ -302,18 +346,21 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
         </VStack>
 
         {totalCount === 0 && (
-          <Box textAlign="center" py={8}>
-            <Text color="text.secondary">No pending requests</Text>
+          <Box
+            textAlign="center"
+            py={8}
+            bg="bauhaus.white"
+            border="3px solid"
+            borderColor="bauhaus.black"
+          >
+            <Text color="text.secondary" fontWeight="500">No pending requests</Text>
           </Box>
         )}
 
         {totalCount > 0 && (
           <Button
-            variant="outline"
+            variant="danger"
             w="full"
-            borderColor="error.solid"
-            color="error.solid"
-            _hover={{ bg: "error.bg" }}
             onClick={onRejectAll}
           >
             Reject All ({totalCount})

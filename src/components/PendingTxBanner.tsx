@@ -1,4 +1,4 @@
-import { HStack, Box, Text, Icon } from "@chakra-ui/react";
+import { HStack, Box, Text } from "@chakra-ui/react";
 import { BellIcon, ChevronRightIcon } from "@chakra-ui/icons";
 
 interface PendingTxBannerProps {
@@ -34,37 +34,55 @@ function PendingTxBanner({ txCount, signatureCount, onClickTx, onClickSignature 
 
   return (
     <Box
-      bg="warning.bg"
-      borderWidth="1px"
-      borderColor="warning.border"
-      borderRadius="lg"
+      bg="bauhaus.yellow"
+      border="3px solid"
+      borderColor="bauhaus.black"
+      boxShadow="4px 4px 0px 0px #121212"
       p={3}
       cursor="pointer"
       onClick={handleClick}
       _hover={{
-        bg: "rgba(251,191,36,0.15)",
-        borderColor: "warning.solid",
+        transform: "translateY(-2px)",
+        boxShadow: "6px 6px 0px 0px #121212",
       }}
-      transition="all 0.2s"
+      _active={{
+        transform: "translate(2px, 2px)",
+        boxShadow: "none",
+      }}
+      transition="all 0.2s ease-out"
+      position="relative"
     >
+      {/* Corner decoration */}
+      <Box
+        position="absolute"
+        top="-3px"
+        right="-3px"
+        w="10px"
+        h="10px"
+        bg="bauhaus.red"
+        border="2px solid"
+        borderColor="bauhaus.black"
+      />
+
       <HStack spacing={0}>
         <Box w="40px" flexShrink={0}>
           <Box
             p={1.5}
-            bg="warning.solid"
-            borderRadius="md"
+            bg="bauhaus.black"
             w="fit-content"
           >
-            <BellIcon boxSize={4} color="bg.base" />
+            <BellIcon boxSize={4} color="bauhaus.yellow" />
           </Box>
         </Box>
         <Box flex="1" textAlign="center">
-          <Text fontSize="sm" fontWeight="600" color="text.primary">
+          <Text fontSize="sm" fontWeight="700" color="bauhaus.black" textTransform="uppercase" letterSpacing="wider">
             {getLabel()}
           </Text>
         </Box>
         <Box w="40px" flexShrink={0} display="flex" justifyContent="flex-end">
-          <ChevronRightIcon color="warning.solid" />
+          <Box bg="bauhaus.black" p={1}>
+            <ChevronRightIcon color="bauhaus.yellow" />
+          </Box>
         </Box>
       </HStack>
     </Box>

@@ -10,8 +10,6 @@ import {
   InputRightElement,
   IconButton,
   Image,
-  Alert,
-  AlertIcon,
   Tooltip,
   Icon,
   useToast,
@@ -177,6 +175,31 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
       px={6}
       position="relative"
     >
+      {/* Geometric decoration - top left */}
+      <Box
+        position="absolute"
+        top={4}
+        left={4}
+        w="12px"
+        h="12px"
+        bg="bauhaus.red"
+        border="2px solid"
+        borderColor="bauhaus.black"
+      />
+
+      {/* Geometric decoration - top right triangle */}
+      <Box
+        position="absolute"
+        top={4}
+        right={sidePanelSupported ? 12 : 4}
+        w="0"
+        h="0"
+        borderLeft="6px solid transparent"
+        borderRight="6px solid transparent"
+        borderBottom="12px solid"
+        borderBottomColor="bauhaus.blue"
+      />
+
       {/* Sidepanel toggle - top right */}
       {sidePanelSupported && (
         <Box position="absolute" top={3} right={3}>
@@ -202,168 +225,209 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
           top={3}
           left={3}
           right={sidePanelSupported ? 12 : 3}
-          bg="warning.bg"
-          borderWidth="1px"
-          borderColor="warning.border"
-          borderRadius="lg"
+          bg="bauhaus.yellow"
+          border="2px solid"
+          borderColor="bauhaus.black"
+          boxShadow="3px 3px 0px 0px #121212"
           px={3}
           py={2}
         >
           <HStack spacing={2}>
             <Box
               p={1.5}
-              bg="warning.solid"
-              borderRadius="md"
+              bg="bauhaus.black"
               display="flex"
               alignItems="center"
               justifyContent="center"
               flexShrink={0}
             >
-              <BellIcon boxSize={3.5} color="bg.base" />
+              <BellIcon boxSize={3.5} color="bauhaus.yellow" />
             </Box>
-            <Text flex="1" textAlign="center" fontSize="xs" fontWeight="500" color="text.primary">
+            <Text flex="1" textAlign="center" fontSize="xs" fontWeight="700" color="bauhaus.black" textTransform="uppercase">
               {pendingTxCount > 0 && pendingSignatureCount > 0
-                ? `${pendingTxCount} tx, ${pendingSignatureCount} signature pending`
+                ? `${pendingTxCount} tx, ${pendingSignatureCount} sig pending`
                 : pendingTxCount > 0
                 ? `${pendingTxCount} pending request${pendingTxCount > 1 ? "s" : ""}`
-                : `${pendingSignatureCount} signature request${pendingSignatureCount > 1 ? "s" : ""}`}
+                : `${pendingSignatureCount} signature${pendingSignatureCount > 1 ? "s" : ""}`}
             </Text>
           </HStack>
         </Box>
       )}
 
       <VStack spacing={6} w="full" maxW="280px">
+        {/* Lock icon in geometric container */}
         <Box
           p={4}
-          bg="bg.subtle"
-          borderRadius="full"
-          borderWidth="1px"
-          borderColor="border.default"
+          bg="bauhaus.blue"
+          border="4px solid"
+          borderColor="bauhaus.black"
+          boxShadow="6px 6px 0px 0px #121212"
+          transform="rotate(-3deg)"
         >
-          <LockIcon boxSize={8} color="primary.400" />
+          <LockIcon boxSize={8} color="bauhaus.white" />
         </Box>
 
         <VStack spacing={1}>
           <Image src="impersonatorLogo.png" w="3rem" />
-          <Text fontSize="xl" fontWeight="600" color="text.primary">
+          <Text fontSize="xl" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="tight">
             BankrWallet
           </Text>
-          <Text fontSize="sm" color="text.secondary" textAlign="center">
+          <Text fontSize="sm" color="text.secondary" textAlign="center" fontWeight="500">
             Enter your password to unlock
           </Text>
         </VStack>
 
-        <VStack spacing={3} w="full">
-          <InputGroup>
-            <Input
-              ref={passwordInputRef}
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              value={password}
-              autoFocus
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (error) setError("");
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleUnlock();
-              }}
-              isDisabled={isUnlocking}
-              bg="bg.subtle"
-              borderColor={error ? "error.solid" : "border.default"}
-              _hover={{ borderColor: error ? "error.solid" : "border.strong" }}
-              _focus={{
-                borderColor: error ? "error.solid" : "primary.500",
-                boxShadow: `0 0 0 1px var(--chakra-colors-${error ? "error-solid" : "primary-500"})`,
-              }}
-            />
-            <InputRightElement>
-              <IconButton
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                icon={showPassword ? <ViewOffIcon /> : <ViewIcon />}
-                size="sm"
-                variant="ghost"
-                onClick={() => setShowPassword(!showPassword)}
-                color="text.secondary"
+        {/* Main form card */}
+        <Box
+          w="full"
+          p={4}
+          bg="bauhaus.white"
+          border="4px solid"
+          borderColor="bauhaus.black"
+          boxShadow="6px 6px 0px 0px #121212"
+          position="relative"
+        >
+          {/* Corner decoration */}
+          <Box
+            position="absolute"
+            top="-2px"
+            right="-2px"
+            w="10px"
+            h="10px"
+            bg="bauhaus.yellow"
+            border="2px solid"
+            borderColor="bauhaus.black"
+          />
+
+          <VStack spacing={3} w="full">
+            <InputGroup>
+              <Input
+                ref={passwordInputRef}
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                value={password}
+                autoFocus
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleUnlock();
+                }}
+                isDisabled={isUnlocking}
+                bg="bauhaus.white"
+                border="2px solid"
+                borderColor={error ? "bauhaus.red" : "bauhaus.black"}
+                borderRadius="0"
+                _hover={{ borderColor: error ? "bauhaus.red" : "bauhaus.black" }}
+                _focus={{
+                  borderColor: error ? "bauhaus.red" : "bauhaus.blue",
+                  boxShadow: error ? "3px 3px 0px 0px #D02020" : "3px 3px 0px 0px #1040C0",
+                }}
               />
-            </InputRightElement>
-          </InputGroup>
+              <InputRightElement>
+                <IconButton
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  icon={showPassword ? <ViewOffIcon /> : <ViewIcon />}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowPassword(!showPassword)}
+                  color="text.secondary"
+                />
+              </InputRightElement>
+            </InputGroup>
 
-          {error && (
-            <VStack spacing={2} w="full">
-              <Alert
-                status="error"
-                borderRadius="md"
-                fontSize="sm"
-                bg="error.bg"
-                borderWidth="1px"
-                borderColor="error.border"
-                py={2}
-                w="full"
-              >
-                <AlertIcon color="error.solid" boxSize={4} />
-                <Text color="text.primary" fontSize="sm">
-                  {error}
-                </Text>
-              </Alert>
-              <Link
-                fontSize="sm"
-                color="text.secondary"
-                _hover={{ color: "primary.400", textDecoration: "underline" }}
-                onClick={onResetModalOpen}
-                cursor="pointer"
-              >
-                Forgot Password?
-              </Link>
-            </VStack>
-          )}
+            {error && (
+              <VStack spacing={2} w="full">
+                <Box
+                  w="full"
+                  bg="bauhaus.red"
+                  border="2px solid"
+                  borderColor="bauhaus.black"
+                  p={2}
+                >
+                  <HStack>
+                    <WarningTwoIcon color="white" boxSize={4} />
+                    <Text color="white" fontSize="sm" fontWeight="700">
+                      {error}
+                    </Text>
+                  </HStack>
+                </Box>
+                <Link
+                  fontSize="sm"
+                  color="text.secondary"
+                  fontWeight="500"
+                  _hover={{ color: "bauhaus.blue", textDecoration: "underline" }}
+                  onClick={onResetModalOpen}
+                  cursor="pointer"
+                >
+                  Forgot Password?
+                </Link>
+              </VStack>
+            )}
 
-          <Button
-            variant="primary"
-            w="full"
-            onClick={handleUnlock}
-            isLoading={isUnlocking}
-            loadingText="Unlocking..."
-          >
-            Unlock
-          </Button>
-        </VStack>
+            <Button
+              variant="primary"
+              w="full"
+              onClick={handleUnlock}
+              isLoading={isUnlocking}
+              loadingText="Unlocking..."
+            >
+              Unlock
+            </Button>
+          </VStack>
+        </Box>
       </VStack>
 
       {/* Reset Extension Modal */}
       <Modal isOpen={isResetModalOpen} onClose={onResetModalClose} isCentered>
         <ModalOverlay bg="blackAlpha.700" />
-        <ModalContent bg="bg.subtle" borderWidth="1px" borderColor="border.default" mx={4}>
-          <ModalHeader color="text.primary" fontSize="md" pb={2}>
+        <ModalContent
+          bg="bauhaus.white"
+          border="4px solid"
+          borderColor="bauhaus.black"
+          borderRadius="0"
+          boxShadow="8px 8px 0px 0px #121212"
+          mx={4}
+        >
+          <ModalHeader color="text.primary" fontSize="md" pb={2} textTransform="uppercase" letterSpacing="wider">
             <Box display="flex" alignItems="center" gap={2}>
-              <WarningTwoIcon color="warning.solid" />
+              <Box p={1} bg="bauhaus.yellow" border="2px solid" borderColor="bauhaus.black">
+                <WarningTwoIcon color="bauhaus.black" />
+              </Box>
               Reset Extension?
             </Box>
           </ModalHeader>
           <ModalBody>
             <VStack spacing={3} align="start">
-              <Text color="text.secondary" fontSize="sm">
+              <Text color="text.secondary" fontSize="sm" fontWeight="500">
                 This will clear all your stored data including:
               </Text>
-              <Box pl={4}>
-                <Text color="text.secondary" fontSize="sm">• Your encrypted API key</Text>
-                <Text color="text.secondary" fontSize="sm">• Your wallet address</Text>
-                <Text color="text.secondary" fontSize="sm">• Transaction history</Text>
+              <Box pl={4} borderLeft="4px solid" borderColor="bauhaus.red">
+                <Text color="text.secondary" fontSize="sm">Your encrypted API key</Text>
+                <Text color="text.secondary" fontSize="sm">Your wallet address</Text>
+                <Text color="text.secondary" fontSize="sm">Transaction history</Text>
               </Box>
-              <Text color="warning.solid" fontSize="sm" fontWeight="500">
-                You will need to enter your Bankr API key and set up a new password again.
-              </Text>
+              <Box
+                w="full"
+                p={3}
+                bg="bauhaus.yellow"
+                border="2px solid"
+                borderColor="bauhaus.black"
+              >
+                <Text color="bauhaus.black" fontSize="sm" fontWeight="700">
+                  You will need to enter your Bankr API key and set up a new password again.
+                </Text>
+              </Box>
             </VStack>
           </ModalBody>
           <ModalFooter gap={2}>
-            <Button variant="ghost" size="sm" onClick={onResetModalClose} isDisabled={isResetting}>
+            <Button variant="secondary" size="sm" onClick={onResetModalClose} isDisabled={isResetting}>
               Cancel
             </Button>
             <Button
+              variant="danger"
               size="sm"
-              bg="error.solid"
-              color="white"
-              _hover={{ bg: "error.solid", opacity: 0.9 }}
               onClick={handleResetExtension}
               isLoading={isResetting}
               loadingText="Resetting..."
@@ -383,15 +447,16 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
         left={0}
         right={0}
       >
-        <Text fontSize="sm" color="text.tertiary">
+        <Text fontSize="sm" color="text.tertiary" fontWeight="500">
           Built by
         </Text>
         <Link
           display="flex"
           alignItems="center"
           gap={1}
-          color="primary.400"
-          _hover={{ color: "primary.500" }}
+          color="bauhaus.blue"
+          fontWeight="700"
+          _hover={{ color: "bauhaus.red" }}
           onClick={() => {
             chrome.tabs.create({ url: "https://x.com/apoorveth" });
           }}

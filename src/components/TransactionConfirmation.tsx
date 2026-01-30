@@ -5,11 +5,8 @@ import {
   HStack,
   Text,
   Button,
-  Divider,
   Badge,
   Spinner,
-  Alert,
-  AlertIcon,
   IconButton,
   Code,
   Flex,
@@ -25,9 +22,9 @@ import { getChainConfig } from "@/constants/chainConfig";
 
 // Success animation keyframes
 const scaleIn = keyframes`
-  0% { transform: scale(0); opacity: 0; }
-  50% { transform: scale(1.2); }
-  100% { transform: scale(1); opacity: 1; }
+  0% { transform: scale(0) rotate(-10deg); opacity: 0; }
+  50% { transform: scale(1.1) rotate(5deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
 `;
 
 const checkmarkDraw = keyframes`
@@ -83,9 +80,9 @@ function CopyButton({ value }: { value: string }) {
       icon={copied ? <CheckIcon /> : <CopyIcon />}
       size="xs"
       variant="ghost"
-      color={copied ? "success.solid" : "text.secondary"}
+      color={copied ? "bauhaus.yellow" : "text.secondary"}
       onClick={handleCopy}
-      _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+      _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
     />
   );
 }
@@ -178,11 +175,6 @@ function TransactionConfirmation({
     return `${eth.toFixed(6)} ETH`;
   };
 
-  const formatTimestamp = (timestamp: number): string => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
-
   // Success animation screen (popup mode only)
   if (state === "sent") {
     return (
@@ -194,14 +186,49 @@ function TransactionConfirmation({
         alignItems="center"
         justifyContent="center"
         p={8}
+        position="relative"
       >
+        {/* Geometric decorations */}
         <Box
-          w="80px"
-          h="80px"
+          position="absolute"
+          top={6}
+          left={6}
+          w="16px"
+          h="16px"
+          bg="bauhaus.red"
+          border="2px solid"
+          borderColor="bauhaus.black"
+        />
+        <Box
+          position="absolute"
+          top={6}
+          right={6}
+          w="16px"
+          h="16px"
+          bg="bauhaus.blue"
           borderRadius="full"
-          bg="success.bg"
-          borderWidth="3px"
-          borderColor="success.solid"
+          border="2px solid"
+          borderColor="bauhaus.black"
+        />
+        <Box
+          position="absolute"
+          bottom={6}
+          left={6}
+          w="0"
+          h="0"
+          borderLeft="8px solid transparent"
+          borderRight="8px solid transparent"
+          borderBottom="16px solid"
+          borderBottomColor="bauhaus.yellow"
+        />
+
+        <Box
+          w="100px"
+          h="100px"
+          bg="bauhaus.yellow"
+          border="4px solid"
+          borderColor="bauhaus.black"
+          boxShadow="8px 8px 0px 0px #121212"
           display="flex"
           alignItems="center"
           justifyContent="center"
@@ -210,16 +237,16 @@ function TransactionConfirmation({
         >
           <Icon
             viewBox="0 0 24 24"
-            w="40px"
-            h="40px"
-            color="success.solid"
+            w="50px"
+            h="50px"
+            color="bauhaus.black"
           >
             <path
               fill="none"
               stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              strokeWidth="4"
+              strokeLinecap="square"
+              strokeLinejoin="miter"
               d="M5 13l4 4L19 7"
               style={{
                 strokeDasharray: 50,
@@ -230,10 +257,12 @@ function TransactionConfirmation({
           </Icon>
         </Box>
         <Text
-          fontSize="xl"
-          fontWeight="600"
+          fontSize="2xl"
+          fontWeight="900"
           color="text.primary"
           mb={2}
+          textTransform="uppercase"
+          letterSpacing="tight"
         >
           Transaction Sent
         </Text>
@@ -241,6 +270,7 @@ function TransactionConfirmation({
           fontSize="sm"
           color="text.secondary"
           textAlign="center"
+          fontWeight="500"
         >
           Your transaction has been submitted
         </Text>
@@ -279,17 +309,17 @@ function TransactionConfirmation({
                 isDisabled={currentIndex === 0}
                 onClick={() => onNavigate("prev")}
                 color="text.secondary"
-                _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+                _hover={{ color: "text.primary", bg: "bg.muted" }}
                 minW="auto"
                 p={1}
               />
               <Badge
-                bg="bg.muted"
-                color="text.secondary"
+                bg="bauhaus.black"
+                color="bauhaus.white"
                 fontSize="xs"
-                px={2}
-                py={0.5}
-                borderRadius="full"
+                px={3}
+                py={1}
+                fontWeight="700"
               >
                 {currentIndex + 1}/{totalCount}
               </Badge>
@@ -308,7 +338,7 @@ function TransactionConfirmation({
                   }
                 }}
                 color="text.secondary"
-                _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+                _hover={{ color: "text.primary", bg: "bg.muted" }}
                 minW="auto"
                 p={1}
               />
@@ -321,8 +351,9 @@ function TransactionConfirmation({
             <Button
               size="xs"
               variant="ghost"
-              color="error.solid"
-              _hover={{ bg: "error.bg" }}
+              color="bauhaus.red"
+              fontWeight="700"
+              _hover={{ bg: "bauhaus.red", color: "white" }}
               onClick={onRejectAll}
               px={2}
             >
@@ -331,157 +362,189 @@ function TransactionConfirmation({
           )}
         </Flex>
 
-        {/* Title row */}
-        <Text fontWeight="600" fontSize="lg" color="text.primary" textAlign="center">
-          Transaction Request
-        </Text>
-
-        {/* Transaction Info */}
-        <VStack
-          spacing={0}
-          bg="bg.subtle"
-          borderRadius="md"
-          borderWidth="1px"
-          borderColor="border.default"
-          divider={<Divider borderColor="border.default" />}
+        {/* Title row with blue background */}
+        <Box
+          bg="bauhaus.blue"
+          border="3px solid"
+          borderColor="bauhaus.black"
+          boxShadow="4px 4px 0px 0px #121212"
+          py={3}
+          px={4}
+          position="relative"
         >
-          {/* Origin */}
-          <HStack w="full" p={3} justify="space-between">
-            <Text fontSize="sm" color="text.secondary">
-              Origin
-            </Text>
-            <HStack spacing={2}>
-              <Box
-                bg="white"
-                p="2px"
-                borderRadius="md"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-              >
-                <Image
-                  src={
-                    favicon ||
-                    `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`
-                  }
-                  alt="favicon"
-                  boxSize="16px"
-                  borderRadius="sm"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    const googleFallback = `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`;
-                    if (target.src !== googleFallback) {
-                      target.src = googleFallback;
-                    }
-                  }}
-                  fallback={<Box boxSize="16px" bg="white" borderRadius="sm" />}
-                />
-              </Box>
-              <Text fontSize="sm" fontWeight="medium" color="text.primary">
-                {new URL(origin).hostname}
-              </Text>
-            </HStack>
-          </HStack>
+          <Box
+            position="absolute"
+            top="-3px"
+            right="-3px"
+            w="10px"
+            h="10px"
+            bg="bauhaus.yellow"
+            border="2px solid"
+            borderColor="bauhaus.black"
+          />
+          <Text fontWeight="900" fontSize="lg" color="white" textAlign="center" textTransform="uppercase" letterSpacing="wider">
+            Transaction Request
+          </Text>
+        </Box>
 
-          {/* Network */}
-          <HStack w="full" p={3} justify="space-between">
-            <Text fontSize="sm" color="text.secondary">
-              Network
-            </Text>
-            {(() => {
-              const config = getChainConfig(tx.chainId);
-              return (
-                <Badge
-                  fontSize="sm"
-                  bg={config.bg}
-                  color={config.text}
-                  borderWidth="1px"
-                  borderColor={config.border}
-                  borderRadius="full"
-                  textTransform="uppercase"
-                  fontWeight="600"
-                  px={3}
-                  py={1}
+        {/* Transaction Info Card */}
+        <Box
+          bg="bauhaus.white"
+          border="3px solid"
+          borderColor="bauhaus.black"
+          boxShadow="4px 4px 0px 0px #121212"
+          position="relative"
+        >
+          {/* Corner decoration */}
+          <Box
+            position="absolute"
+            top="-3px"
+            right="-3px"
+            w="10px"
+            h="10px"
+            bg="bauhaus.red"
+            border="2px solid"
+            borderColor="bauhaus.black"
+            borderRadius="full"
+          />
+
+          <VStack spacing={0} divider={<Box h="2px" bg="bauhaus.black" w="full" />}>
+            {/* Origin */}
+            <HStack w="full" p={3} justify="space-between">
+              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                Origin
+              </Text>
+              <HStack spacing={2}>
+                <Box
+                  bg="bauhaus.white"
+                  border="2px solid"
+                  borderColor="bauhaus.black"
+                  p={1}
                   display="flex"
                   alignItems="center"
-                  gap={1.5}
+                  justifyContent="center"
                 >
-                  {config.icon && (
-                    <Image src={config.icon} alt={chainName} boxSize="14px" />
-                  )}
-                  {chainName}
-                </Badge>
-              );
-            })()}
-          </HStack>
-
-          {/* To Address */}
-          <Box w="full" p={3}>
-            <HStack justify="space-between" mb={toLabels.length > 0 ? 2 : 0}>
-              <Text fontSize="sm" color="text.secondary">
-                To
-              </Text>
-              <HStack spacing={1}>
-                <Code
-                  px={2}
-                  py={1}
-                  borderRadius="md"
-                  fontSize="xs"
-                  bg="bg.muted"
-                  color="text.primary"
-                  fontFamily="mono"
-                >
-                  {tx.to.slice(0, 6)}...{tx.to.slice(-4)}
-                </Code>
-                <CopyButton value={tx.to} />
+                  <Image
+                    src={
+                      favicon ||
+                      `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`
+                    }
+                    alt="favicon"
+                    boxSize="16px"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      const googleFallback = `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`;
+                      if (target.src !== googleFallback) {
+                        target.src = googleFallback;
+                      }
+                    }}
+                    fallback={<Box boxSize="16px" bg="white" />}
+                  />
+                </Box>
+                <Text fontSize="sm" fontWeight="700" color="text.primary">
+                  {new URL(origin).hostname}
+                </Text>
               </HStack>
             </HStack>
-            {toLabels.length > 0 && (
-              <Flex gap={1} flexWrap="nowrap" justify="center">
-                {toLabels.map((label, index) => (
-                  <Badge
-                    key={index}
-                    fontSize="2xs"
-                    bg="info.bg"
-                    color="info.solid"
-                    borderWidth="1px"
-                    borderColor="info.border"
-                    borderRadius="full"
-                    px={1.5}
-                    py={0.5}
-                    fontWeight="normal"
-                    textTransform="none"
-                    whiteSpace="nowrap"
-                  >
-                    {label}
-                  </Badge>
-                ))}
-              </Flex>
-            )}
-          </Box>
 
-          {/* Value */}
-          <HStack w="full" p={3} justify="space-between">
-            <Text fontSize="sm" color="text.secondary">
-              Value
-            </Text>
-            <Text fontSize="sm" fontWeight="medium" color="text.primary">
-              {formatValue(tx.value)}
-            </Text>
-          </HStack>
-        </VStack>
+            {/* Network */}
+            <HStack w="full" p={3} justify="space-between">
+              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                Network
+              </Text>
+              {(() => {
+                const config = getChainConfig(tx.chainId);
+                return (
+                  <Badge
+                    fontSize="sm"
+                    bg={config.bg}
+                    color={config.text}
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    fontWeight="700"
+                    px={3}
+                    py={1}
+                    display="flex"
+                    alignItems="center"
+                    gap={1.5}
+                  >
+                    {config.icon && (
+                      <Image src={config.icon} alt={chainName} boxSize="14px" />
+                    )}
+                    {chainName}
+                  </Badge>
+                );
+              })()}
+            </HStack>
+
+            {/* To Address */}
+            <Box w="full" p={3}>
+              <HStack justify="space-between" mb={toLabels.length > 0 ? 2 : 0}>
+                <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                  To
+                </Text>
+                <HStack spacing={1}>
+                  <Code
+                    px={2}
+                    py={1}
+                    fontSize="xs"
+                    bg="bauhaus.white"
+                    color="text.primary"
+                    fontFamily="mono"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    fontWeight="700"
+                  >
+                    {tx.to.slice(0, 6)}...{tx.to.slice(-4)}
+                  </Code>
+                  <CopyButton value={tx.to} />
+                </HStack>
+              </HStack>
+              {toLabels.length > 0 && (
+                <Flex gap={1} flexWrap="nowrap" justify="center">
+                  {toLabels.map((label, index) => (
+                    <Badge
+                      key={index}
+                      fontSize="2xs"
+                      bg="bauhaus.blue"
+                      color="white"
+                      border="2px solid"
+                      borderColor="bauhaus.black"
+                      px={1.5}
+                      py={0.5}
+                      fontWeight="700"
+                      whiteSpace="nowrap"
+                    >
+                      {label}
+                    </Badge>
+                  ))}
+                </Flex>
+              )}
+            </Box>
+
+            {/* Value */}
+            <HStack w="full" p={3} justify="space-between">
+              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                Value
+              </Text>
+              <Text fontSize="sm" fontWeight="700" color="text.primary">
+                {formatValue(tx.value)}
+              </Text>
+            </HStack>
+          </VStack>
+        </Box>
 
         {/* Calldata */}
         {tx.data && tx.data !== "0x" && (
           <Box
-            bg="bg.subtle"
+            bg="bauhaus.white"
             p={3}
-            borderRadius="md"
-            borderWidth="1px"
-            borderColor="border.default"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="4px 4px 0px 0px #121212"
           >
             <HStack mb={2} alignItems="center">
-              <Text fontSize="sm" color="text.secondary">
+              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
                 Data
               </Text>
               <Spacer />
@@ -489,8 +552,9 @@ function TransactionConfirmation({
             </HStack>
             <Box
               p={3}
-              borderRadius="md"
               bg="bg.muted"
+              border="2px solid"
+              borderColor="bauhaus.black"
               maxH="100px"
               overflowY="auto"
               css={{
@@ -498,11 +562,10 @@ function TransactionConfirmation({
                   width: "6px",
                 },
                 "&::-webkit-scrollbar-track": {
-                  background: "transparent",
+                  background: "#E0E0E0",
                 },
                 "&::-webkit-scrollbar-thumb": {
-                  background: "rgba(255,255,255,0.2)",
-                  borderRadius: "3px",
+                  background: "#121212",
                 },
               }}
             >
@@ -521,24 +584,24 @@ function TransactionConfirmation({
 
         {/* Error Display */}
         {error && state === "error" && (
-          <Alert
-            status="error"
-            borderRadius="md"
-            fontSize="sm"
-            bg="error.bg"
-            borderWidth="1px"
-            borderColor="error.border"
+          <Box
+            bg="bauhaus.red"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="4px 4px 0px 0px #121212"
+            p={3}
           >
-            <AlertIcon color="error.solid" />
-            <Text color="text.primary">{error}</Text>
-          </Alert>
+            <Text color="white" fontSize="sm" fontWeight="700">
+              {error}
+            </Text>
+          </Box>
         )}
 
         {/* Status Messages */}
         {state === "submitting" && (
-          <HStack justify="center" py={2}>
-            <Spinner size="sm" color="primary.500" />
-            <Text fontSize="sm" color="text.secondary">
+          <HStack justify="center" py={3} bg="bauhaus.blue" border="3px solid" borderColor="bauhaus.black">
+            <Spinner size="sm" color="white" />
+            <Text fontSize="sm" color="white" fontWeight="700" textTransform="uppercase">
               Submitting transaction...
             </Text>
           </HStack>
@@ -546,12 +609,12 @@ function TransactionConfirmation({
 
         {/* Action Buttons */}
         {state !== "submitting" && (
-          <HStack pt={2}>
-            <Button variant="outline" flex={1} onClick={handleReject}>
+          <HStack pt={2} spacing={3}>
+            <Button variant="secondary" flex={1} onClick={handleReject}>
               Reject
             </Button>
             <Button
-              variant="primary"
+              variant="yellow"
               flex={1}
               onClick={handleConfirm}
               isDisabled={state === "error"}

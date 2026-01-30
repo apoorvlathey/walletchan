@@ -75,14 +75,16 @@ function EditChain({
           size="sm"
           onClick={back}
         />
-        <Heading size="sm" color="text.primary">
+        <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="tight">
           Edit Chain
-        </Heading>
+        </Text>
         <Spacer />
       </HStack>
 
       <FormControl>
-        <FormLabel color="text.secondary">Name</FormLabel>
+        <FormLabel color="text.secondary" fontWeight="700" textTransform="uppercase" fontSize="xs">
+          Name
+        </FormLabel>
         <Input
           placeholder="Chain name"
           value={newChainName}
@@ -93,55 +95,45 @@ function EditChain({
             }
           }}
           isInvalid={isChainNameNotUnique}
-          bg="bg.subtle"
-          borderColor="border.default"
-          _hover={{ borderColor: "border.strong" }}
-          _focus={{
-            borderColor: "primary.500",
-            boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
-          }}
         />
         {isChainNameNotUnique && (
-          <Text fontSize="xs" color="error.solid" mt={1}>
+          <Text fontSize="xs" color="bauhaus.red" mt={1} fontWeight="700">
             Chain name already exists
           </Text>
         )}
       </FormControl>
 
       <FormControl>
-        <FormLabel color="text.secondary">RPC URL</FormLabel>
+        <FormLabel color="text.secondary" fontWeight="700" textTransform="uppercase" fontSize="xs">
+          RPC URL
+        </FormLabel>
         <Input
           placeholder="https://..."
           value={rpc}
           onChange={(e) => setRpc(e.target.value)}
-          bg="bg.subtle"
-          borderColor="border.default"
-          _hover={{ borderColor: "border.strong" }}
-          _focus={{
-            borderColor: "primary.500",
-            boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
-          }}
         />
       </FormControl>
 
       <FormControl>
-        <FormLabel color="text.secondary">Chain ID</FormLabel>
+        <FormLabel color="text.secondary" fontWeight="700" textTransform="uppercase" fontSize="xs">
+          Chain ID
+        </FormLabel>
         <Input
           placeholder="Chain ID"
           value={chainId}
           isReadOnly
           bg="bg.muted"
-          borderColor="border.default"
           color="text.tertiary"
           cursor="not-allowed"
+          opacity={0.7}
         />
-        <Text fontSize="xs" color="text.tertiary" mt={1}>
+        <Text fontSize="xs" color="text.tertiary" mt={1} fontWeight="500">
           Chain ID cannot be changed
         </Text>
       </FormControl>
 
       <Box display="flex" gap={2} pt={2}>
-        <Button variant="outline" flex={1} onClick={back}>
+        <Button variant="secondary" flex={1} onClick={back}>
           Cancel
         </Button>
         <Button

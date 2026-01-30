@@ -5,10 +5,7 @@ import {
   HStack,
   Text,
   Button,
-  Divider,
   Badge,
-  Alert,
-  AlertIcon,
   IconButton,
   Code,
   Flex,
@@ -16,7 +13,7 @@ import {
   useToast,
   Image,
 } from "@chakra-ui/react";
-import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon } from "@chakra-ui/icons";
+import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon, WarningTwoIcon } from "@chakra-ui/icons";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
 import { getChainConfig } from "@/constants/chainConfig";
 
@@ -65,9 +62,9 @@ function CopyButton({ value }: { value: string }) {
       icon={copied ? <CheckIcon /> : <CopyIcon />}
       size="xs"
       variant="ghost"
-      color={copied ? "success.solid" : "text.secondary"}
+      color={copied ? "bauhaus.yellow" : "text.secondary"}
       onClick={handleCopy}
-      _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+      _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
     />
   );
 }
@@ -200,17 +197,17 @@ function SignatureRequestConfirmation({
                   }
                 }}
                 color="text.secondary"
-                _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+                _hover={{ color: "text.primary", bg: "bg.muted" }}
                 minW="auto"
                 p={1}
               />
               <Badge
-                bg="bg.muted"
-                color="text.secondary"
+                bg="bauhaus.black"
+                color="bauhaus.white"
                 fontSize="xs"
-                px={2}
-                py={0.5}
-                borderRadius="full"
+                px={3}
+                py={1}
+                fontWeight="700"
               >
                 {combinedIndex + 1}/{totalCount}
               </Badge>
@@ -222,7 +219,7 @@ function SignatureRequestConfirmation({
                 isDisabled={currentIndex === totalSignatureCount - 1}
                 onClick={() => onNavigate("next")}
                 color="text.secondary"
-                _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+                _hover={{ color: "text.primary", bg: "bg.muted" }}
                 minW="auto"
                 p={1}
               />
@@ -235,8 +232,9 @@ function SignatureRequestConfirmation({
             <Button
               size="xs"
               variant="ghost"
-              color="error.solid"
-              _hover={{ bg: "error.bg" }}
+              color="bauhaus.red"
+              fontWeight="700"
+              _hover={{ bg: "bauhaus.red", color: "white" }}
               onClick={onCancelAll}
               px={2}
             >
@@ -245,120 +243,154 @@ function SignatureRequestConfirmation({
           )}
         </Flex>
 
-        {/* Title row */}
-        <Text fontWeight="600" fontSize="lg" color="text.primary" textAlign="center">
-          Signature Request
-        </Text>
-
-        {/* Request Info */}
-        <VStack
-          spacing={0}
-          bg="bg.subtle"
-          borderRadius="md"
-          borderWidth="1px"
-          borderColor="border.default"
-          divider={<Divider borderColor="border.default" />}
+        {/* Title row with red background */}
+        <Box
+          bg="bauhaus.red"
+          border="3px solid"
+          borderColor="bauhaus.black"
+          boxShadow="4px 4px 0px 0px #121212"
+          py={3}
+          px={4}
+          position="relative"
         >
-          {/* Origin */}
-          <HStack w="full" p={3} justify="space-between">
-            <Text fontSize="sm" color="text.secondary">
-              Origin
-            </Text>
-            <HStack spacing={2}>
-              <Box
-                bg="white"
-                p="2px"
-                borderRadius="md"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-              >
-                <Image
-                  src={
-                    favicon ||
-                    `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`
-                  }
-                  alt="favicon"
-                  boxSize="16px"
-                  borderRadius="sm"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    const googleFallback = `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`;
-                    if (target.src !== googleFallback) {
-                      target.src = googleFallback;
-                    }
-                  }}
-                  fallback={<Box boxSize="16px" bg="white" borderRadius="sm" />}
-                />
-              </Box>
-              <Text fontSize="sm" fontWeight="medium" color="text.primary">
-                {new URL(origin).hostname}
-              </Text>
-            </HStack>
-          </HStack>
+          <Box
+            position="absolute"
+            top="-3px"
+            right="-3px"
+            w="0"
+            h="0"
+            borderLeft="6px solid transparent"
+            borderRight="6px solid transparent"
+            borderBottom="12px solid"
+            borderBottomColor="bauhaus.yellow"
+          />
+          <Text fontWeight="900" fontSize="lg" color="white" textAlign="center" textTransform="uppercase" letterSpacing="wider">
+            Signature Request
+          </Text>
+        </Box>
 
-          {/* Network */}
-          <HStack w="full" p={3} justify="space-between">
-            <Text fontSize="sm" color="text.secondary">
-              Network
-            </Text>
-            {(() => {
-              const config = getChainConfig(signature.chainId);
-              return (
-                <Badge
-                  fontSize="sm"
-                  bg={config.bg}
-                  color={config.text}
-                  borderWidth="1px"
-                  borderColor={config.border}
-                  borderRadius="full"
-                  textTransform="uppercase"
-                  fontWeight="600"
-                  px={3}
-                  py={1}
+        {/* Request Info Card */}
+        <Box
+          bg="bauhaus.white"
+          border="3px solid"
+          borderColor="bauhaus.black"
+          boxShadow="4px 4px 0px 0px #121212"
+          position="relative"
+        >
+          {/* Corner decoration */}
+          <Box
+            position="absolute"
+            top="-3px"
+            right="-3px"
+            w="10px"
+            h="10px"
+            bg="bauhaus.blue"
+            border="2px solid"
+            borderColor="bauhaus.black"
+          />
+
+          <VStack spacing={0} divider={<Box h="2px" bg="bauhaus.black" w="full" />}>
+            {/* Origin */}
+            <HStack w="full" p={3} justify="space-between">
+              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                Origin
+              </Text>
+              <HStack spacing={2}>
+                <Box
+                  bg="bauhaus.white"
+                  border="2px solid"
+                  borderColor="bauhaus.black"
+                  p={1}
                   display="flex"
                   alignItems="center"
-                  gap={1.5}
+                  justifyContent="center"
                 >
-                  {config.icon && (
-                    <Image src={config.icon} alt={chainName} boxSize="14px" />
-                  )}
-                  {chainName}
-                </Badge>
-              );
-            })()}
-          </HStack>
+                  <Image
+                    src={
+                      favicon ||
+                      `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`
+                    }
+                    alt="favicon"
+                    boxSize="16px"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      const googleFallback = `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`;
+                      if (target.src !== googleFallback) {
+                        target.src = googleFallback;
+                      }
+                    }}
+                    fallback={<Box boxSize="16px" bg="white" />}
+                  />
+                </Box>
+                <Text fontSize="sm" fontWeight="700" color="text.primary">
+                  {new URL(origin).hostname}
+                </Text>
+              </HStack>
+            </HStack>
 
-          {/* Method */}
-          <HStack w="full" p={3} justify="space-between">
-            <Text fontSize="sm" color="text.secondary">
-              Method
-            </Text>
-            <Code
-              px={2}
-              py={1}
-              borderRadius="md"
-              fontSize="xs"
-              bg="bg.muted"
-              color="text.primary"
-              fontFamily="mono"
-            >
-              {getMethodDisplayName(signature.method)}
-            </Code>
-          </HStack>
-        </VStack>
+            {/* Network */}
+            <HStack w="full" p={3} justify="space-between">
+              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                Network
+              </Text>
+              {(() => {
+                const config = getChainConfig(signature.chainId);
+                return (
+                  <Badge
+                    fontSize="sm"
+                    bg={config.bg}
+                    color={config.text}
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    fontWeight="700"
+                    px={3}
+                    py={1}
+                    display="flex"
+                    alignItems="center"
+                    gap={1.5}
+                  >
+                    {config.icon && (
+                      <Image src={config.icon} alt={chainName} boxSize="14px" />
+                    )}
+                    {chainName}
+                  </Badge>
+                );
+              })()}
+            </HStack>
+
+            {/* Method */}
+            <HStack w="full" p={3} justify="space-between">
+              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                Method
+              </Text>
+              <Code
+                px={2}
+                py={1}
+                fontSize="xs"
+                bg="bauhaus.white"
+                color="text.primary"
+                fontFamily="mono"
+                border="2px solid"
+                borderColor="bauhaus.black"
+                fontWeight="700"
+              >
+                {getMethodDisplayName(signature.method)}
+              </Code>
+            </HStack>
+          </VStack>
+        </Box>
 
         {/* Message Display */}
         {message && (
           <Box
-            bg="bg.subtle"
+            bg="bauhaus.white"
             p={3}
-            borderRadius="md"
-            borderWidth="1px"
-            borderColor="border.default"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="4px 4px 0px 0px #121212"
           >
             <HStack mb={2} alignItems="center">
-              <Text fontSize="sm" color="text.secondary">
+              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
                 Message
               </Text>
               <Spacer />
@@ -366,8 +398,9 @@ function SignatureRequestConfirmation({
             </HStack>
             <Box
               p={3}
-              borderRadius="md"
               bg="bg.muted"
+              border="2px solid"
+              borderColor="bauhaus.black"
               maxH="120px"
               overflowY="auto"
               css={{
@@ -375,11 +408,10 @@ function SignatureRequestConfirmation({
                   width: "6px",
                 },
                 "&::-webkit-scrollbar-track": {
-                  background: "transparent",
+                  background: "#E0E0E0",
                 },
                 "&::-webkit-scrollbar-thumb": {
-                  background: "rgba(255,255,255,0.2)",
-                  borderRadius: "3px",
+                  background: "#121212",
                 },
               }}
             >
@@ -398,14 +430,14 @@ function SignatureRequestConfirmation({
 
         {/* Raw Data Display */}
         <Box
-          bg="bg.subtle"
+          bg="bauhaus.white"
           p={3}
-          borderRadius="md"
-          borderWidth="1px"
-          borderColor="border.default"
+          border="3px solid"
+          borderColor="bauhaus.black"
+          boxShadow="4px 4px 0px 0px #121212"
         >
           <HStack mb={2} alignItems="center">
-            <Text fontSize="sm" color="text.secondary">
+            <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
               Raw Data
             </Text>
             <Spacer />
@@ -413,8 +445,9 @@ function SignatureRequestConfirmation({
           </HStack>
           <Box
             p={3}
-            borderRadius="md"
             bg="bg.muted"
+            border="2px solid"
+            borderColor="bauhaus.black"
             maxH="100px"
             overflowY="auto"
             css={{
@@ -422,11 +455,10 @@ function SignatureRequestConfirmation({
                 width: "6px",
               },
               "&::-webkit-scrollbar-track": {
-                background: "transparent",
+                background: "#E0E0E0",
               },
               "&::-webkit-scrollbar-thumb": {
-                background: "rgba(255,255,255,0.2)",
-                borderRadius: "3px",
+                background: "#121212",
               },
             }}
           >
@@ -443,22 +475,26 @@ function SignatureRequestConfirmation({
         </Box>
 
         {/* Warning Box - Signatures not supported */}
-        <Alert
-          status="warning"
-          borderRadius="md"
-          bg="warning.bg"
-          borderWidth="1px"
-          borderColor="warning.border"
+        <Box
+          bg="bauhaus.yellow"
+          border="3px solid"
+          borderColor="bauhaus.black"
+          boxShadow="4px 4px 0px 0px #121212"
+          p={3}
         >
-          <AlertIcon color="warning.solid" />
-          <Text fontSize="sm" color="text.primary">
-            Signatures are not supported in the Bankr API
-          </Text>
-        </Alert>
+          <HStack spacing={2}>
+            <Box p={1} bg="bauhaus.black">
+              <WarningTwoIcon color="bauhaus.yellow" boxSize={4} />
+            </Box>
+            <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
+              Signatures are not supported in the Bankr API
+            </Text>
+          </HStack>
+        </Box>
 
         {/* Reject Button */}
         <Button
-          variant="outline"
+          variant="danger"
           w="full"
           onClick={handleCancel}
           mt={2}

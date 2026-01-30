@@ -1,58 +1,68 @@
 import { extendTheme, ThemeConfig } from "@chakra-ui/react";
 
-// Design tokens from STYLING.md
+// Bauhaus Design System - Bold, Geometric, Constructivist
+// Primary colors: Red, Blue, Yellow + Black/White contrast
+
 const colors = {
-  // Background colors
+  // Background colors - Light mode Bauhaus canvas
   bg: {
-    base: "#0A0A0B", // Main page background
-    subtle: "#111113", // Card backgrounds, elevated surfaces
-    muted: "#18181B", // Secondary backgrounds
-    emphasis: "#27272A", // Hover states, active states
+    base: "#F0F0F0", // Off-white canvas
+    subtle: "#FFFFFF", // Pure white for cards
+    muted: "#E0E0E0", // Muted gray
+    emphasis: "#D0D0D0", // Hover states
   },
-  // Text colors
+  // Text colors - High contrast
   text: {
-    primary: "#FAFAFA", // Primary text, headings
-    secondary: "#A1A1AA", // Secondary text, labels
-    tertiary: "#71717A", // Placeholder, disabled text
+    primary: "#121212", // Stark black
+    secondary: "#3A3A3A", // Dark gray
+    tertiary: "#666666", // Medium gray
   },
-  // Border colors
+  // Border colors - Bold black borders
   border: {
-    subtle: "rgba(255,255,255,0.06)", // Subtle divisions
-    default: "rgba(255,255,255,0.10)", // Standard borders
-    strong: "rgba(255,255,255,0.16)", // Emphasized borders
+    subtle: "#121212",
+    default: "#121212",
+    strong: "#121212",
   },
-  // Primary brand colors
+  // Bauhaus Primary Colors
+  bauhaus: {
+    red: "#D02020",
+    blue: "#1040C0",
+    yellow: "#F0C020",
+    black: "#121212",
+    white: "#FFFFFF",
+  },
+  // Primary brand color (use blue as primary)
   primary: {
-    400: "#60A5FA", // Light blue - links, highlights
-    500: "#3B82F6", // Main brand color
-    600: "#2563EB", // Hover states
-    700: "#1D4ED8", // Active states
+    400: "#1040C0",
+    500: "#1040C0",
+    600: "#0D3399",
+    700: "#0A2673",
   },
-  // Status colors
+  // Status colors - Bauhaus primaries
   success: {
-    bg: "rgba(34,197,94,0.10)",
-    border: "rgba(34,197,94,0.30)",
-    solid: "#4ADE80",
+    bg: "#F0C020",
+    border: "#121212",
+    solid: "#121212",
   },
   warning: {
-    bg: "rgba(251,191,36,0.10)",
-    border: "rgba(251,191,36,0.30)",
-    solid: "#FBBF24",
+    bg: "#F0C020",
+    border: "#121212",
+    solid: "#121212",
   },
   error: {
-    bg: "rgba(239,68,68,0.10)",
-    border: "rgba(239,68,68,0.30)",
-    solid: "#F87171",
+    bg: "#D02020",
+    border: "#121212",
+    solid: "#FFFFFF",
   },
   info: {
-    bg: "rgba(59,130,246,0.10)",
-    border: "rgba(59,130,246,0.30)",
-    solid: "#60A5FA",
+    bg: "#1040C0",
+    border: "#121212",
+    solid: "#FFFFFF",
   },
 };
 
 const config: ThemeConfig = {
-  initialColorMode: "dark",
+  initialColorMode: "light",
   useSystemColorMode: false,
 };
 
@@ -60,9 +70,8 @@ const theme = extendTheme({
   config,
   colors,
   fonts: {
-    heading:
-      "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    body: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    heading: "Outfit, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    body: "Outfit, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
     mono: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
   },
   styles: {
@@ -76,46 +85,107 @@ const theme = extendTheme({
   components: {
     Button: {
       baseStyle: {
-        fontWeight: "500",
-        borderRadius: "lg",
+        fontWeight: "700",
+        borderRadius: "0",
+        textTransform: "uppercase",
+        letterSpacing: "wider",
+        transition: "all 0.2s ease-out",
       },
       variants: {
         primary: {
-          bg: "primary.500",
+          bg: "bauhaus.red",
           color: "white",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
+          boxShadow: "4px 4px 0px 0px #121212",
           _hover: {
-            bg: "primary.600",
+            bg: "bauhaus.red",
+            opacity: 0.9,
             _disabled: {
-              bg: "primary.500",
+              bg: "bauhaus.red",
+              opacity: 0.6,
             },
           },
           _active: {
-            bg: "primary.700",
+            transform: "translate(2px, 2px)",
+            boxShadow: "none",
           },
         },
         secondary: {
-          bg: "bg.muted",
-          color: "text.primary",
-          borderWidth: "1px",
-          borderColor: "border.default",
+          bg: "bauhaus.white",
+          color: "bauhaus.black",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
+          boxShadow: "4px 4px 0px 0px #121212",
           _hover: {
-            bg: "bg.emphasis",
-            borderColor: "border.strong",
+            bg: "#F5F5F5",
+          },
+          _active: {
+            transform: "translate(2px, 2px)",
+            boxShadow: "none",
           },
         },
         ghost: {
-          color: "text.secondary",
+          color: "text.primary",
+          border: "none",
           _hover: {
-            bg: "bg.emphasis",
-            color: "text.primary",
+            bg: "bg.muted",
           },
         },
         outline: {
-          borderColor: "border.default",
+          borderColor: "bauhaus.black",
+          borderWidth: "2px",
           color: "text.primary",
           _hover: {
-            bg: "bg.emphasis",
-            borderColor: "border.strong",
+            bg: "bg.muted",
+          },
+          _active: {
+            transform: "translate(1px, 1px)",
+          },
+        },
+        blue: {
+          bg: "bauhaus.blue",
+          color: "white",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
+          boxShadow: "4px 4px 0px 0px #121212",
+          _hover: {
+            bg: "bauhaus.blue",
+            opacity: 0.9,
+          },
+          _active: {
+            transform: "translate(2px, 2px)",
+            boxShadow: "none",
+          },
+        },
+        yellow: {
+          bg: "bauhaus.yellow",
+          color: "bauhaus.black",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
+          boxShadow: "4px 4px 0px 0px #121212",
+          _hover: {
+            bg: "bauhaus.yellow",
+            opacity: 0.9,
+          },
+          _active: {
+            transform: "translate(2px, 2px)",
+            boxShadow: "none",
+          },
+        },
+        danger: {
+          bg: "bauhaus.red",
+          color: "white",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
+          boxShadow: "4px 4px 0px 0px #121212",
+          _hover: {
+            bg: "bauhaus.red",
+            opacity: 0.9,
+          },
+          _active: {
+            transform: "translate(2px, 2px)",
+            boxShadow: "none",
           },
         },
       },
@@ -127,46 +197,49 @@ const theme = extendTheme({
       variants: {
         filled: {
           field: {
-            bg: "bg.subtle",
-            borderWidth: "1px",
-            borderColor: "border.default",
+            bg: "bauhaus.white",
+            border: "2px solid",
+            borderColor: "bauhaus.black",
+            borderRadius: "0",
             color: "text.primary",
             _placeholder: {
               color: "text.tertiary",
             },
             _hover: {
-              bg: "bg.subtle",
-              borderColor: "border.strong",
+              bg: "bauhaus.white",
+              borderColor: "bauhaus.black",
             },
             _focus: {
-              bg: "bg.subtle",
-              borderColor: "primary.500",
-              boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
+              bg: "bauhaus.white",
+              borderColor: "bauhaus.blue",
+              boxShadow: "3px 3px 0px 0px #1040C0",
             },
             _invalid: {
-              borderColor: "error.solid",
-              boxShadow: "0 0 0 1px var(--chakra-colors-error-solid)",
+              borderColor: "bauhaus.red",
+              boxShadow: "3px 3px 0px 0px #D02020",
             },
           },
         },
         outline: {
           field: {
-            bg: "bg.subtle",
-            borderColor: "border.default",
+            bg: "bauhaus.white",
+            border: "2px solid",
+            borderColor: "bauhaus.black",
+            borderRadius: "0",
             color: "text.primary",
             _placeholder: {
               color: "text.tertiary",
             },
             _hover: {
-              borderColor: "border.strong",
+              borderColor: "bauhaus.black",
             },
             _focus: {
-              borderColor: "primary.500",
-              boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
+              borderColor: "bauhaus.blue",
+              boxShadow: "3px 3px 0px 0px #1040C0",
             },
             _invalid: {
-              borderColor: "error.solid",
-              boxShadow: "0 0 0 1px var(--chakra-colors-error-solid)",
+              borderColor: "bauhaus.red",
+              boxShadow: "3px 3px 0px 0px #D02020",
             },
           },
         },
@@ -179,25 +252,26 @@ const theme = extendTheme({
       variants: {
         filled: {
           field: {
-            bg: "bg.subtle",
-            borderWidth: "1px",
-            borderColor: "border.default",
+            bg: "bauhaus.white",
+            border: "2px solid",
+            borderColor: "bauhaus.black",
+            borderRadius: "0",
             color: "text.primary",
             _hover: {
-              bg: "bg.subtle",
-              borderColor: "border.strong",
+              bg: "bauhaus.white",
+              borderColor: "bauhaus.black",
             },
             _focus: {
-              bg: "bg.subtle",
-              borderColor: "primary.500",
+              bg: "bauhaus.white",
+              borderColor: "bauhaus.blue",
             },
             "> option, > optgroup": {
-              bg: "bg.subtle",
+              bg: "bauhaus.white",
               color: "text.primary",
             },
           },
           icon: {
-            color: "text.secondary",
+            color: "text.primary",
           },
         },
       },
@@ -206,30 +280,54 @@ const theme = extendTheme({
       },
     },
     Badge: {
+      baseStyle: {
+        borderRadius: "0",
+        fontWeight: "700",
+        textTransform: "uppercase",
+        letterSpacing: "wider",
+      },
       variants: {
         success: {
-          bg: "success.bg",
-          color: "success.solid",
-          borderWidth: "1px",
-          borderColor: "success.border",
+          bg: "bauhaus.yellow",
+          color: "bauhaus.black",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
         },
         warning: {
-          bg: "warning.bg",
-          color: "warning.solid",
-          borderWidth: "1px",
-          borderColor: "warning.border",
+          bg: "bauhaus.yellow",
+          color: "bauhaus.black",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
         },
         error: {
-          bg: "error.bg",
-          color: "error.solid",
-          borderWidth: "1px",
-          borderColor: "error.border",
+          bg: "bauhaus.red",
+          color: "white",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
         },
         info: {
-          bg: "info.bg",
-          color: "info.solid",
-          borderWidth: "1px",
-          borderColor: "info.border",
+          bg: "bauhaus.blue",
+          color: "white",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
+        },
+        blue: {
+          bg: "bauhaus.blue",
+          color: "white",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
+        },
+        red: {
+          bg: "bauhaus.red",
+          color: "white",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
+        },
+        yellow: {
+          bg: "bauhaus.yellow",
+          color: "bauhaus.black",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
         },
       },
     },
@@ -237,20 +335,29 @@ const theme = extendTheme({
       variants: {
         subtle: (props: { status: string }) => {
           const status = props.status || "info";
+          const statusColors: Record<string, { bg: string; border: string; text: string }> = {
+            info: { bg: "bauhaus.blue", border: "bauhaus.black", text: "white" },
+            warning: { bg: "bauhaus.yellow", border: "bauhaus.black", text: "bauhaus.black" },
+            error: { bg: "bauhaus.red", border: "bauhaus.black", text: "white" },
+            success: { bg: "bauhaus.yellow", border: "bauhaus.black", text: "bauhaus.black" },
+          };
+          const colors = statusColors[status] || statusColors.info;
           return {
             container: {
-              bg: `${status}.bg`,
-              borderWidth: "1px",
-              borderColor: `${status}.border`,
+              bg: colors.bg,
+              border: "2px solid",
+              borderColor: colors.border,
+              borderRadius: "0",
             },
             icon: {
-              color: `${status}.solid`,
+              color: colors.text,
             },
             title: {
-              color: "text.primary",
+              color: colors.text,
+              fontWeight: "700",
             },
             description: {
-              color: "text.secondary",
+              color: colors.text,
             },
           };
         },
@@ -261,43 +368,101 @@ const theme = extendTheme({
     },
     Divider: {
       baseStyle: {
-        borderColor: "border.default",
+        borderColor: "bauhaus.black",
+        borderWidth: "2px",
       },
     },
     Code: {
       baseStyle: {
-        bg: "bg.muted",
+        bg: "bauhaus.white",
         color: "text.primary",
         fontFamily: "mono",
-        borderRadius: "md",
+        borderRadius: "0",
+        border: "1px solid",
+        borderColor: "bauhaus.black",
       },
     },
     Heading: {
       baseStyle: {
         color: "text.primary",
-        fontWeight: "600",
+        fontWeight: "900",
+        textTransform: "uppercase",
+        letterSpacing: "tight",
       },
     },
     FormLabel: {
       baseStyle: {
-        color: "text.secondary",
+        color: "text.primary",
         fontSize: "sm",
-        fontWeight: "500",
+        fontWeight: "700",
+        textTransform: "uppercase",
+        letterSpacing: "wider",
       },
     },
     Switch: {
       baseStyle: {
         track: {
-          bg: "bg.emphasis",
+          bg: "bg.muted",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
           _checked: {
-            bg: "primary.500",
+            bg: "bauhaus.blue",
           },
+        },
+        thumb: {
+          bg: "bauhaus.white",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
         },
       },
     },
     Spinner: {
       baseStyle: {
-        color: "primary.500",
+        color: "bauhaus.blue",
+      },
+    },
+    Modal: {
+      baseStyle: {
+        dialog: {
+          bg: "bauhaus.white",
+          border: "4px solid",
+          borderColor: "bauhaus.black",
+          borderRadius: "0",
+          boxShadow: "8px 8px 0px 0px #121212",
+        },
+        header: {
+          fontWeight: "700",
+          textTransform: "uppercase",
+          letterSpacing: "wider",
+        },
+      },
+    },
+    Menu: {
+      baseStyle: {
+        list: {
+          bg: "bauhaus.white",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
+          borderRadius: "0",
+          boxShadow: "4px 4px 0px 0px #121212",
+        },
+        item: {
+          bg: "bauhaus.white",
+          _hover: {
+            bg: "bauhaus.yellow",
+          },
+          _focus: {
+            bg: "bauhaus.yellow",
+          },
+        },
+      },
+    },
+    Tooltip: {
+      baseStyle: {
+        bg: "bauhaus.black",
+        color: "bauhaus.white",
+        borderRadius: "0",
+        fontWeight: "500",
       },
     },
   },

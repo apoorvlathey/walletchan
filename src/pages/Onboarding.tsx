@@ -41,31 +41,24 @@ function StepIndicator({
   currentStep: number;
   totalSteps: number;
 }) {
+  const colors = ["bauhaus.red", "bauhaus.blue", "bauhaus.yellow"];
   return (
     <VStack spacing={2}>
       <HStack spacing={3}>
         {Array.from({ length: totalSteps }).map((_, index) => (
           <Box
             key={index}
-            w="10px"
-            h="10px"
-            borderRadius="full"
-            bg={
-              index < currentStep
-                ? "primary.500"
-                : index === currentStep
-                  ? "primary.500"
-                  : "transparent"
-            }
-            borderWidth="2px"
-            borderColor={
-              index <= currentStep ? "primary.500" : "border.default"
-            }
+            w="12px"
+            h="12px"
+            bg={index <= currentStep ? colors[index] : "bauhaus.white"}
+            border="2px solid"
+            borderColor="bauhaus.black"
+            transform={index === currentStep ? "rotate(45deg)" : "none"}
             transition="all 0.2s"
           />
         ))}
       </HStack>
-      <Text fontSize="xs" color="text.tertiary">
+      <Text fontSize="xs" color="text.tertiary" fontWeight="700" textTransform="uppercase">
         Step {currentStep + 1} of {totalSteps}
       </Text>
     </VStack>
@@ -279,7 +272,9 @@ function Onboarding({ onComplete }: OnboardingProps) {
         alignItems="center"
         justifyContent="center"
       >
-        <Text color="text.secondary">Loading...</Text>
+        <Text color="text.secondary" fontWeight="700" textTransform="uppercase" letterSpacing="wider">
+          Loading...
+        </Text>
       </Box>
     );
   }
@@ -295,15 +290,58 @@ function Onboarding({ onComplete }: OnboardingProps) {
         alignItems="center"
         justifyContent="center"
         p={8}
+        position="relative"
       >
+        {/* Geometric decorations */}
+        <Box
+          position="absolute"
+          top={8}
+          left={8}
+          w="20px"
+          h="20px"
+          bg="bauhaus.red"
+          border="3px solid"
+          borderColor="bauhaus.black"
+        />
+        <Box
+          position="absolute"
+          top={8}
+          right={8}
+          w="20px"
+          h="20px"
+          bg="bauhaus.blue"
+          border="3px solid"
+          borderColor="bauhaus.black"
+          borderRadius="full"
+        />
+        <Box
+          position="absolute"
+          bottom={20}
+          left={8}
+          w="0"
+          h="0"
+          borderLeft="10px solid transparent"
+          borderRight="10px solid transparent"
+          borderBottom="20px solid"
+          borderBottomColor="bauhaus.yellow"
+        />
+
         <VStack spacing={8} maxW="400px" textAlign="center">
-          <Image src="/impersonatorLogo.png" w="80px" />
+          <Box
+            bg="bauhaus.yellow"
+            border="4px solid"
+            borderColor="bauhaus.black"
+            boxShadow="6px 6px 0px 0px #121212"
+            p={4}
+          >
+            <Image src="/impersonatorLogo.png" w="60px" />
+          </Box>
 
           <VStack spacing={3}>
-            <Text fontSize="2xl" fontWeight="700" color="text.primary">
+            <Text fontSize="2xl" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
               Welcome to Bankr Wallet
             </Text>
-            <Text fontSize="md" color="text.secondary" lineHeight="tall">
+            <Text fontSize="md" color="text.secondary" lineHeight="tall" fontWeight="500">
               Bring your Bankr Wallet out of the terminal and use it with ALL
               the dApps like a regular wallet!
             </Text>
@@ -329,15 +367,16 @@ function Onboarding({ onComplete }: OnboardingProps) {
           left={0}
           right={0}
         >
-          <Text fontSize="sm" color="text.tertiary">
+          <Text fontSize="sm" color="text.tertiary" fontWeight="500">
             Built by
           </Text>
           <Link
             display="flex"
             alignItems="center"
             gap={1}
-            color="primary.400"
-            _hover={{ color: "primary.500" }}
+            color="bauhaus.blue"
+            fontWeight="700"
+            _hover={{ color: "bauhaus.red" }}
             href="https://x.com/apoorveth"
             isExternal
           >
@@ -372,6 +411,29 @@ function Onboarding({ onComplete }: OnboardingProps) {
         p={8}
         position="relative"
       >
+        {/* Geometric decorations */}
+        <Box
+          position="absolute"
+          top={8}
+          left={8}
+          w="16px"
+          h="16px"
+          bg="bauhaus.red"
+          border="2px solid"
+          borderColor="bauhaus.black"
+        />
+        <Box
+          position="absolute"
+          top={8}
+          right={8}
+          w="16px"
+          h="16px"
+          bg="bauhaus.blue"
+          border="2px solid"
+          borderColor="bauhaus.black"
+          borderRadius="full"
+        />
+
         {/* Floating arrow pointing to extension area */}
         <Box
           position="fixed"
@@ -390,8 +452,8 @@ function Onboarding({ onComplete }: OnboardingProps) {
             w="40px"
             h="40px"
             fill="none"
-            stroke="var(--chakra-colors-primary-400)"
-            strokeWidth="2"
+            stroke="var(--chakra-colors-bauhaus-blue)"
+            strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"
             transform="rotate(-45deg)"
@@ -402,24 +464,25 @@ function Onboarding({ onComplete }: OnboardingProps) {
           <HStack
             mt={2}
             spacing={2}
-            bg="bg.subtle"
+            bg="bauhaus.yellow"
             px={3}
             py={2}
-            borderRadius="lg"
-            borderWidth="1px"
-            borderColor="border.default"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="3px 3px 0px 0px #121212"
           >
             <Image src="/impersonatorLogo.png" w="20px" h="20px" />
-            <Text fontSize="sm" color="text.primary" fontWeight="500">
+            <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
               BankrWallet
             </Text>
           </HStack>
           <Text
             fontSize="xs"
-            color="primary.400"
-            fontWeight="500"
+            color="bauhaus.blue"
+            fontWeight="700"
             mt={1}
             textAlign="center"
+            textTransform="uppercase"
           >
             Pin & click the extension
           </Text>
@@ -429,8 +492,10 @@ function Onboarding({ onComplete }: OnboardingProps) {
           <Box
             w="80px"
             h="80px"
-            borderRadius="full"
-            bg="success.bg"
+            bg="bauhaus.yellow"
+            border="4px solid"
+            borderColor="bauhaus.black"
+            boxShadow="6px 6px 0px 0px #121212"
             display="flex"
             alignItems="center"
             justifyContent="center"
@@ -438,14 +503,14 @@ function Onboarding({ onComplete }: OnboardingProps) {
               animation: `${scaleIn} 0.5s ease-out`,
             }}
           >
-            <CheckIcon boxSize="40px" color="success.solid" />
+            <CheckIcon boxSize="40px" color="bauhaus.black" />
           </Box>
 
           <VStack spacing={2}>
-            <Text fontSize="xl" fontWeight="600" color="text.primary">
+            <Text fontSize="xl" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
               You're all set!
             </Text>
-            <Text fontSize="sm" color="text.secondary" maxW="300px">
+            <Text fontSize="sm" color="text.secondary" maxW="300px" fontWeight="500">
               Pin the Bankr Wallet extension to your browser toolbar, then click
               on it to start using your wallet.
             </Text>
@@ -461,15 +526,16 @@ function Onboarding({ onComplete }: OnboardingProps) {
           left={0}
           right={0}
         >
-          <Text fontSize="sm" color="text.tertiary">
+          <Text fontSize="sm" color="text.tertiary" fontWeight="500">
             Built by
           </Text>
           <Link
             display="flex"
             alignItems="center"
             gap={1}
-            color="primary.400"
-            _hover={{ color: "primary.500" }}
+            color="bauhaus.blue"
+            fontWeight="700"
+            _hover={{ color: "bauhaus.red" }}
             href="https://x.com/apoorveth"
             isExternal
           >
@@ -501,7 +567,31 @@ function Onboarding({ onComplete }: OnboardingProps) {
       alignItems="center"
       justifyContent="center"
       p={8}
+      position="relative"
     >
+      {/* Geometric decorations */}
+      <Box
+        position="absolute"
+        top={8}
+        left={8}
+        w="12px"
+        h="12px"
+        bg="bauhaus.red"
+        border="2px solid"
+        borderColor="bauhaus.black"
+      />
+      <Box
+        position="absolute"
+        top={8}
+        right={8}
+        w="12px"
+        h="12px"
+        bg="bauhaus.blue"
+        border="2px solid"
+        borderColor="bauhaus.black"
+        borderRadius="full"
+      />
+
       <VStack spacing={6} w="full" maxW="400px">
         {/* Header with back button */}
         <HStack w="full" justify="space-between" align="center">
@@ -520,10 +610,10 @@ function Onboarding({ onComplete }: OnboardingProps) {
         {step === "apiKey" && (
           <VStack spacing={6} w="full">
             <VStack spacing={2} textAlign="center">
-              <Text fontSize="lg" fontWeight="600" color="text.primary">
+              <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wide">
                 Enter your API Key
               </Text>
-              <Text fontSize="sm" color="text.secondary">
+              <Text fontSize="sm" color="text.secondary" fontWeight="500">
                 Your Bankr API key is used to authenticate and execute
                 transactions.
               </Text>
@@ -532,13 +622,26 @@ function Onboarding({ onComplete }: OnboardingProps) {
             <Box
               w="full"
               p={6}
-              bg="bg.subtle"
-              borderRadius="lg"
-              borderWidth="1px"
-              borderColor="border.default"
+              bg="bauhaus.white"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+              position="relative"
             >
+              {/* Corner decoration */}
+              <Box
+                position="absolute"
+                top="-3px"
+                right="-3px"
+                w="10px"
+                h="10px"
+                bg="bauhaus.red"
+                border="2px solid"
+                borderColor="bauhaus.black"
+              />
+
               <FormControl isInvalid={!!errors.apiKey}>
-                <FormLabel color="text.secondary" fontSize="sm">
+                <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
                   Bankr API Key
                 </FormLabel>
                 <InputGroup>
@@ -555,13 +658,6 @@ function Onboarding({ onComplete }: OnboardingProps) {
                       if (e.key === "Enter") handleContinue();
                     }}
                     pr="3rem"
-                    bg="bg.muted"
-                    borderColor="border.default"
-                    _hover={{ borderColor: "border.strong" }}
-                    _focus={{
-                      borderColor: "primary.500",
-                      boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
-                    }}
                   />
                   <InputRightElement>
                     <IconButton
@@ -575,7 +671,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
                     />
                   </InputRightElement>
                 </InputGroup>
-                <FormErrorMessage color="error.solid">
+                <FormErrorMessage color="bauhaus.red" fontWeight="700">
                   {errors.apiKey}
                 </FormErrorMessage>
               </FormControl>
@@ -583,10 +679,11 @@ function Onboarding({ onComplete }: OnboardingProps) {
 
             <Link
               fontSize="sm"
-              color="primary.400"
+              color="bauhaus.blue"
+              fontWeight="700"
               href="https://bankr.bot/api"
               isExternal
-              _hover={{ color: "primary.500", textDecoration: "underline" }}
+              _hover={{ color: "bauhaus.red", textDecoration: "underline" }}
             >
               Don't have an API key? Get one from bankr.bot
             </Link>
@@ -601,10 +698,10 @@ function Onboarding({ onComplete }: OnboardingProps) {
         {step === "address" && (
           <VStack spacing={6} w="full">
             <VStack spacing={2} textAlign="center">
-              <Text fontSize="lg" fontWeight="600" color="text.primary">
+              <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wide">
                 Enter your Bankr Wallet Address
               </Text>
-              <Text fontSize="sm" color="text.secondary">
+              <Text fontSize="sm" color="text.secondary" fontWeight="500">
                 This is the wallet address linked to your Bankr account.
               </Text>
             </VStack>
@@ -612,13 +709,27 @@ function Onboarding({ onComplete }: OnboardingProps) {
             <Box
               w="full"
               p={6}
-              bg="bg.subtle"
-              borderRadius="lg"
-              borderWidth="1px"
-              borderColor="border.default"
+              bg="bauhaus.white"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+              position="relative"
             >
+              {/* Corner decoration */}
+              <Box
+                position="absolute"
+                top="-3px"
+                right="-3px"
+                w="10px"
+                h="10px"
+                bg="bauhaus.blue"
+                border="2px solid"
+                borderColor="bauhaus.black"
+                borderRadius="full"
+              />
+
               <FormControl isInvalid={!!errors.walletAddress}>
-                <FormLabel color="text.secondary" fontSize="sm">
+                <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
                   Wallet Address
                 </FormLabel>
                 <Input
@@ -632,15 +743,8 @@ function Onboarding({ onComplete }: OnboardingProps) {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleContinue();
                   }}
-                  bg="bg.muted"
-                  borderColor="border.default"
-                  _hover={{ borderColor: "border.strong" }}
-                  _focus={{
-                    borderColor: "primary.500",
-                    boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
-                  }}
                 />
-                <FormErrorMessage color="error.solid">
+                <FormErrorMessage color="bauhaus.red" fontWeight="700">
                   {errors.walletAddress}
                 </FormErrorMessage>
               </FormControl>
@@ -648,10 +752,11 @@ function Onboarding({ onComplete }: OnboardingProps) {
 
             <Link
               fontSize="sm"
-              color="primary.400"
+              color="bauhaus.blue"
+              fontWeight="700"
               href="https://bankr.bot/terminal"
               isExternal
-              _hover={{ color: "primary.500", textDecoration: "underline" }}
+              _hover={{ color: "bauhaus.red", textDecoration: "underline" }}
             >
               Find your wallet address at bankr.bot/terminal
             </Link>
@@ -672,10 +777,10 @@ function Onboarding({ onComplete }: OnboardingProps) {
         {step === "password" && (
           <VStack spacing={6} w="full">
             <VStack spacing={2} textAlign="center">
-              <Text fontSize="lg" fontWeight="600" color="text.primary">
+              <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wide">
                 Create a Password
               </Text>
-              <Text fontSize="sm" color="text.secondary">
+              <Text fontSize="sm" color="text.secondary" fontWeight="500">
                 Your password encrypts your API key locally. You'll need it to
                 unlock the wallet.
               </Text>
@@ -684,14 +789,28 @@ function Onboarding({ onComplete }: OnboardingProps) {
             <Box
               w="full"
               p={6}
-              bg="bg.subtle"
-              borderRadius="lg"
-              borderWidth="1px"
-              borderColor="border.default"
+              bg="bauhaus.white"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+              position="relative"
             >
+              {/* Corner decoration */}
+              <Box
+                position="absolute"
+                top="-3px"
+                right="-3px"
+                w="0"
+                h="0"
+                borderLeft="6px solid transparent"
+                borderRight="6px solid transparent"
+                borderBottom="10px solid"
+                borderBottomColor="bauhaus.yellow"
+              />
+
               <VStack spacing={4}>
                 <FormControl isInvalid={!!errors.password}>
-                  <FormLabel color="text.secondary" fontSize="sm">
+                  <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
                     Password
                   </FormLabel>
                   <InputGroup>
@@ -708,13 +827,6 @@ function Onboarding({ onComplete }: OnboardingProps) {
                         if (e.key === "Enter") handleContinue();
                       }}
                       pr="3rem"
-                      bg="bg.muted"
-                      borderColor="border.default"
-                      _hover={{ borderColor: "border.strong" }}
-                      _focus={{
-                        borderColor: "primary.500",
-                        boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
-                      }}
                     />
                     <InputRightElement>
                       <IconButton
@@ -730,13 +842,13 @@ function Onboarding({ onComplete }: OnboardingProps) {
                       />
                     </InputRightElement>
                   </InputGroup>
-                  <FormErrorMessage color="error.solid">
+                  <FormErrorMessage color="bauhaus.red" fontWeight="700">
                     {errors.password}
                   </FormErrorMessage>
                 </FormControl>
 
                 <FormControl isInvalid={!!errors.confirmPassword}>
-                  <FormLabel color="text.secondary" fontSize="sm">
+                  <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
                     Confirm Password
                   </FormLabel>
                   <Input
@@ -750,15 +862,8 @@ function Onboarding({ onComplete }: OnboardingProps) {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleContinue();
                     }}
-                    bg="bg.muted"
-                    borderColor="border.default"
-                    _hover={{ borderColor: "border.strong" }}
-                    _focus={{
-                      borderColor: "primary.500",
-                      boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
-                    }}
                   />
-                  <FormErrorMessage color="error.solid">
+                  <FormErrorMessage color="bauhaus.red" fontWeight="700">
                     {errors.confirmPassword}
                   </FormErrorMessage>
                 </FormControl>
@@ -768,12 +873,12 @@ function Onboarding({ onComplete }: OnboardingProps) {
             <Box
               w="full"
               p={4}
-              bg="warning.bg"
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor="warning.border"
+              bg="bauhaus.yellow"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
             >
-              <Text fontSize="sm" color="text.secondary">
+              <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
                 Keep your password safe. If you forget it, you'll need to reset
                 the extension and reconfigure your API key.
               </Text>
@@ -801,15 +906,16 @@ function Onboarding({ onComplete }: OnboardingProps) {
         left={0}
         right={0}
       >
-        <Text fontSize="sm" color="text.tertiary">
+        <Text fontSize="sm" color="text.tertiary" fontWeight="500">
           Built by
         </Text>
         <Link
           display="flex"
           alignItems="center"
           gap={1}
-          color="primary.400"
-          _hover={{ color: "primary.500" }}
+          color="bauhaus.blue"
+          fontWeight="700"
+          _hover={{ color: "bauhaus.red" }}
           href="https://x.com/apoorveth"
           isExternal
         >
