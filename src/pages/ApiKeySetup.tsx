@@ -119,9 +119,9 @@ function ApiKeySetup({
     if (needsPassword) {
       if (!password) {
         newErrors.password = "Password is required";
-      } else if (!isChangingKey && password.length < 8) {
+      } else if (!isChangingKey && password.length < 6) {
         // Only enforce min length for initial setup
-        newErrors.password = "Password must be at least 8 characters";
+        newErrors.password = "Password must be at least 6 characters";
       }
 
       if (!isChangingKey && password !== confirmPassword) {

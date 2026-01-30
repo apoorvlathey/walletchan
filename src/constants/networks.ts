@@ -5,6 +5,10 @@ import { NetworksInfo } from "@/types";
  * These are the only chains supported for transaction signing
  */
 export const DEFAULT_NETWORKS: NetworksInfo = {
+  Base: {
+    chainId: 8453,
+    rpcUrl: "https://mainnet.base.org",
+  },
   Ethereum: {
     chainId: 1,
     rpcUrl: "https://eth.llamarpc.com",
@@ -12,10 +16,6 @@ export const DEFAULT_NETWORKS: NetworksInfo = {
   Polygon: {
     chainId: 137,
     rpcUrl: "https://polygon-rpc.com",
-  },
-  Base: {
-    chainId: 8453,
-    rpcUrl: "https://mainnet.base.org",
   },
   Unichain: {
     chainId: 130,

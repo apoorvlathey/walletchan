@@ -46,7 +46,7 @@ import { getChainConfig } from "@/constants/chainConfig";
 import { hasEncryptedApiKey } from "@/chrome/crypto";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 
-type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm";
+type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | "waitingForOnboarding";
 
 function App() {
   const { networksInfo, reloadRequired, setReloadRequired } = useNetworks();
@@ -65,6 +65,7 @@ function App() {
   const [sidePanelMode, setSidePanelMode] = useState(false);
   const [isInSidePanel, setIsInSidePanel] = useState(false);
   const [failedTxError, setFailedTxError] = useState<{ error: string; origin: string } | null>(null);
+  const [onboardingTabId, setOnboardingTabId] = useState<number | null>(null);
 
   const currentTab = async () => {
     const [tab] = await chrome.tabs.query({
@@ -212,10 +213,39 @@ function App() {
       setHasApiKey(apiKeyConfigured);
 
       if (!apiKeyConfigured) {
-        // No API key - show settings to configure
-        setView("settings");
+        // No API key - open onboarding in a new tab
+        const onboardingUrl = chrome.runtime.getURL("onboarding.html");
+
+        // Check if onboarding tab already exists
+        const existingTabs = await chrome.tabs.query({ url: onboardingUrl });
+        if (existingTabs.length > 0 && existingTabs[0].id) {
+          // Focus existing onboarding tab
+          await chrome.tabs.update(existingTabs[0].id, { active: true });
+          await chrome.windows.update(existingTabs[0].windowId!, { focused: true });
+          setOnboardingTabId(existingTabs[0].id);
+        } else {
+          // Create new onboarding tab
+          const tab = await chrome.tabs.create({ url: onboardingUrl });
+          if (tab.id) {
+            setOnboardingTabId(tab.id);
+          }
+        }
+
+        setView("waitingForOnboarding");
         setIsLoading(false);
         return;
+      }
+
+      // API key is configured - close any open onboarding tabs
+      // Use pattern matching to ensure we find the tab regardless of URL variations
+      const onboardingUrlPattern = chrome.runtime.getURL("onboarding.html") + "*";
+      const onboardingTabs = await chrome.tabs.query({ url: onboardingUrlPattern });
+      for (const tab of onboardingTabs) {
+        if (tab.id) {
+          chrome.tabs.remove(tab.id).catch(() => {
+            // Ignore errors if tab is already closed
+          });
+        }
       }
 
       // Check lock state
@@ -247,9 +277,8 @@ function App() {
         setAddress(storedAddress);
       }
 
-      if (storedChainName) {
-        setChainName(storedChainName);
-      }
+      // Set chain name, defaulting to Base for new installations
+      setChainName(storedChainName || "Base");
 
       // Check if injected in current tab and get latest state
       const tab = await currentTab();
@@ -284,6 +313,7 @@ function App() {
 
   // Listen for new pending tx requests (when sidepanel/popup is already open)
   // Also respond to ping messages so background knows a view is open
+  // Also listen for onboarding completion
   useEffect(() => {
     const handleMessage = (
       message: { type: string; txRequest?: PendingTxRequest },
@@ -301,6 +331,10 @@ function App() {
         // Show the new tx request
         setSelectedTxRequest(message.txRequest);
         setView("txConfirm");
+      }
+      if (message.type === "onboardingComplete") {
+        // Onboarding finished - reload to show unlock screen
+        window.location.reload();
       }
     };
 
@@ -441,6 +475,49 @@ function App() {
   // Unlock screen
   if (view === "unlock") {
     return <UnlockScreen onUnlock={handleUnlock} />;
+  }
+
+  // Waiting for onboarding to complete
+  if (view === "waitingForOnboarding") {
+    return (
+      <Box
+        minH="300px"
+        bg="bg.base"
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        p={6}
+        textAlign="center"
+      >
+        <VStack spacing={4}>
+          <Image src="impersonatorLogo.png" w="3rem" />
+          <Text fontSize="lg" fontWeight="600" color="text.primary">
+            Complete Setup
+          </Text>
+          <Text fontSize="sm" color="text.secondary">
+            Please complete the setup in the new tab that just opened.
+          </Text>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              // Re-open or focus onboarding tab
+              const onboardingUrl = chrome.runtime.getURL("onboarding.html");
+              const existingTabs = await chrome.tabs.query({ url: onboardingUrl });
+              if (existingTabs.length > 0 && existingTabs[0].id) {
+                await chrome.tabs.update(existingTabs[0].id, { active: true });
+                await chrome.windows.update(existingTabs[0].windowId!, { focused: true });
+              } else {
+                await chrome.tabs.create({ url: onboardingUrl });
+              }
+            }}
+          >
+            Open Setup Tab
+          </Button>
+        </VStack>
+      </Box>
+    );
   }
 
   // Settings view

@@ -111,6 +111,42 @@ function clearCachedApiKey(): void {
   cacheTimestamp = 0;
 }
 
+/**
+ * Performs a full security reset - clears ALL sensitive data from memory
+ * This should be called when resetting the extension
+ */
+function performSecurityReset(): void {
+  // 1. Clear cached credentials
+  clearCachedApiKey();
+
+  // 2. Abort all active transactions and clear their API keys from memory
+  for (const [txId, abortController] of activeAbortControllers.entries()) {
+    try {
+      abortController.abort();
+    } catch {
+      // Ignore abort errors
+    }
+  }
+  activeAbortControllers.clear();
+
+  // 3. Clear activeJobs which contains decrypted API keys for in-flight transactions
+  // This is critical - API keys must not persist after reset
+  activeJobs.clear();
+
+  // 4. Reject all pending resolvers with reset error
+  for (const [txId, resolver] of pendingResolvers.entries()) {
+    try {
+      resolver.resolve({ success: false, error: "Extension was reset" });
+    } catch {
+      // Ignore errors
+    }
+  }
+  pendingResolvers.clear();
+
+  // 5. Clear failed transaction results
+  failedTxResults.clear();
+}
+
 // Clear cache when service worker suspends
 self.addEventListener("suspend", () => {
   clearCachedApiKey();
@@ -123,6 +159,15 @@ setInterval(() => {
 
 // Initialize badge on startup
 updateBadge();
+
+// Handle extension install/update
+chrome.runtime.onInstalled.addListener(async (details) => {
+  if (details.reason === "install") {
+    // First time install - open onboarding page
+    const onboardingUrl = chrome.runtime.getURL("onboarding.html");
+    await chrome.tabs.create({ url: onboardingUrl });
+  }
+});
 
 /**
  * Checks if the browser supports the sidePanel API
@@ -1080,6 +1125,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
     }
 
+    case "onboardingComplete": {
+      // Broadcast to all extension views that onboarding is complete
+      chrome.runtime.sendMessage({ type: "onboardingComplete" }).catch(() => {
+        // Ignore errors if no listeners
+      });
+      sendResponse({ success: true });
+      return false;
+    }
+
     case "getTxHistory": {
       getTxHistory().then((history) => {
         sendResponse(history);
@@ -1098,6 +1152,49 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       clearTxHistory().then(() => {
         sendResponse({ success: true });
       });
+      return true;
+    }
+
+    case "resetExtension": {
+      // SECURITY: Perform full memory cleanup first (before async operations)
+      // This ensures API keys are cleared from memory immediately
+      performSecurityReset();
+
+      // Clear all stored data - API key, address, transaction history, and notifications
+      (async () => {
+        try {
+          // Get all storage keys to find notification-related entries
+          const allLocalStorage = await chrome.storage.local.get(null);
+          const notificationKeys = Object.keys(allLocalStorage).filter(
+            (key) => key.startsWith("notification-")
+          );
+
+          // Remove all sensitive data from storage
+          await Promise.all([
+            chrome.storage.local.remove([
+              "encryptedApiKey",
+              "txHistory",
+              "pendingTxRequests",
+              ...notificationKeys, // Clear notification data (may contain tx hashes)
+            ]),
+            chrome.storage.sync.remove("address"),
+          ]);
+
+          // Update badge to show no pending transactions
+          await chrome.action.setBadgeText({ text: "" });
+
+          // Clear any active notifications
+          const notifications = await chrome.notifications.getAll();
+          for (const notificationId of Object.keys(notifications)) {
+            chrome.notifications.clear(notificationId);
+          }
+
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error("Failed to reset extension:", error);
+          sendResponse({ success: false, error: "Failed to reset extension" });
+        }
+      })();
       return true;
     }
   }

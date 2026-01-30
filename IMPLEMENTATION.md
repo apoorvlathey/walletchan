@@ -58,16 +58,18 @@ BankrWallet is a Chrome extension that allows users to impersonate blockchain ac
 
 ## Supported Chains
 
-Only the following chains are supported for transaction signing:
+Only the following chains are supported for transaction signing (listed in dropdown order):
 
 | Chain    | Chain ID | Default RPC                  |
 | -------- | -------- | ---------------------------- |
+| Base     | 8453     | https://mainnet.base.org     |
 | Ethereum | 1        | https://eth.llamarpc.com     |
 | Polygon  | 137      | https://polygon-rpc.com      |
-| Base     | 8453     | https://mainnet.base.org     |
 | Unichain | 130      | https://mainnet.unichain.org |
 
 These are configured in `src/constants/networks.ts` and pre-populated on first install.
+
+**Default Network**: Base is set as the default network for new installations.
 
 ## Provider Discovery (EIP-6963)
 
@@ -161,6 +163,7 @@ src/
 │   ├── networks.ts          # Default networks configuration
 │   └── chainConfig.ts       # Chain-specific styling/icons
 ├── pages/
+│   ├── Onboarding.tsx       # Full-page onboarding wizard for first-time setup
 │   └── ApiKeySetup.tsx      # API key + wallet address configuration
 ├── components/
 │   ├── Settings/
@@ -174,8 +177,112 @@ src/
 │   ├── PendingTxList.tsx    # List of pending transactions
 │   ├── TxStatusList.tsx     # Recent transaction history display
 │   └── TransactionConfirmation.tsx # In-popup tx confirmation with success animation
+├── onboarding.tsx           # React entry point for onboarding page
 └── App.tsx                  # Main popup application
+
+public/
+├── onboarding.html          # HTML entry point for onboarding page
+└── manifest.json            # Extension manifest
 ```
+
+## Onboarding Flow
+
+When the extension is first installed or reset, users are guided through a step-by-step onboarding wizard in a full-page browser tab.
+
+### Auto-Open on Install
+
+The background service worker listens for the `onInstalled` event:
+
+```typescript
+chrome.runtime.onInstalled.addListener(async (details) => {
+  if (details.reason === "install") {
+    const onboardingUrl = chrome.runtime.getURL("onboarding.html");
+    await chrome.tabs.create({ url: onboardingUrl });
+  }
+});
+```
+
+### Onboarding Steps
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Step 0: Welcome Screen                                      │
+│  - Bankr logo + branding                                     │
+│  - "Welcome to Bankr Wallet" heading                         │
+│  - "Get Started" button                                      │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Step 1: API Key (● ○ ○)                                     │
+│  - API key input field                                       │
+│  - Link: "Don't have an API key? Get one from bankr.bot"     │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Step 2: Wallet Address (● ● ○)                              │
+│  - Address input (supports ENS resolution)                   │
+│  - Link: "Find your wallet address at bankr.bot/terminal"    │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Step 3: Create Password (● ● ●)                             │
+│  - Password + Confirm password fields (min 6 chars)          │
+│  - Security warning about password recovery                  │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Step 4: Success                                             │
+│  - Animated green checkmark                                  │
+│  - "You're all set!" message                                 │
+│  - Floating arrow pointing to extension area                 │
+│  - Extension icon + "BankrWallet" badge                      │
+│  - "Pin & click the extension" instruction                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Tab Auto-Close
+
+When the user opens the extension popup after completing onboarding, the onboarding tab is automatically closed:
+
+```typescript
+// In App.tsx init()
+const onboardingUrlPattern = chrome.runtime.getURL("onboarding.html") + "*";
+const onboardingTabs = await chrome.tabs.query({ url: onboardingUrlPattern });
+for (const tab of onboardingTabs) {
+  if (tab.id) {
+    chrome.tabs.remove(tab.id).catch(() => {});
+  }
+}
+```
+
+**Note**: This requires the `tabs` permission in manifest.json to query and close `chrome-extension://` URLs.
+
+### Already Configured Check
+
+If a user navigates to the onboarding page when the extension is already configured, they're shown the success screen directly (no sensitive data exposed):
+
+```typescript
+useEffect(() => {
+  const checkExistingSetup = async () => {
+    const hasApiKey = await hasEncryptedApiKey();
+    if (hasApiKey) {
+      setStep("success");
+    }
+    setIsCheckingSetup(false);
+  };
+  checkExistingSetup();
+}, []);
+```
+
+### Build Configuration
+
+The onboarding page has its own Vite build config:
+
+| Target     | Config File               | Output                          |
+| ---------- | ------------------------- | ------------------------------- |
+| Onboarding | vite.config.onboarding.ts | build/static/js/onboarding.js   |
+
+Build command: `pnpm build:onboarding` (included in `pnpm build`)
 
 ## Transaction Flow
 
@@ -641,29 +748,47 @@ Error is detected by keywords: "missing required", "error", "can't", "cannot", "
 
 ## Build Configuration
 
-The extension has 4 build targets:
+The extension has 5 build targets:
 
-| Target     | Config File               | Output                        |
-| ---------- | ------------------------- | ----------------------------- |
-| Popup      | vite.config.ts            | build/static/js/main.js       |
-| Inpage     | vite.config.inpage.ts     | build/static/js/inpage.js     |
-| Inject     | vite.config.inject.ts     | build/static/js/inject.js     |
-| Background | vite.config.background.ts | build/static/js/background.js |
+| Target     | Config File               | Output                          |
+| ---------- | ------------------------- | ------------------------------- |
+| Popup      | vite.config.ts            | build/static/js/main.js         |
+| Onboarding | vite.config.onboarding.ts | build/static/js/onboarding.js   |
+| Inpage     | vite.config.inpage.ts     | build/static/js/inpage.js       |
+| Inject     | vite.config.inject.ts     | build/static/js/inject.js       |
+| Background | vite.config.background.ts | build/static/js/background.js   |
 
 Build command: `pnpm build`
 
 ## Manifest Configuration
 
-`public/manifest.json` key additions:
+`public/manifest.json` key configurations:
 
 ```json
 {
   "background": {
     "service_worker": "static/js/background.js",
     "type": "module"
-  }
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "sidePanel",
+    "notifications",
+    "tabs"
+  ]
 }
 ```
+
+### Permissions
+
+| Permission    | Purpose                                                |
+| ------------- | ------------------------------------------------------ |
+| `activeTab`   | Access to the currently active tab                     |
+| `storage`     | Store encrypted API key, settings, transaction history |
+| `sidePanel`   | Enable sidepanel mode (Chrome 114+)                    |
+| `notifications` | Show transaction success/failure notifications       |
+| `tabs`        | Query and close extension tabs (e.g., onboarding page) |
 
 ## Message Types
 

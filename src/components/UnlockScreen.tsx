@@ -14,8 +14,16 @@ import {
   Tooltip,
   Icon,
   useToast,
+  Link,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
 } from "@chakra-ui/react";
-import { ViewIcon, ViewOffIcon, LockIcon } from "@chakra-ui/icons";
+import { ViewIcon, ViewOffIcon, LockIcon, WarningTwoIcon } from "@chakra-ui/icons";
 
 // Sidepanel icon
 const SidePanelIcon = (props: any) => (
@@ -40,7 +48,9 @@ function UnlockScreen({ onUnlock }: UnlockScreenProps) {
   const [sidePanelSupported, setSidePanelSupported] = useState(false);
   const [sidePanelMode, setSidePanelMode] = useState(false);
   const [isInSidePanel, setIsInSidePanel] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const passwordInputRef = useRef<HTMLInputElement>(null);
+  const { isOpen: isResetModalOpen, onOpen: onResetModalOpen, onClose: onResetModalClose } = useDisclosure();
 
   useEffect(() => {
     const checkSidePanelSupport = async () => {
@@ -122,6 +132,33 @@ function UnlockScreen({ onUnlock }: UnlockScreenProps) {
         }
       }
     );
+  };
+
+  const handleResetExtension = () => {
+    setIsResetting(true);
+    chrome.runtime.sendMessage({ type: "resetExtension" }, (result) => {
+      setIsResetting(false);
+      if (result?.success) {
+        onResetModalClose();
+        toast({
+          title: "Extension reset",
+          description: "Please set up your API key and password again",
+          status: "info",
+          duration: 4000,
+          isClosable: true,
+        });
+        // Reload the extension popup to show the setup screen
+        window.location.reload();
+      } else {
+        toast({
+          title: "Reset failed",
+          description: result?.error || "Failed to reset extension",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    });
   };
 
   return (
@@ -211,20 +248,32 @@ function UnlockScreen({ onUnlock }: UnlockScreenProps) {
           </InputGroup>
 
           {error && (
-            <Alert
-              status="error"
-              borderRadius="md"
-              fontSize="sm"
-              bg="error.bg"
-              borderWidth="1px"
-              borderColor="error.border"
-              py={2}
-            >
-              <AlertIcon color="error.solid" boxSize={4} />
-              <Text color="text.primary" fontSize="sm">
-                {error}
-              </Text>
-            </Alert>
+            <VStack spacing={2} w="full">
+              <Alert
+                status="error"
+                borderRadius="md"
+                fontSize="sm"
+                bg="error.bg"
+                borderWidth="1px"
+                borderColor="error.border"
+                py={2}
+                w="full"
+              >
+                <AlertIcon color="error.solid" boxSize={4} />
+                <Text color="text.primary" fontSize="sm">
+                  {error}
+                </Text>
+              </Alert>
+              <Link
+                fontSize="sm"
+                color="text.secondary"
+                _hover={{ color: "primary.400", textDecoration: "underline" }}
+                onClick={onResetModalOpen}
+                cursor="pointer"
+              >
+                Forgot Password?
+              </Link>
+            </VStack>
           )}
 
           <Button
@@ -238,6 +287,50 @@ function UnlockScreen({ onUnlock }: UnlockScreenProps) {
           </Button>
         </VStack>
       </VStack>
+
+      {/* Reset Extension Modal */}
+      <Modal isOpen={isResetModalOpen} onClose={onResetModalClose} isCentered>
+        <ModalOverlay bg="blackAlpha.700" />
+        <ModalContent bg="bg.subtle" borderWidth="1px" borderColor="border.default" mx={4}>
+          <ModalHeader color="text.primary" fontSize="md" pb={2}>
+            <Box display="flex" alignItems="center" gap={2}>
+              <WarningTwoIcon color="warning.solid" />
+              Reset Extension?
+            </Box>
+          </ModalHeader>
+          <ModalBody>
+            <VStack spacing={3} align="start">
+              <Text color="text.secondary" fontSize="sm">
+                This will clear all your stored data including:
+              </Text>
+              <Box pl={4}>
+                <Text color="text.secondary" fontSize="sm">• Your encrypted API key</Text>
+                <Text color="text.secondary" fontSize="sm">• Your wallet address</Text>
+                <Text color="text.secondary" fontSize="sm">• Transaction history</Text>
+              </Box>
+              <Text color="warning.solid" fontSize="sm" fontWeight="500">
+                You will need to enter your Bankr API key and set up a new password again.
+              </Text>
+            </VStack>
+          </ModalBody>
+          <ModalFooter gap={2}>
+            <Button variant="ghost" size="sm" onClick={onResetModalClose} isDisabled={isResetting}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              bg="error.solid"
+              color="white"
+              _hover={{ bg: "error.solid", opacity: 0.9 }}
+              onClick={handleResetExtension}
+              isLoading={isResetting}
+              loadingText="Resetting..."
+            >
+              Reset Extension
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 }
