@@ -483,41 +483,41 @@ function TransactionConfirmation({
                 <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
                   To
                 </Text>
-                <HStack spacing={1}>
-                  <Code
-                    px={2}
-                    py={1}
+                <HStack
+                  spacing={1}
+                  px={2}
+                  py={1}
+                  bg="bauhaus.white"
+                  border="2px solid"
+                  borderColor="bauhaus.black"
+                >
+                  <Text
                     fontSize="xs"
-                    bg="bauhaus.white"
                     color="text.primary"
                     fontFamily="mono"
-                    border="2px solid"
-                    borderColor="bauhaus.black"
                     fontWeight="700"
                   >
                     {tx.to.slice(0, 6)}...{tx.to.slice(-4)}
-                  </Code>
+                  </Text>
                   <CopyButton value={tx.to} />
                 </HStack>
               </HStack>
               {toLabels.length > 0 && (
-                <Flex gap={1} flexWrap="nowrap" justify="center">
-                  {toLabels.map((label, index) => (
-                    <Badge
-                      key={index}
-                      fontSize="2xs"
-                      bg="bauhaus.blue"
-                      color="white"
-                      border="2px solid"
-                      borderColor="bauhaus.black"
-                      px={1.5}
-                      py={0.5}
-                      fontWeight="700"
-                      whiteSpace="nowrap"
-                    >
-                      {label}
-                    </Badge>
-                  ))}
+                <Flex justify="flex-end">
+                  <Badge
+                    fontSize="2xs"
+                    bg="bauhaus.blue"
+                    color="white"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    px={2}
+                    py={0.5}
+                    fontWeight="700"
+                    maxW="200px"
+                    isTruncated
+                  >
+                    {toLabels[0]}
+                  </Badge>
                 </Flex>
               )}
             </Box>
