@@ -437,20 +437,21 @@ function TransactionConfirmation({
               </HStack>
             </HStack>
             {toLabels.length > 0 && (
-              <Flex gap={1} flexWrap="wrap" justify="flex-end">
+              <Flex gap={1} flexWrap="nowrap" justify="center">
                 {toLabels.map((label, index) => (
                   <Badge
                     key={index}
-                    fontSize="xs"
-                    bg="bg.muted"
-                    color="text.secondary"
+                    fontSize="2xs"
+                    bg="info.bg"
+                    color="info.solid"
                     borderWidth="1px"
-                    borderColor="border.default"
+                    borderColor="info.border"
                     borderRadius="full"
-                    px={2}
+                    px={1.5}
                     py={0.5}
                     fontWeight="normal"
                     textTransform="none"
+                    whiteSpace="nowrap"
                   >
                     {label}
                   </Badge>

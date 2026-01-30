@@ -221,7 +221,7 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
             >
               <BellIcon boxSize={3.5} color="bg.base" />
             </Box>
-            <Text fontSize="xs" fontWeight="500" color="text.primary">
+            <Text flex="1" textAlign="center" fontSize="xs" fontWeight="500" color="text.primary">
               {pendingTxCount > 0 && pendingSignatureCount > 0
                 ? `${pendingTxCount} tx, ${pendingSignatureCount} signature pending`
                 : pendingTxCount > 0

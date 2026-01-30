@@ -47,25 +47,25 @@ function PendingTxBanner({ txCount, signatureCount, onClickTx, onClickSignature 
       }}
       transition="all 0.2s"
     >
-      <HStack justify="space-between">
-        <HStack spacing={3}>
+      <HStack spacing={0}>
+        <Box w="40px" flexShrink={0}>
           <Box
             p={1.5}
             bg="warning.solid"
             borderRadius="md"
+            w="fit-content"
           >
             <BellIcon boxSize={4} color="bg.base" />
           </Box>
-          <Box>
-            <Text fontSize="sm" fontWeight="600" color="text.primary">
-              {getLabel()}
-            </Text>
-            <Text fontSize="xs" color="text.secondary">
-              Click to review
-            </Text>
-          </Box>
-        </HStack>
-        <ChevronRightIcon color="warning.solid" />
+        </Box>
+        <Box flex="1" textAlign="center">
+          <Text fontSize="sm" fontWeight="600" color="text.primary">
+            {getLabel()}
+          </Text>
+        </Box>
+        <Box w="40px" flexShrink={0} display="flex" justifyContent="flex-end">
+          <ChevronRightIcon color="warning.solid" />
+        </Box>
       </HStack>
     </Box>
   );
