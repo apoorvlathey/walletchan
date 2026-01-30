@@ -94,6 +94,17 @@ const DEFAULT_AUTO_LOCK_TIMEOUT = 15 * 60 * 1000; // 15 minutes default
 const AUTO_LOCK_STORAGE_KEY = "autoLockTimeout";
 let cachedAutoLockTimeout: number | null = null;
 
+// Valid auto-lock timeout values (in milliseconds)
+const VALID_AUTO_LOCK_TIMEOUTS = new Set([
+  60000,      // 1 minute
+  300000,     // 5 minutes
+  900000,     // 15 minutes (default)
+  1800000,    // 30 minutes
+  3600000,    // 1 hour
+  14400000,   // 4 hours
+  0,          // Never
+]);
+
 /**
  * Gets the auto-lock timeout from storage (with caching)
  */
@@ -109,10 +120,15 @@ async function getAutoLockTimeout(): Promise<number> {
 
 /**
  * Sets the auto-lock timeout in storage
+ * Returns false if the timeout value is not in the allowed list
  */
-async function setAutoLockTimeout(timeout: number): Promise<void> {
+async function setAutoLockTimeout(timeout: number): Promise<boolean> {
+  if (!VALID_AUTO_LOCK_TIMEOUTS.has(timeout)) {
+    return false;
+  }
   await chrome.storage.sync.set({ [AUTO_LOCK_STORAGE_KEY]: timeout });
   cachedAutoLockTimeout = timeout;
+  return true;
 }
 
 // Listen for storage changes to update cached timeout
@@ -1462,8 +1478,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "setAutoLockTimeout": {
-      setAutoLockTimeout(message.timeout).then(() => {
-        sendResponse({ success: true });
+      setAutoLockTimeout(message.timeout).then((success) => {
+        sendResponse({ success });
       });
       return true;
     }

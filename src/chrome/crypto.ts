@@ -9,7 +9,7 @@ export interface EncryptedData {
   salt: string; // base64
 }
 
-const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_ITERATIONS = 600000;
 const SALT_LENGTH = 16;
 const IV_LENGTH = 12;
 

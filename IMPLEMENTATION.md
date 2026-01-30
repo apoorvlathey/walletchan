@@ -825,7 +825,7 @@ The Bankr API key is encrypted using AES-256-GCM with PBKDF2 key derivation.
 User Password
       │
       ▼
-PBKDF2 (100,000 iterations, random salt)
+PBKDF2 (600,000 iterations, random salt)
       │
       ▼
 AES-256-GCM Key
@@ -877,13 +877,14 @@ Users can configure the auto-lock timeout via Settings → Auto-Lock:
 - Storage change listener keeps cached value in sync across tabs
 - When timeout is `0` ("Never"), cache validation always passes
 - Changes take effect immediately (no restart required)
+- **Validation**: `setAutoLockTimeout` validates against allowed values and returns `false` for invalid values
 
 **Message Types**:
 
 | Type | Description |
 | ---- | ----------- |
 | `getAutoLockTimeout` | Get current timeout value |
-| `setAutoLockTimeout` | Set new timeout value |
+| `setAutoLockTimeout` | Set new timeout value (validated against allowed values) |
 
 #### Password Caching for API Key Changes
 
