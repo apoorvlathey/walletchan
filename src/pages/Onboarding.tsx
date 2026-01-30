@@ -369,7 +369,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
             boxShadow="6px 6px 0px 0px #121212"
             p={4}
           >
-            <Image src="/impersonatorLogo.png" w="60px" />
+            <Image src="/bankrwallet-icon.png" w="60px" />
           </Box>
 
           <VStack spacing={3}>
@@ -506,7 +506,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
             borderColor="bauhaus.black"
             boxShadow="3px 3px 0px 0px #121212"
           >
-            <Image src="/impersonatorLogo.png" w="20px" h="20px" />
+            <Image src="/bankrwallet-icon.png" w="20px" h="20px" />
             <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
               BankrWallet
             </Text>

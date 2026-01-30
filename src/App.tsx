@@ -819,7 +819,7 @@ function App() {
             boxShadow="4px 4px 0px 0px #121212"
             p={3}
           >
-            <Image src="impersonatorLogo.png" w="3rem" />
+            <Image src="bankrwallet-icon.png" w="3rem" />
           </Box>
           <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
             Complete Setup
@@ -1045,13 +1045,8 @@ function App() {
         />
 
         <HStack spacing={2}>
-          <Box
-            bg="bauhaus.white"
-            border="2px solid"
-            borderColor="bauhaus.black"
-            p={1}
-          >
-            <Image src="impersonatorLogo.png" w="1.5rem" />
+          <Box bg="bauhaus.white" p={0.5}>
+            <Image src="bankrwallet-icon-white-bg.png" h="1.75rem" />
           </Box>
           <Text fontWeight="900" color="bauhaus.white" textTransform="uppercase" letterSpacing="wider">
             BankrWallet

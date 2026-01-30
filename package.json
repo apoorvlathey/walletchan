@@ -18,7 +18,8 @@
     "watch": "pnpm build:web --watch && concurrently 'pnpm build:inpage --watch' 'pnpm build:inject --watch' 'pnpm build:background --watch'",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "chrome:run": "web-ext run --source-dir build --target chromium",
-    "firefox:run": "web-ext run --source-dir build --browser-console"
+    "firefox:run": "web-ext run --source-dir build --browser-console",
+    "icons": "bash scripts/generate-icons.sh"
   },
   "dependencies": {
     "@chakra-ui/icons": "^2.2",

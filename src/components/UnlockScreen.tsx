@@ -255,20 +255,33 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
       )}
 
       <VStack spacing={6} w="full" maxW="280px">
-        {/* Lock icon in geometric container */}
+        {/* Logo in geometric container */}
         <Box
           p={4}
-          bg="bauhaus.blue"
+          bg="bauhaus.white"
           border="4px solid"
           borderColor="bauhaus.black"
           boxShadow="6px 6px 0px 0px #121212"
           transform="rotate(-3deg)"
+          position="relative"
         >
-          <LockIcon boxSize={8} color="bauhaus.white" />
+          <Image src="bankrwallet-animated.gif" w="4.5rem" />
+          {/* Lock badge */}
+          <Box
+            position="absolute"
+            bottom="-14px"
+            right="-14px"
+            p={1.5}
+            bg="bauhaus.blue"
+            border="2px solid"
+            borderColor="bauhaus.black"
+            boxShadow="2px 2px 0px 0px #121212"
+          >
+            <LockIcon boxSize={3.5} color="bauhaus.white" />
+          </Box>
         </Box>
 
         <VStack spacing={1}>
-          <Image src="impersonatorLogo.png" w="3rem" />
           <Text fontSize="xl" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="tight">
             BankrWallet
           </Text>
