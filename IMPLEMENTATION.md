@@ -505,6 +505,91 @@ Build command: `pnpm build`
 | `getCachedPassword`           | Check if password is cached           |
 | `getCachedApiKey`             | Get decrypted API key (if cached)     |
 | `saveApiKeyWithCachedPassword`| Save new API key using cached password|
+| `isSidePanelSupported`        | Check if browser supports sidepanel   |
+| `getSidePanelMode`            | Get current sidepanel mode setting    |
+| `setSidePanelMode`            | Set sidepanel mode (true/false)       |
+
+## Sidepanel Support
+
+The extension supports Chrome's Side Panel API for browsers that implement it (Chrome 114+). Browsers like Arc that don't support the Side Panel API will fallback to popup mode.
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Sidepanel Detection Flow                            │
+│                                                                             │
+│  On Extension Load:                                                         │
+│    1. Check if chrome.sidePanel API exists                                  │
+│    2. Load sidePanelMode from chrome.storage.sync                           │
+│    3. If supported and mode enabled:                                        │
+│       - Set openPanelOnActionClick: true                                    │
+│       - Clicking extension icon opens sidepanel                             │
+│    4. If not supported or mode disabled:                                    │
+│       - Use default popup behavior                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Configuration
+
+| Setting | Storage Key | Default | Description |
+| ------- | ----------- | ------- | ----------- |
+| Mode    | `sidePanelMode` | `true` (if supported) | Whether to use sidepanel or popup |
+
+### UI Toggle
+
+A sidepanel toggle button is available on both the **unlock screen** (top-right corner) and **main view header** (only visible when sidepanel is supported).
+
+When toggling from popup to sidepanel mode:
+- The setting is persisted in `chrome.storage.sync`
+- The extension's action behavior is updated via `chrome.sidePanel.setPanelBehavior`
+- A toast notification instructs user to close popup and click extension icon (Chrome doesn't allow programmatic sidepanel opening)
+
+When toggling from sidepanel to popup mode:
+- A popup window is opened
+- The sidepanel closes automatically
+
+### Transaction Requests
+
+When a dapp requests a transaction, the extension uses a ping/pong mechanism to detect open views:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Transaction Request Flow                                │
+│                                                                             │
+│  1. Background receives eth_sendTransaction from dapp                       │
+│  2. Stores pending tx in chrome.storage.local                               │
+│  3. Broadcasts "newPendingTxRequest" message to all extension views         │
+│  4. Sends "ping" message to check if any view is open                       │
+│     - If view responds "pong": Don't open popup (broadcast updated it)      │
+│     - If no response: Open popup window                                     │
+│  5. Open view displays transaction confirmation UI                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+This ensures:
+- If sidepanel is already open → it updates in-place, no popup opened
+- If popup is already open → it updates in-place, no duplicate popup
+- If nothing is open → a popup window is opened (can't programmatically open sidepanel)
+
+### Message Types for Sidepanel
+
+| Type | Direction | Description |
+| ---- | --------- | ----------- |
+| `ping` | Background → Views | Check if any extension view is open |
+| `pong` | Views → Background | Response indicating view is open |
+| `newPendingTxRequest` | Background → Views | Notify views of new pending transaction |
+| `openPopupWindow` | Views → Background | Request to open a popup window |
+
+### CSS Handling
+
+The extension detects if it's running in a sidepanel context by checking window dimensions:
+- Sidepanel: height > 620px (browser provides more vertical space)
+- Popup: height ≤ 600px (fixed popup dimensions)
+
+When in sidepanel:
+- `body.sidepanel-mode` class is added
+- CSS adjusts to use full viewport height (100vh)
 
 ## UI Layout
 

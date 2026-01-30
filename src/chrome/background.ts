@@ -107,6 +107,51 @@ setInterval(() => {
 updateBadge();
 
 /**
+ * Checks if the browser supports the sidePanel API
+ */
+function isSidePanelSupported(): boolean {
+  return typeof chrome !== "undefined" && !!chrome.sidePanel;
+}
+
+/**
+ * Gets the current sidepanel mode setting
+ */
+async function getSidePanelMode(): Promise<boolean> {
+  if (!isSidePanelSupported()) {
+    return false;
+  }
+  const { sidePanelMode } = await chrome.storage.sync.get(["sidePanelMode"]);
+  // Default to true (sidepanel mode) if supported and not explicitly set to false
+  return sidePanelMode !== false;
+}
+
+/**
+ * Sets the sidepanel mode setting
+ */
+async function setSidePanelMode(enabled: boolean): Promise<void> {
+  await chrome.storage.sync.set({ sidePanelMode: enabled });
+
+  if (isSidePanelSupported()) {
+    // Update action behavior based on mode
+    if (enabled) {
+      // In sidepanel mode, clicking the icon opens the sidepanel
+      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+    } else {
+      // In popup mode, clicking the icon opens the popup (default)
+      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+    }
+  }
+}
+
+// Initialize sidepanel behavior on startup
+(async () => {
+  if (isSidePanelSupported()) {
+    const enabled = await getSidePanelMode();
+    await setSidePanelMode(enabled);
+  }
+})();
+
+/**
  * Handles incoming transaction requests from content script
  */
 async function handleTransactionRequest(
@@ -163,15 +208,36 @@ async function handleTransactionRequest(
   // Store the resolver to respond when user confirms/rejects
   pendingResolvers.set(txId, { resolve: sendResponse });
 
-  // Open the extension popup for user to confirm
+  // Notify any open extension views (sidepanel/popup) about the new tx request
+  chrome.runtime.sendMessage({ type: "newPendingTxRequest", txRequest: pendingRequest }).catch(() => {
+    // Ignore errors if no listeners (popup/sidepanel not open)
+  });
+
+  // Open the extension popup/sidepanel for user to confirm
   openExtensionPopup(senderWindowId);
 }
 
 /**
  * Opens the extension popup window for transaction confirmation
+ * Respects user preference, falls back to popup for unsupported browsers (e.g., Arc)
  */
 async function openExtensionPopup(senderWindowId?: number): Promise<void> {
-  // Check if popup window already exists
+  const useSidePanel = await getSidePanelMode();
+
+  // If sidepanel mode is enabled, check if we can detect an open sidepanel
+  // by trying to send a ping message - if a view responds, it's open
+  if (useSidePanel && isSidePanelSupported()) {
+    try {
+      // Try to ping any open extension views
+      const response = await chrome.runtime.sendMessage({ type: "ping" }).catch(() => null);
+      if (response === "pong") {
+        // An extension view is open and responded, don't open popup
+        return;
+      }
+    } catch {
+      // No views responded, continue to open popup
+    }
+  }
   const existingWindows = await chrome.windows.getAll({ windowTypes: ["popup"] });
   const popupUrl = chrome.runtime.getURL("index.html");
 
@@ -238,6 +304,62 @@ async function openExtensionPopup(senderWindowId?: number): Promise<void> {
 
   // Only set position if we have valid coordinates
   // This allows Chrome to handle positioning on the correct monitor
+  if (left !== undefined && top !== undefined) {
+    createOptions.left = left;
+    createOptions.top = top;
+  }
+
+  await chrome.windows.create(createOptions);
+}
+
+/**
+ * Opens a popup window (used when switching from sidepanel to popup mode)
+ */
+async function openPopupWindow(): Promise<void> {
+  const popupUrl = chrome.runtime.getURL("index.html");
+
+  // Check if popup window already exists
+  const existingWindows = await chrome.windows.getAll({ windowTypes: ["popup"] });
+  for (const win of existingWindows) {
+    if (win.id) {
+      const tabs = await chrome.tabs.query({ windowId: win.id });
+      if (tabs.some(tab => tab.url?.startsWith(popupUrl))) {
+        await chrome.windows.update(win.id, { focused: true });
+        return;
+      }
+    }
+  }
+
+  // Get last focused window for positioning
+  let targetWindow: chrome.windows.Window | null = null;
+  try {
+    targetWindow = await chrome.windows.getLastFocused({ populate: false });
+  } catch {
+    targetWindow = null;
+  }
+
+  const popupWidth = 380;
+  const popupHeight = 540;
+
+  let left: number | undefined;
+  let top: number | undefined;
+
+  if (targetWindow &&
+      targetWindow.left !== undefined &&
+      targetWindow.width !== undefined &&
+      targetWindow.top !== undefined) {
+    left = targetWindow.left + targetWindow.width - popupWidth - 10;
+    top = targetWindow.top + 80;
+  }
+
+  const createOptions: chrome.windows.CreateData = {
+    url: popupUrl,
+    type: "popup",
+    width: popupWidth,
+    height: popupHeight,
+    focused: true,
+  };
+
   if (left !== undefined && top !== undefined) {
     createOptions.left = left;
     createOptions.top = top;
@@ -614,6 +736,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .then((result) => sendResponse({ result }))
         .catch((error) => sendResponse({ error: error.message }));
       return true; // Will respond asynchronously
+    }
+
+    case "isSidePanelSupported": {
+      sendResponse({ supported: isSidePanelSupported() });
+      return false;
+    }
+
+    case "getSidePanelMode": {
+      getSidePanelMode().then((enabled) => {
+        sendResponse({ enabled });
+      });
+      return true;
+    }
+
+    case "setSidePanelMode": {
+      setSidePanelMode(message.enabled).then(() => {
+        sendResponse({ success: true });
+      });
+      return true;
+    }
+
+    case "openPopupWindow": {
+      openPopupWindow().then(() => {
+        sendResponse({ success: true });
+      });
+      return true;
     }
   }
 

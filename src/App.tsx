@@ -21,8 +21,20 @@ import {
   Code,
   useToast,
   VStack,
+  Tooltip,
+  Icon,
 } from "@chakra-ui/react";
 import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon } from "@chakra-ui/icons";
+
+// Sidepanel icon
+const SidePanelIcon = (props: any) => (
+  <Icon viewBox="0 0 24 24" {...props}>
+    <path
+      fill="currentColor"
+      d="M3 3h18a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm12 2v14h5V5h-5zM4 5v14h10V5H4z"
+    />
+  </Icon>
+);
 import Settings from "@/components/Settings";
 import UnlockScreen from "@/components/UnlockScreen";
 import PendingTxBanner from "@/components/PendingTxBanner";
@@ -48,6 +60,9 @@ function App() {
   const [pendingRequests, setPendingRequests] = useState<PendingTxRequest[]>([]);
   const [selectedTxRequest, setSelectedTxRequest] = useState<PendingTxRequest | null>(null);
   const [copied, setCopied] = useState(false);
+  const [sidePanelSupported, setSidePanelSupported] = useState(false);
+  const [sidePanelMode, setSidePanelMode] = useState(false);
+  const [isInSidePanel, setIsInSidePanel] = useState(false);
 
   const currentTab = async () => {
     const [tab] = await chrome.tabs.query({
@@ -72,6 +87,100 @@ function App() {
         resolve(cached);
       });
     });
+  };
+
+  // Check sidepanel support and mode on mount
+  useEffect(() => {
+    const checkSidePanelSupport = async () => {
+      return new Promise<boolean>((resolve) => {
+        chrome.runtime.sendMessage({ type: "isSidePanelSupported" }, (response) => {
+          resolve(response?.supported || false);
+        });
+      });
+    };
+
+    const checkSidePanelMode = async () => {
+      return new Promise<boolean>((resolve) => {
+        chrome.runtime.sendMessage({ type: "getSidePanelMode" }, (response) => {
+          resolve(response?.enabled || false);
+        });
+      });
+    };
+
+    const detectSidePanelContext = () => {
+      // Detect if we're running in a sidepanel context by checking window dimensions
+      // Sidepanel typically has more height than the popup's fixed 480-600px
+      const isWideEnough = window.innerWidth >= 300;
+      const isTall = window.innerHeight > 620;
+      return isWideEnough && isTall;
+    };
+
+    const initSidePanel = async () => {
+      const supported = await checkSidePanelSupport();
+      setSidePanelSupported(supported);
+
+      if (supported) {
+        const mode = await checkSidePanelMode();
+        setSidePanelMode(mode);
+      }
+
+      // Detect if currently in sidepanel
+      const inSidePanel = detectSidePanelContext();
+      setIsInSidePanel(inSidePanel);
+
+      // Add/remove body class for CSS
+      if (inSidePanel) {
+        document.body.classList.add("sidepanel-mode");
+      } else {
+        document.body.classList.remove("sidepanel-mode");
+      }
+    };
+
+    initSidePanel();
+
+    // Listen for window resize to update sidepanel detection
+    const handleResize = () => {
+      const inSidePanel = window.innerHeight > 620;
+      setIsInSidePanel(inSidePanel);
+      if (inSidePanel) {
+        document.body.classList.add("sidepanel-mode");
+      } else {
+        document.body.classList.remove("sidepanel-mode");
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const toggleSidePanelMode = async () => {
+    const newMode = !sidePanelMode;
+
+    // Update the mode setting
+    await new Promise<void>((resolve) => {
+      chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: newMode }, () => {
+        resolve();
+      });
+    });
+    setSidePanelMode(newMode);
+
+    if (!newMode && isInSidePanel) {
+      // Switching from sidepanel to popup mode while in sidepanel
+      // Open popup window, then close sidepanel
+      chrome.runtime.sendMessage({ type: "openPopupWindow" }, () => {
+        window.close();
+      });
+    } else if (newMode && !isInSidePanel) {
+      // Switching from popup to sidepanel mode while in popup
+      // Chrome doesn't allow programmatic sidepanel open, show toast
+      toast({
+        title: "Sidepanel mode enabled",
+        description: "Close popup and click the extension icon to open in sidepanel",
+        status: "info",
+        duration: null,
+        isClosable: true,
+      });
+    }
   };
 
   useEffect(() => {
@@ -149,6 +258,32 @@ function App() {
     };
 
     init();
+  }, []);
+
+  // Listen for new pending tx requests (when sidepanel/popup is already open)
+  // Also respond to ping messages so background knows a view is open
+  useEffect(() => {
+    const handleMessage = (
+      message: { type: string; txRequest?: PendingTxRequest },
+      _sender: chrome.runtime.MessageSender,
+      sendResponse: (response?: any) => void
+    ) => {
+      if (message.type === "ping") {
+        // Respond to ping so background knows we're open
+        sendResponse("pong");
+        return true;
+      }
+      if (message.type === "newPendingTxRequest" && message.txRequest) {
+        // Update pending requests list
+        setPendingRequests((prev) => [...prev, message.txRequest!]);
+        // Show the new tx request
+        setSelectedTxRequest(message.txRequest);
+        setView("txConfirm");
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(handleMessage);
+    return () => chrome.runtime.onMessage.removeListener(handleMessage);
   }, []);
 
   useUpdateEffect(() => {
@@ -232,8 +367,8 @@ function App() {
     if (remaining.length > 0) {
       setSelectedTxRequest(remaining[0]);
     } else {
-      setSelectedTxRequest(null);
-      setView("main");
+      // Close popup when no more pending requests
+      window.close();
     }
   };
 
@@ -247,9 +382,8 @@ function App() {
         );
       });
     }
-    await loadPendingRequests();
-    setSelectedTxRequest(null);
-    setView("main");
+    // Close popup after rejecting all
+    window.close();
   };
 
   const truncateAddress = (addr: string): string => {
@@ -373,13 +507,29 @@ function App() {
           </Text>
         </HStack>
         <Spacer />
-        <IconButton
-          aria-label="Settings"
-          icon={<SettingsIcon />}
-          variant="ghost"
-          size="sm"
-          onClick={() => setView("settings")}
-        />
+        <HStack spacing={1}>
+          {sidePanelSupported && (
+            <Tooltip
+              label={sidePanelMode ? "Switch to popup mode" : "Switch to sidepanel mode"}
+              placement="bottom"
+            >
+              <IconButton
+                aria-label={sidePanelMode ? "Switch to popup mode" : "Switch to sidepanel mode"}
+                icon={<SidePanelIcon />}
+                variant="ghost"
+                size="sm"
+                onClick={toggleSidePanelMode}
+              />
+            </Tooltip>
+          )}
+          <IconButton
+            aria-label="Settings"
+            icon={<SettingsIcon />}
+            variant="ghost"
+            size="sm"
+            onClick={() => setView("settings")}
+          />
+        </HStack>
       </Flex>
 
       <Container pt={4} pb={4}>

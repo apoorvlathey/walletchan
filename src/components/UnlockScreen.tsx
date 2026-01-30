@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   VStack,
@@ -11,18 +11,93 @@ import {
   Image,
   Alert,
   AlertIcon,
+  Tooltip,
+  Icon,
+  useToast,
 } from "@chakra-ui/react";
 import { ViewIcon, ViewOffIcon, LockIcon } from "@chakra-ui/icons";
+
+// Sidepanel icon
+const SidePanelIcon = (props: any) => (
+  <Icon viewBox="0 0 24 24" {...props}>
+    <path
+      fill="currentColor"
+      d="M3 3h18a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm12 2v14h5V5h-5zM4 5v14h10V5H4z"
+    />
+  </Icon>
+);
 
 interface UnlockScreenProps {
   onUnlock: () => void;
 }
 
 function UnlockScreen({ onUnlock }: UnlockScreenProps) {
+  const toast = useToast();
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [error, setError] = useState("");
+  const [sidePanelSupported, setSidePanelSupported] = useState(false);
+  const [sidePanelMode, setSidePanelMode] = useState(false);
+  const [isInSidePanel, setIsInSidePanel] = useState(false);
+
+  useEffect(() => {
+    const checkSidePanelSupport = async () => {
+      return new Promise<boolean>((resolve) => {
+        chrome.runtime.sendMessage({ type: "isSidePanelSupported" }, (response) => {
+          resolve(response?.supported || false);
+        });
+      });
+    };
+
+    const checkSidePanelMode = async () => {
+      return new Promise<boolean>((resolve) => {
+        chrome.runtime.sendMessage({ type: "getSidePanelMode" }, (response) => {
+          resolve(response?.enabled || false);
+        });
+      });
+    };
+
+    const init = async () => {
+      const supported = await checkSidePanelSupport();
+      setSidePanelSupported(supported);
+
+      if (supported) {
+        const mode = await checkSidePanelMode();
+        setSidePanelMode(mode);
+      }
+
+      // Detect if currently in sidepanel
+      setIsInSidePanel(window.innerHeight > 620);
+    };
+
+    init();
+  }, []);
+
+  const toggleSidePanelMode = async () => {
+    const newMode = !sidePanelMode;
+
+    await new Promise<void>((resolve) => {
+      chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: newMode }, () => {
+        resolve();
+      });
+    });
+    setSidePanelMode(newMode);
+
+    if (!newMode && isInSidePanel) {
+      chrome.runtime.sendMessage({ type: "openPopupWindow" }, () => {
+        window.close();
+      });
+    } else if (newMode && !isInSidePanel) {
+      toast({
+        title: "Sidepanel mode enabled",
+        description: "Close popup and click the extension icon to open in sidepanel",
+        status: "info",
+        duration: null,
+        isClosable: true,
+      });
+    }
+  };
 
   const handleUnlock = async () => {
     if (!password) {
@@ -55,7 +130,26 @@ function UnlockScreen({ onUnlock }: UnlockScreenProps) {
       alignItems="center"
       justifyContent="center"
       p={6}
+      position="relative"
     >
+      {/* Sidepanel toggle - top right */}
+      {sidePanelSupported && (
+        <Box position="absolute" top={3} right={3}>
+          <Tooltip
+            label={sidePanelMode ? "Switch to popup mode" : "Switch to sidepanel mode"}
+            placement="bottom"
+          >
+            <IconButton
+              aria-label={sidePanelMode ? "Switch to popup mode" : "Switch to sidepanel mode"}
+              icon={<SidePanelIcon />}
+              variant="ghost"
+              size="sm"
+              onClick={toggleSidePanelMode}
+            />
+          </Tooltip>
+        </Box>
+      )}
+
       <VStack spacing={6} w="full" maxW="280px">
         <Box
           p={4}
@@ -83,6 +177,7 @@ function UnlockScreen({ onUnlock }: UnlockScreenProps) {
               type={showPassword ? "text" : "password"}
               placeholder="Password"
               value={password}
+              autoFocus
               onChange={(e) => {
                 setPassword(e.target.value);
                 if (error) setError("");
