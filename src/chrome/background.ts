@@ -414,8 +414,8 @@ async function openExtensionPopup(senderWindowId?: number): Promise<void> {
     }
   }
 
-  const popupWidth = 380;
-  const popupHeight = 540;
+  const popupWidth = 360;
+  const popupHeight = 680;
 
   // Calculate position: top-right of target window
   // Use the window's actual coordinates (which include multi-monitor offsets)
@@ -477,8 +477,8 @@ async function openPopupWindow(): Promise<void> {
     targetWindow = null;
   }
 
-  const popupWidth = 380;
-  const popupHeight = 540;
+  const popupWidth = 360;
+  const popupHeight = 680;
 
   let left: number | undefined;
   let top: number | undefined;
@@ -1382,8 +1382,8 @@ chrome.notifications.onClicked.addListener(async (notificationId) => {
         await chrome.windows.create({
           url: popupUrl,
           type: "popup",
-          width: 380,
-          height: 540,
+          width: 360,
+          height: 680,
           focused: true,
         });
       } else {
@@ -1392,8 +1392,8 @@ chrome.notifications.onClicked.addListener(async (notificationId) => {
         await chrome.windows.create({
           url: popupUrl,
           type: "popup",
-          width: 380,
-          height: 540,
+          width: 360,
+          height: 680,
           focused: true,
         });
       }

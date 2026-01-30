@@ -122,9 +122,9 @@ function App() {
 
     const detectSidePanelContext = () => {
       // Detect if we're running in a sidepanel context by checking window dimensions
-      // Sidepanel typically has more height than the popup's fixed 480-600px
+      // Sidepanel typically has more height than the popup's fixed 680px
       const isWideEnough = window.innerWidth >= 300;
-      const isTall = window.innerHeight > 620;
+      const isTall = window.innerHeight > 700;
       return isWideEnough && isTall;
     };
 
@@ -153,7 +153,7 @@ function App() {
 
     // Listen for window resize to update sidepanel detection
     const handleResize = () => {
-      const inSidePanel = window.innerHeight > 620;
+      const inSidePanel = window.innerHeight > 700;
       setIsInSidePanel(inSidePanel);
       if (inSidePanel) {
         document.body.classList.add("sidepanel-mode");
