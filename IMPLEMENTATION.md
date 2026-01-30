@@ -249,7 +249,8 @@ src/
 │   │   ├── Chains.tsx       # Chain RPC management
 │   │   ├── AddChain.tsx     # Add new chain
 │   │   ├── EditChain.tsx    # Edit existing chain
-│   │   └── ChangePassword.tsx # Password change flow
+│   │   ├── ChangePassword.tsx # Password change flow
+│   │   └── AutoLockSettings.tsx # Auto-lock timeout configuration
 │   ├── UnlockScreen.tsx     # Wallet unlock (password entry)
 │   ├── PendingTxBanner.tsx  # Banner showing pending tx/signature count
 │   ├── PendingTxList.tsx    # List of pending transactions and signature requests
@@ -848,12 +849,41 @@ Store in chrome.storage.local:
 MetaMask-style wallet lock flow:
 
 - Decrypted API key **and password** are cached in background worker memory
-- Cache expires after 15 minutes (wallet "locks")
+- Cache expires based on **configurable auto-lock timeout** (default: 15 minutes)
 - Cache cleared on browser close or extension suspend
 - When locked, user must enter password before:
   - Viewing the main wallet interface
   - Confirming any pending transactions
 - Unlock persists across popup open/close cycles (until cache expires)
+
+#### Auto-Lock Timeout Configuration
+
+Users can configure the auto-lock timeout via Settings → Auto-Lock:
+
+| Option | Value (ms) | Description |
+| ------ | ---------- | ----------- |
+| 1 minute | 60,000 | Quick lock for high security |
+| 5 minutes | 300,000 | Short timeout |
+| **15 minutes** | 900,000 | **Default** |
+| 30 minutes | 1,800,000 | Medium timeout |
+| 1 hour | 3,600,000 | Extended session |
+| 4 hours | 14,400,000 | Long session |
+| Never | 0 | Never auto-lock (manual lock only) |
+
+**Implementation Details**:
+
+- Setting stored in `chrome.storage.sync` with key `autoLockTimeout`
+- Background worker caches the timeout value in memory for performance
+- Storage change listener keeps cached value in sync across tabs
+- When timeout is `0` ("Never"), cache validation always passes
+- Changes take effect immediately (no restart required)
+
+**Message Types**:
+
+| Type | Description |
+| ---- | ----------- |
+| `getAutoLockTimeout` | Get current timeout value |
+| `setAutoLockTimeout` | Set new timeout value |
 
 #### Password Caching for API Key Changes
 
@@ -1038,6 +1068,8 @@ Build command: `pnpm build`
 | `isSidePanelSupported`        | Check if browser supports sidepanel   |
 | `getSidePanelMode`            | Get current sidepanel mode setting    |
 | `setSidePanelMode`            | Set sidepanel mode (true/false)       |
+| `getAutoLockTimeout`          | Get current auto-lock timeout (ms)    |
+| `setAutoLockTimeout`          | Set auto-lock timeout (ms)            |
 | `getTxHistory`                | Get completed transaction history     |
 | `clearTxHistory`              | Clear all transaction history         |
 

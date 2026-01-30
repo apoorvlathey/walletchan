@@ -27,13 +27,15 @@ import {
   LockIcon,
   ChevronRightIcon,
   DeleteIcon,
+  TimeIcon,
 } from "@chakra-ui/icons";
 import Chains from "./Chains";
 import ChangePassword from "./ChangePassword";
+import AutoLockSettings from "./AutoLockSettings";
 import ApiKeySetup from "@/pages/ApiKeySetup";
 import { hasEncryptedApiKey } from "@/chrome/crypto";
 
-type SettingsTab = "main" | "apiKey" | "chains" | "changePassword";
+type SettingsTab = "main" | "apiKey" | "chains" | "changePassword" | "autoLock";
 
 interface SettingsProps {
   close: () => void;
@@ -108,6 +110,15 @@ function Settings({ close, showBackButton = true, onSessionExpired }: SettingsPr
         onComplete={() => setTab("main")}
         onCancel={() => setTab("main")}
         onSessionExpired={onSessionExpired || (() => setTab("main"))}
+      />
+    );
+  }
+
+  if (tab === "autoLock") {
+    return (
+      <AutoLockSettings
+        onComplete={() => setTab("main")}
+        onCancel={() => setTab("main")}
       />
     );
   }
@@ -282,6 +293,58 @@ function Settings({ close, showBackButton = true, onSessionExpired }: SettingsPr
           </HStack>
         </Box>
       )}
+
+      {/* Auto-Lock Settings Section */}
+      <Box
+        bg="bauhaus.white"
+        border="3px solid"
+        borderColor="bauhaus.black"
+        boxShadow="4px 4px 0px 0px #121212"
+        p={4}
+        cursor="pointer"
+        onClick={() => setTab("autoLock")}
+        _hover={{
+          transform: "translateY(-2px)",
+          boxShadow: "6px 6px 0px 0px #121212",
+        }}
+        _active={{
+          transform: "translate(2px, 2px)",
+          boxShadow: "none",
+        }}
+        transition="all 0.2s ease-out"
+        position="relative"
+      >
+        {/* Corner decoration */}
+        <Box
+          position="absolute"
+          top="-3px"
+          right="-3px"
+          w="8px"
+          h="8px"
+          bg="bauhaus.blue"
+          border="2px solid"
+          borderColor="bauhaus.black"
+        />
+
+        <HStack justify="space-between">
+          <HStack spacing={3}>
+            <Box p={2} bg="bauhaus.blue">
+              <TimeIcon boxSize={4} color="white" />
+            </Box>
+            <Box>
+              <Text fontWeight="700" color="text.primary">
+                Auto-Lock
+              </Text>
+              <Text fontSize="xs" color="text.secondary" fontWeight="500">
+                Configure wallet lock timeout
+              </Text>
+            </Box>
+          </HStack>
+          <Box bg="bauhaus.black" p={1}>
+            <ChevronRightIcon color="bauhaus.white" />
+          </Box>
+        </HStack>
+      </Box>
 
       {/* Chain RPCs Section */}
       <Box

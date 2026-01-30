@@ -88,13 +88,47 @@ const failedTxResults = new Map<string, FailedTxResult>();
 let cachedApiKey: string | null = null;
 let cachedPassword: string | null = null;
 let cacheTimestamp: number = 0;
-const CACHE_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+
+// Auto-lock timeout configuration
+const DEFAULT_AUTO_LOCK_TIMEOUT = 15 * 60 * 1000; // 15 minutes default
+const AUTO_LOCK_STORAGE_KEY = "autoLockTimeout";
+let cachedAutoLockTimeout: number | null = null;
+
+/**
+ * Gets the auto-lock timeout from storage (with caching)
+ */
+async function getAutoLockTimeout(): Promise<number> {
+  if (cachedAutoLockTimeout !== null) {
+    return cachedAutoLockTimeout;
+  }
+  const result = await chrome.storage.sync.get(AUTO_LOCK_STORAGE_KEY);
+  const timeout = result[AUTO_LOCK_STORAGE_KEY] ?? DEFAULT_AUTO_LOCK_TIMEOUT;
+  cachedAutoLockTimeout = timeout;
+  return timeout;
+}
+
+/**
+ * Sets the auto-lock timeout in storage
+ */
+async function setAutoLockTimeout(timeout: number): Promise<void> {
+  await chrome.storage.sync.set({ [AUTO_LOCK_STORAGE_KEY]: timeout });
+  cachedAutoLockTimeout = timeout;
+}
+
+// Listen for storage changes to update cached timeout
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === "sync" && changes[AUTO_LOCK_STORAGE_KEY]) {
+    cachedAutoLockTimeout = changes[AUTO_LOCK_STORAGE_KEY].newValue ?? DEFAULT_AUTO_LOCK_TIMEOUT;
+  }
+});
 
 /**
  * Gets cached API key if still valid
  */
 function getCachedApiKey(): string | null {
-  if (cachedApiKey && Date.now() - cacheTimestamp < CACHE_TIMEOUT) {
+  const timeout = cachedAutoLockTimeout ?? DEFAULT_AUTO_LOCK_TIMEOUT;
+  // timeout of 0 means "Never" - cache never expires
+  if (cachedApiKey && (timeout === 0 || Date.now() - cacheTimestamp < timeout)) {
     return cachedApiKey;
   }
   cachedApiKey = null;
@@ -106,7 +140,9 @@ function getCachedApiKey(): string | null {
  * Gets cached password if still valid
  */
 function getCachedPassword(): string | null {
-  if (cachedPassword && Date.now() - cacheTimestamp < CACHE_TIMEOUT) {
+  const timeout = cachedAutoLockTimeout ?? DEFAULT_AUTO_LOCK_TIMEOUT;
+  // timeout of 0 means "Never" - cache never expires
+  if (cachedPassword && (timeout === 0 || Date.now() - cacheTimestamp < timeout)) {
     return cachedPassword;
   }
   cachedPassword = null;
@@ -192,6 +228,9 @@ setInterval(() => {
 
 // Initialize badge on startup
 updateBadge();
+
+// Initialize auto-lock timeout cache on startup
+getAutoLockTimeout();
 
 // Handle extension install/update
 chrome.runtime.onInstalled.addListener(async (details) => {
@@ -1242,6 +1281,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "setSidePanelMode": {
       setSidePanelMode(message.enabled).then(() => {
+        sendResponse({ success: true });
+      });
+      return true;
+    }
+
+    case "getAutoLockTimeout": {
+      getAutoLockTimeout().then((timeout) => {
+        sendResponse({ timeout });
+      });
+      return true;
+    }
+
+    case "setAutoLockTimeout": {
+      setAutoLockTimeout(message.timeout).then(() => {
         sendResponse({ success: true });
       });
       return true;
