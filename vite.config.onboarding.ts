@@ -14,6 +14,17 @@ export default defineConfig({
       },
       output: {
         entryFileNames: "static/js/[name].js",
+        chunkFileNames: "static/js/[name]-[hash].js",
+        manualChunks: {
+          "vendor-react": ["react", "react-dom"],
+          "vendor-chakra": [
+            "@chakra-ui/react",
+            "@chakra-ui/icons",
+            "@emotion/react",
+            "@emotion/styled",
+            "framer-motion",
+          ],
+        },
       },
     },
   },

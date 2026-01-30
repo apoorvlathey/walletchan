@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import {
   HStack,
   VStack,
@@ -463,4 +463,4 @@ function Settings({ close, showBackButton = true, onSessionExpired }: SettingsPr
   );
 }
 
-export default Settings;
+export default memo(Settings);

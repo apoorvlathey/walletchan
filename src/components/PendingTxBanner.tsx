@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { HStack, Box, Text } from "@chakra-ui/react";
 import { BellIcon, ChevronRightIcon } from "@chakra-ui/icons";
 
@@ -89,4 +90,4 @@ function PendingTxBanner({ txCount, signatureCount, onClickTx, onClickSignature 
   );
 }
 
-export default PendingTxBanner;
+export default memo(PendingTxBanner);

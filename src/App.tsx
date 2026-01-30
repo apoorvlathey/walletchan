@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import {
   useUpdateEffect,
   Flex,
@@ -19,6 +19,7 @@ import {
   Tooltip,
   Icon,
   Link,
+  Spinner,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon, LockIcon, WarningIcon, InfoIcon } from "@chakra-ui/icons";
@@ -32,18 +33,35 @@ const SidePanelIcon = (props: any) => (
     />
   </Icon>
 );
-import Settings from "@/components/Settings";
+
+// Lazy load heavy components
+const Settings = lazy(() => import("@/components/Settings"));
+const TransactionConfirmation = lazy(() => import("@/components/TransactionConfirmation"));
+const SignatureRequestConfirmation = lazy(() => import("@/components/SignatureRequestConfirmation"));
+const PendingTxList = lazy(() => import("@/components/PendingTxList"));
+
+// Eager load components needed immediately
 import UnlockScreen from "@/components/UnlockScreen";
 import PendingTxBanner from "@/components/PendingTxBanner";
-import PendingTxList from "@/components/PendingTxList";
-import TransactionConfirmation from "@/components/TransactionConfirmation";
 import TxStatusList from "@/components/TxStatusList";
 import { useNetworks } from "@/contexts/NetworksContext";
 import { getChainConfig } from "@/constants/chainConfig";
 import { hasEncryptedApiKey } from "@/chrome/crypto";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
-import SignatureRequestConfirmation from "@/components/SignatureRequestConfirmation";
+
+// Loading fallback component
+const LoadingFallback = () => (
+  <Box
+    minH="200px"
+    display="flex"
+    alignItems="center"
+    justifyContent="center"
+    bg="bg.base"
+  >
+    <Spinner size="lg" color="bauhaus.blue" thickness="3px" />
+  </Box>
+);
 
 type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | "signatureConfirm" | "waitingForOnboarding";
 
@@ -443,7 +461,7 @@ function App() {
     }
   }, [reloadRequired, networksInfo]);
 
-  const handleUnlock = async () => {
+  const handleUnlock = useCallback(async () => {
     // Refresh pending requests after unlock
     const requests = await loadPendingRequests();
     const sigRequests = await loadPendingSignatureRequests();
@@ -459,7 +477,7 @@ function App() {
     } else {
       setView("main");
     }
-  };
+  }, []);
 
   const handleCopyAddress = async () => {
     try {
@@ -482,7 +500,7 @@ function App() {
     }
   };
 
-  const handleTxConfirmed = async () => {
+  const handleTxConfirmed = useCallback(async () => {
     const currentTxId = selectedTxRequest?.id;
     const requests = await loadPendingRequests();
 
@@ -494,9 +512,9 @@ function App() {
       setSelectedTxRequest(null);
       setView("main");
     }
-  };
+  }, [selectedTxRequest?.id]);
 
-  const handleTxRejected = async () => {
+  const handleTxRejected = useCallback(async () => {
     const currentTxId = selectedTxRequest?.id;
     const requests = await loadPendingRequests();
 
@@ -513,9 +531,9 @@ function App() {
         window.close();
       }
     }
-  };
+  }, [selectedTxRequest?.id, isInSidePanel]);
 
-  const handleRejectAll = async () => {
+  const handleRejectAll = useCallback(async () => {
     // Reject all pending transactions
     for (const request of pendingRequests) {
       await new Promise<void>((resolve) => {
@@ -544,9 +562,9 @@ function App() {
     } else {
       window.close();
     }
-  };
+  }, [pendingRequests, pendingSignatureRequests, isInSidePanel]);
 
-  const handleSignatureCancelled = async () => {
+  const handleSignatureCancelled = useCallback(async () => {
     const currentSigId = selectedSignatureRequest?.id;
     const sigRequests = await loadPendingSignatureRequests();
 
@@ -568,9 +586,9 @@ function App() {
         window.close();
       }
     }
-  };
+  }, [selectedSignatureRequest?.id, isInSidePanel]);
 
-  const handleCancelAllSignatures = async () => {
+  const handleCancelAllSignatures = useCallback(async () => {
     // Cancel all pending signature requests
     for (const request of pendingSignatureRequests) {
       await new Promise<void>((resolve) => {
@@ -594,7 +612,7 @@ function App() {
     } else {
       window.close();
     }
-  };
+  }, [pendingSignatureRequests, isInSidePanel]);
 
   const truncateAddress = (addr: string): string => {
     if (!addr) return "";
@@ -737,25 +755,27 @@ function App() {
     return (
       <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
         <Container pt={4} pb={4} flex="1" display="flex" flexDirection="column">
-          <Settings
-            close={() => {
-              // After settings, check if now have API key
-              hasEncryptedApiKey().then((has) => {
-                setHasApiKey(has);
-                if (has) {
-                  checkLockState().then((unlocked) => {
-                    if (unlocked) {
-                      setView("main");
-                    } else {
-                      setView("unlock");
-                    }
-                  });
-                }
-              });
-            }}
-            showBackButton={hasApiKey}
-            onSessionExpired={() => setView("unlock")}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <Settings
+              close={() => {
+                // After settings, check if now have API key
+                hasEncryptedApiKey().then((has) => {
+                  setHasApiKey(has);
+                  if (has) {
+                    checkLockState().then((unlocked) => {
+                      if (unlocked) {
+                        setView("main");
+                      } else {
+                        setView("unlock");
+                      }
+                    });
+                  }
+                });
+              }}
+              showBackButton={hasApiKey}
+              onSessionExpired={() => setView("unlock")}
+            />
+          </Suspense>
         </Container>
       </Box>
     );
@@ -764,20 +784,22 @@ function App() {
   // Pending tx list view
   if (view === "pendingTxList") {
     return (
-      <PendingTxList
-        txRequests={pendingRequests}
-        signatureRequests={pendingSignatureRequests}
-        onBack={() => setView("main")}
-        onSelectTx={(tx) => {
-          setSelectedTxRequest(tx);
-          setView("txConfirm");
-        }}
-        onSelectSignature={(sig) => {
-          setSelectedSignatureRequest(sig);
-          setView("signatureConfirm");
-        }}
-        onRejectAll={handleRejectAll}
-      />
+      <Suspense fallback={<LoadingFallback />}>
+        <PendingTxList
+          txRequests={pendingRequests}
+          signatureRequests={pendingSignatureRequests}
+          onBack={() => setView("main")}
+          onSelectTx={(tx) => {
+            setSelectedTxRequest(tx);
+            setView("txConfirm");
+          }}
+          onSelectSignature={(sig) => {
+            setSelectedSignatureRequest(sig);
+            setView("signatureConfirm");
+          }}
+          onRejectAll={handleRejectAll}
+        />
+      </Suspense>
     );
   }
 
@@ -788,41 +810,43 @@ function App() {
     );
     const totalCount = pendingRequests.length + pendingSignatureRequests.length;
     return (
-      <TransactionConfirmation
-        key={selectedTxRequest.id}
-        txRequest={selectedTxRequest}
-        currentIndex={currentIndex >= 0 ? currentIndex : 0}
-        totalTxCount={pendingRequests.length}
-        totalSignatureCount={pendingSignatureRequests.length}
-        isInSidePanel={isInSidePanel}
-        onBack={() => {
-          if (totalCount > 1) {
-            setView("pendingTxList");
-          } else {
-            setView("main");
-          }
-        }}
-        onConfirmed={handleTxConfirmed}
-        onRejected={handleTxRejected}
-        onRejectAll={handleRejectAll}
-        onNavigate={(direction) => {
-          const currentIdx = pendingRequests.findIndex(
-            (r) => r.id === selectedTxRequest.id
-          );
-          if (direction === "prev" && currentIdx > 0) {
-            setSelectedTxRequest(pendingRequests[currentIdx - 1]);
-          } else if (direction === "next" && currentIdx < pendingRequests.length - 1) {
-            setSelectedTxRequest(pendingRequests[currentIdx + 1]);
-          }
-        }}
-        onNavigateToSignature={() => {
-          if (pendingSignatureRequests.length > 0) {
-            setSelectedTxRequest(null);
-            setSelectedSignatureRequest(pendingSignatureRequests[0]);
-            setView("signatureConfirm");
-          }
-        }}
-      />
+      <Suspense fallback={<LoadingFallback />}>
+        <TransactionConfirmation
+          key={selectedTxRequest.id}
+          txRequest={selectedTxRequest}
+          currentIndex={currentIndex >= 0 ? currentIndex : 0}
+          totalTxCount={pendingRequests.length}
+          totalSignatureCount={pendingSignatureRequests.length}
+          isInSidePanel={isInSidePanel}
+          onBack={() => {
+            if (totalCount > 1) {
+              setView("pendingTxList");
+            } else {
+              setView("main");
+            }
+          }}
+          onConfirmed={handleTxConfirmed}
+          onRejected={handleTxRejected}
+          onRejectAll={handleRejectAll}
+          onNavigate={(direction) => {
+            const currentIdx = pendingRequests.findIndex(
+              (r) => r.id === selectedTxRequest.id
+            );
+            if (direction === "prev" && currentIdx > 0) {
+              setSelectedTxRequest(pendingRequests[currentIdx - 1]);
+            } else if (direction === "next" && currentIdx < pendingRequests.length - 1) {
+              setSelectedTxRequest(pendingRequests[currentIdx + 1]);
+            }
+          }}
+          onNavigateToSignature={() => {
+            if (pendingSignatureRequests.length > 0) {
+              setSelectedTxRequest(null);
+              setSelectedSignatureRequest(pendingSignatureRequests[0]);
+              setView("signatureConfirm");
+            }
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -833,41 +857,43 @@ function App() {
     );
     const totalCount = pendingRequests.length + pendingSignatureRequests.length;
     return (
-      <SignatureRequestConfirmation
-        key={selectedSignatureRequest.id}
-        sigRequest={selectedSignatureRequest}
-        currentIndex={currentIndex >= 0 ? currentIndex : 0}
-        totalTxCount={pendingRequests.length}
-        totalSignatureCount={pendingSignatureRequests.length}
-        isInSidePanel={isInSidePanel}
-        onBack={() => {
-          setSelectedSignatureRequest(null);
-          if (totalCount > 1) {
-            setView("pendingTxList");
-          } else {
-            setView("main");
-          }
-        }}
-        onCancelled={handleSignatureCancelled}
-        onCancelAll={handleCancelAllSignatures}
-        onNavigate={(direction) => {
-          const currentIdx = pendingSignatureRequests.findIndex(
-            (r) => r.id === selectedSignatureRequest.id
-          );
-          if (direction === "prev" && currentIdx > 0) {
-            setSelectedSignatureRequest(pendingSignatureRequests[currentIdx - 1]);
-          } else if (direction === "next" && currentIdx < pendingSignatureRequests.length - 1) {
-            setSelectedSignatureRequest(pendingSignatureRequests[currentIdx + 1]);
-          }
-        }}
-        onNavigateToTx={() => {
-          if (pendingRequests.length > 0) {
+      <Suspense fallback={<LoadingFallback />}>
+        <SignatureRequestConfirmation
+          key={selectedSignatureRequest.id}
+          sigRequest={selectedSignatureRequest}
+          currentIndex={currentIndex >= 0 ? currentIndex : 0}
+          totalTxCount={pendingRequests.length}
+          totalSignatureCount={pendingSignatureRequests.length}
+          isInSidePanel={isInSidePanel}
+          onBack={() => {
             setSelectedSignatureRequest(null);
-            setSelectedTxRequest(pendingRequests[pendingRequests.length - 1]);
-            setView("txConfirm");
-          }
-        }}
-      />
+            if (totalCount > 1) {
+              setView("pendingTxList");
+            } else {
+              setView("main");
+            }
+          }}
+          onCancelled={handleSignatureCancelled}
+          onCancelAll={handleCancelAllSignatures}
+          onNavigate={(direction) => {
+            const currentIdx = pendingSignatureRequests.findIndex(
+              (r) => r.id === selectedSignatureRequest.id
+            );
+            if (direction === "prev" && currentIdx > 0) {
+              setSelectedSignatureRequest(pendingSignatureRequests[currentIdx - 1]);
+            } else if (direction === "next" && currentIdx < pendingSignatureRequests.length - 1) {
+              setSelectedSignatureRequest(pendingSignatureRequests[currentIdx + 1]);
+            }
+          }}
+          onNavigateToTx={() => {
+            if (pendingRequests.length > 0) {
+              setSelectedSignatureRequest(null);
+              setSelectedTxRequest(pendingRequests[pendingRequests.length - 1]);
+              setView("txConfirm");
+            }
+          }}
+        />
+      </Suspense>
     );
   }
 

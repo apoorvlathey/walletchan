@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import {
   Box,
   VStack,
@@ -292,4 +292,4 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
   );
 }
 
-export default TxStatusList;
+export default memo(TxStatusList);

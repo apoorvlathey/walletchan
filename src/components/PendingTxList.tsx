@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
   Box,
   VStack,
@@ -371,4 +372,4 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
   );
 }
 
-export default PendingTxList;
+export default memo(PendingTxList);

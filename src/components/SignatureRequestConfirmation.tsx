@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import {
   Box,
   VStack,
@@ -506,4 +506,4 @@ function SignatureRequestConfirmation({
   );
 }
 
-export default SignatureRequestConfirmation;
+export default memo(SignatureRequestConfirmation);

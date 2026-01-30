@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import {
   Box,
   VStack,
@@ -479,4 +479,4 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
   );
 }
 
-export default UnlockScreen;
+export default memo(UnlockScreen);

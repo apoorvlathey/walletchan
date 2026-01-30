@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import {
   Box,
   VStack,
@@ -628,4 +628,4 @@ function TransactionConfirmation({
   );
 }
 
-export default TransactionConfirmation;
+export default memo(TransactionConfirmation);
