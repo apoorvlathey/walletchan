@@ -524,23 +524,37 @@ function App() {
     return () => chrome.runtime.onMessage.removeListener(handleMessage);
   }, []);
 
-  // Listen for storage changes (e.g., when dapp switches chain)
+  // Listen for storage changes (e.g., when dapp switches chain or address changes in settings)
   useEffect(() => {
     const handleStorageChange = (
       changes: { [key: string]: chrome.storage.StorageChange },
       areaName: string
     ) => {
-      if (areaName === "sync" && changes.chainName) {
-        const newChainName = changes.chainName.newValue;
-        if (newChainName && newChainName !== chainName) {
-          setChainName(newChainName);
+      if (areaName === "sync") {
+        if (changes.chainName) {
+          const newChainName = changes.chainName.newValue;
+          if (newChainName && newChainName !== chainName) {
+            setChainName(newChainName);
+          }
+        }
+        if (changes.address) {
+          const newAddress = changes.address.newValue;
+          if (newAddress && newAddress !== address) {
+            setAddress(newAddress);
+          }
+        }
+        if (changes.displayAddress) {
+          const newDisplayAddress = changes.displayAddress.newValue;
+          if (newDisplayAddress && newDisplayAddress !== displayAddress) {
+            setDisplayAddress(newDisplayAddress);
+          }
         }
       }
     };
 
     chrome.storage.onChanged.addListener(handleStorageChange);
     return () => chrome.storage.onChanged.removeListener(handleStorageChange);
-  }, [chainName]);
+  }, [chainName, address, displayAddress]);
 
   // Listen for tab activation changes to update chain for current tab
   useEffect(() => {

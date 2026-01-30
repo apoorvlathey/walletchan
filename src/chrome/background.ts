@@ -131,10 +131,33 @@ async function setAutoLockTimeout(timeout: number): Promise<boolean> {
   return true;
 }
 
-// Listen for storage changes to update cached timeout
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === "sync" && changes[AUTO_LOCK_STORAGE_KEY]) {
-    cachedAutoLockTimeout = changes[AUTO_LOCK_STORAGE_KEY].newValue ?? DEFAULT_AUTO_LOCK_TIMEOUT;
+// Listen for storage changes to update cached timeout and broadcast address changes
+chrome.storage.onChanged.addListener(async (changes, areaName) => {
+  if (areaName === "sync") {
+    if (changes[AUTO_LOCK_STORAGE_KEY]) {
+      cachedAutoLockTimeout = changes[AUTO_LOCK_STORAGE_KEY].newValue ?? DEFAULT_AUTO_LOCK_TIMEOUT;
+    }
+
+    // Broadcast address changes to all tabs so dapps receive accountsChanged event
+    if (changes.address) {
+      const newAddress = changes.address.newValue;
+      const newDisplayAddress = changes.displayAddress?.newValue || newAddress;
+
+      if (newAddress) {
+        // Get all tabs and send setAddress message
+        const tabs = await chrome.tabs.query({});
+        for (const tab of tabs) {
+          if (tab.id && tab.url && !tab.url.startsWith("chrome://") && !tab.url.startsWith("chrome-extension://")) {
+            chrome.tabs.sendMessage(tab.id, {
+              type: "setAddress",
+              msg: { address: newAddress, displayAddress: newDisplayAddress },
+            }).catch(() => {
+              // Ignore errors for tabs without content script
+            });
+          }
+        }
+      }
+    }
   }
 });
 
