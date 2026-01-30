@@ -1,26 +1,27 @@
 import { useState } from "react";
 import {
   Button,
-  Center,
   Box,
   Input,
   Heading,
-  Stack,
-  Flex,
-  Spacer,
+  VStack,
   HStack,
   Text,
+  IconButton,
+  Spacer,
+  FormControl,
+  FormLabel,
 } from "@chakra-ui/react";
-import { ChevronLeftIcon } from "@chakra-ui/icons";
+import { ArrowBackIcon } from "@chakra-ui/icons";
 import { useNetworks } from "@/contexts/NetworksContext";
 import { StaticJsonRpcProvider } from "@ethersproject/providers";
 
 function AddChain({ back }: { back: () => void }) {
   const { networksInfo, setNetworksInfo, setReloadRequired } = useNetworks();
 
-  const [chainName, setChainName] = useState<string>();
-  const [chainId, setChainId] = useState<string>();
-  const [rpc, setRpc] = useState<string>();
+  const [chainName, setChainName] = useState<string>("");
+  const [chainId, setChainId] = useState<string>("");
+  const [rpc, setRpc] = useState<string>("");
   const [isBtnLoading, setIsBtnLoading] = useState(false);
   const [isChainNameNotUnique, setIsChainNameNotUnique] = useState(false);
 
@@ -52,93 +53,119 @@ function AddChain({ back }: { back: () => void }) {
     setIsBtnLoading(false);
   };
 
+  const handleRpcPaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    setIsBtnLoading(true);
+    try {
+      const _rpc = e.clipboardData.getData("Text").trim();
+      const provider = new StaticJsonRpcProvider(_rpc);
+      const _chainId = (await provider.getNetwork()).chainId;
+      setChainId(_chainId.toString());
+    } catch (err) {
+      // Ignore errors - user can manually enter chain ID
+    }
+    setIsBtnLoading(false);
+  };
+
   return (
-    <>
-      <Flex>
+    <VStack spacing={4} align="stretch">
+      {/* Header */}
+      <HStack>
+        <IconButton
+          aria-label="Back"
+          icon={<ArrowBackIcon />}
+          variant="ghost"
+          size="sm"
+          onClick={back}
+        />
+        <Heading size="sm" color="text.primary">
+          Add Chain
+        </Heading>
         <Spacer />
-        <Button size="sm" variant="ghost" onClick={() => back()}>
-          <HStack>
-            <ChevronLeftIcon fontSize="2xl" /> <Text>Back</Text>
-          </HStack>
+      </HStack>
+
+      <Text fontSize="sm" color="text.secondary">
+        Add a new network by entering its RPC URL and chain ID.
+      </Text>
+
+      <FormControl>
+        <FormLabel color="text.secondary">Name</FormLabel>
+        <Input
+          placeholder="e.g., Arbitrum"
+          value={chainName}
+          onChange={(e) => {
+            setChainName(e.target.value);
+            if (isChainNameNotUnique) {
+              setIsChainNameNotUnique(false);
+            }
+          }}
+          isInvalid={isChainNameNotUnique}
+          bg="bg.subtle"
+          borderColor="border.default"
+          _hover={{ borderColor: "border.strong" }}
+          _focus={{
+            borderColor: "primary.500",
+            boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
+          }}
+        />
+        {isChainNameNotUnique && (
+          <Text fontSize="xs" color="error.solid" mt={1}>
+            Chain name already exists
+          </Text>
+        )}
+      </FormControl>
+
+      <FormControl>
+        <FormLabel color="text.secondary">RPC URL</FormLabel>
+        <Input
+          placeholder="https://..."
+          value={rpc}
+          onChange={(e) => setRpc(e.target.value.trim())}
+          onPaste={handleRpcPaste}
+          bg="bg.subtle"
+          borderColor="border.default"
+          _hover={{ borderColor: "border.strong" }}
+          _focus={{
+            borderColor: "primary.500",
+            boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
+          }}
+        />
+        <Text fontSize="xs" color="text.tertiary" mt={1}>
+          Paste RPC URL to auto-detect chain ID
+        </Text>
+      </FormControl>
+
+      <FormControl>
+        <FormLabel color="text.secondary">Chain ID</FormLabel>
+        <Input
+          placeholder="e.g., 42161"
+          type="number"
+          value={chainId}
+          onChange={(e) => setChainId(e.target.value)}
+          bg="bg.subtle"
+          borderColor="border.default"
+          _hover={{ borderColor: "border.strong" }}
+          _focus={{
+            borderColor: "primary.500",
+            boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
+          }}
+        />
+      </FormControl>
+
+      <Box display="flex" gap={2} pt={2}>
+        <Button variant="outline" flex={1} onClick={back}>
+          Cancel
         </Button>
-      </Flex>
-      <Box>
-        <Heading size="md">Add Chain</Heading>
-        <Stack mt="1rem" spacing={2}>
-          <Input
-            placeholder="Name"
-            aria-label="Name"
-            autoComplete="off"
-            minW="20rem"
-            size="sm"
-            rounded="lg"
-            value={chainName}
-            onChange={(e) => {
-              setChainName(e.target.value);
-              if (isChainNameNotUnique) {
-                setIsChainNameNotUnique(false); // remove invalid warning when user types again
-              }
-            }}
-            isInvalid={isChainNameNotUnique}
-          />
-          <Input
-            placeholder="RPC Url"
-            aria-label="RPC Url"
-            autoComplete="off"
-            minW="20rem"
-            size="sm"
-            rounded="lg"
-            value={rpc}
-            onChange={(e) => {
-              setRpc(e.target.value.trim());
-            }}
-            onPaste={async (e) => {
-              // auto-fetch chainId from rpc url
-              setIsBtnLoading(true);
-              try {
-                const items = e.clipboardData.items;
-
-                for (const index in items) {
-                  const item = items[index];
-
-                  if (item.kind === "string" && item.type === "text/plain") {
-                    const _rpc = e.clipboardData.getData("Text");
-                    const provider = new StaticJsonRpcProvider(_rpc);
-                    const _chainId = (await provider.getNetwork()).chainId;
-                    setChainId(_chainId.toString());
-                  }
-                }
-              } catch (e) {}
-              setIsBtnLoading(false);
-            }}
-          />
-          <Input
-            placeholder="Chain Id"
-            aria-label="Chain Id"
-            type="number"
-            autoComplete="off"
-            minW="20rem"
-            size="sm"
-            rounded="lg"
-            value={chainId}
-            onChange={(e) => {
-              setChainId(e.target.value);
-            }}
-          />
-          <Center>
-            <Button
-              size="sm"
-              maxW="6rem"
-              colorScheme="blue"
-              onClick={() => addChain()}
-              isLoading={isBtnLoading}
-            >
-              Add Chain
-            </Button>
-          </Center>
-        </Stack>
+        <Button
+          variant="primary"
+          flex={1}
+          onClick={addChain}
+          isLoading={isBtnLoading}
+          isDisabled={!chainName || !chainId || !rpc}
+        >
+          Add Chain
+        </Button>
       </Box>
-    </>
+    </VStack>
   );
 }
 

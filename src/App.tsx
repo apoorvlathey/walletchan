@@ -2,42 +2,52 @@ import { useState, useEffect } from "react";
 import {
   useUpdateEffect,
   Flex,
-  Heading,
   Spacer,
   Container,
-  Switch,
   Text,
   HStack,
-  Center,
-  Image,
-  InputGroup,
-  Input,
-  InputRightElement,
   Box,
   Button,
-  Select,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
   Alert,
   AlertIcon,
   AlertTitle,
   AlertDescription,
+  Image,
+  IconButton,
+  Code,
+  useToast,
+  VStack,
 } from "@chakra-ui/react";
-import { SettingsIcon } from "@chakra-ui/icons";
-import { StaticJsonRpcProvider } from "@ethersproject/providers";
-import { isAddress } from "@ethersproject/address";
+import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon } from "@chakra-ui/icons";
 import Settings from "@/components/Settings";
+import UnlockScreen from "@/components/UnlockScreen";
+import PendingTxBanner from "@/components/PendingTxBanner";
+import PendingTxList from "@/components/PendingTxList";
+import TransactionConfirmation from "@/components/TransactionConfirmation";
 import { useNetworks } from "@/contexts/NetworksContext";
+import { getChainConfig } from "@/constants/chainConfig";
+import { hasEncryptedApiKey } from "@/chrome/crypto";
+import { PendingTxRequest } from "@/chrome/pendingTxStorage";
+
+type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm";
 
 function App() {
   const { networksInfo, reloadRequired, setReloadRequired } = useNetworks();
+  const toast = useToast();
 
-  const [isEnabled, setIsEnabled] = useState(true);
-  const [isInjected, setIsInjected] = useState(false); // isEnabled can change by toggle, but this tells if actually injected
+  const [view, setView] = useState<AppView>("main");
+  const [isLoading, setIsLoading] = useState(true);
+  const [address, setAddress] = useState<string>("");
   const [displayAddress, setDisplayAddress] = useState<string>("");
-  const [address, setAddress] = useState<string>();
-  const [isAddressValid, setIsAddressValid] = useState(true);
-  const [isUpdating, setIsUpdating] = useState(false);
   const [chainName, setChainName] = useState<string>();
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<PendingTxRequest[]>([]);
+  const [selectedTxRequest, setSelectedTxRequest] = useState<PendingTxRequest | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const currentTab = async () => {
     const [tab] = await chrome.tabs.query({
@@ -47,148 +57,99 @@ function App() {
     return tab;
   };
 
-  const updateAddress = async () => {
-    setIsUpdating(true);
-    const tab = await currentTab();
-
-    let isValid = false;
-    let _address = address;
-    if (address) {
-      // get mainnet rpc (if exists)
-      let mainnetRPC: string | undefined;
-      if (networksInfo) {
-        for (const chainName of Object.keys(networksInfo)) {
-          if (networksInfo[chainName].chainId === 1) {
-            mainnetRPC = networksInfo[chainName].rpcUrl;
-            break;
-          }
-        }
-      }
-
-      if (!mainnetRPC) {
-        // fallback public rpc
-        mainnetRPC = "https://rpc.ankr.com/eth";
-      }
-
-      // Resolve ENS
-      const mainnetProvider = new StaticJsonRpcProvider(mainnetRPC);
-      const resolvedAddress = await mainnetProvider.resolveName(address);
-      if (resolvedAddress) {
-        setAddress(resolvedAddress);
-        _address = resolvedAddress;
-        isValid = true;
-      } else if (isAddress(address)) {
-        isValid = true;
-      }
-    }
-
-    setIsAddressValid(isValid);
-
-    if (isValid) {
-      // send msg to content_script (inject.ts)
-      chrome.tabs.sendMessage(tab.id!, {
-        type: "setAddress",
-        msg: { address: _address, displayAddress },
+  const loadPendingRequests = async () => {
+    return new Promise<PendingTxRequest[]>((resolve) => {
+      chrome.runtime.sendMessage({ type: "getPendingTxRequests" }, (requests) => {
+        setPendingRequests(requests || []);
+        resolve(requests || []);
       });
+    });
+  };
 
-      // save to browser storage
-      await chrome.storage.sync.set({
-        address: _address,
+  const checkLockState = async (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: "isApiKeyCached" }, (cached) => {
+        resolve(cached);
       });
-      await chrome.storage.sync.set({
-        displayAddress,
-      });
-    }
-
-    setIsUpdating(false);
+    });
   };
 
   useEffect(() => {
     const init = async () => {
-      let _address: string | undefined = undefined;
-      let _displayAddress: string | undefined = undefined;
-      let _chainName: string | undefined = undefined;
+      // Check if API key is configured
+      const apiKeyConfigured = await hasEncryptedApiKey();
+      setHasApiKey(apiKeyConfigured);
 
+      if (!apiKeyConfigured) {
+        // No API key - show settings to configure
+        setView("settings");
+        setIsLoading(false);
+        return;
+      }
+
+      // Check lock state
+      const isUnlocked = await checkLockState();
+
+      // Load pending requests
+      const requests = await loadPendingRequests();
+
+      // Load stored data
       const {
         displayAddress: storedDisplayAddress,
         address: storedAddress,
         chainName: storedChainName,
-        isEnabled: storedIsEnabled,
       } = (await chrome.storage.sync.get([
         "displayAddress",
         "address",
         "chainName",
-        "isEnabled",
       ])) as {
         displayAddress: string | undefined;
         address: string | undefined;
         chainName: string | undefined;
-        isEnabled: boolean | undefined;
       };
 
       if (storedDisplayAddress) {
-        _displayAddress = storedDisplayAddress;
+        setDisplayAddress(storedDisplayAddress);
       }
 
-      _address =
-        storedAddress && storedAddress.length > 0
-          ? storedAddress
-          : "0x0000000000000000000000000000000000000000";
+      if (storedAddress) {
+        setAddress(storedAddress);
+      }
 
       if (storedChainName) {
-        _chainName = storedChainName;
+        setChainName(storedChainName);
       }
-      setIsEnabled(storedIsEnabled ?? true);
 
-      // fetch `store` from content_script (inject.ts) if provider already injected in this current tab,
-      // set address & chain
+      // Check if injected in current tab and get latest state
       const tab = await currentTab();
       chrome.tabs.sendMessage(
         tab.id!,
-        {
-          type: "getInfo",
-        },
-        (store: {
-          address: string;
-          displayAddress: string;
-          chainName: string;
-        }) => {
-          if (store.address && store.address.length > 0) {
-            setAddress(store.address);
-          } else if (_address) {
-            setAddress(_address);
+        { type: "getInfo" },
+        (store: { address: string; displayAddress: string; chainName: string }) => {
+          if (store?.chainName && store.chainName.length > 0) {
+            if (store.address) setAddress(store.address);
+            if (store.displayAddress) setDisplayAddress(store.displayAddress);
+            if (store.chainName) setChainName(store.chainName);
           }
-
-          if (store.displayAddress && store.displayAddress.length > 0) {
-            setDisplayAddress(store.displayAddress);
-          } else if (_displayAddress) {
-            setDisplayAddress(_displayAddress);
-          }
-
-          if (store.chainName && store.chainName.length > 0) {
-            setChainName(store.chainName);
-            setIsInjected(true);
-          } else if (_chainName) {
-            setChainName(_chainName);
-          }
-        },
+        }
       );
+
+      // Determine initial view
+      if (!isUnlocked) {
+        setView("unlock");
+      } else if (requests.length > 0) {
+        // Auto-open newest (last) pending request
+        setSelectedTxRequest(requests[requests.length - 1]);
+        setView("txConfirm");
+      } else {
+        setView("main");
+      }
+
+      setIsLoading(false);
     };
 
     init();
   }, []);
-
-  useEffect(() => {
-    chrome.storage.sync.set({
-      isEnabled,
-    });
-  }, [isEnabled]);
-
-  useUpdateEffect(() => {
-    if (isEnabled && chainName && !isInjected) {
-      setReloadRequired(true);
-    }
-  }, [isEnabled]);
 
   useUpdateEffect(() => {
     const updateChainId = async () => {
@@ -196,16 +157,12 @@ function App() {
         const tab = await currentTab();
         const chainId = networksInfo[chainName].chainId;
 
-        // send msg to content_script (inject.ts)
         chrome.tabs.sendMessage(tab.id!, {
           type: "setChainId",
           msg: { chainName, chainId, rpcUrl: networksInfo[chainName].rpcUrl },
         });
 
-        // save to browser storage
-        await chrome.storage.sync.set({
-          chainName,
-        });
+        await chrome.storage.sync.set({ chainName });
       }
     };
 
@@ -214,145 +171,390 @@ function App() {
 
   useUpdateEffect(() => {
     if (reloadRequired && networksInfo) {
-      // first chain is added, so set that as the selected network
       setChainName(Object.keys(networksInfo)[0]);
     }
   }, [reloadRequired, networksInfo]);
 
-  return (
-    <>
-      <Flex
-        py="4"
-        px={["2", "4", "10", "10"]}
-        borderBottom="2px"
-        borderBottomColor="gray.400"
+  const handleUnlock = async () => {
+    // Refresh pending requests after unlock
+    const requests = await loadPendingRequests();
+
+    if (requests.length > 0) {
+      // Show newest (last) pending request
+      setSelectedTxRequest(requests[requests.length - 1]);
+      setView("txConfirm");
+    } else {
+      setView("main");
+    }
+  };
+
+  const handleCopyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      toast({
+        title: "Address copied!",
+        status: "success",
+        duration: 1500,
+        isClosable: true,
+      });
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      toast({
+        title: "Failed to copy",
+        status: "error",
+        duration: 2000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleTxConfirmed = async () => {
+    const currentTxId = selectedTxRequest?.id;
+    const requests = await loadPendingRequests();
+
+    // Check if more pending requests (use fresh data from loadPendingRequests)
+    const remaining = requests.filter((r) => r.id !== currentTxId);
+    if (remaining.length > 0) {
+      setSelectedTxRequest(remaining[0]);
+    } else {
+      setSelectedTxRequest(null);
+      setView("main");
+    }
+  };
+
+  const handleTxRejected = async () => {
+    const currentTxId = selectedTxRequest?.id;
+    const requests = await loadPendingRequests();
+
+    // Check if more pending requests (use fresh data from loadPendingRequests)
+    const remaining = requests.filter((r) => r.id !== currentTxId);
+    if (remaining.length > 0) {
+      setSelectedTxRequest(remaining[0]);
+    } else {
+      setSelectedTxRequest(null);
+      setView("main");
+    }
+  };
+
+  const handleRejectAll = async () => {
+    // Reject all pending transactions
+    for (const request of pendingRequests) {
+      await new Promise<void>((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "rejectTransaction", txId: request.id },
+          () => resolve()
+        );
+      });
+    }
+    await loadPendingRequests();
+    setSelectedTxRequest(null);
+    setView("main");
+  };
+
+  const truncateAddress = (addr: string): string => {
+    if (!addr) return "";
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  };
+
+  if (isLoading) {
+    return (
+      <Box
+        minH="300px"
+        bg="bg.base"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
       >
-        <Spacer flex="1" />
-        <Heading maxW={["302px", "4xl", "4xl", "4xl"]}>
-          <HStack spacing={4}>
-            <Image src="impersonatorLogo.png" w="2.2rem" />
-            <Text>BankrWallet</Text>
-          </HStack>
-        </Heading>
-        <Spacer flex="1" />
-      </Flex>
-      <Container mt="0.4rem" pb="1rem" alignItems={"center"}>
-        {!isSettingsOpen ? (
-          <>
-            <Flex>
-              <HStack spacing={5}>
-                <Text fontSize="md">Enabled</Text>
-                <Switch
-                  size="sm"
-                  isChecked={isEnabled}
-                  onChange={() => setIsEnabled((_isEnabled) => !_isEnabled)}
-                />
-              </HStack>
-              <Spacer />
-              <Button
-                size="sm"
-                onClick={() =>
-                  setIsSettingsOpen((_isSettingsOpen) => !_isSettingsOpen)
+        <Text color="text.secondary">Loading...</Text>
+      </Box>
+    );
+  }
+
+  // Unlock screen
+  if (view === "unlock") {
+    return <UnlockScreen onUnlock={handleUnlock} />;
+  }
+
+  // Settings view
+  if (view === "settings") {
+    return (
+      <Box bg="bg.base" minH="300px">
+        <Container pt={4} pb={4}>
+          <Settings
+            close={() => {
+              // After settings, check if now have API key
+              hasEncryptedApiKey().then((has) => {
+                setHasApiKey(has);
+                if (has) {
+                  checkLockState().then((unlocked) => {
+                    if (unlocked) {
+                      setView("main");
+                    } else {
+                      setView("unlock");
+                    }
+                  });
                 }
-              >
-                <SettingsIcon
-                  transition="900ms rotate ease-in-out"
-                  transform={isSettingsOpen ? "rotate(33deg)" : "rotate(0deg)"}
-                />
-              </Button>
-            </Flex>
-            <Center flexDir={"column"}>
-              <Box mt="1.5rem">
-                <InputGroup>
-                  <Input
-                    placeholder="address / ens"
-                    aria-label="address"
-                    autoComplete="off"
-                    minW="20rem"
-                    pr="5.2rem"
-                    rounded="lg"
-                    value={displayAddress}
-                    onChange={(e) => {
-                      const _displayAddress = e.target.value.trim();
-                      setDisplayAddress(_displayAddress);
-                      setAddress(_displayAddress);
-                      if (isAddressValid) {
-                        setIsAddressValid(true); // remove invalid warning when user types again
+              });
+            }}
+            showBackButton={hasApiKey}
+          />
+        </Container>
+      </Box>
+    );
+  }
+
+  // Pending tx list view
+  if (view === "pendingTxList") {
+    return (
+      <PendingTxList
+        requests={pendingRequests}
+        onBack={() => setView("main")}
+        onSelectTx={(tx) => {
+          setSelectedTxRequest(tx);
+          setView("txConfirm");
+        }}
+        onRejectAll={handleRejectAll}
+      />
+    );
+  }
+
+  // Transaction confirmation view
+  if (view === "txConfirm" && selectedTxRequest) {
+    const currentIndex = pendingRequests.findIndex(
+      (r) => r.id === selectedTxRequest.id
+    );
+    return (
+      <TransactionConfirmation
+        key={selectedTxRequest.id}
+        txRequest={selectedTxRequest}
+        currentIndex={currentIndex >= 0 ? currentIndex : 0}
+        totalCount={pendingRequests.length}
+        onBack={() => {
+          if (pendingRequests.length > 1) {
+            setView("pendingTxList");
+          } else {
+            setView("main");
+          }
+        }}
+        onConfirmed={handleTxConfirmed}
+        onRejected={handleTxRejected}
+        onRejectAll={handleRejectAll}
+        onNavigate={(direction) => {
+          const currentIdx = pendingRequests.findIndex(
+            (r) => r.id === selectedTxRequest.id
+          );
+          if (direction === "prev" && currentIdx > 0) {
+            setSelectedTxRequest(pendingRequests[currentIdx - 1]);
+          } else if (direction === "next" && currentIdx < pendingRequests.length - 1) {
+            setSelectedTxRequest(pendingRequests[currentIdx + 1]);
+          }
+        }}
+      />
+    );
+  }
+
+  // Main view
+  return (
+    <Box bg="bg.base" minH="300px">
+      {/* Header */}
+      <Flex
+        py={3}
+        px={4}
+        bg="bg.subtle"
+        borderBottom="1px"
+        borderBottomColor="border.default"
+        alignItems="center"
+      >
+        <HStack spacing={2}>
+          <Image src="impersonatorLogo.png" w="1.8rem" />
+          <Text fontWeight="600" color="text.primary">
+            BankrWallet
+          </Text>
+        </HStack>
+        <Spacer />
+        <IconButton
+          aria-label="Settings"
+          icon={<SettingsIcon />}
+          variant="ghost"
+          size="sm"
+          onClick={() => setView("settings")}
+        />
+      </Flex>
+
+      <Container pt={4} pb={4}>
+        <VStack spacing={4} align="stretch">
+          {/* Pending Requests Banner */}
+          <PendingTxBanner
+            count={pendingRequests.length}
+            onClick={() => {
+              if (pendingRequests.length === 1) {
+                setSelectedTxRequest(pendingRequests[0]);
+                setView("txConfirm");
+              } else {
+                setView("pendingTxList");
+              }
+            }}
+          />
+
+          {/* Address Display */}
+          <Box
+            bg="bg.subtle"
+            borderRadius="lg"
+            borderWidth="1px"
+            borderColor="border.default"
+            px={4}
+            py={3}
+          >
+            {address ? (
+              <HStack justify="space-between">
+                <HStack spacing={2}>
+                  <Code
+                    fontSize="md"
+                    fontFamily="mono"
+                    bg="transparent"
+                    color="text.primary"
+                    fontWeight="500"
+                  >
+                    {truncateAddress(address)}
+                  </Code>
+                  <IconButton
+                    aria-label="Copy address"
+                    icon={copied ? <CheckIcon /> : <CopyIcon />}
+                    size="xs"
+                    variant="ghost"
+                    color={copied ? "success.solid" : "text.secondary"}
+                    onClick={handleCopyAddress}
+                    _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+                  />
+                </HStack>
+                {chainName && networksInfo && (
+                  <IconButton
+                    aria-label="View on explorer"
+                    icon={<ExternalLinkIcon />}
+                    size="xs"
+                    variant="ghost"
+                    color="text.secondary"
+                    onClick={() => {
+                      const config = getChainConfig(networksInfo[chainName].chainId);
+                      if (config.explorer) {
+                        chrome.tabs.create({
+                          url: `${config.explorer}/address/${address}`,
+                        });
                       }
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") updateAddress();
-                    }}
-                    isInvalid={!isAddressValid}
+                    _hover={{ color: "text.primary", bg: "bg.emphasis" }}
                   />
-                  <InputRightElement w="4.5rem" mr="0.5rem">
-                    <Button
-                      size="sm"
-                      h="1.5rem"
-                      onClick={() => updateAddress()}
-                      isLoading={isUpdating}
+                )}
+              </HStack>
+            ) : (
+              <Text color="text.tertiary" fontSize="sm" textAlign="center">
+                No address configured
+              </Text>
+            )}
+          </Box>
+
+          {/* Chain Selector */}
+          <Menu matchWidth>
+            <MenuButton
+              as={Button}
+              w="full"
+              variant="ghost"
+              rounded="lg"
+              bg="bg.subtle"
+              borderWidth="1px"
+              borderColor="border.default"
+              _hover={{ borderColor: "border.strong" }}
+              _active={{ bg: "bg.emphasis" }}
+              rightIcon={<ChevronDownIcon />}
+              textAlign="left"
+              fontWeight="normal"
+              h="auto"
+              py={3}
+            >
+              {chainName && networksInfo ? (
+                <HStack spacing={2}>
+                  {getChainConfig(networksInfo[chainName].chainId).icon && (
+                    <Image
+                      src={getChainConfig(networksInfo[chainName].chainId).icon}
+                      alt={chainName}
+                      boxSize="20px"
+                    />
+                  )}
+                  <Text color="text.primary">{chainName}</Text>
+                </HStack>
+              ) : (
+                <Text color="text.tertiary">Select Network</Text>
+              )}
+            </MenuButton>
+            <MenuList bg="bg.subtle" borderColor="border.default" py={1}>
+              {networksInfo &&
+                Object.keys(networksInfo).map((_chainName, i) => {
+                  const config = getChainConfig(networksInfo[_chainName].chainId);
+                  return (
+                    <MenuItem
+                      key={i}
+                      bg="bg.subtle"
+                      _hover={{ bg: "bg.emphasis" }}
+                      onClick={() => {
+                        if (!chainName) {
+                          setReloadRequired(true);
+                        }
+                        setChainName(_chainName);
+                      }}
                     >
-                      Update
-                    </Button>
-                  </InputRightElement>
-                </InputGroup>
+                      <HStack spacing={2}>
+                        {config.icon && (
+                          <Image
+                            src={config.icon}
+                            alt={_chainName}
+                            boxSize="20px"
+                          />
+                        )}
+                        <Text color="text.primary">{_chainName}</Text>
+                      </HStack>
+                    </MenuItem>
+                  );
+                })}
+            </MenuList>
+          </Menu>
+
+          {/* Reload Required Alert */}
+          {reloadRequired && (
+            <Alert
+              status="warning"
+              rounded="lg"
+              bg="warning.bg"
+              borderWidth="1px"
+              borderColor="warning.border"
+            >
+              <AlertIcon color="warning.solid" />
+              <Box flex={1}>
+                <AlertTitle fontSize="sm" color="text.primary">
+                  Reload page required
+                </AlertTitle>
+                <AlertDescription fontSize="xs" color="text.secondary">
+                  To apply changes on the current site
+                </AlertDescription>
               </Box>
-              <Select
-                mt="1rem"
-                px="0.2rem"
-                variant="filled"
-                rounded="lg"
-                _hover={{ cursor: "pointer" }}
-                placeholder={
-                  networksInfo && Object.keys(networksInfo).length > 0
-                    ? undefined
-                    : "Select Network"
-                }
-                value={chainName}
-                onChange={(e) => {
-                  if (!chainName) {
-                    setReloadRequired(true);
-                  }
-                  setChainName(e.target.value);
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={async () => {
+                  const tab = await currentTab();
+                  const url = tab.url!;
+                  chrome.tabs.create({ url });
+                  chrome.tabs.remove(tab.id!);
+                  setReloadRequired(false);
                 }}
               >
-                {networksInfo &&
-                  Object.keys(networksInfo).map((chainName, i) => (
-                    <option value={chainName} key={i}>
-                      {chainName}
-                    </option>
-                  ))}
-              </Select>
-            </Center>
-            {reloadRequired && (
-              <Alert mt="1.5rem" status="warning" rounded="lg">
-                <AlertIcon />
-                <AlertTitle fontSize="md">Reload current page</AlertTitle>
-                <Spacer />
-                <AlertDescription>
-                  <Button
-                    size="sm"
-                    onClick={async () => {
-                      const tab = await currentTab();
-                      const url = tab.url!;
-                      // refresh retains cache and injected doesn't work
-                      // so doing like this:
-                      chrome.tabs.create({ url });
-                      chrome.tabs.remove(tab.id!);
-                      setReloadRequired(false);
-                    }}
-                  >
-                    Reload
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            )}
-          </>
-        ) : (
-          <Settings close={() => setIsSettingsOpen(false)} />
-        )}
+                Reload
+              </Button>
+            </Alert>
+          )}
+        </VStack>
       </Container>
-    </>
+    </Box>
   );
 }
 

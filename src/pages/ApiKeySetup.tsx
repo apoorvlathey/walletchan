@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   VStack,
+  HStack,
   Heading,
   Text,
   Input,
@@ -14,10 +15,13 @@ import {
   IconButton,
   Alert,
   AlertIcon,
+  Spacer,
   useToast,
 } from "@chakra-ui/react";
-import { ViewIcon, ViewOffIcon } from "@chakra-ui/icons";
+import { ViewIcon, ViewOffIcon, ArrowBackIcon } from "@chakra-ui/icons";
 import { saveEncryptedApiKey } from "@/chrome/crypto";
+import { StaticJsonRpcProvider } from "@ethersproject/providers";
+import { isAddress } from "@ethersproject/address";
 
 interface ApiKeySetupProps {
   onComplete: () => void;
@@ -25,36 +29,105 @@ interface ApiKeySetupProps {
   isChangingKey?: boolean;
 }
 
-function ApiKeySetup({ onComplete, onCancel, isChangingKey = false }: ApiKeySetupProps) {
+function ApiKeySetup({
+  onComplete,
+  onCancel,
+  isChangingKey = false,
+}: ApiKeySetupProps) {
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
+  const [walletAddress, setWalletAddress] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResolvingAddress, setIsResolvingAddress] = useState(false);
+  const [hasCachedPassword, setHasCachedPassword] = useState(false);
   const [errors, setErrors] = useState<{
     apiKey?: string;
+    walletAddress?: string;
     password?: string;
     confirmPassword?: string;
   }>({});
 
   const toast = useToast();
 
-  const validate = (): boolean => {
+  // Check if password is cached and load existing data when changing key
+  useEffect(() => {
+    if (isChangingKey) {
+      // Check if password is cached
+      chrome.runtime.sendMessage({ type: "getCachedPassword" }, (response) => {
+        setHasCachedPassword(response?.hasCachedPassword || false);
+      });
+
+      // Load existing API key if cached
+      chrome.runtime.sendMessage({ type: "getCachedApiKey" }, (response) => {
+        if (response?.apiKey) {
+          setApiKey(response.apiKey);
+        }
+      });
+
+      // Load existing address
+      chrome.storage.sync.get(["address", "displayAddress"]).then((data) => {
+        if (data.displayAddress) {
+          setWalletAddress(data.displayAddress);
+        } else if (data.address) {
+          setWalletAddress(data.address);
+        }
+      });
+    }
+  }, [isChangingKey]);
+
+  // Determine if we need to show password fields
+  // Show password fields for initial setup OR when changing key but cache expired
+  const needsPassword = !isChangingKey || !hasCachedPassword;
+
+  const resolveAddress = async (input: string): Promise<string | null> => {
+    if (isAddress(input)) {
+      return input;
+    }
+
+    try {
+      const mainnetProvider = new StaticJsonRpcProvider("https://rpc.ankr.com/eth");
+      const resolved = await mainnetProvider.resolveName(input);
+      return resolved;
+    } catch (err) {
+      return null;
+    }
+  };
+
+  const validate = async (): Promise<boolean> => {
     const newErrors: typeof errors = {};
 
     if (!apiKey.trim()) {
       newErrors.apiKey = "API key is required";
     }
 
-    if (!password) {
-      newErrors.password = "Password is required";
-    } else if (password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
+    if (!walletAddress.trim()) {
+      newErrors.walletAddress = "Wallet address is required";
+    } else {
+      setIsResolvingAddress(true);
+      const resolved = await resolveAddress(walletAddress.trim());
+      setIsResolvingAddress(false);
+
+      if (!resolved) {
+        newErrors.walletAddress = "Invalid address or ENS name";
+      }
     }
 
-    if (password !== confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
+    // Validate password when needed (initial setup or cache expired)
+    if (needsPassword) {
+      if (!password) {
+        newErrors.password = "Password is required";
+      } else if (!isChangingKey && password.length < 8) {
+        // Only enforce min length for initial setup
+        newErrors.password = "Password must be at least 8 characters";
+      }
+
+      if (!isChangingKey && password !== confirmPassword) {
+        // Only require confirmation for initial setup
+        newErrors.confirmPassword = "Passwords do not match";
+      }
     }
 
     setErrors(newErrors);
@@ -62,19 +135,56 @@ function ApiKeySetup({ onComplete, onCancel, isChangingKey = false }: ApiKeySetu
   };
 
   const handleSubmit = async () => {
-    if (!validate()) return;
+    const isValid = await validate();
+    if (!isValid) return;
 
     setIsSubmitting(true);
 
     try {
-      await saveEncryptedApiKey(apiKey.trim(), password);
+      // Resolve address (in case it's ENS)
+      const resolvedAddress = await resolveAddress(walletAddress.trim());
+      if (!resolvedAddress) {
+        setErrors({ walletAddress: "Invalid address or ENS name" });
+        setIsSubmitting(false);
+        return;
+      }
 
-      // Clear the API key cache since we're setting a new key
-      await chrome.runtime.sendMessage({ type: "clearApiKeyCache" });
+      if (isChangingKey && hasCachedPassword) {
+        // Use cached password to save new API key
+        const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: "saveApiKeyWithCachedPassword", apiKey: apiKey.trim() },
+            resolve
+          );
+        });
+
+        if (!result.success) {
+          toast({
+            title: "Error saving API key",
+            description: result.error || "Failed to save API key",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      } else {
+        // Initial setup OR changing key with expired cache - save with provided password
+        await saveEncryptedApiKey(apiKey.trim(), password);
+        // Update the cache with the new credentials
+        await chrome.runtime.sendMessage({ type: "unlockWallet", password });
+      }
+
+      // Save wallet address
+      await chrome.storage.sync.set({
+        address: resolvedAddress,
+        displayAddress: walletAddress.trim(),
+      });
 
       toast({
-        title: "API key saved",
-        description: "Your API key has been encrypted and saved.",
+        title: "Configuration saved",
+        description: "Your API key and wallet address have been saved.",
         status: "success",
         duration: 3000,
         isClosable: true,
@@ -83,7 +193,7 @@ function ApiKeySetup({ onComplete, onCancel, isChangingKey = false }: ApiKeySetu
       onComplete();
     } catch (error) {
       toast({
-        title: "Error saving API key",
+        title: "Error saving configuration",
         description: error instanceof Error ? error.message : "Unknown error",
         status: "error",
         duration: 5000,
@@ -95,93 +205,172 @@ function ApiKeySetup({ onComplete, onCancel, isChangingKey = false }: ApiKeySetu
   };
 
   return (
-    <Box p={4}>
-      <VStack spacing={4} align="stretch">
-        <Heading size="md">
-          {isChangingKey ? "Change API Key" : "Configure Bankr API Key"}
+    <VStack spacing={4} align="stretch">
+      {/* Header */}
+      <HStack>
+        <IconButton
+          aria-label="Back"
+          icon={<ArrowBackIcon />}
+          variant="ghost"
+          size="sm"
+          onClick={onCancel}
+        />
+        <Heading size="sm" color="text.primary">
+          {isChangingKey ? "Change API Key & Address" : "Configure Wallet"}
         </Heading>
+        <Spacer />
+      </HStack>
 
-        <Text fontSize="sm" color="gray.400">
-          Your API key will be encrypted with your password and stored securely.
-        </Text>
+      <Text fontSize="sm" color="text.secondary">
+        {isChangingKey
+          ? "Update your API key and wallet address."
+          : "Your API key and wallet address are linked. Both will be used when signing transactions."}
+      </Text>
 
-        <FormControl isInvalid={!!errors.apiKey}>
-          <FormLabel>Bankr API Key</FormLabel>
-          <InputGroup>
-            <Input
-              type={showApiKey ? "text" : "password"}
-              placeholder="Enter your API key"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              pr="3rem"
-            />
-            <InputRightElement>
-              <IconButton
-                aria-label={showApiKey ? "Hide API key" : "Show API key"}
-                icon={showApiKey ? <ViewOffIcon /> : <ViewIcon />}
-                size="sm"
-                variant="ghost"
-                onClick={() => setShowApiKey(!showApiKey)}
-              />
-            </InputRightElement>
-          </InputGroup>
-          <FormErrorMessage>{errors.apiKey}</FormErrorMessage>
-        </FormControl>
-
-        <FormControl isInvalid={!!errors.password}>
-          <FormLabel>Password</FormLabel>
-          <InputGroup>
-            <Input
-              type={showPassword ? "text" : "password"}
-              placeholder="Create a password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              pr="3rem"
-            />
-            <InputRightElement>
-              <IconButton
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                icon={showPassword ? <ViewOffIcon /> : <ViewIcon />}
-                size="sm"
-                variant="ghost"
-                onClick={() => setShowPassword(!showPassword)}
-              />
-            </InputRightElement>
-          </InputGroup>
-          <FormErrorMessage>{errors.password}</FormErrorMessage>
-        </FormControl>
-
-        <FormControl isInvalid={!!errors.confirmPassword}>
-          <FormLabel>Confirm Password</FormLabel>
+      <FormControl isInvalid={!!errors.apiKey}>
+        <FormLabel color="text.secondary">Bankr API Key</FormLabel>
+        <InputGroup>
           <Input
-            type={showPassword ? "text" : "password"}
-            placeholder="Confirm your password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            type={showApiKey ? "text" : "password"}
+            placeholder="Enter your API key"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            pr="3rem"
+            bg="bg.subtle"
+            borderColor="border.default"
+            _hover={{ borderColor: "border.strong" }}
+            _focus={{
+              borderColor: "primary.500",
+              boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
+            }}
           />
-          <FormErrorMessage>{errors.confirmPassword}</FormErrorMessage>
-        </FormControl>
+          <InputRightElement>
+            <IconButton
+              aria-label={showApiKey ? "Hide API key" : "Show API key"}
+              icon={showApiKey ? <ViewOffIcon /> : <ViewIcon />}
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowApiKey(!showApiKey)}
+              color="text.secondary"
+            />
+          </InputRightElement>
+        </InputGroup>
+        <FormErrorMessage color="error.solid">{errors.apiKey}</FormErrorMessage>
+      </FormControl>
 
-        <Alert status="warning" borderRadius="md" fontSize="sm">
-          <AlertIcon />
-          Keep your password safe. If you forget it, you will need to reconfigure your API key.
-        </Alert>
+      <FormControl isInvalid={!!errors.walletAddress}>
+        <FormLabel color="text.secondary">Wallet Address</FormLabel>
+        <Input
+          placeholder="0x... or ENS name"
+          value={walletAddress}
+          onChange={(e) => setWalletAddress(e.target.value)}
+          bg="bg.subtle"
+          borderColor="border.default"
+          _hover={{ borderColor: "border.strong" }}
+          _focus={{
+            borderColor: "primary.500",
+            boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
+          }}
+        />
+        <FormErrorMessage color="error.solid">
+          {errors.walletAddress}
+        </FormErrorMessage>
+      </FormControl>
 
-        <Box display="flex" gap={2} pt={2}>
-          <Button variant="outline" flex={1} onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button
-            colorScheme="blue"
-            flex={1}
-            onClick={handleSubmit}
-            isLoading={isSubmitting}
+      {/* Show password fields when needed */}
+      {needsPassword && (
+        <>
+          <FormControl isInvalid={!!errors.password}>
+            <FormLabel color="text.secondary">
+              {isChangingKey ? "Current Password" : "Password"}
+            </FormLabel>
+            <InputGroup>
+              <Input
+                type={showPassword ? "text" : "password"}
+                placeholder={isChangingKey ? "Enter your password" : "Create a password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                pr="3rem"
+                bg="bg.subtle"
+                borderColor="border.default"
+                _hover={{ borderColor: "border.strong" }}
+                _focus={{
+                  borderColor: "primary.500",
+                  boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
+                }}
+              />
+              <InputRightElement>
+                <IconButton
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  icon={showPassword ? <ViewOffIcon /> : <ViewIcon />}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowPassword(!showPassword)}
+                  color="text.secondary"
+                />
+              </InputRightElement>
+            </InputGroup>
+            <FormErrorMessage color="error.solid">
+              {errors.password}
+            </FormErrorMessage>
+          </FormControl>
+
+          {/* Only show confirm password for initial setup */}
+          {!isChangingKey && (
+            <FormControl isInvalid={!!errors.confirmPassword}>
+              <FormLabel color="text.secondary">Confirm Password</FormLabel>
+              <Input
+                type={showPassword ? "text" : "password"}
+                placeholder="Confirm your password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                bg="bg.subtle"
+                borderColor="border.default"
+                _hover={{ borderColor: "border.strong" }}
+                _focus={{
+                  borderColor: "primary.500",
+                  boxShadow: "0 0 0 1px var(--chakra-colors-primary-500)",
+                }}
+              />
+              <FormErrorMessage color="error.solid">
+                {errors.confirmPassword}
+              </FormErrorMessage>
+            </FormControl>
+          )}
+
+          <Alert
+            status="warning"
+            borderRadius="md"
+            fontSize="sm"
+            bg="warning.bg"
+            borderWidth="1px"
+            borderColor="warning.border"
           >
-            Save
-          </Button>
-        </Box>
-      </VStack>
-    </Box>
+            <AlertIcon color="warning.solid" />
+            <Text color="text.primary">
+              {isChangingKey
+                ? "Enter your password to save changes. Session expired."
+                : "Keep your password safe. If you forget it, you will need to reconfigure your API key."}
+            </Text>
+          </Alert>
+        </>
+      )}
+
+      <Box display="flex" gap={2} pt={2}>
+        <Button variant="outline" flex={1} onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          flex={1}
+          onClick={handleSubmit}
+          isLoading={isSubmitting || isResolvingAddress}
+          loadingText={isResolvingAddress ? "Resolving..." : "Saving..."}
+        >
+          Save
+        </Button>
+      </Box>
+    </VStack>
   );
 }
 

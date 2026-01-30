@@ -37,20 +37,22 @@ BankrWallet is a Chrome extension that allows users to impersonate blockchain ac
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                     Background Service Worker (background.js)               │
 │                     - Handles transaction requests                          │
-│                     - Opens confirmation popup                              │
+│                     - Stores pending txs in chrome.storage.local            │
+│                     - Updates extension badge with pending count            │
 │                     - Makes Bankr API calls                                 │
 │                     - Proxies RPC calls (bypasses page CSP)                 │
-│                     - Manages encrypted API key                             │
+│                     - Manages encrypted API key cache                       │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                     ┌───────────────┴───────────────┐
                     ▼                               ▼
 ┌──────────────────────────────┐    ┌──────────────────────────────┐
-│    Confirmation Popup        │    │       Bankr API              │
-│    (confirmation.html)       │    │  api.bankr.bot               │
-│    - Shows tx details        │    │  - POST /agent/prompt        │
-│    - Password input          │    │  - GET /agent/job/{id}       │
-│    - Approve/Reject/Cancel   │    │  - POST /agent/job/{id}/cancel│
+│    Extension Popup           │    │       Bankr API              │
+│    (index.html)              │    │  api.bankr.bot               │
+│    - Unlock screen           │    │  - POST /agent/prompt        │
+│    - Pending tx banner       │    │  - GET /agent/job/{id}       │
+│    - In-popup tx confirm     │    │  - POST /agent/job/{id}/cancel│
+│    - Settings management     │    │                              │
 └──────────────────────────────┘    └──────────────────────────────┘
 ```
 
@@ -148,20 +150,29 @@ Dapps that support EIP-6963 will show Bankr Wallet in their wallet selection UI.
 ```
 src/
 ├── chrome/
-│   ├── impersonator.ts    # Inpage script - EIP-6963 provider + window.ethereum
-│   ├── inject.ts          # Content script - message bridge
-│   ├── background.ts      # Service worker - API calls, tx handling
-│   ├── crypto.ts          # AES-256-GCM encryption for API key
-│   └── bankrApi.ts        # Bankr API client
+│   ├── impersonator.ts      # Inpage script - EIP-6963 provider + window.ethereum
+│   ├── inject.ts            # Content script - message bridge
+│   ├── background.ts        # Service worker - API calls, tx handling
+│   ├── crypto.ts            # AES-256-GCM encryption for API key
+│   ├── bankrApi.ts          # Bankr API client
+│   └── pendingTxStorage.ts  # Persistent storage for pending transactions
 ├── constants/
-│   └── networks.ts        # Default networks configuration
+│   ├── networks.ts          # Default networks configuration
+│   └── chainConfig.ts       # Chain-specific styling/icons
 ├── pages/
-│   ├── Confirmation.tsx   # Transaction confirmation popup UI
-│   └── ApiKeySetup.tsx    # API key configuration UI
+│   └── ApiKeySetup.tsx      # API key + wallet address configuration
 ├── components/
-│   └── Settings/
-│       └── index.tsx      # Settings with API key management
-└── confirmation.tsx       # Confirmation popup entry point
+│   ├── Settings/
+│   │   ├── index.tsx        # Main settings page
+│   │   ├── Chains.tsx       # Chain RPC management
+│   │   ├── AddChain.tsx     # Add new chain
+│   │   ├── EditChain.tsx    # Edit existing chain
+│   │   └── ChangePassword.tsx # Password change flow
+│   ├── UnlockScreen.tsx     # Wallet unlock (password entry)
+│   ├── PendingTxBanner.tsx  # Banner showing pending tx count
+│   ├── PendingTxList.tsx    # List of pending transactions
+│   └── TransactionConfirmation.tsx # In-popup tx confirmation
+└── App.tsx                  # Main popup application
 ```
 
 ## Transaction Flow
@@ -222,22 +233,45 @@ await provider.request({
 - Forwards to background via `chrome.runtime.sendMessage`
 - Sends result back to inpage via `postMessage`
 
-### 5. Background Opens Confirmation Popup
+### 5. Background Stores Pending Transaction & Opens Popup
 
 `src/chrome/background.ts`:
 
 - Validates chain ID again (double-check)
 - Checks if API key is configured
-- Creates pending transaction entry
-- Opens confirmation popup window (400x600)
+- Stores pending transaction in `chrome.storage.local`
+- Updates extension badge with pending count
+- **Auto-opens popup window** for user confirmation
 
-### 6. User Confirms Transaction
+### 6. Popup Auto-Opens for Transaction Confirmation
 
-`src/pages/Confirmation.tsx`:
+The extension automatically opens a popup window when a transaction request is received:
 
-- Displays: origin, network, from, to, value, data
-- If API key not cached: prompts for password
+- Popup positioned at **top-right of the dapp's browser window**
+- Works correctly across **multiple monitors** (follows the dapp's window)
+- If popup already exists, focuses the existing window instead of creating a new one
+- Shows the **newest transaction** by default (e.g., "2/2" not "1/2")
+
+### 7. User Confirms Transaction in Popup
+
+`src/App.tsx` + `src/components/TransactionConfirmation.tsx`:
+
+- If wallet locked (API key not cached): shows unlock screen first
+- Shows pending transaction banner if requests exist
+- Displays: origin, network, to, value, data
 - User clicks Confirm or Reject
+- Closing popup does NOT cancel transaction (persisted)
+
+#### Multiple Transaction Handling
+
+When multiple transactions are pending:
+
+- **Navigation**: Arrow buttons (`<` `>`) to switch between transactions
+- **Counter**: Badge showing position (e.g., "2/2")
+- **Reject All**: Button to reject all pending transactions at once
+- **Header Layout**: Back arrow (left) | "Tx Request < 2/2 >" (center) | "Reject All" (right)
+
+Each transaction maintains its own response callback - rejecting/confirming one transaction only affects that specific dapp's request.
 
 ### 7. Background Submits to Bankr API
 
@@ -318,14 +352,76 @@ Store in chrome.storage.local:
 }
 ```
 
-### Session Caching
+### Session Caching (Wallet Lock/Unlock)
 
-To avoid asking for password on every transaction:
+MetaMask-style wallet lock flow:
 
-- Decrypted API key is cached in background worker memory
-- Cache expires after 15 minutes
+- Decrypted API key **and password** are cached in background worker memory
+- Cache expires after 15 minutes (wallet "locks")
 - Cache cleared on browser close or extension suspend
-- First transaction after timeout requires password
+- When locked, user must enter password before:
+  - Viewing the main wallet interface
+  - Confirming any pending transactions
+- Unlock persists across popup open/close cycles (until cache expires)
+
+#### Password Caching for API Key Changes
+
+When changing the API key while the wallet is unlocked:
+
+- Uses the **cached password** to encrypt the new API key
+- No need to re-enter password if session is active
+- If cache expires, prompts for "Current Password" with message "Session expired"
+- Existing API key is **pre-filled** in the form (decrypted from cache)
+
+### Pending Transaction Storage
+
+Transactions are stored persistently in `chrome.storage.local`:
+
+- Closing popup does NOT reject/cancel pending transactions
+- Pending requests survive popup close, browser restart
+- Extension badge shows count of pending requests
+- Transactions auto-expire after 30 minutes
+- User can review and confirm/reject at any time
+
+#### Pending Requests List
+
+When multiple transactions are pending:
+
+- Shows all pending requests with **request numbers** (#1, #2, etc.)
+- Displays: origin favicon, hostname, chain badge, timestamp, target address
+- Click any request to view full details
+- **Reject All** button at the bottom to reject all pending transactions
+
+## Popup Window Positioning
+
+When a transaction request is received, the background worker automatically opens a popup window:
+
+```typescript
+async function openExtensionPopup(senderWindowId?: number): Promise<void> {
+  // Get the window where the dapp is running
+  let targetWindow = await chrome.windows.get(senderWindowId);
+
+  // Position at top-right of target window
+  const left = targetWindow.left + targetWindow.width - popupWidth - 10;
+  const top = targetWindow.top + 80;
+
+  await chrome.windows.create({
+    url: popupUrl,
+    type: "popup",
+    width: 380,
+    height: 540,
+    left,
+    top,
+    focused: true,
+  });
+}
+```
+
+**Multi-Monitor Support**:
+- Uses `senderWindowId` from the message sender's tab to identify the correct window
+- Falls back to `chrome.windows.getLastFocused()` if sender window not available
+- Allows negative `left` coordinates for monitors positioned left of primary
+- Popup appears on the same monitor as the dapp requesting the transaction
 
 ## Cancellation
 
@@ -345,15 +441,14 @@ Error is detected by keywords: "missing required", "error", "can't", "cannot", "
 
 ## Build Configuration
 
-The extension has 5 build targets:
+The extension has 4 build targets:
 
-| Target       | Config File                 | Output                        |
-| ------------ | --------------------------- | ----------------------------- |
-| Popup        | vite.config.ts              | build/static/js/main.js       |
-| Inpage       | vite.config.inpage.ts       | build/static/js/inpage.js     |
-| Inject       | vite.config.inject.ts       | build/static/js/inject.js     |
-| Background   | vite.config.background.ts   | build/static/js/background.js |
-| Confirmation | vite.config.confirmation.ts | build/confirmation.html       |
+| Target     | Config File               | Output                        |
+| ---------- | ------------------------- | ----------------------------- |
+| Popup      | vite.config.ts            | build/static/js/main.js       |
+| Inpage     | vite.config.inpage.ts     | build/static/js/inpage.js     |
+| Inject     | vite.config.inject.ts     | build/static/js/inject.js     |
+| Background | vite.config.background.ts | build/static/js/background.js |
 
 Build command: `pnpm build`
 
@@ -395,16 +490,51 @@ Build command: `pnpm build`
 | `sendTransaction` | Submit transaction |
 | `rpcRequest`      | Proxy RPC call     |
 
-### Popup/Confirmation → Background (chrome.runtime)
+### Popup → Background (chrome.runtime)
 
-| Type                    | Description                   |
-| ----------------------- | ----------------------------- |
-| `getPendingTransaction` | Get tx details for popup      |
-| `isApiKeyCached`        | Check if password needed      |
-| `confirmTransaction`    | User approved tx              |
-| `rejectTransaction`     | User rejected tx              |
-| `cancelTransaction`     | User cancelled in-progress tx |
-| `clearApiKeyCache`      | Clear cached API key          |
+| Type                          | Description                           |
+| ----------------------------- | ------------------------------------- |
+| `getPendingTxRequests`        | Get all pending tx requests           |
+| `getPendingTransaction`       | Get specific tx details               |
+| `isApiKeyCached`              | Check if password needed              |
+| `unlockWallet`                | Unlock wallet with password           |
+| `confirmTransaction`          | User approved tx                      |
+| `rejectTransaction`           | User rejected tx                      |
+| `cancelTransaction`           | User cancelled in-progress tx         |
+| `clearApiKeyCache`            | Clear cached API key                  |
+| `getCachedPassword`           | Check if password is cached           |
+| `getCachedApiKey`             | Get decrypted API key (if cached)     |
+| `saveApiKeyWithCachedPassword`| Save new API key using cached password|
+
+## UI Layout
+
+### Popup Dimensions
+
+- Width: 360px (fixed)
+- Height: 480px (max 600px)
+- Font: Inter (UI), JetBrains Mono (code/addresses)
+
+### Transaction Confirmation Header
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ←  │           Tx Request  < 2/2 >           │  Reject All │
+└─────────────────────────────────────────────────────────────┘
+     Left              Center (absolute)              Right
+```
+
+- **Back arrow**: Returns to pending list (if multiple) or main view
+- **Center**: Title + navigation arrows + counter badge (when multiple txs)
+- **Reject All**: Rejects all pending transactions (only shown when multiple)
+
+### Pending Requests List
+
+Each request shows:
+- Request number badge (#1, #2, etc.)
+- Origin favicon and hostname
+- Chain badge with icon
+- Relative timestamp ("2 mins ago")
+- Target address (truncated)
 
 ## Security Considerations
 
@@ -424,3 +554,30 @@ Build command: `pnpm build`
 | API error                   | Display error message            |
 | Transaction timeout (5 min) | Auto-fail with timeout message   |
 | Network error               | Display error, allow retry       |
+
+## React State Management
+
+### Transaction Component Keys
+
+The `TransactionConfirmation` component uses `key={selectedTxRequest.id}` to force React to remount when switching between transactions. This ensures:
+
+- All closures capture fresh values
+- No stale state when confirming/rejecting
+- Correct transaction ID sent to background
+
+### Avoiding Stale State
+
+When handling transaction completion:
+
+```typescript
+const handleTxRejected = async () => {
+  const currentTxId = selectedTxRequest?.id;  // Capture before async
+  const requests = await loadPendingRequests(); // Returns fresh data
+
+  // Use fresh data, not stale pendingRequests state
+  const remaining = requests.filter((r) => r.id !== currentTxId);
+  // ...
+};
+```
+
+This pattern prevents the common React bug where async operations use stale closure values.

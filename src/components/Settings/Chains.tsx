@@ -2,16 +2,19 @@ import React, { useState } from "react";
 import {
   Box,
   Button,
-  Center,
   Flex,
   HStack,
+  Image,
   Spacer,
-  Stack,
+  VStack,
   Text,
+  IconButton,
+  Heading,
 } from "@chakra-ui/react";
-import { CloseIcon } from "@chakra-ui/icons";
+import { ArrowBackIcon, ChevronRightIcon } from "@chakra-ui/icons";
 import { useNetworks } from "@/contexts/NetworksContext";
 import { NetworksInfo } from "@/types";
+import { getChainConfig } from "@/constants/chainConfig";
 import AddChain from "./AddChain";
 import EditChain from "./EditChain";
 
@@ -24,29 +27,43 @@ function Chain({
   network: NetworksInfo[string];
   openEditChain: () => void;
 }) {
+  const config = getChainConfig(network.chainId);
+
   return (
     <Box
-      p="1rem"
-      w="17rem"
-      border="1px solid white"
-      fontSize="md"
-      rounded={"md"}
-      onClick={() => openEditChain()}
-      _hover={{ cursor: "pointer" }}
+      bg="bg.subtle"
+      borderWidth="1px"
+      borderColor="border.default"
+      borderRadius="lg"
+      p={3}
+      cursor="pointer"
+      onClick={openEditChain}
+      _hover={{
+        bg: "bg.emphasis",
+        borderColor: "border.strong",
+      }}
+      transition="all 0.2s"
     >
-      <HStack>
-        <Text fontWeight="bold">Name: </Text>
-        <Text>{chainName}</Text>
-      </HStack>
-      <HStack>
-        <Text fontWeight="bold">ChainId: </Text>
-        <Text>{network.chainId}</Text>
-      </HStack>
-      <HStack>
-        <Text fontWeight="bold">RPC: </Text>
-        <Text overflow="hidden" whiteSpace="nowrap" textOverflow="ellipsis">
-          {network.rpcUrl}
-        </Text>
+      <HStack justify="space-between">
+        <HStack spacing={3}>
+          {config.icon && (
+            <Image src={config.icon} alt={chainName} boxSize="24px" />
+          )}
+          <Box>
+            <Text fontWeight="500" color="text.primary">
+              {chainName}
+            </Text>
+            <Text fontSize="xs" color="text.tertiary" noOfLines={1}>
+              {network.rpcUrl}
+            </Text>
+          </Box>
+        </HStack>
+        <HStack spacing={2}>
+          <Text fontSize="xs" color="text.secondary">
+            ID: {network.chainId}
+          </Text>
+          <ChevronRightIcon color="text.tertiary" />
+        </HStack>
       </HStack>
     </Box>
   );
@@ -57,42 +74,58 @@ function Chains({ close }: { close: () => void }) {
 
   const [tab, setTab] = useState<React.ReactElement>();
 
-  return tab !== undefined ? (
-    tab
-  ) : (
-    <>
-      <Flex>
+  if (tab !== undefined) {
+    return tab;
+  }
+
+  return (
+    <VStack spacing={4} align="stretch">
+      {/* Header */}
+      <HStack>
+        <IconButton
+          aria-label="Back"
+          icon={<ArrowBackIcon />}
+          variant="ghost"
+          size="sm"
+          onClick={close}
+        />
+        <Heading size="sm" color="text.primary">
+          Chain RPCs
+        </Heading>
         <Spacer />
-        <Button size="xs" variant="ghost" onClick={() => close()}>
-          <CloseIcon />
-        </Button>
-      </Flex>
-      <Center flexDir={"column"}>
-        <Stack mt="1rem" pb="2rem" spacing={4}>
-          {networksInfo &&
-            Object.keys(networksInfo).map((chainName, i) => (
-              <Chain
-                key={i}
-                chainName={chainName}
-                network={networksInfo[chainName]}
-                openEditChain={() =>
-                  setTab(
-                    <EditChain
-                      back={() => setTab(undefined)}
-                      chainName={chainName}
-                    />
-                  )
-                }
-              />
-            ))}
-          <Button
-            onClick={() => setTab(<AddChain back={() => setTab(undefined)} />)}
-          >
-            Add Chain
-          </Button>
-        </Stack>
-      </Center>
-    </>
+      </HStack>
+
+      <Text fontSize="sm" color="text.secondary">
+        Configure RPC endpoints for supported networks.
+      </Text>
+
+      {/* Chain List */}
+      <VStack spacing={2} align="stretch">
+        {networksInfo &&
+          Object.keys(networksInfo).map((chainName, i) => (
+            <Chain
+              key={i}
+              chainName={chainName}
+              network={networksInfo[chainName]}
+              openEditChain={() =>
+                setTab(
+                  <EditChain
+                    back={() => setTab(undefined)}
+                    chainName={chainName}
+                  />
+                )
+              }
+            />
+          ))}
+      </VStack>
+
+      <Button
+        variant="primary"
+        onClick={() => setTab(<AddChain back={() => setTab(undefined)} />)}
+      >
+        Add Chain
+      </Button>
+    </VStack>
   );
 }
 

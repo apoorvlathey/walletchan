@@ -1,5 +1,29 @@
 import { NetworksInfo } from "../types";
 
+/**
+ * Get the favicon URL from the current page
+ */
+function getFaviconUrl(): string | null {
+  // Try standard favicon link elements
+  const standardFavicon = document.querySelector(
+    'link[rel="icon"], link[rel="shortcut icon"]'
+  ) as HTMLLinkElement | null;
+  if (standardFavicon?.href) {
+    return standardFavicon.href;
+  }
+
+  // Try Apple touch icon (usually higher quality)
+  const appleTouchIcon = document.querySelector(
+    'link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]'
+  ) as HTMLLinkElement | null;
+  if (appleTouchIcon?.href) {
+    return appleTouchIcon.href;
+  }
+
+  // Fallback to default /favicon.ico
+  return new URL("/favicon.ico", window.location.origin).href;
+}
+
 let store = {
   address: "",
   displayAddress: "",
@@ -7,11 +31,6 @@ let store = {
 };
 
 const init = async () => {
-  const { isEnabled } = (await chrome.storage.sync.get("isEnabled")) as {
-    isEnabled: boolean | undefined;
-  };
-  if (!isEnabled) return;
-
   // inject inpage.js into webpage
   try {
     let script = document.createElement("script");
@@ -167,6 +186,7 @@ window.addEventListener("message", async (e) => {
           type: "sendTransaction",
           tx: { from, to, data, value, chainId },
           origin: window.location.origin,
+          favicon: getFaviconUrl(),
         },
         (result: { success: boolean; txHash?: string; error?: string }) => {
           // Send result back to impersonator.ts

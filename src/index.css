@@ -1,5 +1,18 @@
+/* Fallback font import for environments where HTML link fails */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap");
+
 body {
   width: 360px;
-  height: 320px;
-  max-height: 560px;
+  height: 480px;
+  max-height: 600px;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code,
+pre,
+.mono {
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
 }

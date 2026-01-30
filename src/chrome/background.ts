@@ -1,7 +1,7 @@
 /**
  * Background service worker for handling transactions
  * - Receives transaction requests from content script
- * - Opens confirmation popup
+ * - Stores pending transactions persistently
  * - Submits approved transactions to Bankr API
  * - Returns results to content script
  */
@@ -15,12 +15,18 @@ import {
   BankrApiError,
 } from "./bankrApi";
 import { ALLOWED_CHAIN_IDS, CHAIN_NAMES } from "../constants/networks";
+import {
+  savePendingTxRequest,
+  removePendingTxRequest,
+  getPendingTxRequestById,
+  getPendingTxRequests,
+  clearExpiredTxRequests,
+  updateBadge,
+  PendingTxRequest,
+} from "./pendingTxStorage";
 
-// Pending transactions waiting for user confirmation
-interface PendingTransaction {
-  id: string;
-  tx: TransactionParams;
-  origin: string;
+// In-memory map for resolving transaction promises back to content script
+interface PendingResolver {
   resolve: (result: TransactionResult) => void;
 }
 
@@ -30,7 +36,7 @@ interface TransactionResult {
   error?: string;
 }
 
-const pendingTransactions = new Map<string, PendingTransaction>();
+const pendingResolvers = new Map<string, PendingResolver>();
 
 // Active transaction AbortControllers for cancellation
 const activeAbortControllers = new Map<string, AbortController>();
@@ -38,8 +44,9 @@ const activeAbortControllers = new Map<string, AbortController>();
 // Active job IDs and API keys for cancellation via Bankr API
 const activeJobs = new Map<string, { jobId: string; apiKey: string }>();
 
-// Session cache for decrypted API key (cleared on restart/suspend)
+// Session cache for decrypted API key and password (cleared on restart/suspend)
 let cachedApiKey: string | null = null;
+let cachedPassword: string | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 
@@ -51,22 +58,38 @@ function getCachedApiKey(): string | null {
     return cachedApiKey;
   }
   cachedApiKey = null;
+  cachedPassword = null;
   return null;
 }
 
 /**
- * Caches the decrypted API key
+ * Gets cached password if still valid
  */
-function setCachedApiKey(apiKey: string): void {
+function getCachedPassword(): string | null {
+  if (cachedPassword && Date.now() - cacheTimestamp < CACHE_TIMEOUT) {
+    return cachedPassword;
+  }
+  cachedPassword = null;
+  return null;
+}
+
+/**
+ * Caches the decrypted API key and password
+ */
+function setCachedApiKey(apiKey: string, password?: string): void {
   cachedApiKey = apiKey;
+  if (password) {
+    cachedPassword = password;
+  }
   cacheTimestamp = Date.now();
 }
 
 /**
- * Clears the cached API key
+ * Clears the cached API key and password
  */
 function clearCachedApiKey(): void {
   cachedApiKey = null;
+  cachedPassword = null;
   cacheTimestamp = 0;
 }
 
@@ -75,43 +98,13 @@ self.addEventListener("suspend", () => {
   clearCachedApiKey();
 });
 
-/**
- * Opens the confirmation popup window
- */
-async function openConfirmationPopup(txId: string): Promise<void> {
-  const width = 400;
-  const height = 600;
+// Clean up expired transactions periodically
+setInterval(() => {
+  clearExpiredTxRequests();
+}, 60000); // Every minute
 
-  // Try to center the popup
-  let left = 100;
-  let top = 100;
-
-  try {
-    const currentWindow = await chrome.windows.getCurrent();
-    if (currentWindow.left !== undefined && currentWindow.width !== undefined) {
-      left = Math.round(
-        currentWindow.left + (currentWindow.width - width) / 2
-      );
-    }
-    if (currentWindow.top !== undefined && currentWindow.height !== undefined) {
-      top = Math.round(
-        currentWindow.top + (currentWindow.height - height) / 2
-      );
-    }
-  } catch {
-    // Use defaults if unable to get current window
-  }
-
-  await chrome.windows.create({
-    url: `confirmation.html?txId=${txId}`,
-    type: "popup",
-    width,
-    height,
-    left,
-    top,
-    focused: true,
-  });
-}
+// Initialize badge on startup
+updateBadge();
 
 /**
  * Handles incoming transaction requests from content script
@@ -121,10 +114,12 @@ async function handleTransactionRequest(
     type: string;
     tx: TransactionParams;
     origin: string;
+    favicon?: string | null;
   },
-  sendResponse: (response: TransactionResult) => void
+  sendResponse: (response: TransactionResult) => void,
+  senderWindowId?: number
 ): Promise<void> {
-  const { tx, origin } = message;
+  const { tx, origin, favicon } = message;
 
   // Validate chain ID
   if (!ALLOWED_CHAIN_IDS.has(tx.chainId)) {
@@ -149,20 +144,106 @@ async function handleTransactionRequest(
     return;
   }
 
-  // Create pending transaction
+  // Create pending transaction request
   const txId = crypto.randomUUID();
+  const chainName = CHAIN_NAMES[tx.chainId] || `Chain ${tx.chainId}`;
 
-  // Store the pending transaction with its resolver
-  const pendingTx: PendingTransaction = {
+  const pendingRequest: PendingTxRequest = {
     id: txId,
     tx,
     origin,
-    resolve: sendResponse,
+    favicon: favicon || null,
+    chainName,
+    timestamp: Date.now(),
   };
-  pendingTransactions.set(txId, pendingTx);
 
-  // Open confirmation popup
-  await openConfirmationPopup(txId);
+  // Store the pending request persistently
+  await savePendingTxRequest(pendingRequest);
+
+  // Store the resolver to respond when user confirms/rejects
+  pendingResolvers.set(txId, { resolve: sendResponse });
+
+  // Open the extension popup for user to confirm
+  openExtensionPopup(senderWindowId);
+}
+
+/**
+ * Opens the extension popup window for transaction confirmation
+ */
+async function openExtensionPopup(senderWindowId?: number): Promise<void> {
+  // Check if popup window already exists
+  const existingWindows = await chrome.windows.getAll({ windowTypes: ["popup"] });
+  const popupUrl = chrome.runtime.getURL("index.html");
+
+  for (const win of existingWindows) {
+    if (win.id) {
+      const tabs = await chrome.tabs.query({ windowId: win.id });
+      if (tabs.some(tab => tab.url?.startsWith(popupUrl))) {
+        // Focus existing popup window
+        await chrome.windows.update(win.id, { focused: true });
+        return;
+      }
+    }
+  }
+
+  // Get the window where the dapp is running
+  // Try multiple methods to ensure we get the correct window
+  let targetWindow: chrome.windows.Window | null = null;
+
+  // Method 1: Use sender's window ID (most accurate)
+  if (senderWindowId) {
+    try {
+      targetWindow = await chrome.windows.get(senderWindowId, { populate: false });
+    } catch {
+      // Window might have been closed
+      targetWindow = null;
+    }
+  }
+
+  // Method 2: Fall back to last focused window
+  if (!targetWindow || targetWindow.left === undefined) {
+    try {
+      targetWindow = await chrome.windows.getLastFocused({ populate: false });
+    } catch {
+      targetWindow = null;
+    }
+  }
+
+  const popupWidth = 380;
+  const popupHeight = 540;
+
+  // Calculate position: top-right of target window
+  // Use the window's actual coordinates (which include multi-monitor offsets)
+  let left: number | undefined;
+  let top: number | undefined;
+
+  if (targetWindow &&
+      targetWindow.left !== undefined &&
+      targetWindow.width !== undefined &&
+      targetWindow.top !== undefined) {
+    // Position at right edge of target window, with small margin
+    left = targetWindow.left + targetWindow.width - popupWidth - 10;
+    // Position at top of target window, with margin for toolbar
+    top = targetWindow.top + 80;
+  }
+
+  // Create new popup window
+  const createOptions: chrome.windows.CreateData = {
+    url: popupUrl,
+    type: "popup",
+    width: popupWidth,
+    height: popupHeight,
+    focused: true,
+  };
+
+  // Only set position if we have valid coordinates
+  // This allows Chrome to handle positioning on the correct monitor
+  if (left !== undefined && top !== undefined) {
+    createOptions.left = left;
+    createOptions.top = top;
+  }
+
+  await chrome.windows.create(createOptions);
 }
 
 /**
@@ -172,7 +253,7 @@ async function handleConfirmTransaction(
   txId: string,
   password: string
 ): Promise<TransactionResult> {
-  const pending = pendingTransactions.get(txId);
+  const pending = await getPendingTxRequestById(txId);
   if (!pending) {
     return { success: false, error: "Transaction not found or expired" };
   }
@@ -186,8 +267,8 @@ async function handleConfirmTransaction(
     if (!apiKey) {
       return { success: false, error: "Invalid password" };
     }
-    // Cache the API key for future transactions
-    setCachedApiKey(apiKey);
+    // Cache the API key and password for future transactions
+    setCachedApiKey(apiKey, password);
   }
 
   // Create AbortController for this transaction
@@ -301,10 +382,6 @@ async function handleConfirmTransaction(
  * Handles rejection from the popup
  */
 function handleRejectTransaction(txId: string): TransactionResult {
-  const pending = pendingTransactions.get(txId);
-  if (!pending) {
-    return { success: false, error: "Transaction not found or expired" };
-  }
   return { success: false, error: "Transaction rejected by user" };
 }
 
@@ -340,27 +417,48 @@ async function handleCancelTransaction(txId: string): Promise<{ success: boolean
 }
 
 /**
- * Gets pending transaction details for the popup
- */
-function getPendingTransaction(
-  txId: string
-): { tx: TransactionParams; origin: string; chainName: string } | null {
-  const pending = pendingTransactions.get(txId);
-  if (!pending) {
-    return null;
-  }
-  return {
-    tx: pending.tx,
-    origin: pending.origin,
-    chainName: CHAIN_NAMES[pending.tx.chainId] || `Chain ${pending.tx.chainId}`,
-  };
-}
-
-/**
  * Checks if the API key is currently cached (no password needed)
  */
 function isApiKeyCached(): boolean {
   return getCachedApiKey() !== null;
+}
+
+/**
+ * Attempts to unlock the wallet by caching the decrypted API key
+ */
+async function handleUnlockWallet(password: string): Promise<{ success: boolean; error?: string }> {
+  const apiKey = await loadDecryptedApiKey(password);
+  if (!apiKey) {
+    return { success: false, error: "Invalid password" };
+  }
+  setCachedApiKey(apiKey, password);
+  return { success: true };
+}
+
+/**
+ * Saves a new API key using the currently cached password
+ * This is used when changing API key while already unlocked
+ */
+async function handleSaveApiKeyWithCachedPassword(
+  newApiKey: string
+): Promise<{ success: boolean; error?: string }> {
+  const password = getCachedPassword();
+  if (!password) {
+    return { success: false, error: "Wallet is locked. Please unlock first." };
+  }
+
+  try {
+    const { saveEncryptedApiKey } = await import("./crypto");
+    await saveEncryptedApiKey(newApiKey, password);
+    // Update the cached API key
+    setCachedApiKey(newApiKey, password);
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to save API key"
+    };
+  }
 }
 
 /**
@@ -398,19 +496,37 @@ async function handleRpcRequest(
 }
 
 // Message listener
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.type) {
     case "sendTransaction": {
-      // Handle async response
-      handleTransactionRequest(message, sendResponse);
+      // Handle async response, pass sender's window ID for popup positioning
+      const senderWindowId = sender.tab?.windowId;
+      handleTransactionRequest(message, sendResponse, senderWindowId);
       // Return true to indicate we will send response asynchronously
       return true;
     }
 
+    case "getPendingTxRequests": {
+      getPendingTxRequests().then((requests) => {
+        sendResponse(requests);
+      });
+      return true;
+    }
+
     case "getPendingTransaction": {
-      const result = getPendingTransaction(message.txId);
-      sendResponse(result);
-      return false;
+      getPendingTxRequestById(message.txId).then((request) => {
+        if (request) {
+          sendResponse({
+            tx: request.tx,
+            origin: request.origin,
+            chainName: request.chainName,
+            favicon: request.favicon,
+          });
+        } else {
+          sendResponse(null);
+        }
+      });
+      return true;
     }
 
     case "isApiKeyCached": {
@@ -420,12 +536,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     case "confirmTransaction": {
       handleConfirmTransaction(message.txId, message.password).then(
-        (result) => {
-          // Send result back to content script
-          const pending = pendingTransactions.get(message.txId);
-          if (pending) {
-            pending.resolve(result);
-            pendingTransactions.delete(message.txId);
+        async (result) => {
+          // Remove from pending storage
+          await removePendingTxRequest(message.txId);
+
+          // Send result back to content script if resolver exists
+          const resolver = pendingResolvers.get(message.txId);
+          if (resolver) {
+            resolver.resolve(result);
+            pendingResolvers.delete(message.txId);
           }
           sendResponse(result);
         }
@@ -435,13 +554,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     case "rejectTransaction": {
       const result = handleRejectTransaction(message.txId);
-      const pending = pendingTransactions.get(message.txId);
-      if (pending) {
-        pending.resolve(result);
-        pendingTransactions.delete(message.txId);
-      }
-      sendResponse(result);
-      return false;
+
+      // Remove from pending storage
+      removePendingTxRequest(message.txId).then(() => {
+        // Send result back to content script if resolver exists
+        const resolver = pendingResolvers.get(message.txId);
+        if (resolver) {
+          resolver.resolve(result);
+          pendingResolvers.delete(message.txId);
+        }
+        sendResponse(result);
+      });
+      return true;
     }
 
     case "cancelTransaction": {
@@ -454,6 +578,33 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     case "clearApiKeyCache": {
       clearCachedApiKey();
       sendResponse({ success: true });
+      return false;
+    }
+
+    case "unlockWallet": {
+      handleUnlockWallet(message.password).then((result) => {
+        sendResponse(result);
+      });
+      return true;
+    }
+
+    case "saveApiKeyWithCachedPassword": {
+      handleSaveApiKeyWithCachedPassword(message.apiKey).then((result) => {
+        sendResponse(result);
+      });
+      return true;
+    }
+
+    case "getCachedPassword": {
+      // Return whether password is cached (not the actual password for security)
+      sendResponse({ hasCachedPassword: getCachedPassword() !== null });
+      return false;
+    }
+
+    case "getCachedApiKey": {
+      // Return the cached API key if available (for displaying in settings)
+      const apiKey = getCachedApiKey();
+      sendResponse({ apiKey: apiKey || null });
       return false;
     }
 
