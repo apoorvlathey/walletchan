@@ -36,7 +36,7 @@
       "all_frames": true
     }
   ],
-  "permissions": ["activeTab", "storage", "sidePanel"],
+  "permissions": ["activeTab", "storage", "sidePanel", "notifications"],
   "host_permissions": ["https://*/*", "http://*/*"],
   "web_accessible_resources": [
     {

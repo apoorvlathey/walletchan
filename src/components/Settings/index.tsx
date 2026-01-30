@@ -12,12 +12,21 @@ import {
   Heading,
   Spacer,
   Code,
+  useToast,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
 } from "@chakra-ui/react";
 import {
   ArrowBackIcon,
   WarningIcon,
   LockIcon,
   ChevronRightIcon,
+  DeleteIcon,
 } from "@chakra-ui/icons";
 import Chains from "./Chains";
 import ChangePassword from "./ChangePassword";
@@ -35,6 +44,20 @@ function Settings({ close, showBackButton = true }: SettingsProps) {
   const [tab, setTab] = useState<SettingsTab>("main");
   const [hasApiKey, setHasApiKey] = useState(false);
   const [address, setAddress] = useState<string>("");
+  const toast = useToast();
+  const { isOpen: isDeleteModalOpen, onOpen: onDeleteModalOpen, onClose: onDeleteModalClose } = useDisclosure();
+
+  const handleClearHistory = () => {
+    chrome.runtime.sendMessage({ type: "clearTxHistory" }, () => {
+      toast({
+        title: "Transaction history cleared",
+        status: "success",
+        duration: 2000,
+        isClosable: true,
+      });
+      onDeleteModalClose();
+    });
+  };
 
   useEffect(() => {
     checkApiKey();
@@ -233,6 +256,67 @@ function Settings({ close, showBackButton = true }: SettingsProps) {
           <ChevronRightIcon color="text.tertiary" />
         </HStack>
       </Box>
+
+      {/* Clear Transaction History Section */}
+      <Box
+        bg="bg.subtle"
+        borderWidth="1px"
+        borderColor="border.default"
+        borderRadius="lg"
+        p={4}
+        cursor="pointer"
+        onClick={onDeleteModalOpen}
+        _hover={{
+          bg: "bg.emphasis",
+          borderColor: "border.strong",
+        }}
+        transition="all 0.2s"
+      >
+        <HStack justify="space-between">
+          <HStack spacing={3}>
+            <Box p={2} bg="bg.muted" borderRadius="md">
+              <DeleteIcon boxSize={4} color="text.secondary" />
+            </Box>
+            <Box>
+              <Text fontWeight="500" color="text.primary">
+                Clear Transaction History
+              </Text>
+              <Text fontSize="xs" color="text.secondary">
+                Remove all transaction records
+              </Text>
+            </Box>
+          </HStack>
+        </HStack>
+      </Box>
+
+      {/* Delete Confirmation Modal */}
+      <Modal isOpen={isDeleteModalOpen} onClose={onDeleteModalClose} isCentered>
+        <ModalOverlay bg="blackAlpha.700" />
+        <ModalContent bg="bg.subtle" borderWidth="1px" borderColor="border.default" mx={4}>
+          <ModalHeader color="text.primary" fontSize="md">
+            Clear Transaction History?
+          </ModalHeader>
+          <ModalBody>
+            <Text color="text.secondary" fontSize="sm">
+              This will permanently delete all transaction records. This action cannot be undone.
+            </Text>
+          </ModalBody>
+          <ModalFooter gap={2}>
+            <Button variant="ghost" size="sm" onClick={onDeleteModalClose}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              bg="error.solid"
+              color="white"
+              _hover={{ bg: "error.solid", opacity: 0.9 }}
+              onClick={handleClearHistory}
+            >
+              Delete
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 
       <Divider borderColor="border.default" />
 

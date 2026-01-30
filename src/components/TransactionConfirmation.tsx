@@ -16,15 +16,30 @@ import {
   Spacer,
   useToast,
   Image,
+  Icon,
 } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon } from "@chakra-ui/icons";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { getChainConfig } from "@/constants/chainConfig";
+
+// Success animation keyframes
+const scaleIn = keyframes`
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+`;
+
+const checkmarkDraw = keyframes`
+  0% { stroke-dashoffset: 50; }
+  100% { stroke-dashoffset: 0; }
+`;
 
 interface TransactionConfirmationProps {
   txRequest: PendingTxRequest;
   currentIndex: number;
   totalCount: number;
+  isInSidePanel: boolean;
   onBack: () => void;
   onConfirmed: () => void;
   onRejected: () => void;
@@ -32,7 +47,7 @@ interface TransactionConfirmationProps {
   onNavigate: (direction: "prev" | "next") => void;
 }
 
-type ConfirmationState = "ready" | "submitting" | "polling" | "success" | "error";
+type ConfirmationState = "ready" | "submitting" | "sent" | "error";
 
 // Copy button component
 function CopyButton({ value }: { value: string }) {
@@ -77,6 +92,7 @@ function TransactionConfirmation({
   txRequest,
   currentIndex,
   totalCount,
+  isInSidePanel,
   onBack,
   onConfirmed,
   onRejected,
@@ -85,7 +101,6 @@ function TransactionConfirmation({
 }: TransactionConfirmationProps) {
   const [state, setState] = useState<ConfirmationState>("ready");
   const [error, setError] = useState<string>("");
-  const [txHash, setTxHash] = useState<string>("");
   const [toLabels, setToLabels] = useState<string[]>([]);
 
   const { tx, origin, chainName, favicon } = txRequest;
@@ -117,17 +132,22 @@ function TransactionConfirmation({
     setError("");
 
     chrome.runtime.sendMessage(
-      { type: "confirmTransaction", txId: txRequest.id, password: "" },
-      (result: { success: boolean; txHash?: string; error?: string }) => {
-        if (result.success && result.txHash) {
-          setTxHash(result.txHash);
-          setState("success");
-          // Notify parent after short delay to show success state
-          setTimeout(() => {
+      { type: "confirmTransactionAsync", txId: txRequest.id, password: "" },
+      (result: { success: boolean; error?: string }) => {
+        if (result.success) {
+          // Transaction submitted
+          if (isInSidePanel) {
+            // In sidepanel, navigate away immediately
             onConfirmed();
-          }, 1500);
+          } else {
+            // In popup, show success animation then close
+            setState("sent");
+            setTimeout(() => {
+              window.close();
+            }, 1000);
+          }
         } else {
-          setError(result.error || "Transaction failed");
+          setError(result.error || "Failed to submit transaction");
           setState("error");
         }
       }
@@ -139,18 +159,6 @@ function TransactionConfirmation({
       { type: "rejectTransaction", txId: txRequest.id },
       () => {
         onRejected();
-      }
-    );
-  };
-
-  const handleCancel = () => {
-    chrome.runtime.sendMessage(
-      { type: "cancelTransaction", txId: txRequest.id },
-      (result: { success: boolean; error?: string }) => {
-        if (result.success) {
-          setError("Transaction cancelled");
-          setState("ready");
-        }
       }
     );
   };
@@ -170,45 +178,67 @@ function TransactionConfirmation({
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  if (state === "success") {
-    const isActualTxHash = txHash.startsWith("0x") && txHash.length === 66;
-
+  // Success animation screen (popup mode only)
+  if (state === "sent") {
     return (
-      <Box p={4} bg="bg.base" minH="100%">
-        <VStack spacing={4}>
-          <Alert
-            status="success"
-            borderRadius="md"
-            bg="success.bg"
-            borderWidth="1px"
-            borderColor="success.border"
+      <Box
+        h="100vh"
+        bg="bg.base"
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        p={8}
+      >
+        <Box
+          w="80px"
+          h="80px"
+          borderRadius="full"
+          bg="success.bg"
+          borderWidth="3px"
+          borderColor="success.solid"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          animation={`${scaleIn} 0.4s ease-out`}
+          mb={6}
+        >
+          <Icon
+            viewBox="0 0 24 24"
+            w="40px"
+            h="40px"
+            color="success.solid"
           >
-            <AlertIcon color="success.solid" />
-            <Text color="text.primary">Transaction completed!</Text>
-          </Alert>
-          <Box w="full">
-            <Flex mb={1} alignItems="center">
-              <Text fontSize="sm" color="text.secondary">
-                {isActualTxHash ? "Transaction Hash:" : "Response:"}
-              </Text>
-              <Spacer />
-              <CopyButton value={txHash} />
-            </Flex>
-            <Code
-              p={2}
-              borderRadius="md"
-              fontSize="xs"
-              wordBreak="break-all"
-              bg="bg.muted"
-              color="text.primary"
-              fontFamily="mono"
-              display="block"
-              w="full"
-            >
-              {txHash}
-            </Code>
-          </Box>
-        </VStack>
+            <path
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M5 13l4 4L19 7"
+              style={{
+                strokeDasharray: 50,
+                strokeDashoffset: 0,
+                animation: `${checkmarkDraw} 0.4s ease-out 0.2s backwards`,
+              }}
+            />
+          </Icon>
+        </Box>
+        <Text
+          fontSize="xl"
+          fontWeight="600"
+          color="text.primary"
+          mb={2}
+        >
+          Transaction Sent
+        </Text>
+        <Text
+          fontSize="sm"
+          color="text.secondary"
+          textAlign="center"
+        >
+          Your transaction has been submitted
+        </Text>
       </Box>
     );
   }
@@ -308,23 +338,32 @@ function TransactionConfirmation({
               Origin
             </Text>
             <HStack spacing={2}>
-              <Image
-                src={
-                  favicon ||
-                  `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`
-                }
-                alt="favicon"
-                boxSize="16px"
-                borderRadius="sm"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  const googleFallback = `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`;
-                  if (target.src !== googleFallback) {
-                    target.src = googleFallback;
+              <Box
+                bg="white"
+                p="2px"
+                borderRadius="md"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Image
+                  src={
+                    favicon ||
+                    `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`
                   }
-                }}
-                fallback={<Box boxSize="16px" bg="bg.muted" borderRadius="sm" />}
-              />
+                  alt="favicon"
+                  boxSize="16px"
+                  borderRadius="sm"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    const googleFallback = `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`;
+                    if (target.src !== googleFallback) {
+                      target.src = googleFallback;
+                    }
+                  }}
+                  fallback={<Box boxSize="16px" bg="bg.muted" borderRadius="sm" />}
+                />
+              </Box>
               <Text fontSize="sm" fontWeight="medium" color="text.primary">
                 {new URL(origin).hostname}
               </Text>
@@ -482,31 +521,17 @@ function TransactionConfirmation({
         )}
 
         {/* Status Messages */}
-        {(state === "submitting" || state === "polling") && (
-          <VStack py={2} spacing={2}>
-            <HStack justify="center">
-              <Spinner size="sm" color="primary.500" />
-              <Text fontSize="sm" color="text.secondary">
-                {state === "submitting"
-                  ? "Submitting transaction..."
-                  : "Waiting for confirmation..."}
-              </Text>
-            </HStack>
-            <Button
-              size="sm"
-              variant="outline"
-              borderColor="error.solid"
-              color="error.solid"
-              _hover={{ bg: "error.bg" }}
-              onClick={handleCancel}
-            >
-              Cancel
-            </Button>
-          </VStack>
+        {state === "submitting" && (
+          <HStack justify="center" py={2}>
+            <Spinner size="sm" color="primary.500" />
+            <Text fontSize="sm" color="text.secondary">
+              Submitting transaction...
+            </Text>
+          </HStack>
         )}
 
         {/* Action Buttons */}
-        {state !== "submitting" && state !== "polling" && state !== "success" && (
+        {state !== "submitting" && (
           <HStack pt={2}>
             <Button variant="outline" flex={1} onClick={handleReject}>
               Reject

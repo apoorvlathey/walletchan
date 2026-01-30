@@ -40,6 +40,7 @@ import UnlockScreen from "@/components/UnlockScreen";
 import PendingTxBanner from "@/components/PendingTxBanner";
 import PendingTxList from "@/components/PendingTxList";
 import TransactionConfirmation from "@/components/TransactionConfirmation";
+import TxStatusList from "@/components/TxStatusList";
 import { useNetworks } from "@/contexts/NetworksContext";
 import { getChainConfig } from "@/constants/chainConfig";
 import { hasEncryptedApiKey } from "@/chrome/crypto";
@@ -63,6 +64,7 @@ function App() {
   const [sidePanelSupported, setSidePanelSupported] = useState(false);
   const [sidePanelMode, setSidePanelMode] = useState(false);
   const [isInSidePanel, setIsInSidePanel] = useState(false);
+  const [failedTxError, setFailedTxError] = useState<{ error: string; origin: string } | null>(null);
 
   const currentTab = async () => {
     const [tab] = await chrome.tabs.query({
@@ -151,6 +153,26 @@ function App() {
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Check URL params for error display (from notification click)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const showErrorId = urlParams.get("showError");
+
+    if (showErrorId) {
+      // Fetch the failed tx result from background
+      chrome.runtime.sendMessage(
+        { type: "getFailedTxResult", notificationId: showErrorId },
+        (result: { error: string; origin: string } | null) => {
+          if (result) {
+            setFailedTxError({ error: result.error, origin: result.origin });
+          }
+          // Clear the URL param
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+      );
+    }
   }, []);
 
   const toggleSidePanelMode = async () => {
@@ -367,8 +389,13 @@ function App() {
     if (remaining.length > 0) {
       setSelectedTxRequest(remaining[0]);
     } else {
-      // Close popup when no more pending requests
-      window.close();
+      // Only close popup when no more pending requests (not sidepanel)
+      if (isInSidePanel) {
+        setSelectedTxRequest(null);
+        setView("main");
+      } else {
+        window.close();
+      }
     }
   };
 
@@ -382,8 +409,14 @@ function App() {
         );
       });
     }
-    // Close popup after rejecting all
-    window.close();
+    // Only close popup after rejecting all (not sidepanel)
+    if (isInSidePanel) {
+      setPendingRequests([]);
+      setSelectedTxRequest(null);
+      setView("main");
+    } else {
+      window.close();
+    }
   };
 
   const truncateAddress = (addr: string): string => {
@@ -464,6 +497,7 @@ function App() {
         txRequest={selectedTxRequest}
         currentIndex={currentIndex >= 0 ? currentIndex : 0}
         totalCount={pendingRequests.length}
+        isInSidePanel={isInSidePanel}
         onBack={() => {
           if (pendingRequests.length > 1) {
             setView("pendingTxList");
@@ -534,6 +568,42 @@ function App() {
 
       <Container pt={4} pb={4}>
         <VStack spacing={4} align="stretch">
+          {/* Failed Transaction Error */}
+          {failedTxError && (
+            <Alert
+              status="error"
+              borderRadius="lg"
+              bg="error.bg"
+              borderWidth="1px"
+              borderColor="error.border"
+              flexDirection="column"
+              alignItems="flex-start"
+            >
+              <HStack w="full" justify="space-between" mb={2}>
+                <HStack>
+                  <AlertIcon color="error.solid" />
+                  <AlertTitle fontSize="sm" color="text.primary">
+                    Transaction Failed
+                  </AlertTitle>
+                </HStack>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  color="text.secondary"
+                  onClick={() => setFailedTxError(null)}
+                >
+                  Dismiss
+                </Button>
+              </HStack>
+              <Text fontSize="xs" color="text.secondary" mb={1}>
+                {failedTxError.origin}
+              </Text>
+              <AlertDescription fontSize="sm" color="text.primary">
+                {failedTxError.error}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Pending Requests Banner */}
           <PendingTxBanner
             count={pendingRequests.length}
@@ -557,46 +627,51 @@ function App() {
             py={3}
           >
             {address ? (
-              <HStack justify="space-between">
-                <HStack spacing={2}>
-                  <Code
-                    fontSize="md"
-                    fontFamily="mono"
-                    bg="transparent"
-                    color="text.primary"
-                    fontWeight="500"
-                  >
-                    {truncateAddress(address)}
-                  </Code>
-                  <IconButton
-                    aria-label="Copy address"
-                    icon={copied ? <CheckIcon /> : <CopyIcon />}
-                    size="xs"
-                    variant="ghost"
-                    color={copied ? "success.solid" : "text.secondary"}
-                    onClick={handleCopyAddress}
-                    _hover={{ color: "text.primary", bg: "bg.emphasis" }}
-                  />
+              <VStack align="stretch" spacing={1}>
+                <Text fontSize="xs" color="text.secondary">
+                  Bankr Wallet Address
+                </Text>
+                <HStack justify="space-between">
+                  <HStack spacing={2}>
+                    <Code
+                      fontSize="md"
+                      fontFamily="mono"
+                      bg="transparent"
+                      color="text.primary"
+                      fontWeight="500"
+                    >
+                      {truncateAddress(address)}
+                    </Code>
+                    <IconButton
+                      aria-label="Copy address"
+                      icon={copied ? <CheckIcon /> : <CopyIcon />}
+                      size="xs"
+                      variant="ghost"
+                      color={copied ? "success.solid" : "text.secondary"}
+                      onClick={handleCopyAddress}
+                      _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+                    />
+                  </HStack>
+                  {chainName && networksInfo && (
+                    <IconButton
+                      aria-label="View on explorer"
+                      icon={<ExternalLinkIcon />}
+                      size="xs"
+                      variant="ghost"
+                      color="text.secondary"
+                      onClick={() => {
+                        const config = getChainConfig(networksInfo[chainName].chainId);
+                        if (config.explorer) {
+                          chrome.tabs.create({
+                            url: `${config.explorer}/address/${address}`,
+                          });
+                        }
+                      }}
+                      _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+                    />
+                  )}
                 </HStack>
-                {chainName && networksInfo && (
-                  <IconButton
-                    aria-label="View on explorer"
-                    icon={<ExternalLinkIcon />}
-                    size="xs"
-                    variant="ghost"
-                    color="text.secondary"
-                    onClick={() => {
-                      const config = getChainConfig(networksInfo[chainName].chainId);
-                      if (config.explorer) {
-                        chrome.tabs.create({
-                          url: `${config.explorer}/address/${address}`,
-                        });
-                      }
-                    }}
-                    _hover={{ color: "text.primary", bg: "bg.emphasis" }}
-                  />
-                )}
-              </HStack>
+              </VStack>
             ) : (
               <Text color="text.tertiary" fontSize="sm" textAlign="center">
                 No address configured
@@ -702,6 +777,9 @@ function App() {
               </Button>
             </Alert>
           )}
+
+          {/* Transaction Status List */}
+          <TxStatusList maxItems={5} />
         </VStack>
       </Container>
     </Box>

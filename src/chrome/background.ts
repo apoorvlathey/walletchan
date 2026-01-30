@@ -15,6 +15,7 @@ import {
   BankrApiError,
 } from "./bankrApi";
 import { ALLOWED_CHAIN_IDS, CHAIN_NAMES } from "../constants/networks";
+import { CHAIN_CONFIG } from "../constants/chainConfig";
 import {
   savePendingTxRequest,
   removePendingTxRequest,
@@ -24,6 +25,13 @@ import {
   updateBadge,
   PendingTxRequest,
 } from "./pendingTxStorage";
+import {
+  addTxToHistory,
+  updateTxInHistory,
+  getTxHistory,
+  getProcessingTxs,
+  clearTxHistory,
+} from "./txHistoryStorage";
 
 // In-memory map for resolving transaction promises back to content script
 interface PendingResolver {
@@ -43,6 +51,16 @@ const activeAbortControllers = new Map<string, AbortController>();
 
 // Active job IDs and API keys for cancellation via Bankr API
 const activeJobs = new Map<string, { jobId: string; apiKey: string }>();
+
+// Store failed transaction results for display when opening from notification
+interface FailedTxResult {
+  txId: string;
+  error: string;
+  origin: string;
+  chainId: number;
+  timestamp: number;
+}
+const failedTxResults = new Map<string, FailedTxResult>();
 
 // Session cache for decrypted API key and password (cleared on restart/suspend)
 let cachedApiKey: string | null = null;
@@ -539,6 +557,277 @@ async function handleCancelTransaction(txId: string): Promise<{ success: boolean
 }
 
 /**
+ * Shows a browser notification
+ */
+async function showNotification(
+  notificationId: string,
+  title: string,
+  message: string
+): Promise<string> {
+  return new Promise((resolve) => {
+    chrome.notifications.create(
+      notificationId,
+      {
+        type: "basic",
+        iconUrl: chrome.runtime.getURL("icons/icon128.png"),
+        title,
+        message,
+        priority: 2,
+      },
+      (createdId) => {
+        if (chrome.runtime.lastError) {
+          console.error("Notification error:", chrome.runtime.lastError);
+        }
+        resolve(createdId || notificationId);
+      }
+    );
+  });
+}
+
+/**
+ * Handles async confirmation - returns immediately and polls in background
+ */
+async function handleConfirmTransactionAsync(
+  txId: string,
+  password: string
+): Promise<{ success: boolean; error?: string }> {
+  const pending = await getPendingTxRequestById(txId);
+  if (!pending) {
+    return { success: false, error: "Transaction not found or expired" };
+  }
+
+  // Try to use cached API key first
+  let apiKey = getCachedApiKey();
+
+  if (!apiKey) {
+    // Decrypt API key with provided password
+    apiKey = await loadDecryptedApiKey(password);
+    if (!apiKey) {
+      return { success: false, error: "Invalid password" };
+    }
+    // Cache the API key and password for future transactions
+    setCachedApiKey(apiKey, password);
+  }
+
+  // Remove from pending storage immediately
+  await removePendingTxRequest(txId);
+
+  // Start background processing
+  processTransactionInBackground(txId, pending, apiKey);
+
+  return { success: true };
+}
+
+/**
+ * Processes transaction in background and shows notification on completion
+ */
+async function processTransactionInBackground(
+  txId: string,
+  pending: PendingTxRequest,
+  apiKey: string
+): Promise<void> {
+  // Create AbortController for this transaction
+  const abortController = new AbortController();
+  activeAbortControllers.set(txId, abortController);
+
+  // Save to history as "processing" immediately
+  await addTxToHistory({
+    id: txId,
+    status: "processing",
+    tx: pending.tx,
+    origin: pending.origin,
+    favicon: pending.favicon,
+    chainName: pending.chainName,
+    chainId: pending.tx.chainId,
+    createdAt: pending.timestamp,
+  });
+
+  try {
+    // Submit transaction to Bankr API
+    const { jobId } = await submitTransaction(apiKey, pending.tx, abortController.signal);
+
+    // Store job ID and API key for potential cancellation
+    activeJobs.set(txId, { jobId, apiKey });
+
+    // Poll for completion
+    const status = await pollJobUntilComplete(apiKey, jobId, {
+      pollInterval: 2000,
+      maxDuration: 300000, // 5 minutes
+      signal: abortController.signal,
+    });
+
+    // Send result back to content script
+    const resolver = pendingResolvers.get(txId);
+
+    if (status.status === "completed") {
+      // Check for txHash in result
+      let txHash = status.result?.txHash;
+      const response = status.response || "";
+
+      if (!txHash) {
+        // Extract transaction hash from response (0x + 64 hex chars)
+        const txHashMatch = response.match(/0x[a-fA-F0-9]{64}/);
+        if (txHashMatch) {
+          txHash = txHashMatch[0];
+        }
+      }
+
+      if (txHash) {
+        // Update history to "success"
+        await updateTxInHistory(txId, {
+          status: "success",
+          txHash,
+          completedAt: Date.now(),
+        });
+
+        // Success with hash - show notification
+        const notificationId = `tx-success-${txId}`;
+        const chainConfig = CHAIN_CONFIG[pending.tx.chainId];
+        const explorerUrl = chainConfig?.explorer
+          ? `${chainConfig.explorer}/tx/${txHash}`
+          : null;
+
+        // Store explorer URL for notification click
+        if (explorerUrl) {
+          chrome.storage.local.set({ [`notification-${notificationId}`]: explorerUrl });
+        }
+
+        await showNotification(
+          notificationId,
+          "Transaction Confirmed",
+          `Transaction on ${pending.chainName} was successful. Click to view.`
+        );
+
+        if (resolver) {
+          resolver.resolve({ success: true, txHash });
+        }
+      } else {
+        // Check if response contains a transaction URL
+        const hasExplorerUrl =
+          response.includes("basescan.org/tx/") ||
+          response.includes("etherscan.io/tx/") ||
+          response.includes("polygonscan.com/tx/") ||
+          response.includes("uniscan.xyz/tx/") ||
+          response.includes("unichain.org/tx/");
+
+        if (hasExplorerUrl || (status.statusUpdates && status.statusUpdates.length > 0)) {
+          // Update history to "success"
+          await updateTxInHistory(txId, {
+            status: "success",
+            txHash: response || undefined,
+            completedAt: Date.now(),
+          });
+
+          await showNotification(
+            `tx-success-${txId}`,
+            "Transaction Completed",
+            `Transaction on ${pending.chainName} completed.`
+          );
+
+          if (resolver) {
+            resolver.resolve({ success: true, txHash: response || "Transaction completed" });
+          }
+        } else {
+          // Check if response indicates an error
+          const isErrorResponse =
+            response.toLowerCase().includes("missing required") ||
+            response.toLowerCase().includes("error") ||
+            response.toLowerCase().includes("can't execute") ||
+            response.toLowerCase().includes("cannot") ||
+            response.toLowerCase().includes("unable to") ||
+            response.toLowerCase().includes("invalid") ||
+            response.toLowerCase().includes("not supported");
+
+          if (isErrorResponse) {
+            await handleTransactionFailure(txId, pending, response, resolver);
+          } else {
+            // Assume success - update history
+            await updateTxInHistory(txId, {
+              status: "success",
+              txHash: response || undefined,
+              completedAt: Date.now(),
+            });
+
+            await showNotification(
+              `tx-success-${txId}`,
+              "Transaction Completed",
+              `Transaction on ${pending.chainName} completed.`
+            );
+
+            if (resolver) {
+              resolver.resolve({ success: true, txHash: response || "Transaction completed" });
+            }
+          }
+        }
+      }
+    } else if (status.status === "failed") {
+      const error = status.result?.error || status.response || "Transaction failed";
+      await handleTransactionFailure(txId, pending, error, resolver);
+    } else {
+      await handleTransactionFailure(txId, pending, "Unexpected job status", resolver);
+    }
+  } catch (error) {
+    const resolver = pendingResolvers.get(txId);
+    let errorMessage = "Unknown error";
+
+    if (error instanceof Error) {
+      if (error.name === "AbortError") {
+        errorMessage = "Transaction cancelled by user";
+      } else {
+        errorMessage = error.message;
+      }
+    }
+
+    await handleTransactionFailure(txId, pending, errorMessage, resolver);
+  } finally {
+    activeAbortControllers.delete(txId);
+    activeJobs.delete(txId);
+    pendingResolvers.delete(txId);
+  }
+}
+
+/**
+ * Handles transaction failure - shows notification and stores error for display
+ */
+async function handleTransactionFailure(
+  txId: string,
+  pending: PendingTxRequest,
+  error: string,
+  resolver?: PendingResolver
+): Promise<void> {
+  const notificationId = `tx-failed-${txId}`;
+
+  // Update history to "failed"
+  await updateTxInHistory(txId, {
+    status: "failed",
+    error,
+    completedAt: Date.now(),
+  });
+
+  // Store failed result for display when opening from notification
+  failedTxResults.set(notificationId, {
+    txId,
+    error,
+    origin: pending.origin,
+    chainId: pending.tx.chainId,
+    timestamp: Date.now(),
+  });
+
+  // Store notification ID for click handler
+  chrome.storage.local.set({ [`notification-${notificationId}`]: { type: "error", txId: notificationId } });
+
+  await showNotification(
+    notificationId,
+    "Transaction Failed",
+    error.length > 100 ? error.substring(0, 100) + "..." : error
+  );
+
+  if (resolver) {
+    resolver.resolve({ success: false, error });
+  }
+}
+
+/**
  * Checks if the API key is currently cached (no password needed)
  */
 function isApiKeyCached(): boolean {
@@ -763,9 +1052,102 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       return true;
     }
+
+    case "confirmTransactionAsync": {
+      handleConfirmTransactionAsync(message.txId, message.password).then(
+        (result) => {
+          sendResponse(result);
+        }
+      );
+      return true;
+    }
+
+    case "getFailedTxResult": {
+      const result = failedTxResults.get(message.notificationId);
+      if (result) {
+        // Clear after retrieving
+        failedTxResults.delete(message.notificationId);
+        chrome.storage.local.remove(`notification-${message.notificationId}`);
+      }
+      sendResponse(result || null);
+      return false;
+    }
+
+    case "clearFailedTxResult": {
+      failedTxResults.delete(message.notificationId);
+      chrome.storage.local.remove(`notification-${message.notificationId}`);
+      sendResponse({ success: true });
+      return false;
+    }
+
+    case "getTxHistory": {
+      getTxHistory().then((history) => {
+        sendResponse(history);
+      });
+      return true;
+    }
+
+    case "getProcessingTxs": {
+      getProcessingTxs().then((txs) => {
+        sendResponse(txs);
+      });
+      return true;
+    }
+
+    case "clearTxHistory": {
+      clearTxHistory().then(() => {
+        sendResponse({ success: true });
+      });
+      return true;
+    }
   }
 
   return false;
+});
+
+// Handle notification clicks
+chrome.notifications.onClicked.addListener(async (notificationId) => {
+  // Get stored data for this notification
+  const storageKey = `notification-${notificationId}`;
+  const data = await chrome.storage.local.get([storageKey]);
+  const notificationData = data[storageKey];
+
+  if (notificationData) {
+    if (typeof notificationData === "string") {
+      // It's an explorer URL - open in new tab
+      chrome.tabs.create({ url: notificationData });
+      chrome.storage.local.remove(storageKey);
+    } else if (notificationData.type === "error") {
+      // It's an error - open popup/sidepanel to show error
+      const useSidePanel = await getSidePanelMode();
+
+      if (useSidePanel && isSidePanelSupported()) {
+        // Try to open sidepanel - but Chrome doesn't allow programmatic open
+        // So we open a popup instead with the error info
+        const popupUrl = chrome.runtime.getURL(`index.html?showError=${notificationData.txId}`);
+        await chrome.windows.create({
+          url: popupUrl,
+          type: "popup",
+          width: 380,
+          height: 540,
+          focused: true,
+        });
+      } else {
+        // Open popup with error info
+        const popupUrl = chrome.runtime.getURL(`index.html?showError=${notificationData.txId}`);
+        await chrome.windows.create({
+          url: popupUrl,
+          type: "popup",
+          width: 380,
+          height: 540,
+          focused: true,
+        });
+      }
+    }
+  }
+
+  // Clear the notification
+  chrome.notifications.clear(notificationId);
 });
 
 // Export for module

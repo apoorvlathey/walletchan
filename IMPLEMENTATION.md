@@ -152,10 +152,11 @@ src/
 ├── chrome/
 │   ├── impersonator.ts      # Inpage script - EIP-6963 provider + window.ethereum
 │   ├── inject.ts            # Content script - message bridge
-│   ├── background.ts        # Service worker - API calls, tx handling
+│   ├── background.ts        # Service worker - API calls, tx handling, notifications
 │   ├── crypto.ts            # AES-256-GCM encryption for API key
 │   ├── bankrApi.ts          # Bankr API client
-│   └── pendingTxStorage.ts  # Persistent storage for pending transactions
+│   ├── pendingTxStorage.ts  # Persistent storage for pending transactions
+│   └── txHistoryStorage.ts  # Persistent storage for completed transaction history
 ├── constants/
 │   ├── networks.ts          # Default networks configuration
 │   └── chainConfig.ts       # Chain-specific styling/icons
@@ -163,7 +164,7 @@ src/
 │   └── ApiKeySetup.tsx      # API key + wallet address configuration
 ├── components/
 │   ├── Settings/
-│   │   ├── index.tsx        # Main settings page
+│   │   ├── index.tsx        # Main settings page (includes clear history)
 │   │   ├── Chains.tsx       # Chain RPC management
 │   │   ├── AddChain.tsx     # Add new chain
 │   │   ├── EditChain.tsx    # Edit existing chain
@@ -171,7 +172,8 @@ src/
 │   ├── UnlockScreen.tsx     # Wallet unlock (password entry)
 │   ├── PendingTxBanner.tsx  # Banner showing pending tx count
 │   ├── PendingTxList.tsx    # List of pending transactions
-│   └── TransactionConfirmation.tsx # In-popup tx confirmation
+│   ├── TxStatusList.tsx     # Recent transaction history display
+│   └── TransactionConfirmation.tsx # In-popup tx confirmation with success animation
 └── App.tsx                  # Main popup application
 ```
 
@@ -258,9 +260,21 @@ The extension automatically opens a popup window when a transaction request is r
 
 - If wallet locked (API key not cached): shows unlock screen first
 - Shows pending transaction banner if requests exist
-- Displays: origin, network, to, value, data
+- Displays: origin (with favicon), network, to address (with labels), value, data
 - User clicks Confirm or Reject
 - Closing popup does NOT cancel transaction (persisted)
+
+#### Address Labels
+
+The "to" address displays labels fetched from eth.sh API:
+
+```typescript
+const response = await fetch(
+  `https://eth.sh/api/labels/${tx.to}?chainId=${tx.chainId}`
+);
+const labels = await response.json();
+// Displays as badges below the address (e.g., "Uniswap V3: Router")
+```
 
 #### Multiple Transaction Handling
 
@@ -298,6 +312,192 @@ Submit this transaction:
 - Transaction hash extracted via regex: `/0x[a-fA-F0-9]{64}/`
 - Returned through the message chain back to dapp
 - Dapp receives the tx hash from `eth_sendTransaction`
+
+## Async Transaction Confirmation
+
+When a user confirms a transaction, the extension uses an async flow that allows the popup to close immediately while processing continues in the background.
+
+### Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Async Transaction Confirmation Flow                      │
+│                                                                             │
+│  1. User clicks "Confirm" in popup/sidepanel                                │
+│  2. Popup sends "confirmTransactionAsync" to background                     │
+│  3. Background immediately responds with { success: true }                  │
+│  4. Popup behavior:                                                         │
+│     - Sidepanel: Navigate back to main view immediately                     │
+│     - Popup: Show success animation, then close after 1 second              │
+│  5. Background processes transaction in parallel:                           │
+│     a. Adds to history with status: "processing"                            │
+│     b. Calls Bankr API and polls for result                                 │
+│     c. On success: Updates history, shows notification                      │
+│     d. On failure: Updates history with error, shows notification           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Success Animation (Popup Mode Only)
+
+When confirming a transaction in popup mode, a full-screen success animation is shown:
+
+```typescript
+// Animation keyframes
+const scaleIn = keyframes`
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+`;
+
+const checkmarkDraw = keyframes`
+  0% { stroke-dashoffset: 50; }
+  100% { stroke-dashoffset: 0; }
+`;
+```
+
+The animation shows:
+- Green circular badge with animated checkmark
+- "Transaction Sent" heading
+- "Your transaction has been submitted" subtext
+- Auto-closes popup after 1 second
+
+In sidepanel mode, the view navigates back immediately without the animation (sidepanel stays open for further interactions).
+
+## Browser Notifications
+
+The extension uses Chrome's Notifications API to alert users when transactions complete while the popup/sidepanel is closed.
+
+### Notification Types
+
+| Event | Title | Message |
+| ----- | ----- | ------- |
+| Transaction Confirmed | "Transaction Confirmed" | "Your transaction on {chainName} was successful" |
+| Transaction Failed | "Transaction Failed" | "Error: {errorMessage}" |
+
+### Implementation
+
+```typescript
+async function showNotification(
+  notificationId: string,
+  title: string,
+  message: string
+): Promise<string> {
+  return new Promise((resolve) => {
+    chrome.notifications.create(
+      notificationId,
+      {
+        type: "basic",
+        iconUrl: chrome.runtime.getURL("icons/icon128.png"),
+        title,
+        message,
+        priority: 2,
+      },
+      (createdId) => {
+        if (chrome.runtime.lastError) {
+          console.error("Notification error:", chrome.runtime.lastError);
+        }
+        resolve(createdId || notificationId);
+      }
+    );
+  });
+}
+```
+
+### macOS Permissions Note
+
+On macOS, Chrome notifications require explicit permission in System Preferences:
+- **System Preferences → Notifications → Google Chrome → Allow Notifications**
+
+Without this permission, `chrome.notifications.create()` will execute without error but no notification will appear.
+
+### Manifest Permission
+
+```json
+{
+  "permissions": [
+    "notifications"
+  ]
+}
+```
+
+## Transaction History
+
+Completed transactions (confirmed or failed) are stored persistently and displayed on the homepage.
+
+### Data Model
+
+`src/chrome/txHistoryStorage.ts`:
+
+```typescript
+export type TxStatus = "processing" | "success" | "failed";
+
+export interface CompletedTransaction {
+  id: string;
+  status: TxStatus;
+  tx: TransactionParams;
+  origin: string;
+  favicon: string | null;
+  chainName: string;
+  chainId: number;
+  createdAt: number;
+  completedAt?: number;
+  txHash?: string;
+  error?: string;
+}
+```
+
+### Storage Functions
+
+| Function | Description |
+| -------- | ----------- |
+| `getTxHistory()` | Get all history (newest first, max 50) |
+| `addTxToHistory(tx)` | Add new entry with "processing" status |
+| `updateTxInHistory(txId, updates)` | Update status, txHash, error, completedAt |
+| `clearTxHistory()` | Remove all history entries |
+
+### Storage Details
+
+- **Key**: `txHistory` in `chrome.storage.local`
+- **Max entries**: 50 (oldest entries removed when limit exceeded)
+- **Sort order**: Newest first (by `createdAt`)
+
+### UI Component
+
+`src/components/TxStatusList.tsx` displays the transaction history:
+
+- **Default view**: 5 most recent transactions
+- **Expandable**: Show/hide older transactions
+- **Empty state**: "No recent transactions" message
+
+Each transaction shows:
+- Origin favicon and hostname
+- Chain badge with icon
+- Status badge:
+  - **Processing**: Blue badge with spinner
+  - **Confirmed**: Green badge with checkmark, explorer link
+  - **Failed**: Red badge with warning icon, error message
+- Relative timestamp ("Just now", "5m ago", "2h ago")
+
+### Real-time Updates
+
+The component listens for `txHistoryUpdated` messages to refresh automatically:
+
+```typescript
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === "txHistoryUpdated") {
+    chrome.runtime.sendMessage({ type: "getTxHistory" }, (result) => {
+      setHistory(result || []);
+    });
+  }
+});
+```
+
+### Clear History
+
+Users can clear transaction history via Settings:
+- Navigate to Settings → "Clear Transaction History"
+- Confirmation modal prevents accidental deletion
+- Message: "This will permanently delete all transaction records. This action cannot be undone."
 
 ## RPC Proxy (CSP Bypass)
 
@@ -498,7 +698,8 @@ Build command: `pnpm build`
 | `getPendingTransaction`       | Get specific tx details               |
 | `isApiKeyCached`              | Check if password needed              |
 | `unlockWallet`                | Unlock wallet with password           |
-| `confirmTransaction`          | User approved tx                      |
+| `confirmTransaction`          | User approved tx (sync, waits)        |
+| `confirmTransactionAsync`     | User approved tx (async, returns immediately) |
 | `rejectTransaction`           | User rejected tx                      |
 | `cancelTransaction`           | User cancelled in-progress tx         |
 | `clearApiKeyCache`            | Clear cached API key                  |
@@ -508,6 +709,22 @@ Build command: `pnpm build`
 | `isSidePanelSupported`        | Check if browser supports sidepanel   |
 | `getSidePanelMode`            | Get current sidepanel mode setting    |
 | `setSidePanelMode`            | Set sidepanel mode (true/false)       |
+| `getTxHistory`                | Get completed transaction history     |
+| `clearTxHistory`              | Clear all transaction history         |
+
+### Background → Views (chrome.runtime broadcast)
+
+| Type                 | Description                                    |
+| -------------------- | ---------------------------------------------- |
+| `txHistoryUpdated`   | Notifies views that transaction history changed |
+| `newPendingTxRequest`| Notifies views of new pending transaction      |
+| `ping`               | Check if any extension view is open            |
+
+### Views → Background (response)
+
+| Type   | Description                              |
+| ------ | ---------------------------------------- |
+| `pong` | Response indicating view is open         |
 
 ## Sidepanel Support
 
@@ -595,8 +812,9 @@ When in sidepanel:
 
 ### Popup Dimensions
 
-- Width: 360px (fixed)
-- Height: 480px (max 600px)
+- Window: 380px width, 540px height (created by background.ts)
+- Body: 100% width, min-width 360px, max-height 600px
+- Sidepanel: 100vh height (no max-height restriction)
 - Font: Inter (UI), JetBrains Mono (code/addresses)
 
 ### Transaction Confirmation Header
@@ -616,10 +834,47 @@ When in sidepanel:
 
 Each request shows:
 - Request number badge (#1, #2, etc.)
-- Origin favicon and hostname
+- Origin favicon with white background (handles transparent icons)
+- Origin hostname
 - Chain badge with icon
 - Relative timestamp ("2 mins ago")
 - Target address (truncated)
+
+### Origin Favicon Styling
+
+Origin favicons are displayed with a white background to handle transparent icons:
+
+```tsx
+<Box
+  bg="white"
+  p="2px"
+  borderRadius="md"
+  display="flex"
+  alignItems="center"
+  justifyContent="center"
+>
+  <Image
+    src={favicon || `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`}
+    boxSize="16px"
+    borderRadius="sm"
+  />
+</Box>
+```
+
+### Homepage Layout
+
+The main view (after unlock) shows:
+
+1. **Header**: Lock button, Settings icon, Sidepanel toggle (if supported)
+2. **Wallet Address Section**:
+   - "Bankr Wallet Address" label
+   - Truncated address with copy button
+   - Network chain badges
+3. **Pending Transaction Banner** (if any pending)
+4. **Recent Transactions** (TxStatusList):
+   - Shows last 5 transactions by default
+   - Expandable to show all
+   - Empty state: "No recent transactions"
 
 ## Security Considerations
 
