@@ -153,6 +153,9 @@ class ImpersonatorProvider extends EventEmitter {
         // @ts-ignore
         const chainId = Number(params[0].chainId as string);
 
+        // Capture reference to this provider instance for use in event listener
+        const self = this;
+
         const setChainIdPromise = new Promise<null>((resolve, reject) => {
           // send message to content_script (inject.ts) to fetch corresponding RPC
           window.postMessage(
@@ -183,9 +186,9 @@ class ImpersonatorProvider extends EventEmitter {
                 case "switchEthereumChain": {
                   const chainId = e.data.msg.chainId as number;
                   const rpcUrl = e.data.msg.rpcUrl as string;
-                  (
-                    (window as Window).ethereum as ImpersonatorProvider
-                  ).setChainId(chainId, rpcUrl);
+                  // Use the captured reference instead of window.ethereum
+                  // to avoid issues with other wallets claiming window.ethereum
+                  self.setChainId(chainId, rpcUrl);
                   // remove this listener as we already have a listener for "message" and don't want duplicates
                   controller.abort();
 
@@ -364,6 +367,45 @@ function announceProvider() {
   );
 }
 
+// Safely set window.ethereum, handling conflicts with other wallets like Rabby
+// that aggressively claim the property with getter-only descriptors
+function setWindowEthereum(provider: ImpersonatorProvider): boolean {
+  try {
+    // First, try to delete any existing property to clear getter-only descriptors
+    try {
+      delete (window as any).ethereum;
+    } catch {
+      // Ignore - property might not be configurable
+    }
+
+    // Try direct assignment first (works if property doesn't exist or has setter)
+    try {
+      (window as Window).ethereum = provider;
+      if ((window as Window).ethereum === provider) {
+        return true;
+      }
+    } catch {
+      // Direct assignment failed, try Object.defineProperty
+    }
+
+    // Use Object.defineProperty with configurable: true so other wallets can still override if needed
+    Object.defineProperty(window, "ethereum", {
+      value: provider,
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
+
+    return (window as Window).ethereum === provider;
+  } catch (e) {
+    console.warn(
+      "Bankr Wallet: Could not set window.ethereum (another wallet may have claimed it).",
+      "Dapps supporting EIP-6963 will still be able to discover Bankr Wallet."
+    );
+    return false;
+  }
+}
+
 // Listen for EIP-6963 provider requests from dapps
 window.addEventListener("eip6963:requestProvider", () => {
   announceProvider();
@@ -396,9 +438,10 @@ window.addEventListener("message", (e: any) => {
         providerInstance = impersonatedProvider;
 
         // Legacy: Set window.ethereum for backward compatibility
-        (window as Window).ethereum = impersonatedProvider;
+        // Uses Object.defineProperty to handle conflicts with other wallets like Rabby
+        setWindowEthereum(impersonatedProvider);
 
-        // EIP-6963: Announce provider to dapps
+        // EIP-6963: Announce provider to dapps (works even if window.ethereum couldn't be set)
         announceProvider();
       } catch (e) {
         console.error("Impersonator Error:", e);
@@ -408,16 +451,20 @@ window.addEventListener("message", (e: any) => {
     }
     case "setAddress": {
       const address = e.data.msg.address as string;
-      ((window as Window).ethereum as ImpersonatorProvider).setAddress(address);
+      // Use providerInstance directly instead of window.ethereum
+      // to avoid issues with other wallets claiming window.ethereum
+      if (providerInstance) {
+        providerInstance.setAddress(address);
+      }
       break;
     }
     case "setChainId": {
       const chainId = e.data.msg.chainId as number;
       const rpcUrl = e.data.msg.rpcUrl as string;
-      ((window as Window).ethereum as ImpersonatorProvider).setChainId(
-        chainId,
-        rpcUrl
-      );
+      // Use providerInstance directly instead of window.ethereum
+      if (providerInstance) {
+        providerInstance.setChainId(chainId, rpcUrl);
+      }
       break;
     }
     case "sendTransactionResult": {

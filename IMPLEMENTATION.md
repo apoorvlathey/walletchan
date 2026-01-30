@@ -147,6 +147,83 @@ The wallet maintains backward compatibility by:
 
 Dapps that support EIP-6963 will show Bankr Wallet in their wallet selection UI. Legacy dapps will still work via `window.ethereum`.
 
+### Multi-Wallet Conflict Handling
+
+Some wallets (like Rabby) aggressively claim `window.ethereum` using `Object.defineProperty` with a getter-only descriptor, which prevents other wallets from setting it via direct assignment. BankrWallet handles this gracefully:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      window.ethereum Claim Strategy                          │
+│                                                                             │
+│  1. Try to delete existing window.ethereum property                         │
+│     (clears getter-only descriptors if configurable)                        │
+│                                                                             │
+│  2. Try direct assignment: window.ethereum = provider                       │
+│     (works if property doesn't exist or has a setter)                       │
+│                                                                             │
+│  3. If direct assignment fails, use Object.defineProperty with:             │
+│     - configurable: true                                                    │
+│     - writable: true                                                        │
+│     - enumerable: true                                                      │
+│                                                                             │
+│  4. If all attempts fail:                                                   │
+│     - Log a warning (not an error)                                          │
+│     - Continue with EIP-6963 announcements                                  │
+│     - Modern dapps will still discover the wallet                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Implementation** (`src/chrome/impersonator.ts`):
+
+```typescript
+function setWindowEthereum(provider: ImpersonatorProvider): boolean {
+  try {
+    // First, try to delete any existing property
+    try {
+      delete (window as any).ethereum;
+    } catch {
+      // Ignore - property might not be configurable
+    }
+
+    // Try direct assignment first
+    try {
+      (window as Window).ethereum = provider;
+      if ((window as Window).ethereum === provider) {
+        return true;
+      }
+    } catch {
+      // Direct assignment failed, try Object.defineProperty
+    }
+
+    // Use Object.defineProperty as fallback
+    Object.defineProperty(window, "ethereum", {
+      value: provider,
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
+
+    return (window as Window).ethereum === provider;
+  } catch (e) {
+    console.warn(
+      "Bankr Wallet: Could not set window.ethereum (another wallet may have claimed it).",
+      "Dapps supporting EIP-6963 will still be able to discover Bankr Wallet."
+    );
+    return false;
+  }
+}
+```
+
+**Internal Provider References**:
+
+To avoid issues with other wallets intercepting `window.ethereum`, all internal operations use the `providerInstance` variable directly:
+
+- `setAddress` and `setChainId` message handlers use `providerInstance`
+- `wallet_switchEthereumChain` captures `this` reference before async operations
+- EIP-6963 announcements use `providerInstance`
+
+This ensures the wallet functions correctly even when `window.ethereum` is claimed by another extension.
+
 ## File Structure
 
 ```
