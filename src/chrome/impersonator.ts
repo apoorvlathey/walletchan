@@ -428,7 +428,16 @@ window.addEventListener("message", (e: any) => {
         if (e.data.msg.success && e.data.msg.txHash) {
           callbacks.resolve(e.data.msg.txHash);
         } else {
-          callbacks.reject(new Error(e.data.msg.error || "Transaction failed"));
+          const errorMessage = e.data.msg.error || "Transaction failed";
+          // Check if this is a user rejection (EIP-1193 error code 4001)
+          const isUserRejection = errorMessage.toLowerCase().includes("rejected by user") ||
+                                   errorMessage.toLowerCase().includes("user rejected") ||
+                                   errorMessage.toLowerCase().includes("user denied");
+          const error = new Error(errorMessage) as Error & { code: number };
+          if (isUserRejection) {
+            error.code = 4001; // EIP-1193: User Rejected Request
+          }
+          callbacks.reject(error);
         }
       }
       break;
@@ -441,7 +450,16 @@ window.addEventListener("message", (e: any) => {
         if (e.data.msg.success && e.data.msg.signature) {
           callbacks.resolve(e.data.msg.signature);
         } else {
-          callbacks.reject(new Error(e.data.msg.error || "Signature request rejected"));
+          const errorMessage = e.data.msg.error || "Signature request rejected";
+          // Check if this is a user rejection (EIP-1193 error code 4001)
+          const isUserRejection = errorMessage.toLowerCase().includes("rejected") ||
+                                   errorMessage.toLowerCase().includes("cancelled") ||
+                                   errorMessage.toLowerCase().includes("denied");
+          const error = new Error(errorMessage) as Error & { code: number };
+          if (isUserRejection) {
+            error.code = 4001; // EIP-1193: User Rejected Request
+          }
+          callbacks.reject(error);
         }
       }
       break;
