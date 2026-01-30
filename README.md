@@ -11,7 +11,7 @@
 <table>
   <tr>
     <td><img src="./.github/usage/password-page.png" alt="Password Page" /></td>
-    <td><img src="./.github/usage/homepage.png" alt="Homepage" /></td>
+    <td><img src="./.github/usage/homepage-new.png" alt="Homepage" /></td>
     <td><img src="./.github/usage/settings.png" alt="Settings Page" /></td>
   </tr>
 </table>
