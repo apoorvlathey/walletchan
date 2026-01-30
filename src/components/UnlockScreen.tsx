@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Box,
   VStack,
@@ -40,6 +40,7 @@ function UnlockScreen({ onUnlock }: UnlockScreenProps) {
   const [sidePanelSupported, setSidePanelSupported] = useState(false);
   const [sidePanelMode, setSidePanelMode] = useState(false);
   const [isInSidePanel, setIsInSidePanel] = useState(false);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const checkSidePanelSupport = async () => {
@@ -102,6 +103,7 @@ function UnlockScreen({ onUnlock }: UnlockScreenProps) {
   const handleUnlock = async () => {
     if (!password) {
       setError("Password is required");
+      passwordInputRef.current?.focus();
       return;
     }
 
@@ -116,6 +118,7 @@ function UnlockScreen({ onUnlock }: UnlockScreenProps) {
         } else {
           setError(result.error || "Invalid password");
           setIsUnlocking(false);
+          passwordInputRef.current?.focus();
         }
       }
     );
@@ -174,6 +177,7 @@ function UnlockScreen({ onUnlock }: UnlockScreenProps) {
         <VStack spacing={3} w="full">
           <InputGroup>
             <Input
+              ref={passwordInputRef}
               type={showPassword ? "text" : "password"}
               placeholder="Password"
               value={password}
