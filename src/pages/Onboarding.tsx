@@ -319,6 +319,42 @@ function Onboarding({ onComplete }: OnboardingProps) {
             Get Started
           </Button>
         </VStack>
+
+        {/* Footer */}
+        <HStack
+          spacing={1}
+          justify="center"
+          position="absolute"
+          bottom={6}
+          left={0}
+          right={0}
+        >
+          <Text fontSize="sm" color="text.tertiary">
+            Built by
+          </Text>
+          <Link
+            display="flex"
+            alignItems="center"
+            gap={1}
+            color="primary.400"
+            _hover={{ color: "primary.500" }}
+            href="https://x.com/apoorveth"
+            isExternal
+          >
+            <Box
+              as="svg"
+              viewBox="0 0 24 24"
+              w="14px"
+              h="14px"
+              fill="currentColor"
+            >
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+            </Box>
+            <Text fontSize="sm" textDecor="underline">
+              @apoorveth
+            </Text>
+          </Link>
+        </HStack>
       </Box>
     );
   }
@@ -415,6 +451,42 @@ function Onboarding({ onComplete }: OnboardingProps) {
             </Text>
           </VStack>
         </VStack>
+
+        {/* Footer */}
+        <HStack
+          spacing={1}
+          justify="center"
+          position="absolute"
+          bottom={6}
+          left={0}
+          right={0}
+        >
+          <Text fontSize="sm" color="text.tertiary">
+            Built by
+          </Text>
+          <Link
+            display="flex"
+            alignItems="center"
+            gap={1}
+            color="primary.400"
+            _hover={{ color: "primary.500" }}
+            href="https://x.com/apoorveth"
+            isExternal
+          >
+            <Box
+              as="svg"
+              viewBox="0 0 24 24"
+              w="14px"
+              h="14px"
+              fill="currentColor"
+            >
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+            </Box>
+            <Text fontSize="sm" textDecor="underline">
+              @apoorveth
+            </Text>
+          </Link>
+        </HStack>
       </Box>
     );
   }
@@ -719,6 +791,42 @@ function Onboarding({ onComplete }: OnboardingProps) {
           </VStack>
         )}
       </VStack>
+
+      {/* Footer */}
+      <HStack
+        spacing={1}
+        justify="center"
+        position="absolute"
+        bottom={6}
+        left={0}
+        right={0}
+      >
+        <Text fontSize="sm" color="text.tertiary">
+          Built by
+        </Text>
+        <Link
+          display="flex"
+          alignItems="center"
+          gap={1}
+          color="primary.400"
+          _hover={{ color: "primary.500" }}
+          href="https://x.com/apoorveth"
+          isExternal
+        >
+          <Box
+            as="svg"
+            viewBox="0 0 24 24"
+            w="14px"
+            h="14px"
+            fill="currentColor"
+          >
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+          </Box>
+          <Text fontSize="sm" textDecor="underline">
+            @apoorveth
+          </Text>
+        </Link>
+      </HStack>
     </Box>
   );
 }

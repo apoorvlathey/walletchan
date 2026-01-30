@@ -111,7 +111,7 @@ function Settings({ close, showBackButton = true }: SettingsProps) {
   }
 
   return (
-    <VStack spacing={4} align="stretch">
+    <VStack spacing={4} align="stretch" flex="1">
       {/* Header */}
       <HStack>
         {showBackButton && (
@@ -318,22 +318,37 @@ function Settings({ close, showBackButton = true }: SettingsProps) {
         </ModalContent>
       </Modal>
 
+      {/* Spacer to push footer to bottom */}
+      <Box flex="1" />
+
       <Divider borderColor="border.default" />
 
-      <HStack>
+      <HStack spacing={1} justify="center">
         <Text fontSize="sm" color="text.tertiary">
-          Built by:
+          Built by
         </Text>
         <Link
-          fontSize="sm"
+          display="flex"
+          alignItems="center"
+          gap={1}
           color="primary.400"
-          textDecor="underline"
           _hover={{ color: "primary.500" }}
           onClick={() => {
-            chrome.tabs.create({ url: "https://twitter.com/apoorveth" });
+            chrome.tabs.create({ url: "https://x.com/apoorveth" });
           }}
         >
-          Apoorv Lathey
+          <Box
+            as="svg"
+            viewBox="0 0 24 24"
+            w="14px"
+            h="14px"
+            fill="currentColor"
+          >
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+          </Box>
+          <Text fontSize="sm" textDecor="underline">
+            @apoorveth
+          </Text>
         </Link>
       </HStack>
     </VStack>

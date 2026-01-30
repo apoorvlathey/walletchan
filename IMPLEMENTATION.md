@@ -879,6 +879,7 @@ Build command: `pnpm build`
 | `getPendingTransaction`       | Get specific tx details               |
 | `isApiKeyCached`              | Check if password needed              |
 | `unlockWallet`                | Unlock wallet with password           |
+| `lockWallet`                  | Lock wallet (clear cached credentials)|
 | `confirmTransaction`          | User approved tx (sync, waits)        |
 | `confirmTransactionAsync`     | User approved tx (async, returns immediately) |
 | `rejectTransaction`           | User rejected tx                      |
@@ -994,7 +995,7 @@ When in sidepanel:
 ### Popup Dimensions
 
 - Window: 380px width, 540px height (created by background.ts)
-- Body: 100% width, min-width 360px, max-height 600px
+- HTML: 360px width, 600px height (fixed for popup)
 - Sidepanel: 100vh height (no max-height restriction)
 - Font: Inter (UI), JetBrains Mono (code/addresses)
 
@@ -1046,16 +1047,51 @@ Origin favicons are displayed with a white background to handle transparent icon
 
 The main view (after unlock) shows:
 
-1. **Header**: Lock button, Settings icon, Sidepanel toggle (if supported)
+1. **Header**: Lock button, Sidepanel toggle (if supported), Settings icon
 2. **Wallet Address Section**:
    - "Bankr Wallet Address" label
    - Truncated address with copy button
-   - Network chain badges
-3. **Pending Transaction Banner** (if any pending)
-4. **Recent Transactions** (TxStatusList):
+   - Explorer link icon
+3. **Chain Selector**: Dropdown to select network
+4. **Pending Transaction Banner** (if any pending)
+5. **Recent Transactions** (TxStatusList):
    - Shows last 5 transactions by default
    - Expandable to show all
    - Empty state: "No recent transactions"
+6. **Footer**: "Built by @apoorveth" with X logo link
+
+### Lock Wallet Button
+
+The header includes a lock icon button that allows users to manually lock the wallet:
+
+- Clears the cached API key and password from memory
+- Redirects to the unlock screen
+- Useful for security when stepping away from the computer
+
+```typescript
+// In App.tsx header
+<IconButton
+  aria-label="Lock wallet"
+  icon={<LockIcon />}
+  onClick={() => {
+    chrome.runtime.sendMessage({ type: "lockWallet" }, () => {
+      setView("unlock");
+    });
+  }}
+/>
+```
+
+### Footer Attribution
+
+All main screens display a centered footer with attribution:
+
+- **Text**: "Built by @apoorveth"
+- **X Logo**: SVG icon linking to https://x.com/apoorveth
+- **Pages with footer**:
+  - Homepage (main view)
+  - Unlock/Password screen
+  - Onboarding (welcome, form steps, success)
+  - Settings page
 
 ## Security Considerations
 

@@ -23,8 +23,9 @@ import {
   VStack,
   Tooltip,
   Icon,
+  Link,
 } from "@chakra-ui/react";
-import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon } from "@chakra-ui/icons";
+import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon, LockIcon } from "@chakra-ui/icons";
 
 // Sidepanel icon
 const SidePanelIcon = (props: any) => (
@@ -556,6 +557,34 @@ function App() {
           >
             Open Setup Tab
           </Button>
+          <HStack spacing={1} justify="center" mt={4}>
+            <Text fontSize="sm" color="text.tertiary">
+              Built by
+            </Text>
+            <Link
+              display="flex"
+              alignItems="center"
+              gap={1}
+              color="primary.400"
+              _hover={{ color: "primary.500" }}
+              onClick={() => {
+                chrome.tabs.create({ url: "https://x.com/apoorveth" });
+              }}
+            >
+              <Box
+                as="svg"
+                viewBox="0 0 24 24"
+                w="14px"
+                h="14px"
+                fill="currentColor"
+              >
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+              </Box>
+              <Text fontSize="sm" textDecor="underline">
+                @apoorveth
+              </Text>
+            </Link>
+          </HStack>
         </VStack>
       </Box>
     );
@@ -564,8 +593,8 @@ function App() {
   // Settings view
   if (view === "settings") {
     return (
-      <Box bg="bg.base" minH="300px">
-        <Container pt={4} pb={4}>
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Container pt={4} pb={4} flex="1" display="flex" flexDirection="column">
           <Settings
             close={() => {
               // After settings, check if now have API key
@@ -642,7 +671,7 @@ function App() {
 
   // Main view
   return (
-    <Box bg="bg.base" minH="300px">
+    <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
       {/* Header */}
       <Flex
         py={3}
@@ -660,6 +689,19 @@ function App() {
         </HStack>
         <Spacer />
         <HStack spacing={1}>
+          <Tooltip label="Lock wallet" placement="bottom">
+            <IconButton
+              aria-label="Lock wallet"
+              icon={<LockIcon />}
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                chrome.runtime.sendMessage({ type: "lockWallet" }, () => {
+                  setView("unlock");
+                });
+              }}
+            />
+          </Tooltip>
           {sidePanelSupported && (
             <Tooltip
               label={sidePanelMode ? "Switch to popup mode" : "Switch to sidepanel mode"}
@@ -684,8 +726,8 @@ function App() {
         </HStack>
       </Flex>
 
-      <Container pt={4} pb={4}>
-        <VStack spacing={4} align="stretch">
+      <Container pt={4} pb={4} flex="1" display="flex" flexDirection="column">
+        <VStack spacing={4} align="stretch" flex="1">
           {/* Failed Transaction Error */}
           {failedTxError && (
             <Alert
@@ -898,6 +940,39 @@ function App() {
 
           {/* Transaction Status List */}
           <TxStatusList maxItems={5} />
+
+          {/* Spacer to push footer to bottom */}
+          <Box flex="1" />
+
+          {/* Footer */}
+          <HStack spacing={1} justify="center" pt={2}>
+            <Text fontSize="sm" color="text.tertiary">
+              Built by
+            </Text>
+            <Link
+              display="flex"
+              alignItems="center"
+              gap={1}
+              color="primary.400"
+              _hover={{ color: "primary.500" }}
+              onClick={() => {
+                chrome.tabs.create({ url: "https://x.com/apoorveth" });
+              }}
+            >
+              <Box
+                as="svg"
+                viewBox="0 0 24 24"
+                w="14px"
+                h="14px"
+                fill="currentColor"
+              >
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+              </Box>
+              <Text fontSize="sm" textDecor="underline">
+                @apoorveth
+              </Text>
+            </Link>
+          </HStack>
         </VStack>
       </Container>
     </Box>

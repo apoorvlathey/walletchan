@@ -1,11 +1,15 @@
 /* Fallback font import for environments where HTML link fails */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap");
 
+html {
+  width: 360px;
+  height: 600px;
+}
+
 body {
   width: 100%;
-  min-width: 360px;
-  min-height: 480px;
-  max-height: 600px;
+  height: 100%;
+  margin: 0;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -13,10 +17,18 @@ body {
   overflow-x: hidden;
 }
 
+#root {
+  height: 100%;
+}
+
 /* Sidepanel mode - when opened in browser sidepanel, use full viewport */
 body.sidepanel-mode {
   height: 100vh;
-  max-height: none;
+}
+
+html:has(body.sidepanel-mode) {
+  width: 100%;
+  height: 100vh;
 }
 
 code,

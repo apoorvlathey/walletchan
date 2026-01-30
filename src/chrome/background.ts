@@ -1044,6 +1044,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
+    case "lockWallet": {
+      clearCachedApiKey();
+      sendResponse({ success: true });
+      return false;
+    }
+
     case "saveApiKeyWithCachedPassword": {
       handleSaveApiKeyWithCachedPassword(message.apiKey).then((result) => {
         sendResponse(result);
