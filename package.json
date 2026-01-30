@@ -1,6 +1,6 @@
 {
   "name": "bankr-wallet-extension",
-  "version": "0.1.2",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,7 +19,14 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "chrome:run": "web-ext run --source-dir build --target chromium",
     "firefox:run": "web-ext run --source-dir build --browser-console",
-    "icons": "bash scripts/generate-icons.sh"
+    "icons": "bash scripts/generate-icons.sh",
+    "zip": "cd build && zip -r ../bankr-wallet.zip . && cd ..",
+    "version": "bash scripts/sync-version.sh && git add public/manifest.json",
+    "postversion": "git push origin master --tags",
+    "release": "git tag v$(node -p \"require('./package.json').version\") && git push origin master --tags",
+    "release:patch": "npm version patch -m 'chore: release v%s'",
+    "release:minor": "npm version minor -m 'chore: release v%s'",
+    "release:major": "npm version major -m 'chore: release v%s'"
   },
   "dependencies": {
     "@chakra-ui/icons": "^2.2",

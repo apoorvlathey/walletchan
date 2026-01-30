@@ -1,49 +1,94 @@
-# BankrWallet Extension
+# BankrWallet
 
-<i><b>Log-in as ANY address on ALL dapps.</b></i><br />
-<br />
-BankrWallet injects into the dapps just like Metamask, but gives you the freedom to set custom address which tricks the dapp into thinking you own that address.
+<p align="center">
+  <img src="./.github/bankr-wallet-heading.png" alt="BankrWallet" />
+</p>
 
-## How to Install
+<p align="center">
+  <b>Pull your BankrWallet out of the Terminal and into your browser to use with Any Dapp, just like Metamask!</b>
+</p>
 
-<ol>
-  <li>
-    Download extension from the <a href="https://chrome.google.com/webstore/detail/impersonator/hgihfkmoibhccfdohjdbklmmcknjjmgl">Chrome Web Store</a>
-  </li>
+<table>
+  <tr>
+    <td><img src="./.github/usage/password-page.png" alt="Password Page" /></td>
+    <td><img src="./.github/usage/homepage.png" alt="Homepage" /></td>
+    <td><img src="./.github/usage/settings.png" alt="Settings Page" /></td>
+  </tr>
+</table>
 
-  <li> 
-    <b>NOTE:</b> Extension should not be installed along with Metamask, here are 3 different ways to avoid it:<br/>
-    <ol type="a">
-      <li>
-        Create a new browser profile <br />
-        <img src="./.github/installation/browser-profile.png" width="300rem"/>
-      </li>
-      <li>
-        OR disable Metamask when using Bankr Wallet <br />
-        <img src="./.github/installation/disable-mm.png" width="300rem" />
-      </li>
-      <li>
-        OR use a different browser.
-      </li>
-    </ol>
-  </li>
-</ol>
+<img src="./.github/usage/tx-request.png" alt="Transaction Request" />
 
-## Using the Extension
+## Features
 
-1. Click on 🕵️ icon in the extensions bar to open Bankr Wallet popup <br />
-   <img src="./.github/usage/popup.png" width="300rem" />
-2. Open settings -> "Add Chain" button<br />
-   Fill Chain Name, Paste RPC URL and the Chain Id would get auto filled. Press "Add Chain". <br />
-   <img src="./.github/usage/add-chain.png" width="300rem" />
-3. You can view all the saved chains in the Settings tab <br />
-   <img src="./.github/usage/chains.png" width="300rem" />
-4. Clicking on any of the chains would open up the Edit page. You can modify or delete the chain. <br />
-   <img src="./.github/usage/edit-chain.png" width="300rem" />
-5. On the homepage, you can enter address or ENS. Select preferred network and set the Enabled toggle. <br />
-   <img src="./.github/usage/homepage.png" width="300rem" />
-6. You can now open any dapp and connect wallet as Metamask. The dapp would detect your custom address and network.
+- **Transaction Execution** - Submits transactions through the Bankr API
+- **Works in Browser Side Panel** - Keep the wallet in sight for quick access, and no popups!
+- **Multi-Chain Support** - Base, Ethereum, Polygon, and Unichain
+- **Per-Tab Chain State** - Different chains in different browser tabs
+- **Transaction History** - Track your recent transactions with status updates
+- **Browser Notifications** - Get notified when transactions complete
+- **EIP-6963 Compatible** - Works alongside other wallets with modern dapp discovery
+- **Secure Storage** - API key encrypted with AES-256-GCM
 
-<br />
-⭐ Unique feature that differentiates it from other wallets: <b>You can have different address & chain injected in different browser tabs at the same time! </b><br /><br />
-So in one tab you might have Uniswap connected to <code>Polygon</code> with <code>apoorv.eth</code> and in another one you can have Sushiswap connected to <code>Ethereum Mainnet</code> with <code>vitalik.eth</code>
+## Installation
+
+### Download
+
+1. Go to the [latest release](https://github.com/apoorvlathey/bankr-wallet/releases/latest) on GitHub
+2. Download the `bankr-wallet-vX.Y.Z.zip` file from the release assets (e.g., `bankr-wallet-v0.1.0.zip`)
+3. Extract the zip file to a folder on your computer
+
+### Chrome / Brave / Arc
+
+<img src="./.github/installation/developer-mode.png" width="600px" alt="Chrome Developer Mode toggle" />
+
+1. Open your browser and navigate to the extensions page: `chrome://extensions`
+2. Enable **Developer mode** (toggle in the top-right corner)
+3. Click **Load unpacked**
+4. Select the extracted folder containing the extension files
+
+## Getting Started
+
+1. Install the extension
+2. Click the Bankr Wallet icon to open the onboarding wizard
+3. Enter your Bankr API key (get one from [bankr.bot](https://bankr.bot/api))
+4. Enter your wallet address corresponding to the API key (supports ENS)
+5. Create a password to secure your API key
+6. Connect to any dapp and start transacting!
+
+## Development
+
+### Prerequisites
+
+- Node.js (see `.nvmrc` for version)
+- pnpm
+
+### Building from Source
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build the extension
+pnpm build
+
+# The built extension will be in the `build` directory
+```
+
+## Architecture
+
+For detailed implementation documentation, see [IMPLEMENTATION.md](IMPLEMENTATION.md).
+
+## Security
+
+- API key is encrypted using AES-256-GCM with PBKDF2 key derivation (600,000 iterations)
+- Password is never stored, only used to derive encryption key
+- Decrypted API key is cached in memory with configurable auto-lock timeout
+- Every transaction requires explicit user confirmation
+
+## License
+
+MIT
+
+## Author
+
+Built by [@apoorveth](https://x.com/apoorveth)

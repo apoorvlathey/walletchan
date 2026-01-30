@@ -1,12 +1,12 @@
 {
   "name": "BankrWallet",
-  "version": "0.1.2",
+  "version": "0.1.0",
   "manifest_version": 3,
   "description": "BankrWallet",
-  "homepage_url": "https://impersonator.xyz",
+  "homepage_url": "https://x.com/apoorveth",
   "browser_specific_settings": {
     "gecko": {
-      "id": "extension@impersonator.xyz"
+      "id": "extension@bankr.wallet"
     }
   },
   "action": {
