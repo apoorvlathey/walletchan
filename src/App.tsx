@@ -1038,14 +1038,18 @@ function App() {
                   Bankr Wallet Address
                 </Text>
                 <HStack justify="space-between">
-                  <HStack spacing={2}>
+                  <HStack
+                    bg="bauhaus.black"
+                    px={2}
+                    py={1}
+                    spacing={2}
+                  >
                     <Code
                       fontSize="md"
                       fontFamily="mono"
-                      bg="bauhaus.black"
+                      bg="transparent"
                       color="bauhaus.white"
-                      px={2}
-                      py={1}
+                      p={0}
                       fontWeight="700"
                     >
                       {truncateAddress(address)}
@@ -1055,29 +1059,61 @@ function App() {
                       icon={copied ? <CheckIcon /> : <CopyIcon />}
                       size="xs"
                       variant="ghost"
-                      color={copied ? "bauhaus.yellow" : "text.secondary"}
+                      color={copied ? "bauhaus.yellow" : "bauhaus.white"}
                       onClick={handleCopyAddress}
-                      _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
+                      _hover={{ color: "bauhaus.yellow" }}
+                      minW="auto"
+                      h="auto"
+                      p={0}
                     />
+                    {chainName && networksInfo && (
+                      <IconButton
+                        aria-label="View on explorer"
+                        icon={<ExternalLinkIcon />}
+                        size="xs"
+                        variant="ghost"
+                        color="bauhaus.white"
+                        onClick={() => {
+                          const config = getChainConfig(networksInfo[chainName].chainId);
+                          if (config.explorer) {
+                            chrome.tabs.create({
+                              url: `${config.explorer}/address/${address}`,
+                            });
+                          }
+                        }}
+                        _hover={{ color: "bauhaus.yellow" }}
+                        minW="auto"
+                        h="auto"
+                        p={0}
+                      />
+                    )}
                   </HStack>
-                  {chainName && networksInfo && (
-                    <IconButton
-                      aria-label="View on explorer"
-                      icon={<ExternalLinkIcon />}
-                      size="xs"
-                      variant="ghost"
-                      color="text.secondary"
-                      onClick={() => {
-                        const config = getChainConfig(networksInfo[chainName].chainId);
-                        if (config.explorer) {
-                          chrome.tabs.create({
-                            url: `${config.explorer}/address/${address}`,
-                          });
-                        }
-                      }}
-                      _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
-                    />
-                  )}
+                  <Box
+                    as="button"
+                    bg="#FD8464"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    boxShadow="2px 2px 0px 0px #121212"
+                    p={1}
+                    cursor="pointer"
+                    transition="all 0.2s ease-out"
+                    _hover={{
+                      transform: "translateY(-1px)",
+                      boxShadow: "3px 3px 0px 0px #121212",
+                    }}
+                    _active={{
+                      transform: "translate(2px, 2px)",
+                      boxShadow: "none",
+                    }}
+                    onClick={() => {
+                      chrome.tabs.create({
+                        url: `https://debank.com/profile/${address}`,
+                      });
+                    }}
+                    title="View on DeBank"
+                  >
+                    <Image src="debank-icon.ico" boxSize="20px" />
+                  </Box>
                 </HStack>
               </VStack>
             ) : (
