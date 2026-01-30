@@ -456,7 +456,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
             strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"
-            transform="rotate(-45deg)"
+            transform="rotate(45deg)"
           >
             <line x1="12" y1="19" x2="12" y2="5" />
             <polyline points="5 12 12 5 19 12" />
