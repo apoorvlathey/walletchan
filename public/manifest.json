@@ -14,7 +14,7 @@
     "default_icon": {
       "128": "./icons/icon128.png"
     },
-    "default_popup": "index.html"
+    "default_popup": "popup-init.html"
   },
   "icons": {
     "128": "./icons/icon128.png",

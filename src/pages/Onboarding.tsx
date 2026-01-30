@@ -33,6 +33,19 @@ interface OnboardingProps {
   onComplete: () => void;
 }
 
+/**
+ * Detects if we're running in Arc browser using CSS variable
+ * Arc browser injects --arc-palette-title CSS variable
+ */
+function isArcBrowser(): boolean {
+  try {
+    const arcPaletteTitle = getComputedStyle(document.documentElement).getPropertyValue('--arc-palette-title');
+    return !!arcPaletteTitle && arcPaletteTitle.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
 // Step indicator component
 function StepIndicator({
   currentStep,
@@ -99,8 +112,15 @@ function Onboarding({ onComplete }: OnboardingProps) {
 
   // Check if extension is already configured on mount
   // If so, skip directly to success screen (don't expose any sensitive data)
+  // Also detect Arc browser early to disable sidepanel
   useEffect(() => {
     const checkExistingSetup = async () => {
+      // Detect Arc browser early and set flags
+      if (isArcBrowser()) {
+        console.log("Arc browser detected during onboarding - disabling sidepanel");
+        await chrome.storage.sync.set({ isArcBrowser: true, sidePanelVerified: false, sidePanelMode: false });
+      }
+
       const hasApiKey = await hasEncryptedApiKey();
       if (hasApiKey) {
         // Extension already configured - show success screen only
@@ -231,6 +251,21 @@ function Onboarding({ onComplete }: OnboardingProps) {
         displayAddress: walletAddress.trim(),
         chainName: "Base",
       });
+
+      // Enable sidepanel mode by default for non-Arc browsers
+      // Arc detection already happened in useEffect, so check storage
+      const { isArcBrowser: storedIsArc } = await chrome.storage.sync.get(["isArcBrowser"]);
+      if (!storedIsArc) {
+        // Not Arc - try to enable sidepanel mode
+        try {
+          const response = await chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: true });
+          if (response?.success) {
+            console.log("Sidepanel mode enabled by default");
+          }
+        } catch {
+          // Ignore errors - popup mode is fine as fallback
+        }
+      }
 
       // Show success step
       setStep("success");

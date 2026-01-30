@@ -34,6 +34,20 @@ const SidePanelIcon = (props: any) => (
   </Icon>
 );
 
+/**
+ * Detects if we're running in Arc browser using CSS variable
+ * Arc browser injects --arc-palette-title CSS variable
+ * This is the recommended way to detect Arc (used by MetaMask)
+ */
+function isArcBrowser(): boolean {
+  try {
+    const arcPaletteTitle = getComputedStyle(document.documentElement).getPropertyValue('--arc-palette-title');
+    return !!arcPaletteTitle && arcPaletteTitle.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
 // Lazy load heavy components
 const Settings = lazy(() => import("@/components/Settings"));
 const TransactionConfirmation = lazy(() => import("@/components/TransactionConfirmation"));
@@ -112,48 +126,112 @@ function App() {
     return tab;
   };
 
-  const loadPendingRequests = async () => {
-    return new Promise<PendingTxRequest[]>((resolve) => {
-      chrome.runtime.sendMessage({ type: "getPendingTxRequests" }, (requests) => {
-        setPendingRequests(requests || []);
-        resolve(requests || []);
-      });
+  /**
+   * Try to wake up the service worker using chrome.runtime.connect
+   * This is needed for browsers like Arc that don't auto-wake the service worker
+   */
+  const wakeUpServiceWorker = async (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      try {
+        const port = chrome.runtime.connect({ name: "popup-wake" });
+        port.onDisconnect.addListener(() => {
+          // Port disconnected, but that's okay - we just needed to wake it up
+          resolve(true);
+        });
+        // Give it a moment then disconnect
+        setTimeout(() => {
+          try {
+            port.disconnect();
+          } catch {
+            // Ignore disconnect errors
+          }
+          resolve(true);
+        }, 100);
+      } catch (error) {
+        console.warn("Failed to wake service worker:", error);
+        resolve(false);
+      }
     });
+  };
+
+  /**
+   * Send a message to the background script with retry logic
+   * Some browsers (like Arc) may not wake up the service worker immediately
+   */
+  const sendMessageWithRetry = async <T,>(
+    message: { type: string; [key: string]: any },
+    maxRetries = 5,
+    delay = 200
+  ): Promise<T | null> => {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const response = await new Promise<T | null>((resolve, reject) => {
+          chrome.runtime.sendMessage(message, (result) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve(result);
+            }
+          });
+        });
+        return response;
+      } catch (error) {
+        console.warn(`Message attempt ${attempt + 1} failed:`, error);
+        if (attempt < maxRetries - 1) {
+          // Try to wake up the service worker
+          await wakeUpServiceWorker();
+          // Wait before retrying, with exponential backoff
+          await new Promise((r) => setTimeout(r, delay * Math.pow(2, attempt)));
+        }
+      }
+    }
+    return null;
+  };
+
+  const loadPendingRequests = async () => {
+    const requests = await sendMessageWithRetry<PendingTxRequest[]>({ type: "getPendingTxRequests" });
+    setPendingRequests(requests || []);
+    return requests || [];
   };
 
   const loadPendingSignatureRequests = async () => {
-    return new Promise<PendingSignatureRequest[]>((resolve) => {
-      chrome.runtime.sendMessage({ type: "getPendingSignatureRequests" }, (requests) => {
-        setPendingSignatureRequests(requests || []);
-        resolve(requests || []);
-      });
-    });
+    const requests = await sendMessageWithRetry<PendingSignatureRequest[]>({ type: "getPendingSignatureRequests" });
+    setPendingSignatureRequests(requests || []);
+    return requests || [];
   };
 
   const checkLockState = async (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: "isApiKeyCached" }, (cached) => {
-        resolve(cached);
-      });
-    });
+    const cached = await sendMessageWithRetry<boolean>({ type: "isApiKeyCached" });
+    return cached || false;
   };
 
   // Check sidepanel support and mode on mount
+  // IMPORTANT: Arc browser detection must happen FIRST and synchronously notify background
   useEffect(() => {
     const checkSidePanelSupport = async () => {
-      return new Promise<boolean>((resolve) => {
-        chrome.runtime.sendMessage({ type: "isSidePanelSupported" }, (response) => {
-          resolve(response?.supported || false);
-        });
-      });
+      // First check if we're in Arc browser - sidepanel doesn't work there
+      if (isArcBrowser()) {
+        console.log("Arc browser detected via CSS variable - disabling sidepanel");
+        // Notify background that we're in Arc - this must happen before anything else
+        // Use direct chrome.storage.sync.set for immediate effect (no message needed)
+        await chrome.storage.sync.set({ isArcBrowser: true, sidePanelVerified: false, sidePanelMode: false });
+        // Also notify background via message (for any runtime state it needs to update)
+        try {
+          chrome.runtime.sendMessage({ type: "setArcBrowser", isArc: true });
+        } catch {
+          // Ignore errors if background isn't ready yet
+        }
+        return false;
+      }
+
+      // Not Arc - check if sidepanel is supported
+      const response = await sendMessageWithRetry<{ supported: boolean }>({ type: "isSidePanelSupported" });
+      return response?.supported || false;
     };
 
     const checkSidePanelMode = async () => {
-      return new Promise<boolean>((resolve) => {
-        chrome.runtime.sendMessage({ type: "getSidePanelMode" }, (response) => {
-          resolve(response?.enabled || false);
-        });
-      });
+      const response = await sendMessageWithRetry<{ enabled: boolean }>({ type: "getSidePanelMode" });
+      return response?.enabled || false;
     };
 
     const detectSidePanelContext = () => {
@@ -169,8 +247,25 @@ function App() {
       setSidePanelSupported(supported);
 
       if (supported) {
-        const mode = await checkSidePanelMode();
-        setSidePanelMode(mode);
+        // Check if sidepanel mode has been explicitly set
+        const { sidePanelMode: storedMode } = await chrome.storage.sync.get(["sidePanelMode"]);
+
+        if (storedMode === undefined) {
+          // First time after onboarding or upgrade - enable sidepanel by default for non-Arc
+          try {
+            const response = await sendMessageWithRetry<{ success: boolean }>({ type: "setSidePanelMode", enabled: true });
+            if (response?.success) {
+              setSidePanelMode(true);
+              console.log("Sidepanel mode enabled by default");
+            } else {
+              setSidePanelMode(false);
+            }
+          } catch {
+            setSidePanelMode(false);
+          }
+        } else {
+          setSidePanelMode(storedMode);
+        }
       }
 
       // Detect if currently in sidepanel
@@ -226,11 +321,26 @@ function App() {
     const newMode = !sidePanelMode;
 
     // Update the mode setting
-    await new Promise<void>((resolve) => {
-      chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: newMode }, () => {
-        resolve();
+    const response = await new Promise<{ success: boolean; sidePanelWorks: boolean }>((resolve) => {
+      chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: newMode }, (res) => {
+        resolve(res || { success: false, sidePanelWorks: false });
       });
     });
+
+    // If trying to enable sidepanel but it doesn't work, show error and keep popup mode
+    if (newMode && !response.success) {
+      toast({
+        title: "Sidepanel not supported",
+        description: "This browser doesn't support sidepanel. Using popup mode instead.",
+        status: "warning",
+        duration: 4000,
+        isClosable: true,
+      });
+      setSidePanelSupported(false);
+      setSidePanelMode(false);
+      return;
+    }
+
     setSidePanelMode(newMode);
 
     if (!newMode && isInSidePanel) {

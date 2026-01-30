@@ -1068,6 +1068,7 @@ Build command: `pnpm build`
 | `isSidePanelSupported`        | Check if browser supports sidepanel   |
 | `getSidePanelMode`            | Get current sidepanel mode setting    |
 | `setSidePanelMode`            | Set sidepanel mode (true/false)       |
+| `setArcBrowser`               | Mark browser as Arc (disables sidepanel) |
 | `getAutoLockTimeout`          | Get current auto-lock timeout (ms)    |
 | `setAutoLockTimeout`          | Set auto-lock timeout (ms)            |
 | `getTxHistory`                | Get completed transaction history     |
@@ -1090,22 +1091,62 @@ Build command: `pnpm build`
 
 ## Sidepanel Support
 
-The extension supports Chrome's Side Panel API for browsers that implement it (Chrome 114+). Browsers like Arc that don't support the Side Panel API will fallback to popup mode.
+The extension supports Chrome's Side Panel API for browsers that implement it (Chrome 114+). Some browsers like Arc have the `chrome.sidePanel` API but it doesn't function properly, so the extension uses a conservative approach to ensure compatibility.
+
+### Browser Compatibility
+
+| Browser | Sidepanel Support | Default Mode |
+| ------- | ----------------- | ------------ |
+| Chrome  | ✅ Full support   | Sidepanel    |
+| Brave   | ✅ Full support   | Sidepanel    |
+| Arc     | ❌ Broken API     | Popup        |
+| Firefox | ❌ No API         | Popup        |
+
+### Arc Browser Detection
+
+Arc browser has `chrome.sidePanel` defined but it doesn't work properly. The extension detects Arc using a CSS variable that Arc injects:
+
+```typescript
+function isArcBrowser(): boolean {
+  try {
+    const arcPaletteTitle = getComputedStyle(document.documentElement)
+      .getPropertyValue('--arc-palette-title');
+    return !!arcPaletteTitle && arcPaletteTitle.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+```
+
+This detection happens in:
+- **Onboarding page**: Sets `isArcBrowser` flag in storage before user completes setup
+- **App.tsx**: Checks on mount and updates storage if Arc is detected
 
 ### How It Works
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Sidepanel Detection Flow                            │
+│                    Sidepanel Initialization Flow                            │
 │                                                                             │
-│  On Extension Load:                                                         │
-│    1. Check if chrome.sidePanel API exists                                  │
-│    2. Load sidePanelMode from chrome.storage.sync                           │
-│    3. If supported and mode enabled:                                        │
-│       - Set openPanelOnActionClick: true                                    │
-│       - Clicking extension icon opens sidepanel                             │
-│    4. If not supported or mode disabled:                                    │
-│       - Use default popup behavior                                          │
+│  Background Service Worker Startup:                                         │
+│    1. Check storage for isArcBrowser, sidePanelMode, sidePanelVerified      │
+│    2. If Arc browser detected → ensure popup mode (openPanelOnActionClick   │
+│       = false)                                                              │
+│    3. If sidePanelVerified === false → ensure popup mode                    │
+│    4. If sidePanelMode === true AND sidePanelVerified === true:             │
+│       - Enable sidepanel (openPanelOnActionClick: true)                     │
+│    5. Otherwise → default to popup mode (safe default)                      │
+│                                                                             │
+│  After Onboarding Completes (non-Arc browsers):                             │
+│    1. Check if Arc was detected during onboarding                           │
+│    2. If NOT Arc → send setSidePanelMode(true) to background                │
+│    3. Background verifies sidepanel works and enables it                    │
+│    4. sidePanelVerified set to true on success                              │
+│                                                                             │
+│  On App.tsx Mount (existing users):                                         │
+│    1. If sidePanelMode is undefined (never set) and not Arc:                │
+│       - Try to enable sidepanel mode                                        │
+│       - This handles upgrades from older versions                           │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1113,7 +1154,9 @@ The extension supports Chrome's Side Panel API for browsers that implement it (C
 
 | Setting | Storage Key | Default | Description |
 | ------- | ----------- | ------- | ----------- |
-| Mode    | `sidePanelMode` | `true` (if supported) | Whether to use sidepanel or popup |
+| Mode    | `sidePanelMode` | `true` (after onboarding, if supported) | Whether to use sidepanel or popup |
+| Verified | `sidePanelVerified` | Set on first successful enable | Whether sidepanel has been tested and works |
+| Arc Browser | `isArcBrowser` | Detected via CSS variable | Whether running in Arc browser |
 
 ### UI Toggle
 
@@ -1159,6 +1202,21 @@ This ensures:
 | `pong` | Views → Background | Response indicating view is open |
 | `newPendingTxRequest` | Background → Views | Notify views of new pending transaction |
 | `openPopupWindow` | Views → Background | Request to open a popup window |
+| `setArcBrowser` | Views → Background | Notify background that Arc browser was detected |
+| `isSidePanelSupported` | Views → Background | Check if sidepanel is supported and verified |
+| `setSidePanelMode` | Views → Background | Enable/disable sidepanel mode |
+
+### Key Design Decisions
+
+**Conservative Default**: The extension defaults to popup mode on startup and only enables sidepanel after verification. This ensures:
+- Arc browser users always get a working popup
+- New installs work immediately without sidepanel configuration issues
+- Sidepanel is only enabled after explicit verification that it works
+
+**Detection Timing**: Arc detection happens at multiple points:
+1. **Onboarding page** (first install): Earliest possible detection, before user ever clicks extension icon
+2. **App.tsx mount** (subsequent loads): Catches cases where onboarding was skipped or flags were cleared
+3. **Storage persistence**: Once detected, the `isArcBrowser` flag persists across sessions
 
 ### CSS Handling
 

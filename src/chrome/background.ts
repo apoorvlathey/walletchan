@@ -242,10 +242,55 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 });
 
 /**
+ * Checks if we're running in Arc browser
+ * Arc has chrome.sidePanel but it doesn't work properly
+ * Note: In service worker context, we can't check CSS variables, so we use storage
+ */
+function isArcBrowser(): boolean {
+  try {
+    // Arc browser identifies itself in the user agent
+    return navigator.userAgent.includes("Arc/");
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Checks if the browser supports the sidePanel API
+ * Note: Some browsers (like Arc) may have chrome.sidePanel defined but non-functional
  */
 function isSidePanelSupported(): boolean {
-  return typeof chrome !== "undefined" && !!chrome.sidePanel;
+  try {
+    // Arc browser has broken sidepanel support - skip entirely
+    if (isArcBrowser()) {
+      return false;
+    }
+    return typeof chrome !== "undefined" &&
+      typeof chrome.sidePanel !== "undefined" &&
+      chrome.sidePanel !== null &&
+      typeof chrome.sidePanel.setPanelBehavior === "function";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Tests if sidepanel actually works by attempting to set panel behavior
+ * Returns true only if the API call succeeds
+ */
+async function testSidePanelWorks(): Promise<boolean> {
+  try {
+    if (!isSidePanelSupported()) {
+      return false;
+    }
+
+    // Try to set panel behavior - if this fails, the API is broken
+    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+    return true;
+  } catch (error) {
+    console.warn("SidePanel API exists but is non-functional:", error);
+    return false;
+  }
 }
 
 /**
@@ -255,34 +300,122 @@ async function getSidePanelMode(): Promise<boolean> {
   if (!isSidePanelSupported()) {
     return false;
   }
-  const { sidePanelMode } = await chrome.storage.sync.get(["sidePanelMode"]);
+  // Check if we've previously determined sidepanel doesn't work (e.g., Arc browser)
+  const { sidePanelMode, sidePanelVerified } = await chrome.storage.sync.get(["sidePanelMode", "sidePanelVerified"]);
+
+  // If we haven't verified yet, or verification found it doesn't work, return false
+  if (sidePanelVerified === false) {
+    return false;
+  }
+
   // Default to true (sidepanel mode) if supported and not explicitly set to false
   return sidePanelMode !== false;
 }
 
 /**
  * Sets the sidepanel mode setting
+ * Returns false if setting sidepanel behavior failed (browser doesn't support it properly)
  */
-async function setSidePanelMode(enabled: boolean): Promise<void> {
-  await chrome.storage.sync.set({ sidePanelMode: enabled });
+async function setSidePanelMode(enabled: boolean): Promise<boolean> {
+  // Check if Arc browser first - sidepanel is broken there
+  const { isArcBrowser: storedIsArc } = await chrome.storage.sync.get(["isArcBrowser"]);
+  if (storedIsArc && enabled) {
+    // Can't enable sidepanel in Arc
+    return false;
+  }
 
-  if (isSidePanelSupported()) {
-    // Update action behavior based on mode
+  if (!isSidePanelSupported()) {
+    // No sidepanel support at all
     if (enabled) {
-      // In sidepanel mode, clicking the icon opens the sidepanel
-      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-    } else {
-      // In popup mode, clicking the icon opens the popup (default)
-      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+      return false;
     }
+    await chrome.storage.sync.set({ sidePanelMode: false });
+    return true; // Successfully set to popup mode (the only option)
+  }
+
+  try {
+    if (enabled) {
+      // Trying to enable sidepanel - test first
+      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+      // If we get here, it worked
+      await chrome.storage.sync.set({ sidePanelMode: true, sidePanelVerified: true });
+      return true;
+    } else {
+      // Disabling sidepanel (going to popup mode)
+      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+      await chrome.storage.sync.set({ sidePanelMode: false });
+      return true;
+    }
+  } catch (error) {
+    console.warn("Failed to set sidepanel behavior:", error);
+    // Mark sidepanel as not working for this browser
+    await chrome.storage.sync.set({ sidePanelVerified: false, sidePanelMode: false });
+    return false;
   }
 }
 
 // Initialize sidepanel behavior on startup
+// IMPORTANT: We default to popup mode and only enable sidepanel when explicitly requested by UI
+// This ensures Arc browser (where sidepanel is broken) works properly with popup
 (async () => {
-  if (isSidePanelSupported()) {
-    const enabled = await getSidePanelMode();
-    await setSidePanelMode(enabled);
+  try {
+    // Check if we've stored that this is Arc browser (detected by UI via CSS variable)
+    const { isArcBrowser: storedIsArc, sidePanelMode, sidePanelVerified } = await chrome.storage.sync.get([
+      "isArcBrowser",
+      "sidePanelMode",
+      "sidePanelVerified"
+    ]);
+
+    if (storedIsArc) {
+      // Arc browser - sidepanel doesn't work, ensure popup mode
+      console.log("Arc browser detected, ensuring popup mode");
+      // Make absolutely sure sidepanel won't intercept clicks
+      if (chrome.sidePanel?.setPanelBehavior) {
+        try {
+          await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+        } catch {
+          // Ignore errors
+        }
+      }
+      return;
+    }
+
+    // If sidepanel has been verified as not working, ensure popup mode
+    if (sidePanelVerified === false) {
+      if (chrome.sidePanel?.setPanelBehavior) {
+        try {
+          await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+        } catch {
+          // Ignore errors
+        }
+      }
+      return;
+    }
+
+    // Only enable sidepanel if it's explicitly been enabled by user AND verified to work
+    // This is the key change: we don't auto-enable sidepanel on first run
+    if (isSidePanelSupported() && sidePanelMode === true && sidePanelVerified === true) {
+      try {
+        await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+      } catch (error) {
+        // If setting sidepanel fails, disable it
+        console.warn("Failed to enable sidepanel:", error);
+        await chrome.storage.sync.set({ sidePanelVerified: false, sidePanelMode: false });
+      }
+    } else {
+      // Default: ensure popup mode (sidepanel won't intercept clicks)
+      if (chrome.sidePanel?.setPanelBehavior) {
+        try {
+          await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+        } catch {
+          // Ignore errors - some browsers don't have this API
+        }
+      }
+    }
+  } catch (error) {
+    // If anything fails during sidepanel initialization, log and continue
+    // The extension will fall back to popup mode (which is the safe default)
+    console.error("Error during sidepanel initialization:", error);
   }
 })();
 
@@ -1102,6 +1235,15 @@ async function handleRpcRequest(
   return data.result;
 }
 
+// Port connection listener - used for waking up the service worker
+// Some browsers (like Arc) don't auto-wake the service worker when popup opens
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === "popup-wake") {
+    // Just acknowledge the connection - the popup is waking us up
+    console.log("Service worker woken up by popup");
+  }
+});
+
 // Message listener
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.type) {
@@ -1267,9 +1409,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true; // Will respond asynchronously
     }
 
-    case "isSidePanelSupported": {
-      sendResponse({ supported: isSidePanelSupported() });
+    case "setArcBrowser": {
+      // UI detected Arc browser - disable sidepanel
+      if (message.isArc) {
+        // Update storage
+        chrome.storage.sync.set({ sidePanelVerified: false, sidePanelMode: false, isArcBrowser: true });
+        // Also immediately disable sidepanel behavior to ensure popup mode works
+        if (chrome.sidePanel?.setPanelBehavior) {
+          chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {
+            // Ignore errors
+          });
+        }
+      }
+      sendResponse({ success: true });
       return false;
+    }
+
+    case "isSidePanelSupported": {
+      // Return true only if sidepanel API exists AND has been verified to work
+      (async () => {
+        if (!isSidePanelSupported()) {
+          sendResponse({ supported: false });
+          return;
+        }
+        const { sidePanelVerified } = await chrome.storage.sync.get(["sidePanelVerified"]);
+        // If not yet verified, assume supported (will be verified on first use)
+        // If verified as false, not supported
+        sendResponse({ supported: sidePanelVerified !== false });
+      })();
+      return true;
     }
 
     case "getSidePanelMode": {
@@ -1280,8 +1448,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "setSidePanelMode": {
-      setSidePanelMode(message.enabled).then(() => {
-        sendResponse({ success: true });
+      setSidePanelMode(message.enabled).then((success) => {
+        sendResponse({ success, sidePanelWorks: success || !message.enabled });
       });
       return true;
     }
@@ -1387,7 +1555,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               "pendingSignatureRequests",
               ...notificationKeys, // Clear notification data (may contain tx hashes)
             ]),
-            chrome.storage.sync.remove("address"),
+            chrome.storage.sync.remove(["address", "sidePanelVerified", "sidePanelMode"]),
           ]);
 
           // Update badge to show no pending transactions
