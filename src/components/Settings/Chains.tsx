@@ -1,8 +1,6 @@
 import React, { useState } from "react";
 import {
   Box,
-  Button,
-  Flex,
   HStack,
   Image,
   Spacer,
@@ -15,7 +13,6 @@ import { ArrowBackIcon, ChevronRightIcon } from "@chakra-ui/icons";
 import { useNetworks } from "@/contexts/NetworksContext";
 import { NetworksInfo } from "@/types";
 import { getChainConfig } from "@/constants/chainConfig";
-import AddChain from "./AddChain";
 import EditChain from "./EditChain";
 
 function Chain({
@@ -151,13 +148,6 @@ function Chains({ close }: { close: () => void }) {
             />
           ))}
       </VStack>
-
-      <Button
-        variant="primary"
-        onClick={() => setTab(<AddChain back={() => setTab(undefined)} />)}
-      >
-        Add Chain
-      </Button>
     </VStack>
   );
 }

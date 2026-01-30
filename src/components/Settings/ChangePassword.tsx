@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Box,
   VStack,
   HStack,
-  Heading,
   Text,
   Input,
   Button,
@@ -14,37 +13,66 @@ import {
   InputRightElement,
   IconButton,
   Spacer,
-  useToast,
 } from "@chakra-ui/react";
+import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { ViewIcon, ViewOffIcon, ArrowBackIcon, InfoIcon } from "@chakra-ui/icons";
-import { loadDecryptedApiKey, saveEncryptedApiKey } from "@/chrome/crypto";
 
 interface ChangePasswordProps {
   onComplete: () => void;
   onCancel: () => void;
+  onSessionExpired?: () => void;
 }
 
-function ChangePassword({ onComplete, onCancel }: ChangePasswordProps) {
-  const [currentPassword, setCurrentPassword] = useState("");
+function ChangePassword({ onComplete, onCancel, onSessionExpired }: ChangePasswordProps) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [errors, setErrors] = useState<{
-    currentPassword?: string;
     newPassword?: string;
     confirmPassword?: string;
   }>({});
 
-  const toast = useToast();
+  const toast = useBauhausToast();
+  const intervalRef = useRef<number | null>(null);
+
+  // Check session on mount and periodically
+  useEffect(() => {
+    const checkSession = () => {
+      chrome.runtime.sendMessage({ type: "getCachedPassword" }, (response) => {
+        if (!response?.hasCachedPassword) {
+          setSessionExpired(true);
+        }
+      });
+    };
+
+    // Check immediately on mount
+    checkSession();
+
+    // Check every 30 seconds
+    intervalRef.current = window.setInterval(checkSession, 30000);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
+
+  // Handle session expiry
+  useEffect(() => {
+    if (sessionExpired) {
+      if (onSessionExpired) {
+        onSessionExpired();
+      } else {
+        onCancel();
+      }
+    }
+  }, [sessionExpired, onSessionExpired, onCancel]);
 
   const validate = (): boolean => {
     const newErrors: typeof errors = {};
-
-    if (!currentPassword) {
-      newErrors.currentPassword = "Current password is required";
-    }
 
     if (!newPassword) {
       newErrors.newPassword = "New password is required";
@@ -54,10 +82,6 @@ function ChangePassword({ onComplete, onCancel }: ChangePasswordProps) {
 
     if (newPassword !== confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match";
-    }
-
-    if (newPassword === currentPassword && newPassword) {
-      newErrors.newPassword = "New password must be different";
     }
 
     setErrors(newErrors);
@@ -70,19 +94,28 @@ function ChangePassword({ onComplete, onCancel }: ChangePasswordProps) {
     setIsSubmitting(true);
 
     try {
-      // Verify current password by trying to decrypt
-      const apiKey = await loadDecryptedApiKey(currentPassword);
-      if (!apiKey) {
-        setErrors({ currentPassword: "Invalid password" });
+      const response = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "changePasswordWithCachedPassword", newPassword },
+          resolve
+        );
+      });
+
+      if (!response.success) {
+        if (response.error?.includes("Session expired")) {
+          setSessionExpired(true);
+          return;
+        }
+        toast({
+          title: "Error changing password",
+          description: response.error || "Unknown error",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
         setIsSubmitting(false);
         return;
       }
-
-      // Re-encrypt with new password
-      await saveEncryptedApiKey(apiKey, newPassword);
-
-      // Clear the API key cache since password changed
-      await chrome.runtime.sendMessage({ type: "clearApiKeyCache" });
 
       toast({
         title: "Password changed",
@@ -124,36 +157,8 @@ function ChangePassword({ onComplete, onCancel }: ChangePasswordProps) {
       </HStack>
 
       <Text fontSize="sm" color="text.secondary" fontWeight="500">
-        Enter your current password and choose a new one.
+        Choose a new password to secure your wallet.
       </Text>
-
-      <FormControl isInvalid={!!errors.currentPassword}>
-        <FormLabel color="text.secondary" fontWeight="700" textTransform="uppercase" fontSize="xs">
-          Current Password
-        </FormLabel>
-        <InputGroup>
-          <Input
-            type={showCurrentPassword ? "text" : "password"}
-            placeholder="Enter current password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            pr="3rem"
-          />
-          <InputRightElement>
-            <IconButton
-              aria-label={showCurrentPassword ? "Hide" : "Show"}
-              icon={showCurrentPassword ? <ViewOffIcon /> : <ViewIcon />}
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-              color="text.secondary"
-            />
-          </InputRightElement>
-        </InputGroup>
-        <FormErrorMessage color="bauhaus.red" fontWeight="700">
-          {errors.currentPassword}
-        </FormErrorMessage>
-      </FormControl>
 
       <FormControl isInvalid={!!errors.newPassword}>
         <FormLabel color="text.secondary" fontWeight="700" textTransform="uppercase" fontSize="xs">
@@ -216,7 +221,7 @@ function ChangePassword({ onComplete, onCancel }: ChangePasswordProps) {
       </Box>
 
       <Box display="flex" gap={2} pt={2}>
-        <Button variant="secondary" flex={1} onClick={onCancel}>
+        <Button variant="secondary" onClick={onCancel} minW="100px">
           Cancel
         </Button>
         <Button

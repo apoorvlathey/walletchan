@@ -787,6 +787,18 @@ When changing the API key while the wallet is unlocked:
 - If cache expires, prompts for "Current Password" with message "Session expired"
 - Existing API key is **pre-filled** in the form (decrypted from cache)
 
+#### Password Change Flow
+
+When changing the wallet password (Settings → Change Password):
+
+- **No current password required**: User is already authenticated (wallet unlocked)
+- Uses **cached password** from background service worker to decrypt API key
+- Re-encrypts API key with the new password
+- **Session check**: Periodic check (every 30 seconds) ensures session hasn't expired
+- **Auto-redirect**: If session expires while on the form, user is redirected to unlock screen
+- **Cache cleared**: After password change, user must unlock with new password
+- Password handling stays entirely in background worker (never exposed to UI)
+
 ### Pending Transaction Storage
 
 Transactions are stored persistently in `chrome.storage.local`:
@@ -945,6 +957,7 @@ Build command: `pnpm build`
 | `getCachedPassword`           | Check if password is cached           |
 | `getCachedApiKey`             | Get decrypted API key (if cached)     |
 | `saveApiKeyWithCachedPassword`| Save new API key using cached password|
+| `changePasswordWithCachedPassword`| Change password using cached password |
 | `isSidePanelSupported`        | Check if browser supports sidepanel   |
 | `getSidePanelMode`            | Get current sidepanel mode setting    |
 | `setSidePanelMode`            | Set sidepanel mode (true/false)       |

@@ -11,10 +11,10 @@ import {
   Code,
   Flex,
   Spacer,
-  useToast,
   Image,
   Icon,
 } from "@chakra-ui/react";
+import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { keyframes } from "@emotion/react";
 import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon } from "@chakra-ui/icons";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
@@ -51,7 +51,7 @@ type ConfirmationState = "ready" | "submitting" | "sent" | "error";
 // Copy button component
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
-  const toast = useToast();
+  const toast = useBauhausToast();
 
   const handleCopy = async () => {
     try {

@@ -15,12 +15,12 @@ import {
   Image,
   IconButton,
   Code,
-  useToast,
   VStack,
   Tooltip,
   Icon,
   Link,
 } from "@chakra-ui/react";
+import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon, LockIcon, WarningIcon, InfoIcon } from "@chakra-ui/icons";
 
 // Sidepanel icon
@@ -49,7 +49,7 @@ type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | 
 
 function App() {
   const { networksInfo, reloadRequired, setReloadRequired } = useNetworks();
-  const toast = useToast();
+  const toast = useBauhausToast();
 
   const [view, setView] = useState<AppView>("main");
   const [isLoading, setIsLoading] = useState(true);
@@ -754,6 +754,7 @@ function App() {
               });
             }}
             showBackButton={hasApiKey}
+            onSessionExpired={() => setView("unlock")}
           />
         </Container>
       </Box>

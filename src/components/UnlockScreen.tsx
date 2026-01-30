@@ -12,7 +12,6 @@ import {
   Image,
   Tooltip,
   Icon,
-  useToast,
   Link,
   Modal,
   ModalOverlay,
@@ -22,6 +21,7 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@chakra-ui/react";
+import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { ViewIcon, ViewOffIcon, LockIcon, WarningTwoIcon, BellIcon } from "@chakra-ui/icons";
 
 // Sidepanel icon
@@ -41,7 +41,7 @@ interface UnlockScreenProps {
 }
 
 function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: UnlockScreenProps) {
-  const toast = useToast();
+  const toast = useBauhausToast();
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);

@@ -10,9 +10,9 @@ import {
   Code,
   Flex,
   Spacer,
-  useToast,
   Image,
 } from "@chakra-ui/react";
+import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon, WarningTwoIcon } from "@chakra-ui/icons";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
 import { getChainConfig } from "@/constants/chainConfig";
@@ -33,7 +33,7 @@ interface SignatureRequestConfirmationProps {
 // Copy button component
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
-  const toast = useToast();
+  const toast = useBauhausToast();
 
   const handleCopy = async () => {
     try {

@@ -994,6 +994,42 @@ async function handleSaveApiKeyWithCachedPassword(
 }
 
 /**
+ * Changes the wallet password using the currently cached password
+ * This is used when changing password while already unlocked
+ */
+async function handleChangePasswordWithCachedPassword(
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  const currentPassword = getCachedPassword();
+  if (!currentPassword) {
+    return { success: false, error: "Session expired. Please unlock your wallet again." };
+  }
+
+  try {
+    const { loadDecryptedApiKey, saveEncryptedApiKey } = await import("./crypto");
+
+    // Decrypt API key with cached password
+    const apiKey = await loadDecryptedApiKey(currentPassword);
+    if (!apiKey) {
+      return { success: false, error: "Failed to decrypt API key" };
+    }
+
+    // Re-encrypt with new password
+    await saveEncryptedApiKey(apiKey, newPassword);
+
+    // Clear the cache - user must unlock with new password
+    clearCachedApiKey();
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to change password"
+    };
+  }
+}
+
+/**
  * Handles RPC requests proxied from inpage script (to bypass page CSP)
  */
 async function handleRpcRequest(
@@ -1168,6 +1204,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // Return whether password is cached (not the actual password for security)
       sendResponse({ hasCachedPassword: getCachedPassword() !== null });
       return false;
+    }
+
+    case "changePasswordWithCachedPassword": {
+      handleChangePasswordWithCachedPassword(message.newPassword).then((result) => {
+        sendResponse(result);
+      });
+      return true;
     }
 
     case "getCachedApiKey": {

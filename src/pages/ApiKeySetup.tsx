@@ -16,8 +16,8 @@ import {
   Alert,
   AlertIcon,
   Spacer,
-  useToast,
 } from "@chakra-ui/react";
+import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { ViewIcon, ViewOffIcon, ArrowBackIcon } from "@chakra-ui/icons";
 import { saveEncryptedApiKey } from "@/chrome/crypto";
 import { StaticJsonRpcProvider } from "@ethersproject/providers";
@@ -50,7 +50,7 @@ function ApiKeySetup({
     confirmPassword?: string;
   }>({});
 
-  const toast = useToast();
+  const toast = useBauhausToast();
 
   // Check if password is cached and load existing data when changing key
   useEffect(() => {

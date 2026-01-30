@@ -12,7 +12,6 @@ import {
   Heading,
   Spacer,
   Code,
-  useToast,
   Modal,
   ModalOverlay,
   ModalContent,
@@ -21,6 +20,7 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@chakra-ui/react";
+import { useBauhausToast } from "@/hooks/useBauhausToast";
 import {
   ArrowBackIcon,
   WarningIcon,
@@ -38,13 +38,14 @@ type SettingsTab = "main" | "apiKey" | "chains" | "changePassword";
 interface SettingsProps {
   close: () => void;
   showBackButton?: boolean;
+  onSessionExpired?: () => void;
 }
 
-function Settings({ close, showBackButton = true }: SettingsProps) {
+function Settings({ close, showBackButton = true, onSessionExpired }: SettingsProps) {
   const [tab, setTab] = useState<SettingsTab>("main");
   const [hasApiKey, setHasApiKey] = useState(false);
   const [address, setAddress] = useState<string>("");
-  const toast = useToast();
+  const toast = useBauhausToast();
   const { isOpen: isDeleteModalOpen, onOpen: onDeleteModalOpen, onClose: onDeleteModalClose } = useDisclosure();
 
   const handleClearHistory = () => {
@@ -106,6 +107,7 @@ function Settings({ close, showBackButton = true }: SettingsProps) {
       <ChangePassword
         onComplete={() => setTab("main")}
         onCancel={() => setTab("main")}
+        onSessionExpired={onSessionExpired || (() => setTab("main"))}
       />
     );
   }
