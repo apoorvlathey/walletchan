@@ -26,6 +26,15 @@ import {
   PendingTxRequest,
 } from "./pendingTxStorage";
 import {
+  savePendingSignatureRequest,
+  removePendingSignatureRequest,
+  getPendingSignatureRequestById,
+  getPendingSignatureRequests,
+  clearExpiredSignatureRequests,
+  PendingSignatureRequest,
+  SignatureParams,
+} from "./pendingSignatureStorage";
+import {
   addTxToHistory,
   updateTxInHistory,
   getTxHistory,
@@ -45,6 +54,19 @@ interface TransactionResult {
 }
 
 const pendingResolvers = new Map<string, PendingResolver>();
+
+// In-memory map for resolving signature requests back to content script
+interface PendingSignatureResolver {
+  resolve: (result: SignatureResult) => void;
+}
+
+interface SignatureResult {
+  success: boolean;
+  signature?: string;
+  error?: string;
+}
+
+const pendingSignatureResolvers = new Map<string, PendingSignatureResolver>();
 
 // Active transaction AbortControllers for cancellation
 const activeAbortControllers = new Map<string, AbortController>();
@@ -143,7 +165,17 @@ function performSecurityReset(): void {
   }
   pendingResolvers.clear();
 
-  // 5. Clear failed transaction results
+  // 5. Reject all pending signature resolvers with reset error
+  for (const [sigId, resolver] of pendingSignatureResolvers.entries()) {
+    try {
+      resolver.resolve({ success: false, error: "Extension was reset" });
+    } catch {
+      // Ignore errors
+    }
+  }
+  pendingSignatureResolvers.clear();
+
+  // 6. Clear failed transaction results
   failedTxResults.clear();
 }
 
@@ -152,9 +184,10 @@ self.addEventListener("suspend", () => {
   clearCachedApiKey();
 });
 
-// Clean up expired transactions periodically
+// Clean up expired transactions and signature requests periodically
 setInterval(() => {
   clearExpiredTxRequests();
+  clearExpiredSignatureRequests();
 }, 60000); // Every minute
 
 // Initialize badge on startup
@@ -277,6 +310,49 @@ async function handleTransactionRequest(
   });
 
   // Open the extension popup/sidepanel for user to confirm
+  openExtensionPopup(senderWindowId);
+}
+
+/**
+ * Handles incoming signature requests from content script
+ */
+async function handleSignatureRequest(
+  message: {
+    type: string;
+    signature: SignatureParams;
+    origin: string;
+    favicon?: string | null;
+  },
+  sendResponse: (response: SignatureResult) => void,
+  senderWindowId?: number
+): Promise<void> {
+  const { signature, origin, favicon } = message;
+
+  // Create pending signature request
+  const sigId = crypto.randomUUID();
+  const chainName = CHAIN_NAMES[signature.chainId] || `Chain ${signature.chainId}`;
+
+  const pendingRequest: PendingSignatureRequest = {
+    id: sigId,
+    signature,
+    origin,
+    favicon: favicon || null,
+    chainName,
+    timestamp: Date.now(),
+  };
+
+  // Store the pending request persistently
+  await savePendingSignatureRequest(pendingRequest);
+
+  // Store the resolver to respond when user cancels
+  pendingSignatureResolvers.set(sigId, { resolve: sendResponse });
+
+  // Notify any open extension views (sidepanel/popup) about the new signature request
+  chrome.runtime.sendMessage({ type: "newPendingSignatureRequest", sigRequest: pendingRequest }).catch(() => {
+    // Ignore errors if no listeners (popup/sidepanel not open)
+  });
+
+  // Open the extension popup/sidepanel for user to view
   openExtensionPopup(senderWindowId);
 }
 
@@ -962,6 +1038,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
+    case "signatureRequest": {
+      // Handle signature request, pass sender's window ID for popup positioning
+      const senderWindowId = sender.tab?.windowId;
+      handleSignatureRequest(message, sendResponse, senderWindowId);
+      // Return true to indicate we will send response asynchronously
+      return true;
+    }
+
+    case "getPendingSignatureRequests": {
+      getPendingSignatureRequests().then((requests) => {
+        sendResponse(requests);
+      });
+      return true;
+    }
+
+    case "rejectSignatureRequest": {
+      const result: SignatureResult = { success: false, error: "Signature request cancelled by user" };
+
+      // Remove from pending storage
+      removePendingSignatureRequest(message.sigId).then(() => {
+        // Send result back to content script if resolver exists
+        const resolver = pendingSignatureResolvers.get(message.sigId);
+        if (resolver) {
+          resolver.resolve(result);
+          pendingSignatureResolvers.delete(message.sigId);
+        }
+        sendResponse(result);
+      });
+      return true;
+    }
+
     case "getPendingTxRequests": {
       getPendingTxRequests().then((requests) => {
         sendResponse(requests);
@@ -1181,6 +1288,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               "encryptedApiKey",
               "txHistory",
               "pendingTxRequests",
+              "pendingSignatureRequests",
               ...notificationKeys, // Clear notification data (may contain tx hashes)
             ]),
             chrome.storage.sync.remove("address"),

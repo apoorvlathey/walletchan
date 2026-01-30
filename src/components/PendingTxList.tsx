@@ -12,16 +12,21 @@ import {
 } from "@chakra-ui/react";
 import { ArrowBackIcon, ChevronRightIcon } from "@chakra-ui/icons";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
+import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
 import { getChainConfig } from "@/constants/chainConfig";
 
 interface PendingTxListProps {
-  requests: PendingTxRequest[];
+  txRequests: PendingTxRequest[];
+  signatureRequests: PendingSignatureRequest[];
   onBack: () => void;
   onSelectTx: (txRequest: PendingTxRequest) => void;
+  onSelectSignature: (sigRequest: PendingSignatureRequest) => void;
   onRejectAll: () => void;
 }
 
-function PendingTxList({ requests, onBack, onSelectTx, onRejectAll }: PendingTxListProps) {
+function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSelectSignature, onRejectAll }: PendingTxListProps) {
+  const totalCount = txRequests.length + signatureRequests.length;
+
   const formatTimestamp = (timestamp: number): string => {
     const now = Date.now();
     const diff = now - timestamp;
@@ -34,6 +39,21 @@ function PendingTxList({ requests, onBack, onSelectTx, onRejectAll }: PendingTxL
     const hours = Math.floor(minutes / 60);
     if (hours === 1) return "1 hour ago";
     return `${hours} hours ago`;
+  };
+
+  const getMethodDisplayName = (method: string): string => {
+    switch (method) {
+      case "personal_sign":
+        return "Personal Sign";
+      case "eth_sign":
+        return "Eth Sign";
+      case "eth_signTypedData":
+      case "eth_signTypedData_v3":
+      case "eth_signTypedData_v4":
+        return "Typed Data";
+      default:
+        return method;
+    }
   };
 
   return (
@@ -59,12 +79,13 @@ function PendingTxList({ requests, onBack, onSelectTx, onRejectAll }: PendingTxL
             borderRadius="full"
             px={2}
           >
-            {requests.length}
+            {totalCount}
           </Badge>
         </HStack>
 
         <VStack spacing={2} align="stretch">
-          {requests.map((request, index) => {
+          {/* Transaction Requests */}
+          {txRequests.map((request, index) => {
             const config = getChainConfig(request.tx.chainId);
             return (
               <Box
@@ -102,7 +123,7 @@ function PendingTxList({ requests, onBack, onSelectTx, onRejectAll }: PendingTxL
                       alt="favicon"
                       boxSize="28px"
                       borderRadius="md"
-                      bg="bg.muted"
+                      bg="white"
                       p={1}
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
@@ -111,14 +132,27 @@ function PendingTxList({ requests, onBack, onSelectTx, onRejectAll }: PendingTxL
                     />
                     <Box flex={1}>
                       <HStack justify="space-between">
-                        <Text
-                          fontSize="sm"
-                          fontWeight="500"
-                          color="text.primary"
-                          noOfLines={1}
-                        >
-                          {new URL(request.origin).hostname}
-                        </Text>
+                        <HStack spacing={2}>
+                          <Text
+                            fontSize="sm"
+                            fontWeight="500"
+                            color="text.primary"
+                            noOfLines={1}
+                          >
+                            {new URL(request.origin).hostname}
+                          </Text>
+                          <Badge
+                            fontSize="xs"
+                            bg="primary.500"
+                            color="white"
+                            borderRadius="full"
+                            px={1.5}
+                            py={0}
+                            textTransform="uppercase"
+                          >
+                            TX
+                          </Badge>
+                        </HStack>
                         <Text fontSize="xs" color="text.tertiary">
                           {formatTimestamp(request.timestamp)}
                         </Text>
@@ -157,15 +191,123 @@ function PendingTxList({ requests, onBack, onSelectTx, onRejectAll }: PendingTxL
               </Box>
             );
           })}
+
+          {/* Signature Requests */}
+          {signatureRequests.map((request, index) => {
+            const config = getChainConfig(request.signature.chainId);
+            return (
+              <Box
+                key={request.id}
+                bg="bg.subtle"
+                borderWidth="1px"
+                borderColor="border.default"
+                borderRadius="lg"
+                p={3}
+                cursor="pointer"
+                onClick={() => onSelectSignature(request)}
+                _hover={{
+                  bg: "bg.emphasis",
+                  borderColor: "border.strong",
+                }}
+                transition="all 0.2s"
+              >
+                <HStack justify="space-between">
+                  <HStack spacing={3} flex={1}>
+                    <Badge
+                      bg="bg.muted"
+                      color="text.secondary"
+                      fontSize="xs"
+                      minW="24px"
+                      textAlign="center"
+                      borderRadius="md"
+                    >
+                      #{txRequests.length + index + 1}
+                    </Badge>
+                    <Image
+                      src={
+                        request.favicon ||
+                        `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`
+                      }
+                      alt="favicon"
+                      boxSize="28px"
+                      borderRadius="md"
+                      bg="white"
+                      p={1}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = `https://www.google.com/s2/favicons?domain=${new URL(request.origin).hostname}&sz=32`;
+                      }}
+                    />
+                    <Box flex={1}>
+                      <HStack justify="space-between">
+                        <HStack spacing={2}>
+                          <Text
+                            fontSize="sm"
+                            fontWeight="500"
+                            color="text.primary"
+                            noOfLines={1}
+                          >
+                            {new URL(request.origin).hostname}
+                          </Text>
+                          <Badge
+                            fontSize="xs"
+                            bg="warning.solid"
+                            color="bg.base"
+                            borderRadius="full"
+                            px={1.5}
+                            py={0}
+                            textTransform="uppercase"
+                          >
+                            SIG
+                          </Badge>
+                        </HStack>
+                        <Text fontSize="xs" color="text.tertiary">
+                          {formatTimestamp(request.timestamp)}
+                        </Text>
+                      </HStack>
+                      <HStack spacing={2} mt={1}>
+                        <Badge
+                          fontSize="xs"
+                          bg={config.bg}
+                          color={config.text}
+                          borderWidth="1px"
+                          borderColor={config.border}
+                          borderRadius="full"
+                          px={2}
+                          py={0.5}
+                          display="flex"
+                          alignItems="center"
+                          gap={1}
+                        >
+                          {config.icon && (
+                            <Image
+                              src={config.icon}
+                              alt={request.chainName}
+                              boxSize="10px"
+                            />
+                          )}
+                          {request.chainName}
+                        </Badge>
+                        <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
+                          {getMethodDisplayName(request.signature.method)}
+                        </Text>
+                      </HStack>
+                    </Box>
+                  </HStack>
+                  <ChevronRightIcon color="text.tertiary" />
+                </HStack>
+              </Box>
+            );
+          })}
         </VStack>
 
-        {requests.length === 0 && (
+        {totalCount === 0 && (
           <Box textAlign="center" py={8}>
             <Text color="text.secondary">No pending requests</Text>
           </Box>
         )}
 
-        {requests.length > 0 && (
+        {totalCount > 0 && (
           <Button
             variant="outline"
             w="full"
@@ -174,7 +316,7 @@ function PendingTxList({ requests, onBack, onSelectTx, onRejectAll }: PendingTxL
             _hover={{ bg: "error.bg" }}
             onClick={onRejectAll}
           >
-            Reject All ({requests.length})
+            Reject All ({totalCount})
           </Button>
         )}
       </VStack>

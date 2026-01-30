@@ -46,8 +46,10 @@ import { useNetworks } from "@/contexts/NetworksContext";
 import { getChainConfig } from "@/constants/chainConfig";
 import { hasEncryptedApiKey } from "@/chrome/crypto";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
+import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
+import SignatureRequestConfirmation from "@/components/SignatureRequestConfirmation";
 
-type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | "waitingForOnboarding";
+type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | "signatureConfirm" | "waitingForOnboarding";
 
 function App() {
   const { networksInfo, reloadRequired, setReloadRequired } = useNetworks();
@@ -61,6 +63,8 @@ function App() {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<PendingTxRequest[]>([]);
   const [selectedTxRequest, setSelectedTxRequest] = useState<PendingTxRequest | null>(null);
+  const [pendingSignatureRequests, setPendingSignatureRequests] = useState<PendingSignatureRequest[]>([]);
+  const [selectedSignatureRequest, setSelectedSignatureRequest] = useState<PendingSignatureRequest | null>(null);
   const [copied, setCopied] = useState(false);
   const [sidePanelSupported, setSidePanelSupported] = useState(false);
   const [sidePanelMode, setSidePanelMode] = useState(false);
@@ -80,6 +84,15 @@ function App() {
     return new Promise<PendingTxRequest[]>((resolve) => {
       chrome.runtime.sendMessage({ type: "getPendingTxRequests" }, (requests) => {
         setPendingRequests(requests || []);
+        resolve(requests || []);
+      });
+    });
+  };
+
+  const loadPendingSignatureRequests = async () => {
+    return new Promise<PendingSignatureRequest[]>((resolve) => {
+      chrome.runtime.sendMessage({ type: "getPendingSignatureRequests" }, (requests) => {
+        setPendingSignatureRequests(requests || []);
         resolve(requests || []);
       });
     });
@@ -254,6 +267,7 @@ function App() {
 
       // Load pending requests
       const requests = await loadPendingRequests();
+      const sigRequests = await loadPendingSignatureRequests();
 
       // Load stored data
       const {
@@ -299,9 +313,13 @@ function App() {
       if (!isUnlocked) {
         setView("unlock");
       } else if (requests.length > 0) {
-        // Auto-open newest (last) pending request
+        // Auto-open newest (last) pending transaction request
         setSelectedTxRequest(requests[requests.length - 1]);
         setView("txConfirm");
+      } else if (sigRequests.length > 0) {
+        // Auto-open newest (last) pending signature request
+        setSelectedSignatureRequest(sigRequests[sigRequests.length - 1]);
+        setView("signatureConfirm");
       } else {
         setView("main");
       }
@@ -312,12 +330,12 @@ function App() {
     init();
   }, []);
 
-  // Listen for new pending tx requests (when sidepanel/popup is already open)
+  // Listen for new pending tx/signature requests (when sidepanel/popup is already open)
   // Also respond to ping messages so background knows a view is open
   // Also listen for onboarding completion
   useEffect(() => {
-    const handleMessage = (
-      message: { type: string; txRequest?: PendingTxRequest },
+    const handleMessage = async (
+      message: { type: string; txRequest?: PendingTxRequest; sigRequest?: PendingSignatureRequest },
       _sender: chrome.runtime.MessageSender,
       sendResponse: (response?: any) => void
     ) => {
@@ -329,9 +347,30 @@ function App() {
       if (message.type === "newPendingTxRequest" && message.txRequest) {
         // Update pending requests list
         setPendingRequests((prev) => [...prev, message.txRequest!]);
-        // Show the new tx request
-        setSelectedTxRequest(message.txRequest);
-        setView("txConfirm");
+        // Check if wallet is locked before showing the request
+        const isUnlocked = await checkLockState();
+        if (isUnlocked) {
+          // Show the new tx request
+          setSelectedTxRequest(message.txRequest);
+          setView("txConfirm");
+        } else {
+          // Wallet is locked - show unlock screen (requests will be shown after unlock)
+          setView("unlock");
+        }
+      }
+      if (message.type === "newPendingSignatureRequest" && message.sigRequest) {
+        // Update pending signature requests list
+        setPendingSignatureRequests((prev) => [...prev, message.sigRequest!]);
+        // Check if wallet is locked before showing the request
+        const isUnlocked = await checkLockState();
+        if (isUnlocked) {
+          // Show the new signature request
+          setSelectedSignatureRequest(message.sigRequest);
+          setView("signatureConfirm");
+        } else {
+          // Wallet is locked - show unlock screen (requests will be shown after unlock)
+          setView("unlock");
+        }
       }
       if (message.type === "onboardingComplete") {
         // Onboarding finished - reload to show unlock screen
@@ -411,11 +450,16 @@ function App() {
   const handleUnlock = async () => {
     // Refresh pending requests after unlock
     const requests = await loadPendingRequests();
+    const sigRequests = await loadPendingSignatureRequests();
 
     if (requests.length > 0) {
-      // Show newest (last) pending request
+      // Show newest (last) pending transaction request
       setSelectedTxRequest(requests[requests.length - 1]);
       setView("txConfirm");
+    } else if (sigRequests.length > 0) {
+      // Show newest (last) pending signature request
+      setSelectedSignatureRequest(sigRequests[sigRequests.length - 1]);
+      setView("signatureConfirm");
     } else {
       setView("main");
     }
@@ -485,10 +529,71 @@ function App() {
         );
       });
     }
+    // Reject all pending signature requests
+    for (const request of pendingSignatureRequests) {
+      await new Promise<void>((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "rejectSignatureRequest", sigId: request.id },
+          () => resolve()
+        );
+      });
+    }
     // Only close popup after rejecting all (not sidepanel)
     if (isInSidePanel) {
       setPendingRequests([]);
+      setPendingSignatureRequests([]);
       setSelectedTxRequest(null);
+      setSelectedSignatureRequest(null);
+      setView("main");
+    } else {
+      window.close();
+    }
+  };
+
+  const handleSignatureCancelled = async () => {
+    const currentSigId = selectedSignatureRequest?.id;
+    const sigRequests = await loadPendingSignatureRequests();
+
+    // Check if more pending signature requests (use fresh data)
+    const remaining = sigRequests.filter((r) => r.id !== currentSigId);
+    if (remaining.length > 0) {
+      setSelectedSignatureRequest(remaining[0]);
+    } else {
+      // Check if there are pending transaction requests
+      const txRequests = await loadPendingRequests();
+      if (txRequests.length > 0) {
+        setSelectedSignatureRequest(null);
+        setSelectedTxRequest(txRequests[0]);
+        setView("txConfirm");
+      } else if (isInSidePanel) {
+        setSelectedSignatureRequest(null);
+        setView("main");
+      } else {
+        window.close();
+      }
+    }
+  };
+
+  const handleCancelAllSignatures = async () => {
+    // Cancel all pending signature requests
+    for (const request of pendingSignatureRequests) {
+      await new Promise<void>((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "rejectSignatureRequest", sigId: request.id },
+          () => resolve()
+        );
+      });
+    }
+    // Check if there are pending transaction requests
+    const txRequests = await loadPendingRequests();
+    if (txRequests.length > 0) {
+      setPendingSignatureRequests([]);
+      setSelectedSignatureRequest(null);
+      setSelectedTxRequest(txRequests[0]);
+      setView("txConfirm");
+    } else if (isInSidePanel) {
+      setPendingSignatureRequests([]);
+      setSelectedSignatureRequest(null);
       setView("main");
     } else {
       window.close();
@@ -516,7 +621,13 @@ function App() {
 
   // Unlock screen
   if (view === "unlock") {
-    return <UnlockScreen onUnlock={handleUnlock} />;
+    return (
+      <UnlockScreen
+        onUnlock={handleUnlock}
+        pendingTxCount={pendingRequests.length}
+        pendingSignatureCount={pendingSignatureRequests.length}
+      />
+    );
   }
 
   // Waiting for onboarding to complete
@@ -622,11 +733,16 @@ function App() {
   if (view === "pendingTxList") {
     return (
       <PendingTxList
-        requests={pendingRequests}
+        txRequests={pendingRequests}
+        signatureRequests={pendingSignatureRequests}
         onBack={() => setView("main")}
         onSelectTx={(tx) => {
           setSelectedTxRequest(tx);
           setView("txConfirm");
+        }}
+        onSelectSignature={(sig) => {
+          setSelectedSignatureRequest(sig);
+          setView("signatureConfirm");
         }}
         onRejectAll={handleRejectAll}
       />
@@ -638,15 +754,17 @@ function App() {
     const currentIndex = pendingRequests.findIndex(
       (r) => r.id === selectedTxRequest.id
     );
+    const totalCount = pendingRequests.length + pendingSignatureRequests.length;
     return (
       <TransactionConfirmation
         key={selectedTxRequest.id}
         txRequest={selectedTxRequest}
         currentIndex={currentIndex >= 0 ? currentIndex : 0}
-        totalCount={pendingRequests.length}
+        totalTxCount={pendingRequests.length}
+        totalSignatureCount={pendingSignatureRequests.length}
         isInSidePanel={isInSidePanel}
         onBack={() => {
-          if (pendingRequests.length > 1) {
+          if (totalCount > 1) {
             setView("pendingTxList");
           } else {
             setView("main");
@@ -663,6 +781,58 @@ function App() {
             setSelectedTxRequest(pendingRequests[currentIdx - 1]);
           } else if (direction === "next" && currentIdx < pendingRequests.length - 1) {
             setSelectedTxRequest(pendingRequests[currentIdx + 1]);
+          }
+        }}
+        onNavigateToSignature={() => {
+          if (pendingSignatureRequests.length > 0) {
+            setSelectedTxRequest(null);
+            setSelectedSignatureRequest(pendingSignatureRequests[0]);
+            setView("signatureConfirm");
+          }
+        }}
+      />
+    );
+  }
+
+  // Signature request confirmation view
+  if (view === "signatureConfirm" && selectedSignatureRequest) {
+    const currentIndex = pendingSignatureRequests.findIndex(
+      (r) => r.id === selectedSignatureRequest.id
+    );
+    const totalCount = pendingRequests.length + pendingSignatureRequests.length;
+    return (
+      <SignatureRequestConfirmation
+        key={selectedSignatureRequest.id}
+        sigRequest={selectedSignatureRequest}
+        currentIndex={currentIndex >= 0 ? currentIndex : 0}
+        totalTxCount={pendingRequests.length}
+        totalSignatureCount={pendingSignatureRequests.length}
+        isInSidePanel={isInSidePanel}
+        onBack={() => {
+          setSelectedSignatureRequest(null);
+          if (totalCount > 1) {
+            setView("pendingTxList");
+          } else {
+            setView("main");
+          }
+        }}
+        onCancelled={handleSignatureCancelled}
+        onCancelAll={handleCancelAllSignatures}
+        onNavigate={(direction) => {
+          const currentIdx = pendingSignatureRequests.findIndex(
+            (r) => r.id === selectedSignatureRequest.id
+          );
+          if (direction === "prev" && currentIdx > 0) {
+            setSelectedSignatureRequest(pendingSignatureRequests[currentIdx - 1]);
+          } else if (direction === "next" && currentIdx < pendingSignatureRequests.length - 1) {
+            setSelectedSignatureRequest(pendingSignatureRequests[currentIdx + 1]);
+          }
+        }}
+        onNavigateToTx={() => {
+          if (pendingRequests.length > 0) {
+            setSelectedSignatureRequest(null);
+            setSelectedTxRequest(pendingRequests[pendingRequests.length - 1]);
+            setView("txConfirm");
           }
         }}
       />
@@ -766,13 +936,20 @@ function App() {
 
           {/* Pending Requests Banner */}
           <PendingTxBanner
-            count={pendingRequests.length}
-            onClick={() => {
+            txCount={pendingRequests.length}
+            signatureCount={pendingSignatureRequests.length}
+            onClickTx={() => {
               if (pendingRequests.length === 1) {
                 setSelectedTxRequest(pendingRequests[0]);
                 setView("txConfirm");
               } else {
                 setView("pendingTxList");
+              }
+            }}
+            onClickSignature={() => {
+              if (pendingSignatureRequests.length > 0) {
+                setSelectedSignatureRequest(pendingSignatureRequests[0]);
+                setView("signatureConfirm");
               }
             }}
           />

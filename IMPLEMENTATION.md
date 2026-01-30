@@ -158,6 +158,7 @@ src/
 │   ├── crypto.ts            # AES-256-GCM encryption for API key
 │   ├── bankrApi.ts          # Bankr API client
 │   ├── pendingTxStorage.ts  # Persistent storage for pending transactions
+│   ├── pendingSignatureStorage.ts # Persistent storage for pending signature requests
 │   └── txHistoryStorage.ts  # Persistent storage for completed transaction history
 ├── constants/
 │   ├── networks.ts          # Default networks configuration
@@ -173,10 +174,11 @@ src/
 │   │   ├── EditChain.tsx    # Edit existing chain
 │   │   └── ChangePassword.tsx # Password change flow
 │   ├── UnlockScreen.tsx     # Wallet unlock (password entry)
-│   ├── PendingTxBanner.tsx  # Banner showing pending tx count
-│   ├── PendingTxList.tsx    # List of pending transactions
+│   ├── PendingTxBanner.tsx  # Banner showing pending tx/signature count
+│   ├── PendingTxList.tsx    # List of pending transactions and signature requests
 │   ├── TxStatusList.tsx     # Recent transaction history display
-│   └── TransactionConfirmation.tsx # In-popup tx confirmation with success animation
+│   ├── TransactionConfirmation.tsx # In-popup tx confirmation with success animation
+│   └── SignatureRequestConfirmation.tsx # Signature request display (reject only)
 ├── onboarding.tsx           # React entry point for onboarding page
 └── App.tsx                  # Main popup application
 
@@ -419,6 +421,56 @@ Submit this transaction:
 - Transaction hash extracted via regex: `/0x[a-fA-F0-9]{64}/`
 - Returned through the message chain back to dapp
 - Dapp receives the tx hash from `eth_sendTransaction`
+
+## Signature Request Handling
+
+The Bankr API does not support message signing. When dapps request signatures, the extension displays the request details but only allows rejection.
+
+### Supported Signature Methods
+
+| Method | Description |
+| ------ | ----------- |
+| `personal_sign` | Sign a plain text message |
+| `eth_sign` | Sign arbitrary data (deprecated) |
+| `eth_signTypedData` | Sign typed data (EIP-712) |
+| `eth_signTypedData_v3` | Sign typed data v3 |
+| `eth_signTypedData_v4` | Sign typed data v4 |
+
+### Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Signature Request Flow                                  │
+│                                                                             │
+│  1. Dapp calls personal_sign, eth_signTypedData_v4, etc.                    │
+│  2. Impersonator creates pending promise with sigId                         │
+│  3. Request forwarded to background via content script                      │
+│  4. Background stores in pendingSignatureRequests storage                   │
+│  5. Popup/sidepanel shows SignatureRequestConfirmation                      │
+│  6. User can only REJECT (signing not supported)                            │
+│  7. Rejection returns error to dapp                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### UI Display
+
+The SignatureRequestConfirmation component shows:
+- Origin (with favicon)
+- Network badge
+- Method name (e.g., "Personal Sign", "Sign Typed Data v4")
+- Decoded message content (for personal_sign)
+- Raw data with copy button
+- **Warning box**: "Signatures are not supported in the Bankr API"
+- **Reject button**: Only action available
+
+### Combined Navigation
+
+When both transaction and signature requests are pending:
+- Counter shows combined total (e.g., "1/3" for 2 tx + 1 sig)
+- Transaction requests appear first in the list
+- Navigation arrows allow moving between all request types
+- "Reject All" button rejects both transactions and signatures
+- Pending list shows both types with TX/SIG badges
 
 ## Async Transaction Confirmation
 
@@ -849,27 +901,30 @@ Build command: `pnpm build`
 
 ### Inpage → Content Script (postMessage)
 
-| Type                    | Description          |
-| ----------------------- | -------------------- |
-| `i_sendTransaction`     | Transaction request  |
-| `i_rpcRequest`          | RPC call request     |
-| `i_switchEthereumChain` | Chain switch request |
+| Type                    | Description            |
+| ----------------------- | ---------------------- |
+| `i_sendTransaction`     | Transaction request    |
+| `i_signatureRequest`    | Signature request      |
+| `i_rpcRequest`          | RPC call request       |
+| `i_switchEthereumChain` | Chain switch request   |
 
 ### Content Script → Inpage (postMessage)
 
 | Type                       | Description                              |
 | -------------------------- | ---------------------------------------- |
 | `sendTransactionResult`    | Transaction result                       |
+| `signatureRequestResult`   | Signature request result (rejection)     |
 | `rpcResponse`              | RPC call response                        |
 | `switchEthereumChain`      | Chain switch success (chainId, rpcUrl)   |
 | `switchEthereumChainError` | Chain switch error (unsupported chain)   |
 
 ### Content Script → Background (chrome.runtime)
 
-| Type              | Description        |
-| ----------------- | ------------------ |
-| `sendTransaction` | Submit transaction |
-| `rpcRequest`      | Proxy RPC call     |
+| Type               | Description               |
+| ------------------ | ------------------------- |
+| `sendTransaction`  | Submit transaction        |
+| `signatureRequest` | Submit signature request  |
+| `rpcRequest`       | Proxy RPC call            |
 
 ### Popup → Background (chrome.runtime)
 
@@ -883,6 +938,8 @@ Build command: `pnpm build`
 | `confirmTransaction`          | User approved tx (sync, waits)        |
 | `confirmTransactionAsync`     | User approved tx (async, returns immediately) |
 | `rejectTransaction`           | User rejected tx                      |
+| `getPendingSignatureRequests` | Get all pending signature requests    |
+| `rejectSignatureRequest`      | User rejected signature request       |
 | `cancelTransaction`           | User cancelled in-progress tx         |
 | `clearApiKeyCache`            | Clear cached API key                  |
 | `getCachedPassword`           | Check if password is cached           |
@@ -896,11 +953,12 @@ Build command: `pnpm build`
 
 ### Background → Views (chrome.runtime broadcast)
 
-| Type                 | Description                                    |
-| -------------------- | ---------------------------------------------- |
-| `txHistoryUpdated`   | Notifies views that transaction history changed |
-| `newPendingTxRequest`| Notifies views of new pending transaction      |
-| `ping`               | Check if any extension view is open            |
+| Type                        | Description                                      |
+| --------------------------- | ------------------------------------------------ |
+| `txHistoryUpdated`          | Notifies views that transaction history changed  |
+| `newPendingTxRequest`       | Notifies views of new pending transaction        |
+| `newPendingSignatureRequest`| Notifies views of new pending signature request  |
+| `ping`                      | Check if any extension view is open              |
 
 ### Views → Background (response)
 
@@ -999,28 +1057,37 @@ When in sidepanel:
 - Sidepanel: 100vh height (no max-height restriction)
 - Font: Inter (UI), JetBrains Mono (code/addresses)
 
-### Transaction Confirmation Header
+### Transaction/Signature Confirmation Header
+
+The confirmation views use a two-row header layout:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  ←  │           Tx Request  < 2/2 >           │  Reject All │
+│  ←  │               < 1/2 >               │  Reject All │  ← Row 1
+├─────────────────────────────────────────────────────────────┤
+│                   Transaction Request                       │  ← Row 2
 └─────────────────────────────────────────────────────────────┘
-     Left              Center (absolute)              Right
 ```
 
-- **Back arrow**: Returns to pending list (if multiple) or main view
-- **Center**: Title + navigation arrows + counter badge (when multiple txs)
-- **Reject All**: Rejects all pending transactions (only shown when multiple)
+**Row 1:**
+- **Back arrow** (left): Returns to pending list (if multiple) or main view
+- **Navigation** (center, absolute): `< 1/2 >` arrows + counter badge
+- **Reject All** (right): Rejects all pending requests (only shown when multiple)
+
+**Row 2:**
+- **Title** (centered): "Transaction Request" or "Signature Request" (larger font)
 
 ### Pending Requests List
 
-Each request shows:
+The list shows both transaction and signature requests. Each request shows:
 - Request number badge (#1, #2, etc.)
 - Origin favicon with white background (handles transparent icons)
 - Origin hostname
+- Type badge: **TX** (blue) or **SIG** (orange/warning)
 - Chain badge with icon
 - Relative timestamp ("2 mins ago")
-- Target address (truncated)
+- For transactions: Target address (truncated)
+- For signatures: Method name (e.g., "Personal Sign", "Typed Data")
 
 ### Origin Favicon Styling
 

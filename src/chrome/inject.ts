@@ -233,6 +233,41 @@ window.addEventListener("message", async (e) => {
       break;
     }
 
+    case "i_signatureRequest": {
+      const { id, method, params, chainId } = e.data.msg as {
+        id: string;
+        method: string;
+        params: any[];
+        chainId: number;
+      };
+
+      // Forward to background worker
+      chrome.runtime.sendMessage(
+        {
+          type: "signatureRequest",
+          signature: { method, params, chainId },
+          origin: window.location.origin,
+          favicon: getFaviconUrl(),
+        },
+        (result: { success: boolean; signature?: string; error?: string }) => {
+          // Send result back to impersonator.ts
+          window.postMessage(
+            {
+              type: "signatureRequestResult",
+              msg: {
+                id,
+                success: result.success,
+                signature: result.signature,
+                error: result.error,
+              },
+            },
+            "*"
+          );
+        }
+      );
+      break;
+    }
+
     case "i_rpcRequest": {
       const { id, rpcUrl, method, params } = e.data.msg as {
         id: string;

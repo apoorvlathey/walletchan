@@ -38,13 +38,15 @@ const checkmarkDraw = keyframes`
 interface TransactionConfirmationProps {
   txRequest: PendingTxRequest;
   currentIndex: number;
-  totalCount: number;
+  totalTxCount: number;
+  totalSignatureCount: number;
   isInSidePanel: boolean;
   onBack: () => void;
   onConfirmed: () => void;
   onRejected: () => void;
   onRejectAll: () => void;
   onNavigate: (direction: "prev" | "next") => void;
+  onNavigateToSignature: () => void;
 }
 
 type ConfirmationState = "ready" | "submitting" | "sent" | "error";
@@ -91,14 +93,17 @@ function CopyButton({ value }: { value: string }) {
 function TransactionConfirmation({
   txRequest,
   currentIndex,
-  totalCount,
+  totalTxCount,
+  totalSignatureCount,
   isInSidePanel,
   onBack,
   onConfirmed,
   onRejected,
   onRejectAll,
   onNavigate,
+  onNavigateToSignature,
 }: TransactionConfirmationProps) {
+  const totalCount = totalTxCount + totalSignatureCount;
   const [state, setState] = useState<ConfirmationState>("ready");
   const [error, setError] = useState<string>("");
   const [toLabels, setToLabels] = useState<string[]>([]);
@@ -245,8 +250,9 @@ function TransactionConfirmation({
 
   return (
     <Box p={4} minH="100%" bg="bg.base">
-      <VStack spacing={4} align="stretch">
-        <Flex align="center" position="relative">
+      <VStack spacing={3} align="stretch">
+        {/* Top row - Back button, navigation, Reject All */}
+        <Flex align="center" position="relative" minH="32px">
           {/* Left - Back button */}
           <IconButton
             aria-label="Back"
@@ -257,55 +263,57 @@ function TransactionConfirmation({
             minW="auto"
           />
 
-          {/* Center - Title and navigation */}
-          <HStack
-            spacing={2}
-            position="absolute"
-            left="50%"
-            transform="translateX(-50%)"
-          >
-            <Text fontWeight="600" fontSize="sm" color="text.primary" whiteSpace="nowrap">
-              Tx Request
-            </Text>
-            {totalCount > 1 && (
-              <HStack spacing={0}>
-                <IconButton
-                  aria-label="Previous"
-                  icon={<ChevronLeftIcon />}
-                  variant="ghost"
-                  size="xs"
-                  isDisabled={currentIndex === 0}
-                  onClick={() => onNavigate("prev")}
-                  color="text.secondary"
-                  _hover={{ color: "text.primary", bg: "bg.emphasis" }}
-                  minW="auto"
-                  p={1}
-                />
-                <Badge
-                  bg="bg.muted"
-                  color="text.secondary"
-                  fontSize="xs"
-                  px={2}
-                  py={0.5}
-                  borderRadius="full"
-                >
-                  {currentIndex + 1}/{totalCount}
-                </Badge>
-                <IconButton
-                  aria-label="Next"
-                  icon={<ChevronRightIcon />}
-                  variant="ghost"
-                  size="xs"
-                  isDisabled={currentIndex === totalCount - 1}
-                  onClick={() => onNavigate("next")}
-                  color="text.secondary"
-                  _hover={{ color: "text.primary", bg: "bg.emphasis" }}
-                  minW="auto"
-                  p={1}
-                />
-              </HStack>
-            )}
-          </HStack>
+          {/* Center - Navigation (absolutely positioned for true centering) */}
+          {totalCount > 1 && (
+            <HStack
+              spacing={0}
+              position="absolute"
+              left="50%"
+              transform="translateX(-50%)"
+            >
+              <IconButton
+                aria-label="Previous"
+                icon={<ChevronLeftIcon />}
+                variant="ghost"
+                size="xs"
+                isDisabled={currentIndex === 0}
+                onClick={() => onNavigate("prev")}
+                color="text.secondary"
+                _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+                minW="auto"
+                p={1}
+              />
+              <Badge
+                bg="bg.muted"
+                color="text.secondary"
+                fontSize="xs"
+                px={2}
+                py={0.5}
+                borderRadius="full"
+              >
+                {currentIndex + 1}/{totalCount}
+              </Badge>
+              <IconButton
+                aria-label="Next"
+                icon={<ChevronRightIcon />}
+                variant="ghost"
+                size="xs"
+                isDisabled={currentIndex + 1 === totalCount}
+                onClick={() => {
+                  // If at last tx request and there are signature requests, navigate to signatures
+                  if (currentIndex === totalTxCount - 1 && totalSignatureCount > 0) {
+                    onNavigateToSignature();
+                  } else {
+                    onNavigate("next");
+                  }
+                }}
+                color="text.secondary"
+                _hover={{ color: "text.primary", bg: "bg.emphasis" }}
+                minW="auto"
+                p={1}
+              />
+            </HStack>
+          )}
 
           {/* Right - Reject All */}
           <Spacer />
@@ -322,6 +330,11 @@ function TransactionConfirmation({
             </Button>
           )}
         </Flex>
+
+        {/* Title row */}
+        <Text fontWeight="600" fontSize="lg" color="text.primary" textAlign="center">
+          Transaction Request
+        </Text>
 
         {/* Transaction Info */}
         <VStack
@@ -361,7 +374,7 @@ function TransactionConfirmation({
                       target.src = googleFallback;
                     }
                   }}
-                  fallback={<Box boxSize="16px" bg="bg.muted" borderRadius="sm" />}
+                  fallback={<Box boxSize="16px" bg="white" borderRadius="sm" />}
                 />
               </Box>
               <Text fontSize="sm" fontWeight="medium" color="text.primary">

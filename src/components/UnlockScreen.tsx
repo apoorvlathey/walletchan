@@ -24,7 +24,7 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@chakra-ui/react";
-import { ViewIcon, ViewOffIcon, LockIcon, WarningTwoIcon } from "@chakra-ui/icons";
+import { ViewIcon, ViewOffIcon, LockIcon, WarningTwoIcon, BellIcon } from "@chakra-ui/icons";
 
 // Sidepanel icon
 const SidePanelIcon = (props: any) => (
@@ -38,9 +38,11 @@ const SidePanelIcon = (props: any) => (
 
 interface UnlockScreenProps {
   onUnlock: () => void;
+  pendingTxCount: number;
+  pendingSignatureCount: number;
 }
 
-function UnlockScreen({ onUnlock }: UnlockScreenProps) {
+function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: UnlockScreenProps) {
   const toast = useToast();
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -190,6 +192,43 @@ function UnlockScreen({ onUnlock }: UnlockScreenProps) {
               onClick={toggleSidePanelMode}
             />
           </Tooltip>
+        </Box>
+      )}
+
+      {/* Pending requests banner */}
+      {(pendingTxCount > 0 || pendingSignatureCount > 0) && (
+        <Box
+          position="absolute"
+          top={3}
+          left={3}
+          right={sidePanelSupported ? 12 : 3}
+          bg="warning.bg"
+          borderWidth="1px"
+          borderColor="warning.border"
+          borderRadius="lg"
+          px={3}
+          py={2}
+        >
+          <HStack spacing={2}>
+            <Box
+              p={1.5}
+              bg="warning.solid"
+              borderRadius="md"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              flexShrink={0}
+            >
+              <BellIcon boxSize={3.5} color="bg.base" />
+            </Box>
+            <Text fontSize="xs" fontWeight="500" color="text.primary">
+              {pendingTxCount > 0 && pendingSignatureCount > 0
+                ? `${pendingTxCount} tx, ${pendingSignatureCount} signature pending`
+                : pendingTxCount > 0
+                ? `${pendingTxCount} pending request${pendingTxCount > 1 ? "s" : ""}`
+                : `${pendingSignatureCount} signature request${pendingSignatureCount > 1 ? "s" : ""}`}
+            </Text>
+          </HStack>
         </Box>
       )}
 

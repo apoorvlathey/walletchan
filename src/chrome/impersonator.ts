@@ -46,6 +46,12 @@ const pendingTxCallbacks = new Map<
   { resolve: (hash: string) => void; reject: (error: Error) => void }
 >();
 
+// Pending signature request callbacks
+const pendingSignatureCallbacks = new Map<
+  string,
+  { resolve: (result: string) => void; reject: (error: Error) => void }
+>();
+
 // Pending RPC request callbacks
 const pendingRpcCallbacks = new Map<
   string,
@@ -209,11 +215,31 @@ class ImpersonatorProvider extends EventEmitter {
         await setChainIdPromise;
         return null;
       }
-      case "eth_sign": {
-        return throwUnsupported("eth_sign not supported");
-      }
-      case "personal_sign": {
-        return throwUnsupported("personal_sign not supported");
+      case "eth_sign":
+      case "personal_sign":
+      case "eth_signTypedData":
+      case "eth_signTypedData_v3":
+      case "eth_signTypedData_v4": {
+        const sigId = crypto.randomUUID();
+
+        return new Promise<string>((resolve, reject) => {
+          // Store callbacks for this signature request
+          pendingSignatureCallbacks.set(sigId, { resolve, reject });
+
+          // Send signature request to content script
+          window.postMessage(
+            {
+              type: "i_signatureRequest",
+              msg: {
+                id: sigId,
+                method: method,
+                params: params || [],
+                chainId: this.chainId,
+              },
+            },
+            "*"
+          );
+        });
       }
       case "eth_sendTransaction": {
         // Validate chain ID
@@ -403,6 +429,19 @@ window.addEventListener("message", (e: any) => {
           callbacks.resolve(e.data.msg.txHash);
         } else {
           callbacks.reject(new Error(e.data.msg.error || "Transaction failed"));
+        }
+      }
+      break;
+    }
+    case "signatureRequestResult": {
+      const sigId = e.data.msg.id as string;
+      const callbacks = pendingSignatureCallbacks.get(sigId);
+      if (callbacks) {
+        pendingSignatureCallbacks.delete(sigId);
+        if (e.data.msg.success && e.data.msg.signature) {
+          callbacks.resolve(e.data.msg.signature);
+        } else {
+          callbacks.reject(new Error(e.data.msg.error || "Signature request rejected"));
         }
       }
       break;
