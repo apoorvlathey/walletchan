@@ -37,13 +37,10 @@ jobs:
         run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Create zip
-        run: |
-          cd build
-          zip -r ../bankr-wallet-v${{ steps.version.outputs.version }}.zip .
-          cd ..
+        run: pnpm zip
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: bankr-wallet-v${{ steps.version.outputs.version }}.zip
+          files: zip/bankr-wallet-v${{ steps.version.outputs.version }}.zip
           generate_release_notes: true
