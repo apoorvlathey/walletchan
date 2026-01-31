@@ -1,6 +1,6 @@
 {
   "name": "BankrWallet",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "manifest_version": 3,
   "description": "BankrWallet",
   "homepage_url": "https://x.com/apoorveth",
@@ -17,9 +17,9 @@
     "default_popup": "popup-init.html"
   },
   "icons": {
-    "128": "./icons/icon128.png",
+    "16": "./icons/icon16.png",
     "48": "./icons/icon48.png",
-    "16": "./icons/icon16.png"
+    "128": "./icons/icon128.png"
   },
   "background": {
     "service_worker": "static/js/background.js",
@@ -30,18 +30,39 @@
   },
   "content_scripts": [
     {
-      "matches": ["file://*/*", "http://*/*", "https://*/*"],
-      "js": ["static/js/inject.js"],
+      "matches": [
+        "file://*/*",
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "static/js/inject.js"
+      ],
       "run_at": "document_start",
       "all_frames": true
     }
   ],
-  "permissions": ["activeTab", "storage", "sidePanel", "notifications", "tabs"],
-  "host_permissions": ["https://*/*", "http://*/*"],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "sidePanel",
+    "notifications",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
   "web_accessible_resources": [
     {
-      "resources": ["static/js/inpage.js"],
-      "matches": ["file://*/*", "http://*/*", "https://*/*"]
+      "resources": [
+        "static/js/inpage.js"
+      ],
+      "matches": [
+        "file://*/*",
+        "http://*/*",
+        "https://*/*"
+      ]
     }
   ]
 }
