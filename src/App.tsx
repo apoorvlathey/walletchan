@@ -1111,7 +1111,55 @@ function App() {
         </HStack>
       </Flex>
 
-      <Container pt={4} pb={4} flex="1" display="flex" flexDirection="column">
+      {/* Powered by Banner */}
+      <HStack
+        bg="bauhaus.yellow"
+        py={1}
+        px={4}
+        justify="center"
+        spacing={2}
+        borderBottom="3px solid"
+        borderColor="bauhaus.black"
+        mb={4}
+      >
+        <Box w="6px" h="6px" bg="bauhaus.black" />
+        <Text
+          fontSize="xs"
+          fontWeight="700"
+          color="bauhaus.black"
+          textTransform="uppercase"
+          letterSpacing="wider"
+        >
+          Powered by
+        </Text>
+        <Link
+          bg="bauhaus.blue"
+          color="bauhaus.white"
+          px={2}
+          py={0.5}
+          fontWeight="900"
+          fontSize="xs"
+          textTransform="uppercase"
+          letterSpacing="wide"
+          border="2px solid"
+          borderColor="bauhaus.black"
+          _hover={{
+            bg: "#F97316",
+            color: "bauhaus.white",
+          }}
+          transition="all 0.2s ease-out"
+          onClick={() => {
+            chrome.tabs.create({
+              url: "https://clanker.world/clanker/0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07",
+            });
+          }}
+        >
+          $BNKRW
+        </Link>
+        <Box w="6px" h="6px" bg="bauhaus.black" />
+      </HStack>
+
+      <Container pt={6} pb={4} flex="1" display="flex" flexDirection="column">
         <VStack spacing={4} align="stretch" flex="1">
           {/* Failed Transaction Error */}
           {failedTxError && (
