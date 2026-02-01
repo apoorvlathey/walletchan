@@ -20,8 +20,7 @@ import {
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { ViewIcon, ViewOffIcon, ArrowBackIcon } from "@chakra-ui/icons";
 import { saveEncryptedApiKey } from "@/chrome/crypto";
-import { StaticJsonRpcProvider } from "@ethersproject/providers";
-import { isAddress } from "@ethersproject/address";
+import { resolveAddress } from "@/utils/nameResolution";
 
 interface ApiKeySetupProps {
   onComplete: () => void;
@@ -82,20 +81,6 @@ function ApiKeySetup({
   // Show password fields for initial setup OR when changing key but cache expired
   const needsPassword = !isChangingKey || !hasCachedPassword;
 
-  const resolveAddress = async (input: string): Promise<string | null> => {
-    if (isAddress(input)) {
-      return input;
-    }
-
-    try {
-      const mainnetProvider = new StaticJsonRpcProvider("https://rpc.ankr.com/eth");
-      const resolved = await mainnetProvider.resolveName(input);
-      return resolved;
-    } catch (err) {
-      return null;
-    }
-  };
-
   const validate = async (): Promise<boolean> => {
     const newErrors: typeof errors = {};
 
@@ -111,7 +96,7 @@ function ApiKeySetup({
       setIsResolvingAddress(false);
 
       if (!resolved) {
-        newErrors.walletAddress = "Invalid address or ENS name";
+        newErrors.walletAddress = "Invalid address, ENS name, or WNS name";
       }
     }
 
@@ -141,10 +126,10 @@ function ApiKeySetup({
     setIsSubmitting(true);
 
     try {
-      // Resolve address (in case it's ENS)
+      // Resolve address (in case it's ENS or WNS)
       const resolvedAddress = await resolveAddress(walletAddress.trim());
       if (!resolvedAddress) {
-        setErrors({ walletAddress: "Invalid address or ENS name" });
+        setErrors({ walletAddress: "Invalid address, ENS name, or WNS name" });
         setIsSubmitting(false);
         return;
       }
@@ -261,7 +246,7 @@ function ApiKeySetup({
       <FormControl isInvalid={!!errors.walletAddress}>
         <FormLabel color="text.secondary">Wallet Address</FormLabel>
         <Input
-          placeholder="0x... or ENS name"
+          placeholder="0x... or name (e.g., vitalik.eth, example.wei)"
           value={walletAddress}
           onChange={(e) => setWalletAddress(e.target.value)}
           bg="bg.subtle"

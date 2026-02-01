@@ -19,6 +19,7 @@ import { keyframes } from "@emotion/react";
 import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon } from "@chakra-ui/icons";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { getChainConfig } from "@/constants/chainConfig";
+import { reverseResolveAddress } from "@/utils/nameResolution";
 
 // Success animation keyframes
 const scaleIn = keyframes`
@@ -99,6 +100,7 @@ function TransactionConfirmation({
   const [state, setState] = useState<ConfirmationState>("ready");
   const [error, setError] = useState<string>("");
   const [toLabels, setToLabels] = useState<string[]>([]);
+  const [resolvedToName, setResolvedToName] = useState<string | null>(null);
 
   const { tx, origin, chainName, favicon } = txRequest;
 
@@ -123,6 +125,22 @@ function TransactionConfirmation({
 
     fetchLabels();
   }, [tx.to, tx.chainId]);
+
+  // Reverse resolve the "to" address to get .wei or .eth name
+  useEffect(() => {
+    const fetchResolvedName = async () => {
+      if (!tx.to) return;
+      try {
+        const name = await reverseResolveAddress(tx.to);
+        setResolvedToName(name);
+      } catch (err) {
+        // Silently fail - name resolution is optional
+        console.debug("Failed to reverse resolve address:", err);
+      }
+    };
+
+    fetchResolvedName();
+  }, [tx.to]);
 
   const handleConfirm = async () => {
     setState("submitting");
@@ -467,28 +485,46 @@ function TransactionConfirmation({
 
             {/* To Address */}
             <Box w="full" p={3}>
-              <HStack justify="space-between" mb={toLabels.length > 0 ? 2 : 0}>
+              <HStack justify="space-between" mb={(toLabels.length > 0 || resolvedToName) ? 2 : 0}>
                 <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
                   To
                 </Text>
-                <HStack
-                  spacing={1}
-                  px={2}
-                  py={1}
-                  bg="bauhaus.white"
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                >
-                  <Text
-                    fontSize="xs"
-                    color="text.primary"
-                    fontFamily="mono"
-                    fontWeight="700"
+                <VStack spacing={1} align="flex-end">
+                  {resolvedToName && (
+                    <Badge
+                      fontSize="xs"
+                      bg="bauhaus.yellow"
+                      color="bauhaus.black"
+                      border="2px solid"
+                      borderColor="bauhaus.black"
+                      px={2}
+                      py={0.5}
+                      fontWeight="700"
+                      maxW="200px"
+                      isTruncated
+                    >
+                      {resolvedToName}
+                    </Badge>
+                  )}
+                  <HStack
+                    spacing={1}
+                    px={2}
+                    py={1}
+                    bg="bauhaus.white"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
                   >
-                    {tx.to.slice(0, 6)}...{tx.to.slice(-4)}
-                  </Text>
-                  <CopyButton value={tx.to} />
-                </HStack>
+                    <Text
+                      fontSize="xs"
+                      color="text.primary"
+                      fontFamily="mono"
+                      fontWeight="700"
+                    >
+                      {tx.to.slice(0, 6)}...{tx.to.slice(-4)}
+                    </Text>
+                    <CopyButton value={tx.to} />
+                  </HStack>
+                </VStack>
               </HStack>
               {toLabels.length > 0 && (
                 <Flex justify="flex-end">

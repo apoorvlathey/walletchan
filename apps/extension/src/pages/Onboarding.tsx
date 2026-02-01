@@ -23,9 +23,7 @@ import {
   CheckIcon,
 } from "@chakra-ui/icons";
 import { saveEncryptedApiKey, hasEncryptedApiKey } from "@/chrome/crypto";
-import { StaticJsonRpcProvider } from "@ethersproject/providers";
-import { isAddress } from "@ethersproject/address";
-import { DEFAULT_NETWORKS } from "@/constants/networks";
+import { resolveAddress } from "@/utils/nameResolution";
 
 type OnboardingStep = "welcome" | "apiKey" | "address" | "password" | "success";
 
@@ -131,23 +129,6 @@ function Onboarding({ onComplete }: OnboardingProps) {
     checkExistingSetup();
   }, []);
 
-  const resolveAddress = async (input: string): Promise<string | null> => {
-    if (isAddress(input)) {
-      return input;
-    }
-
-    try {
-      // Use the configured Ethereum RPC URL for ENS resolution
-      const mainnetProvider = new StaticJsonRpcProvider(
-        DEFAULT_NETWORKS.Ethereum.rpcUrl,
-      );
-      const resolved = await mainnetProvider.resolveName(input);
-      return resolved;
-    } catch {
-      return null;
-    }
-  };
-
   const validateApiKey = (): boolean => {
     if (!apiKey.trim()) {
       setErrors({ apiKey: "API key is required" });
@@ -168,7 +149,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
     setIsResolvingAddress(false);
 
     if (!resolved) {
-      setErrors({ walletAddress: "Invalid address or ENS name" });
+      setErrors({ walletAddress: "Invalid address, ENS name, or WNS name" });
       return false;
     }
 
@@ -231,10 +212,10 @@ function Onboarding({ onComplete }: OnboardingProps) {
     setIsSubmitting(true);
 
     try {
-      // Resolve address (in case it's ENS)
+      // Resolve address (in case it's ENS or WNS)
       const resolvedAddress = await resolveAddress(walletAddress.trim());
       if (!resolvedAddress) {
-        setErrors({ walletAddress: "Invalid address or ENS name" });
+        setErrors({ walletAddress: "Invalid address, ENS name, or WNS name" });
         setIsSubmitting(false);
         return;
       }
@@ -768,7 +749,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
                   Wallet Address
                 </FormLabel>
                 <Input
-                  placeholder="0x... or ENS name (e.g., vitalik.eth)"
+                  placeholder="0x... or name (e.g., vitalik.eth, example.wei)"
                   value={walletAddress}
                   autoFocus
                   onChange={(e) => {
