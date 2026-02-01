@@ -595,7 +595,7 @@ A funky, bold landing page that showcases BankrWallet—the browser extension th
 ## SEO & Meta
 
 ```html
-<title>BankrWallet - Pull Your Bankr Bot Into Any Dapp</title>
+<title>BankrWallet - Your Bankr Wallet, Anywhere</title>
 <meta
   name="description"
   content="Browser extension that brings your Bankr terminal wallet to any dapp. AI-powered transactions, multi-chain support, no seed phrases needed."

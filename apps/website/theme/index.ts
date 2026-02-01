@@ -23,6 +23,7 @@ const theme = extendTheme({
       red: bauhausColors.red,
       blue: bauhausColors.blue,
       yellow: bauhausColors.yellow,
+      green: "#208040",
       black: bauhausColors.black,
       white: bauhausColors.white,
       background: bauhausColors.background,
@@ -107,6 +108,23 @@ const theme = extendTheme({
           _hover: {
             bg: "bauhaus.yellow",
             opacity: 0.9,
+          },
+          _active: {
+            transform: "translate(2px, 2px)",
+            boxShadow: "none",
+          },
+        },
+        green: {
+          bg: "bauhaus.green",
+          color: "white",
+          border: "2px solid",
+          borderColor: "bauhaus.black",
+          boxShadow: bauhausShadows.md,
+          _hover: {
+            bg: "bauhaus.green",
+            opacity: 0.9,
+            transform: "translateY(-2px)",
+            boxShadow: bauhausShadows.lg,
           },
           _active: {
             transform: "translate(2px, 2px)",
