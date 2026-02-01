@@ -1,5 +1,5 @@
 // Token addresses
-export const TOKEN_ADDRESS = "0xf055bcd5f2f7c46eed08f100a52dac307e73e36c";
+export const TOKEN_ADDRESS = "0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07";
 export const POOL_ADDRESS =
   "0x6c8fd04c19e3c6c3efc21f6f5ae79c1453a19d971b7b7d4969df1928c380aaad";
 
