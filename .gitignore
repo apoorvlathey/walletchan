@@ -3,20 +3,23 @@
 TODO.md
 
 # dependencies
-/node_modules
+node_modules
 /.pnp
 .pnp.js
 
 # cache
 .eslintcache
 .cache
+.turbo
 
 # testing
 /coverage
 
-# production
-/build
-/zip
+# production builds
+build
+zip
+.next
+out
 
 # misc
 .DS_Store
@@ -29,7 +32,11 @@ TODO.md
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # Firefox build artifacts
 web-ext-artifacts
 source.zip
+
+# Vercel
+.vercel

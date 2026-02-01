@@ -57,6 +57,8 @@
 
 ## Development
 
+This repository is a monorepo containing the browser extension and [website](apps/website/). See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development instructions.
+
 ### Prerequisites
 
 - Node.js (see `.nvmrc` for version)
@@ -69,9 +71,9 @@
 pnpm install
 
 # Build the extension
-pnpm build
+pnpm build:extension
 
-# The built extension will be in the `build` directory
+# The built extension will be in `apps/extension/build/`
 ```
 
 ## Architecture

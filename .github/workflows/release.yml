@@ -30,11 +30,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build extension
-        run: pnpm build
+        run: pnpm build:extension
 
       - name: Get version
         id: version
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        run: echo "version=$(node -p "require('./apps/extension/package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Create zip
         run: pnpm zip
@@ -42,5 +42,5 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: zip/bankr-wallet-v${{ steps.version.outputs.version }}.zip
+          files: apps/extension/zip/bankr-wallet-v${{ steps.version.outputs.version }}.zip
           generate_release_notes: true
