@@ -258,7 +258,7 @@ export function Footer() {
               fontSize="sm"
               display={{ base: "none", md: "block" }}
             >
-              © 2025 BankrWallet
+              © {new Date().getFullYear()} BankrWallet
             </Text>
           </Flex>
         </VStack>
