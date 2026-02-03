@@ -8,6 +8,10 @@
   <b>Pull your BankrWallet out of the Terminal and into your browser to use with Any Dapp, just like Metamask!</b>
 </p>
 
+<p align="center">
+  <a href="https://bankrwallet.app/">https://bankrwallet.app/</a>
+</p>
+
 <table>
   <tr>
     <td><img src="./.github/usage/password-page.png" alt="Password Page" /></td>
