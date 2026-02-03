@@ -28,7 +28,9 @@ import {
   ChevronRightIcon,
   DeleteIcon,
   TimeIcon,
+  ChatIcon,
 } from "@chakra-ui/icons";
+import { clearChatHistory } from "@/chrome/chatStorage";
 import Chains from "./Chains";
 import ChangePassword from "./ChangePassword";
 import AutoLockSettings from "./AutoLockSettings";
@@ -49,6 +51,7 @@ function Settings({ close, showBackButton = true, onSessionExpired }: SettingsPr
   const [address, setAddress] = useState<string>("");
   const toast = useBauhausToast();
   const { isOpen: isDeleteModalOpen, onOpen: onDeleteModalOpen, onClose: onDeleteModalClose } = useDisclosure();
+  const { isOpen: isChatDeleteModalOpen, onOpen: onChatDeleteModalOpen, onClose: onChatDeleteModalClose } = useDisclosure();
 
   const handleClearHistory = () => {
     chrome.runtime.sendMessage({ type: "clearTxHistory" }, () => {
@@ -60,6 +63,17 @@ function Settings({ close, showBackButton = true, onSessionExpired }: SettingsPr
       });
       onDeleteModalClose();
     });
+  };
+
+  const handleClearChatHistory = async () => {
+    await clearChatHistory();
+    toast({
+      title: "Chat history cleared",
+      status: "success",
+      duration: 2000,
+      isClosable: true,
+    });
+    onChatDeleteModalClose();
   };
 
   useEffect(() => {
@@ -447,7 +461,57 @@ function Settings({ close, showBackButton = true, onSessionExpired }: SettingsPr
         </HStack>
       </Box>
 
-      {/* Delete Confirmation Modal */}
+      {/* Clear Chat History Section */}
+      <Box
+        bg="bauhaus.white"
+        border="3px solid"
+        borderColor="bauhaus.black"
+        boxShadow="4px 4px 0px 0px #121212"
+        p={4}
+        cursor="pointer"
+        onClick={onChatDeleteModalOpen}
+        _hover={{
+          transform: "translateY(-2px)",
+          boxShadow: "6px 6px 0px 0px #121212",
+        }}
+        _active={{
+          transform: "translate(2px, 2px)",
+          boxShadow: "none",
+        }}
+        transition="all 0.2s ease-out"
+        position="relative"
+      >
+        {/* Corner decoration */}
+        <Box
+          position="absolute"
+          top="-3px"
+          right="-3px"
+          w="8px"
+          h="8px"
+          bg="bauhaus.red"
+          border="2px solid"
+          borderColor="bauhaus.black"
+          borderRadius="full"
+        />
+
+        <HStack justify="space-between">
+          <HStack spacing={3}>
+            <Box p={2} bg="bauhaus.red">
+              <ChatIcon boxSize={4} color="white" />
+            </Box>
+            <Box>
+              <Text fontWeight="700" color="text.primary">
+                Clear Chat History
+              </Text>
+              <Text fontSize="xs" color="text.secondary" fontWeight="500">
+                Remove all chat conversations
+              </Text>
+            </Box>
+          </HStack>
+        </HStack>
+      </Box>
+
+      {/* Delete Transaction History Confirmation Modal */}
       <Modal isOpen={isDeleteModalOpen} onClose={onDeleteModalClose} isCentered>
         <ModalOverlay bg="blackAlpha.800" />
         <ModalContent
@@ -481,6 +545,47 @@ function Settings({ close, showBackButton = true, onSessionExpired }: SettingsPr
               variant="danger"
               size="sm"
               onClick={handleClearHistory}
+            >
+              Delete
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Delete Chat History Confirmation Modal */}
+      <Modal isOpen={isChatDeleteModalOpen} onClose={onChatDeleteModalClose} isCentered>
+        <ModalOverlay bg="blackAlpha.800" />
+        <ModalContent
+          bg="bauhaus.white"
+          border="3px solid"
+          borderColor="bauhaus.black"
+          boxShadow="8px 8px 0px 0px #121212"
+          mx={4}
+          borderRadius="0"
+        >
+          <ModalHeader
+            color="bauhaus.black"
+            fontWeight="900"
+            fontSize="md"
+            textTransform="uppercase"
+            borderBottom="3px solid"
+            borderColor="bauhaus.black"
+          >
+            Clear Chat History?
+          </ModalHeader>
+          <ModalBody py={4}>
+            <Text color="text.secondary" fontSize="sm" fontWeight="500">
+              This will permanently delete all chat conversations. This action cannot be undone.
+            </Text>
+          </ModalBody>
+          <ModalFooter gap={2} borderTop="3px solid" borderColor="bauhaus.black">
+            <Button variant="secondary" size="sm" onClick={onChatDeleteModalClose}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleClearChatHistory}
             >
               Delete
             </Button>

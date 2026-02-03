@@ -22,7 +22,7 @@ import {
   Spinner,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
-import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon, LockIcon, WarningIcon, InfoIcon } from "@chakra-ui/icons";
+import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon, LockIcon, WarningIcon, InfoIcon, ChatIcon } from "@chakra-ui/icons";
 
 // Sidepanel icon
 const SidePanelIcon = (props: any) => (
@@ -53,6 +53,7 @@ const Settings = lazy(() => import("@/components/Settings"));
 const TransactionConfirmation = lazy(() => import("@/components/TransactionConfirmation"));
 const SignatureRequestConfirmation = lazy(() => import("@/components/SignatureRequestConfirmation"));
 const PendingTxList = lazy(() => import("@/components/PendingTxList"));
+const ChatView = lazy(() => import("@/components/Chat/ChatView"));
 
 // Eager load components needed immediately
 import UnlockScreen from "@/components/UnlockScreen";
@@ -95,7 +96,7 @@ const LoadingFallback = () => (
   </Box>
 );
 
-type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | "signatureConfirm" | "waitingForOnboarding";
+type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | "signatureConfirm" | "waitingForOnboarding" | "chat";
 
 function App() {
   const { networksInfo, reloadRequired, setReloadRequired } = useNetworks();
@@ -117,6 +118,10 @@ function App() {
   const [isInSidePanel, setIsInSidePanel] = useState(false);
   const [failedTxError, setFailedTxError] = useState<{ error: string; origin: string } | null>(null);
   const [onboardingTabId, setOnboardingTabId] = useState<number | null>(null);
+  const [startChatWithNew, setStartChatWithNew] = useState(false);
+  const [returnToChatAfterUnlock, setReturnToChatAfterUnlock] = useState(false);
+  const [returnToConversationId, setReturnToConversationId] = useState<string | null>(null);
+  const [isWalletUnlocked, setIsWalletUnlocked] = useState(false);
 
   const currentTab = async () => {
     const [tab] = await chrome.tabs.query({
@@ -451,6 +456,9 @@ function App() {
         }
       );
 
+      // Set wallet unlock state
+      setIsWalletUnlocked(isUnlocked);
+
       // Determine initial view
       if (!isUnlocked) {
         setView("unlock");
@@ -491,6 +499,7 @@ function App() {
         setPendingRequests((prev) => [...prev, message.txRequest!]);
         // Check if wallet is locked before showing the request
         const isUnlocked = await checkLockState();
+        setIsWalletUnlocked(isUnlocked);
         if (isUnlocked) {
           // Show the new tx request
           setSelectedTxRequest(message.txRequest);
@@ -505,6 +514,7 @@ function App() {
         setPendingSignatureRequests((prev) => [...prev, message.sigRequest!]);
         // Check if wallet is locked before showing the request
         const isUnlocked = await checkLockState();
+        setIsWalletUnlocked(isUnlocked);
         if (isUnlocked) {
           // Show the new signature request
           setSelectedSignatureRequest(message.sigRequest);
@@ -604,6 +614,20 @@ function App() {
   }, [reloadRequired, networksInfo]);
 
   const handleUnlock = useCallback(async () => {
+    // Mark wallet as unlocked
+    setIsWalletUnlocked(true);
+
+    // If we came from chat, return to chat
+    if (returnToChatAfterUnlock) {
+      setReturnToChatAfterUnlock(false);
+      // Note: returnToConversationId is kept so ChatView can load the conversation
+      setView("chat");
+      return;
+    }
+
+    // Clear conversation ID if not returning to chat
+    setReturnToConversationId(null);
+
     // Refresh pending requests after unlock
     const requests = await loadPendingRequests();
     const sigRequests = await loadPendingSignatureRequests();
@@ -619,7 +643,7 @@ function App() {
     } else {
       setView("main");
     }
-  }, []);
+  }, [returnToChatAfterUnlock]);
 
   const handleCopyAddress = async () => {
     try {
@@ -905,6 +929,7 @@ function App() {
                   setHasApiKey(has);
                   if (has) {
                     checkLockState().then((unlocked) => {
+                      setIsWalletUnlocked(unlocked);
                       if (unlocked) {
                         setView("main");
                       } else {
@@ -915,11 +940,40 @@ function App() {
                 });
               }}
               showBackButton={hasApiKey}
-              onSessionExpired={() => setView("unlock")}
+              onSessionExpired={() => {
+                setIsWalletUnlocked(false);
+                setView("unlock");
+              }}
             />
           </Suspense>
         </Container>
       </Box>
+    );
+  }
+
+  // Chat view
+  if (view === "chat") {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <ChatView
+          onBack={() => {
+            setStartChatWithNew(false);
+            setReturnToConversationId(null);
+            setView("main");
+          }}
+          startWithNewChat={startChatWithNew}
+          returnToConversationId={returnToConversationId}
+          isWalletUnlocked={isWalletUnlocked}
+          onUnlock={(conversationId) => {
+            setReturnToChatAfterUnlock(true);
+            setReturnToConversationId(conversationId || null);
+            setView("unlock");
+          }}
+          onWalletLocked={() => {
+            setIsWalletUnlocked(false);
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -1068,6 +1122,20 @@ function App() {
         </HStack>
         <Spacer />
         <HStack spacing={1}>
+          <Tooltip label="Chat History" placement="bottom">
+            <IconButton
+              aria-label="Chat History"
+              icon={<ChatIcon />}
+              variant="ghost"
+              size="sm"
+              color="bauhaus.white"
+              _hover={{ bg: "whiteAlpha.200" }}
+              onClick={() => {
+                setStartChatWithNew(false);
+                setView("chat");
+              }}
+            />
+          </Tooltip>
           <Tooltip label="Lock wallet" placement="bottom">
             <IconButton
               aria-label="Lock wallet"
@@ -1159,8 +1227,8 @@ function App() {
         <Box w="6px" h="6px" bg="bauhaus.black" />
       </HStack>
 
-      <Container pt={6} pb={4} flex="1" display="flex" flexDirection="column">
-        <VStack spacing={4} align="stretch" flex="1">
+      <Container pt={6} pb={4} flex="1" display="flex" flexDirection="column" overflowY="auto">
+        <VStack spacing={4} align="stretch">
           {/* Failed Transaction Error */}
           {failedTxError && (
             <Box
@@ -1474,42 +1542,87 @@ function App() {
 
           {/* Transaction Status List */}
           <TxStatusList maxItems={5} />
-
-          {/* Spacer to push footer to bottom */}
-          <Box flex="1" />
-
-          {/* Footer */}
-          <HStack spacing={1} justify="center" pt={2}>
-            <Text fontSize="sm" color="text.tertiary" fontWeight="500">
-              Built by
-            </Text>
-            <Link
-              display="flex"
-              alignItems="center"
-              gap={1}
-              color="bauhaus.blue"
-              fontWeight="700"
-              _hover={{ color: "bauhaus.red" }}
-              onClick={() => {
-                chrome.tabs.create({ url: "https://x.com/apoorveth" });
-              }}
-            >
-              <Box
-                as="svg"
-                viewBox="0 0 24 24"
-                w="14px"
-                h="14px"
-                fill="currentColor"
-              >
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-              </Box>
-              <Text fontSize="sm" textDecor="underline">
-                @apoorveth
-              </Text>
-            </Link>
-          </HStack>
         </VStack>
       </Container>
+
+      {/* Sticky Footer */}
+      <Box
+        position="sticky"
+        bottom={0}
+        bg="bg.base"
+        borderTop="3px solid"
+        borderColor="bauhaus.black"
+        p={3}
+      >
+        <Box position="relative">
+          {/* Geometric decorations */}
+          <Box
+            position="absolute"
+            top="-8px"
+            left="10px"
+            w="12px"
+            h="12px"
+            bg="bauhaus.red"
+            borderRadius="full"
+            border="2px solid"
+            borderColor="bauhaus.black"
+            zIndex={1}
+          />
+          <Box
+            position="absolute"
+            top="-6px"
+            right="12px"
+            w="10px"
+            h="10px"
+            bg="bauhaus.blue"
+            transform="rotate(45deg)"
+            border="2px solid"
+            borderColor="bauhaus.black"
+            zIndex={1}
+          />
+          <Box
+            position="absolute"
+            bottom="-8px"
+            right="40px"
+            w={0}
+            h={0}
+            borderLeft="7px solid transparent"
+            borderRight="7px solid transparent"
+            borderBottom="12px solid"
+            borderBottomColor="bauhaus.green"
+            zIndex={1}
+          />
+
+          <Button
+            w="full"
+            bg="bauhaus.yellow"
+            color="bauhaus.black"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="4px 4px 0px 0px #121212"
+            fontWeight="900"
+            textTransform="uppercase"
+            letterSpacing="wider"
+            py={6}
+            _hover={{
+              bg: "bauhaus.yellow",
+              transform: "translateY(-2px)",
+              boxShadow: "6px 6px 0px 0px #121212",
+            }}
+            _active={{
+              transform: "translate(2px, 2px)",
+              boxShadow: "none",
+            }}
+            onClick={() => {
+              setStartChatWithNew(true);
+              setView("chat");
+            }}
+            leftIcon={<ChatIcon />}
+          >
+            Chat with Bankr
+          </Button>
+        </Box>
+      </Box>
     </Box>
   );
 }

@@ -4,6 +4,9 @@
 
 BankrWallet is a Chrome extension that allows users to impersonate blockchain accounts and execute transactions through the Bankr API. This document describes the transaction handling implementation.
 
+**Related Documentation:**
+- [CHAT.md](./CHAT.md) - Chat feature implementation (AI conversations with Bankr agent)
+
 ## Architecture
 
 ```
@@ -234,6 +237,8 @@ src/
 │   ├── background.ts        # Service worker - API calls, tx handling, notifications
 │   ├── crypto.ts            # AES-256-GCM encryption for API key
 │   ├── bankrApi.ts          # Bankr API client
+│   ├── chatApi.ts           # Chat API client for Bankr agent
+│   ├── chatStorage.ts       # Persistent storage for chat conversations
 │   ├── pendingTxStorage.ts  # Persistent storage for pending transactions
 │   ├── pendingSignatureStorage.ts # Persistent storage for pending signature requests
 │   └── txHistoryStorage.ts  # Persistent storage for completed transaction history
@@ -244,6 +249,14 @@ src/
 │   ├── Onboarding.tsx       # Full-page onboarding wizard for first-time setup
 │   └── ApiKeySetup.tsx      # API key + wallet address configuration
 ├── components/
+│   ├── Chat/
+│   │   ├── ChatView.tsx     # Main chat orchestrator (list/chat modes)
+│   │   ├── ChatList.tsx     # Past conversations list
+│   │   ├── ChatHeader.tsx   # Navigation and actions
+│   │   ├── ChatInput.tsx    # Text input + send button
+│   │   ├── MessageList.tsx  # Scrollable message container
+│   │   ├── MessageBubble.tsx # Individual message display
+│   │   └── ShapesLoader.tsx # Animated Bauhaus loading indicator
 │   ├── Settings/
 │   │   ├── index.tsx        # Main settings page (includes clear history)
 │   │   ├── Chains.tsx       # Chain RPC management
@@ -257,6 +270,8 @@ src/
 │   ├── TxStatusList.tsx     # Recent transaction history display
 │   ├── TransactionConfirmation.tsx # In-popup tx confirmation with success animation
 │   └── SignatureRequestConfirmation.tsx # Signature request display (reject only)
+├── hooks/
+│   └── useChat.ts           # Chat state management hook
 ├── onboarding.tsx           # React entry point for onboarding page
 └── App.tsx                  # Main popup application
 

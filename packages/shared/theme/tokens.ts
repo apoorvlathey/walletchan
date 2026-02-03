@@ -10,6 +10,7 @@ export const bauhausColors = {
   red: "#D02020",
   blue: "#1040C0",
   yellow: "#F0C020",
+  green: "#208040",
   black: "#121212",
   white: "#FFFFFF",
 

@@ -109,13 +109,14 @@ apps/website/
 
 When working on features, refer to these docs:
 
-| Doc                              | When to read                                      |
-| -------------------------------- | ------------------------------------------------- |
-| `IMPLEMENTATION.md`              | Extension internals, message types, tx flow       |
-| `STYLING.md`                     | UI components, design tokens, Bauhaus system      |
-| `WEBSITE.md`                     | Website sections, layout specs, animations        |
-| `DEVELOPMENT.md`                 | Build process, release workflow                   |
-| `openclaw-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling |
+| Doc                              | When to read                                          |
+| -------------------------------- | ----------------------------------------------------- |
+| `IMPLEMENTATION.md`              | Extension internals, message types, tx flow           |
+| `CHAT.md`                        | Chat interface to directly chat & prompt to bankr api |
+| `STYLING.md`                     | UI components, design tokens, Bauhaus system          |
+| `WEBSITE.md`                     | Website sections, layout specs, animations            |
+| `DEVELOPMENT.md`                 | Build process, release workflow                       |
+| `openclaw-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling     |
 
 ## Important Patterns
 

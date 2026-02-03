@@ -41,6 +41,20 @@ import {
   getProcessingTxs,
   clearTxHistory,
 } from "./txHistoryStorage";
+import {
+  submitChatPrompt,
+  pollChatJobUntilComplete,
+  ChatMessage,
+} from "./chatApi";
+import {
+  getConversations,
+  getConversation,
+  createConversation,
+  deleteConversation,
+  addMessageToConversation,
+  updateMessageInConversation,
+  Message,
+} from "./chatStorage";
 
 // In-memory map for resolving transaction promises back to content script
 interface PendingResolver {
@@ -1167,6 +1181,135 @@ function isApiKeyCached(): boolean {
 }
 
 /**
+ * Handles chat prompt submission - sends to Bankr API and polls for response
+ */
+async function handleSubmitChatPrompt(
+  conversationId: string,
+  messageId: string,
+  prompt: string
+): Promise<{ success: boolean; error?: string }> {
+  // Get cached API key
+  const apiKey = getCachedApiKey();
+  if (!apiKey) {
+    // Notify UI that API key is not available
+    chrome.runtime.sendMessage({
+      type: "chatJobComplete",
+      conversationId,
+      messageId,
+      error: "Wallet is locked. Please unlock first.",
+    }).catch(() => {});
+    return { success: false, error: "Wallet is locked. Please unlock first." };
+  }
+
+  // Fetch conversation history to provide context
+  let history: ChatMessage[] = [];
+  try {
+    const conversation = await getConversation(conversationId);
+    if (conversation && conversation.messages.length > 0) {
+      // Get all completed messages except the current pending assistant message
+      // and the current user message (which is already in 'prompt')
+      history = conversation.messages
+        .filter((msg) => {
+          // Skip the pending assistant message we just created
+          if (msg.id === messageId) return false;
+          // Only include completed messages with content
+          if (msg.status === "pending" || msg.status === "error") return false;
+          if (!msg.content || msg.content.trim() === "") return false;
+          return true;
+        })
+        .map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        }));
+
+      // Remove the last user message since it's the current prompt
+      // (it was just added to the conversation before the pending assistant message)
+      if (history.length > 0 && history[history.length - 1].role === "user") {
+        history.pop();
+      }
+    }
+  } catch (error) {
+    // If we can't get history, continue without it
+    console.error("Failed to fetch conversation history:", error);
+  }
+
+  // Start background processing with history
+  processChatPromptInBackground(conversationId, messageId, prompt, apiKey, history);
+
+  return { success: true };
+}
+
+/**
+ * Processes chat prompt in background and sends updates to UI
+ */
+async function processChatPromptInBackground(
+  conversationId: string,
+  messageId: string,
+  prompt: string,
+  apiKey: string,
+  history: ChatMessage[] = []
+): Promise<void> {
+  try {
+    // Submit prompt to Bankr API with conversation history for context
+    const { jobId } = await submitChatPrompt(apiKey, prompt, history);
+
+    // Poll for completion with status updates
+    const result = await pollChatJobUntilComplete(apiKey, jobId, {
+      pollInterval: 2000,
+      maxDuration: 300000, // 5 minutes
+      onStatusUpdate: (status) => {
+        // Send status updates to UI
+        chrome.runtime.sendMessage({
+          type: "chatJobUpdate",
+          conversationId,
+          messageId,
+          status: status.status,
+          statusUpdates: status.statusUpdates,
+        }).catch(() => {});
+      },
+    });
+
+    // Update message with result
+    if (result.success) {
+      await updateMessageInConversation(conversationId, messageId, {
+        content: result.response,
+        status: "complete",
+      });
+    } else {
+      await updateMessageInConversation(conversationId, messageId, {
+        content: result.error || "Request failed",
+        status: "error",
+      });
+    }
+
+    // Notify UI
+    chrome.runtime.sendMessage({
+      type: "chatJobComplete",
+      conversationId,
+      messageId,
+      content: result.success ? result.response : result.error,
+      error: result.success ? undefined : result.error,
+    }).catch(() => {});
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+    // Update message with error
+    await updateMessageInConversation(conversationId, messageId, {
+      content: errorMessage,
+      status: "error",
+    });
+
+    // Notify UI
+    chrome.runtime.sendMessage({
+      type: "chatJobComplete",
+      conversationId,
+      messageId,
+      error: errorMessage,
+    }).catch(() => {});
+  }
+}
+
+/**
  * Attempts to unlock the wallet by caching the decrypted API key
  */
 async function handleUnlockWallet(password: string): Promise<{ success: boolean; error?: string }> {
@@ -1592,6 +1735,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               "txHistory",
               "pendingTxRequests",
               "pendingSignatureRequests",
+              "chatHistory",
               ...notificationKeys, // Clear notification data (may contain tx hashes)
             ]),
             chrome.storage.sync.remove(["address", "sidePanelVerified", "sidePanelMode"]),
@@ -1612,6 +1756,66 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: false, error: "Failed to reset extension" });
         }
       })();
+      return true;
+    }
+
+    // Chat message handlers
+    case "submitChatPrompt": {
+      handleSubmitChatPrompt(
+        message.conversationId,
+        message.messageId,
+        message.prompt
+      ).then((result) => {
+        sendResponse(result);
+      });
+      return true;
+    }
+
+    case "getChatConversations": {
+      getConversations().then((conversations) => {
+        sendResponse(conversations);
+      });
+      return true;
+    }
+
+    case "getChatConversation": {
+      getConversation(message.conversationId).then((conversation) => {
+        sendResponse(conversation);
+      });
+      return true;
+    }
+
+    case "createChatConversation": {
+      createConversation(message.title).then((conversation) => {
+        sendResponse(conversation);
+      });
+      return true;
+    }
+
+    case "deleteChatConversation": {
+      deleteConversation(message.conversationId).then(() => {
+        sendResponse({ success: true });
+      });
+      return true;
+    }
+
+    case "addChatMessage": {
+      addMessageToConversation(message.conversationId, message.message).then(
+        (conversation) => {
+          sendResponse(conversation);
+        }
+      );
+      return true;
+    }
+
+    case "updateChatMessage": {
+      updateMessageInConversation(
+        message.conversationId,
+        message.messageId,
+        message.updates
+      ).then((conversation) => {
+        sendResponse(conversation);
+      });
       return true;
     }
   }
