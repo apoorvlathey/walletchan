@@ -15,7 +15,7 @@ export const BANKR_API_URL = "https://bankr.bot/api";
 export const CLANKER_URL =
   "https://clanker.world/clanker/0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07";
 export const BUY_LINK =
-  "https://clanker.world/clanker/0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07";
+  "https://app.uniswap.org/swap?chain=base&inputCurrency=NATIVE&outputCurrency=0xf48bc234855ab08ab2ec0cfaaeb2a80d065a3b07";
 export const DEXSCREENER_URL = `https://dexscreener.com/base/${POOL_ADDRESS}`;
 export const GECKOTERMINAL_URL = `https://www.geckoterminal.com/base/pools/${POOL_ADDRESS}`;
 export const GECKOTERMINAL_EMBED_URL = `https://www.geckoterminal.com/base/pools/${POOL_ADDRESS}?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&chart_type=market_cap&resolution=1h`;
