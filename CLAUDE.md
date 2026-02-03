@@ -1,0 +1,133 @@
+# BankrWallet
+
+Browser wallet extension + landing page website in a pnpm workspace monorepo.
+
+## Project Overview
+
+**What it does**: BankrWallet is a Chrome extension that impersonates blockchain accounts and executes transactions through the Bankr API. Like MetaMask, but AI-powered with no seed phrases.
+
+**Supported chains**: Base (8453), Ethereum (1), Polygon (137), Unichain (130)
+
+## Monorepo Structure
+
+```
+bankr-wallet/
+├── apps/
+│   ├── extension/    # Browser extension (Vite + React + Chakra UI)
+│   └── website/      # Landing page (Next.js + Chakra UI)
+├── packages/
+│   └── shared/       # Shared design tokens and assets
+├── IMPLEMENTATION.md # Extension architecture and message flows
+├── STYLING.md        # Bauhaus design system (colors, typography, components)
+├── WEBSITE.md        # Website PRD and section specs
+└── DEVELOPMENT.md    # Detailed build and release instructions
+```
+
+## Tech Stack
+
+| App       | Framework               | UI Library | Build Tool |
+| --------- | ----------------------- | ---------- | ---------- |
+| Extension | React 18                | Chakra UI  | Vite       |
+| Website   | Next.js 14 (App Router) | Chakra UI  | Next.js    |
+
+**Design System**: Bauhaus - geometric, primary colors (Red #D02020, Blue #1040C0, Yellow #F0C020), hard shadows, thick borders. See `STYLING.md`.
+
+## Commands
+
+```bash
+# Install dependencies
+pnpm install
+
+# Development
+pnpm dev:extension      # Build extension in dev mode
+pnpm dev:website        # Start website dev server at localhost:3000
+
+# Build
+pnpm build              # Build both extension and website
+pnpm build:extension    # Build extension only (output: apps/extension/build/)
+pnpm build:website      # Build website only
+
+# Extension-specific
+pnpm zip                # Create distribution zip
+pnpm lint               # Lint extension code
+
+# Release (auto-bumps version, syncs manifest, creates tag, pushes)
+pnpm release:patch      # 0.1.0 → 0.1.1
+pnpm release:minor      # 0.1.0 → 0.2.0
+pnpm release:major      # 0.1.0 → 1.0.0
+```
+
+## Extension Architecture
+
+The extension has 5 build targets (see `apps/extension/vite.config.*.ts`):
+
+| Script        | Purpose                                            |
+| ------------- | -------------------------------------------------- |
+| main.js       | Popup/sidepanel UI (React app)                     |
+| onboarding.js | Full-page onboarding wizard                        |
+| inpage.js     | Injected provider (EIP-6963 + window.ethereum)     |
+| inject.js     | Content script (bridges inpage ↔ background)       |
+| background.js | Service worker (API calls, storage, notifications) |
+
+**Message flow**: Dapp → inpage.js → inject.js → background.js → Bankr API
+
+For detailed architecture, message types, and flows, see `IMPLEMENTATION.md`.
+
+## Key Extension Files
+
+```
+apps/extension/src/
+├── chrome/
+│   ├── impersonator.ts    # Inpage provider (EIP-6963)
+│   ├── inject.ts          # Content script bridge
+│   ├── background.ts      # Service worker
+│   ├── crypto.ts          # AES-256-GCM encryption
+│   └── bankrApi.ts        # Bankr API client
+├── components/
+│   ├── TransactionConfirmation.tsx
+│   ├── SignatureRequestConfirmation.tsx
+│   ├── UnlockScreen.tsx
+│   └── Settings/
+├── pages/
+│   └── Onboarding.tsx
+└── App.tsx                # Main popup app
+```
+
+## Key Website Files
+
+```
+apps/website/
+├── app/
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── components/        # Hero, Features, TokenSection, etc.
+└── lib/
+    └── theme.ts           # Chakra UI Bauhaus theme
+```
+
+## Documentation References
+
+When working on features, refer to these docs:
+
+| Doc                              | When to read                                      |
+| -------------------------------- | ------------------------------------------------- |
+| `IMPLEMENTATION.md`              | Extension internals, message types, tx flow       |
+| `STYLING.md`                     | UI components, design tokens, Bauhaus system      |
+| `WEBSITE.md`                     | Website sections, layout specs, animations        |
+| `DEVELOPMENT.md`                 | Build process, release workflow                   |
+| `openclaw-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling |
+
+## Important Patterns
+
+- **API key encryption**: AES-256-GCM with PBKDF2 (600k iterations)
+- **Session caching**: Decrypted API key cached in background worker memory with auto-lock timeout
+- **Per-tab chain state**: Each browser tab maintains its own selected chain
+- **Transaction persistence**: Pending transactions survive popup close (stored in chrome.storage.local)
+- **EIP-6963**: Modern wallet discovery alongside legacy window.ethereum
+
+## Testing Extension Changes
+
+1. `pnpm build:extension`
+2. Go to `chrome://extensions`
+3. Click refresh icon on BankrWallet card
+4. Test in a dapp (e.g., app.aave.com)
