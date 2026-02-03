@@ -29,7 +29,6 @@
     "release:major": "npm version major -m 'chore: release v%s'"
   },
   "dependencies": {
-    "@adraffy/ens-normalize": "^1.10.1",
     "@chakra-ui/icons": "^2.2",
     "@chakra-ui/react": "^2.9",
     "@chakra-ui/theme-tools": "^2.2",
@@ -37,8 +36,6 @@
     "@emotion/styled": "^11.13",
     "@ethersproject/address": "^5.7.0",
     "@ethersproject/bytes": "^5.7.0",
-    "@ethersproject/contracts": "^5.7.0",
-    "@ethersproject/hash": "^5.7.0",
     "@ethersproject/logger": "^5.7.0",
     "@ethersproject/providers": "^5.7.1",
     "framer-motion": "^4.1.17",

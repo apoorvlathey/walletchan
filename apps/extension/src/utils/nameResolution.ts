@@ -1,10 +1,12 @@
+/**
+ * Name resolution utilities for .wei (WNS) and .eth (ENS) names
+ * Uses the wei SDK for .wei resolution
+ */
+
 import { StaticJsonRpcProvider } from "@ethersproject/providers";
-import { Contract } from "@ethersproject/contracts";
 import { isAddress } from "@ethersproject/address";
-import { namehash } from "@ethersproject/hash";
-import { ens_normalize } from "@adraffy/ens-normalize";
 import { DEFAULT_NETWORKS } from "@/constants/networks";
-import { WNS_CONTRACT_ADDRESS, WNS_ABI } from "@/constants/wns";
+import wei from "@/utils/wei";
 
 // Cache entry with TTL
 interface CacheEntry<T> {
@@ -13,11 +15,14 @@ interface CacheEntry<T> {
 }
 
 // In-memory cache with 5-minute TTL
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
 const forwardCache = new Map<string, CacheEntry<string | null>>();
 const reverseCache = new Map<string, CacheEntry<string | null>>();
 
-function getCached<T>(cache: Map<string, CacheEntry<T>>, key: string): T | undefined {
+function getCached<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string
+): T | undefined {
   const entry = cache.get(key);
   if (!entry) return undefined;
   if (Date.now() - entry.timestamp > CACHE_TTL) {
@@ -27,55 +32,21 @@ function getCached<T>(cache: Map<string, CacheEntry<T>>, key: string): T | undef
   return entry.value;
 }
 
-function setCache<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T): void {
+function setCache<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string,
+  value: T
+): void {
   cache.set(key, { value, timestamp: Date.now() });
 }
 
-// Lazy-loaded provider
+// Lazy-loaded provider for ENS
 let mainnetProvider: StaticJsonRpcProvider | null = null;
 function getMainnetProvider(): StaticJsonRpcProvider {
   if (!mainnetProvider) {
     mainnetProvider = new StaticJsonRpcProvider(DEFAULT_NETWORKS.Ethereum.rpcUrl);
   }
   return mainnetProvider;
-}
-
-// Lazy-loaded WNS contract
-let wnsContract: Contract | null = null;
-function getWnsContract(): Contract {
-  if (!wnsContract) {
-    wnsContract = new Contract(WNS_CONTRACT_ADDRESS, WNS_ABI, getMainnetProvider());
-  }
-  return wnsContract;
-}
-
-/**
- * Compute the WNS token ID for a given name
- * Uses ENS-compatible namehash algorithm
- */
-function computeWnsTokenId(name: string): string {
-  const normalized = ens_normalize(name);
-  return namehash(normalized);
-}
-
-/**
- * Resolve a .wei name to an address using the WNS contract
- */
-async function resolveWnsName(name: string): Promise<string | null> {
-  try {
-    const tokenId = computeWnsTokenId(name);
-    const contract = getWnsContract();
-    const address = await contract.resolve(tokenId);
-
-    // Check if address is valid (not zero address)
-    if (address && address !== "0x0000000000000000000000000000000000000000") {
-      return address;
-    }
-    return null;
-  } catch (error) {
-    console.error("WNS resolution failed:", error);
-    return null;
-  }
 }
 
 /**
@@ -87,7 +58,7 @@ async function resolveEnsName(name: string): Promise<string | null> {
     const address = await provider.resolveName(name);
     return address;
   } catch (error) {
-    console.error("ENS resolution failed:", error);
+    console.debug("ENS resolution failed:", error);
     return null;
   }
 }
@@ -117,12 +88,10 @@ export async function resolveAddress(input: string): Promise<string | null> {
   let result: string | null = null;
 
   // Detect name type and resolve
-  if (trimmed.endsWith(".wei")) {
-    result = await resolveWnsName(trimmed);
-  } else if (trimmed.endsWith(".eth")) {
-    result = await resolveEnsName(trimmed);
+  if (wei.isWei(trimmed)) {
+    result = await wei.resolve(trimmed);
   } else {
-    // Try ENS as fallback for other TLDs
+    // ENS handles .eth and other names
     result = await resolveEnsName(trimmed);
   }
 
@@ -139,7 +108,9 @@ export async function resolveAddress(input: string): Promise<string | null> {
  * @param address - Ethereum address to look up
  * @returns Name (.wei or .eth) or null if not found
  */
-export async function reverseResolveAddress(address: string): Promise<string | null> {
+export async function reverseResolveAddress(
+  address: string
+): Promise<string | null> {
   if (!isAddress(address)) {
     return null;
   }
@@ -153,17 +124,8 @@ export async function reverseResolveAddress(address: string): Promise<string | n
 
   let result: string | null = null;
 
-  // Try WNS reverse resolution first
-  try {
-    const contract = getWnsContract();
-    const wnsName = await contract.reverseResolve(address);
-    if (wnsName && typeof wnsName === "string" && wnsName.length > 0) {
-      result = wnsName;
-    }
-  } catch (error) {
-    // WNS reverse resolution not available or failed
-    console.debug("WNS reverse resolution failed:", error);
-  }
+  // Try WNS reverse resolution first using wei SDK
+  result = await wei.reverseResolve(address);
 
   // Fall back to ENS if WNS didn't find a name
   if (!result) {
