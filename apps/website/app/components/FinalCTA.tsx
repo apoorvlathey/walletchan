@@ -8,6 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { motion } from "framer-motion";
+import { CHROME_STORE_URL } from "../constants";
 
 const MotionBox = motion(Box);
 
@@ -106,7 +107,8 @@ export function FinalCTA() {
               variant="yellow"
               size="xl"
               as="a"
-              href="#install"
+              href={CHROME_STORE_URL}
+              target="_blank"
               px={{ base: 8, md: 12 }}
               py={{ base: 4, md: 6 }}
               fontSize={{ base: "lg", md: "xl" }}

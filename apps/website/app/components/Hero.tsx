@@ -14,7 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { ExternalLink } from "lucide-react";
-import { GITHUB_URL, COINGECKO_URL } from "../constants";
+import { GITHUB_URL, COINGECKO_URL, CHROME_STORE_URL } from "../constants";
 
 const MotionBox = motion(Box);
 
@@ -88,7 +88,8 @@ export function Hero() {
                     variant="primary"
                     size={{ base: "md", md: "lg" }}
                     as="a"
-                    href="#install"
+                    href={CHROME_STORE_URL}
+                    target="_blank"
                   >
                     Add to Chrome
                   </Button>

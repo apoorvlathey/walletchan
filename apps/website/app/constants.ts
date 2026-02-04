@@ -4,7 +4,8 @@ export const POOL_ADDRESS =
   "0x6c8fd04c19e3c6c3efc21f6f5ae79c1453a19d971b7b7d4969df1928c380aaad";
 
 // App URLs
-export const CHROME_STORE_URL = "https://chromewebstore.google.com/"; // TODO: add once live
+export const CHROME_STORE_URL =
+  "https://chromewebstore.google.com/detail/bankrwallet/kofbkhbkfhiollbhjkbebajngppmpbgc";
 export const GITHUB_URL = "https://github.com/apoorvlathey/bankr-wallet";
 export const GITHUB_RELEASES_URL =
   "https://github.com/apoorvlathey/bankr-wallet/releases/latest";

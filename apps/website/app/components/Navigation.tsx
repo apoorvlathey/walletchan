@@ -20,6 +20,7 @@ import {
 } from "@chakra-ui/react";
 import { Menu } from "lucide-react";
 import { LogoShapes } from "./ui/GeometricShape";
+import { CHROME_STORE_URL } from "../constants";
 
 const navLinks = [
   { label: "Features", href: "#features" },
@@ -83,7 +84,8 @@ export function Navigation() {
               variant="primary"
               size="md"
               as="a"
-              href="#install"
+              href={CHROME_STORE_URL}
+              target="_blank"
               display={{ base: "none", md: "flex" }}
             >
               Add to Chrome
@@ -140,7 +142,8 @@ export function Navigation() {
                 variant="primary"
                 size="lg"
                 as="a"
-                href="#install"
+                href={CHROME_STORE_URL}
+                target="_blank"
                 mt={4}
                 onClick={onClose}
               >
