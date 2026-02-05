@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import {
   useUpdateEffect,
   Flex,
@@ -127,6 +127,7 @@ function App() {
   const [isWalletUnlocked, setIsWalletUnlocked] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [activeAccount, setActiveAccount] = useState<Account | null>(null);
+  const keepAlivePortRef = useRef<chrome.runtime.Port | null>(null);
 
   const currentTab = async () => {
     const [tab] = await chrome.tabs.query({
@@ -453,6 +454,15 @@ function App() {
           chrome.tabs.remove(tab.id).catch(() => {
             // Ignore errors if tab is already closed
           });
+        }
+      }
+
+      // Establish keepalive connection to pause auto-lock while UI is open
+      if (!keepAlivePortRef.current) {
+        try {
+          keepAlivePortRef.current = chrome.runtime.connect({ name: "ui-keepalive" });
+        } catch {
+          // Ignore connection errors
         }
       }
 

@@ -138,6 +138,10 @@ let cacheTimestamp: number = 0;
 let cachedVault: DecryptedEntry[] | null = null;
 let vaultCacheTimestamp: number = 0;
 
+// UI connection tracking for auto-lock
+// While any popup/sidepanel is connected, the cache never expires
+let activeUIConnections = 0;
+
 // Auto-lock timeout configuration
 const DEFAULT_AUTO_LOCK_TIMEOUT = 15 * 60 * 1000; // 15 minutes default
 const AUTO_LOCK_STORAGE_KEY = "autoLockTimeout";
@@ -215,8 +219,8 @@ chrome.storage.onChanged.addListener(async (changes, areaName) => {
  */
 function getCachedApiKey(): string | null {
   const timeout = cachedAutoLockTimeout ?? DEFAULT_AUTO_LOCK_TIMEOUT;
-  // timeout of 0 means "Never" - cache never expires
-  if (cachedApiKey && (timeout === 0 || Date.now() - cacheTimestamp < timeout)) {
+  // Skip timeout check while UI is open, or if timeout is 0 ("Never")
+  if (cachedApiKey && (activeUIConnections > 0 || timeout === 0 || Date.now() - cacheTimestamp < timeout)) {
     return cachedApiKey;
   }
   cachedApiKey = null;
@@ -229,8 +233,8 @@ function getCachedApiKey(): string | null {
  */
 function getCachedPassword(): string | null {
   const timeout = cachedAutoLockTimeout ?? DEFAULT_AUTO_LOCK_TIMEOUT;
-  // timeout of 0 means "Never" - cache never expires
-  if (cachedPassword && (timeout === 0 || Date.now() - cacheTimestamp < timeout)) {
+  // Skip timeout check while UI is open, or if timeout is 0 ("Never")
+  if (cachedPassword && (activeUIConnections > 0 || timeout === 0 || Date.now() - cacheTimestamp < timeout)) {
     return cachedPassword;
   }
   cachedPassword = null;
@@ -262,8 +266,8 @@ function clearCachedApiKey(): void {
  */
 function getCachedVault(): DecryptedEntry[] | null {
   const timeout = cachedAutoLockTimeout ?? DEFAULT_AUTO_LOCK_TIMEOUT;
-  // timeout of 0 means "Never" - cache never expires
-  if (cachedVault && (timeout === 0 || Date.now() - vaultCacheTimestamp < timeout)) {
+  // Skip timeout check while UI is open, or if timeout is 0 ("Never")
+  if (cachedVault && (activeUIConnections > 0 || timeout === 0 || Date.now() - vaultCacheTimestamp < timeout)) {
     return cachedVault;
   }
   cachedVault = null;
@@ -1835,12 +1839,28 @@ async function handleRpcRequest(
   return data.result;
 }
 
-// Port connection listener - used for waking up the service worker
+// Port connection listener - used for waking up the service worker and UI keepalive
 // Some browsers (like Arc) don't auto-wake the service worker when popup opens
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "popup-wake") {
     // Just acknowledge the connection - the popup is waking us up
     console.log("Service worker woken up by popup");
+  } else if (port.name === "ui-keepalive") {
+    // UI view (popup/sidepanel/onboarding) connected - pause auto-lock timer
+    activeUIConnections++;
+    port.onDisconnect.addListener(() => {
+      activeUIConnections--;
+      if (activeUIConnections <= 0) {
+        activeUIConnections = 0;
+        // Reset timestamps so the countdown starts fresh from now
+        if (cachedApiKey) {
+          cacheTimestamp = Date.now();
+        }
+        if (cachedVault) {
+          vaultCacheTimestamp = Date.now();
+        }
+      }
+    });
   }
 });
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Box,
   VStack,
@@ -121,6 +121,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
     password?: string;
     confirmPassword?: string;
   }>({});
+  const keepAlivePortRef = useRef<chrome.runtime.Port | null>(null);
 
   // Check if extension is already configured on mount
   // If so, skip directly to success screen (don't expose any sensitive data)
@@ -139,6 +140,15 @@ function Onboarding({ onComplete }: OnboardingProps) {
         setStep("success");
       }
       setIsCheckingSetup(false);
+
+      // Establish keepalive connection to pause auto-lock while onboarding is open
+      if (!keepAlivePortRef.current) {
+        try {
+          keepAlivePortRef.current = chrome.runtime.connect({ name: "ui-keepalive" });
+        } catch {
+          // Ignore connection errors
+        }
+      }
     };
     checkExistingSetup();
   }, []);
