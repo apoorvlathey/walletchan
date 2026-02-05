@@ -28,6 +28,8 @@ let store = {
   address: "",
   displayAddress: "",
   chainName: "",
+  accountId: "",      // Current account ID
+  accountType: "",    // "bankr" | "privateKey"
 };
 
 const init = async () => {
@@ -67,6 +69,8 @@ const init = async () => {
           address,
           displayAddress,
           chainName,
+          accountId: "",
+          accountType: "",
         };
 
         window.postMessage(
@@ -80,6 +84,32 @@ const init = async () => {
           },
           "*"
         );
+
+        // Verify with background that we have the correct active account address
+        // This ensures the address matches the active account even if storage was stale
+        chrome.runtime.sendMessage({ type: "getActiveAccount" }, (account) => {
+          if (chrome.runtime.lastError) {
+            // Extension context invalidated, ignore
+            return;
+          }
+          if (account && account.address && account.address.toLowerCase() !== address.toLowerCase()) {
+            // Active account address differs from storage - update
+            store.address = account.address;
+            store.displayAddress = account.displayName || account.address;
+            store.accountId = account.id;
+            store.accountType = account.type;
+
+            // Emit accountsChanged to sync dapp with correct address
+            window.postMessage({
+              type: "accountsChanged",
+              msg: { address: account.address },
+            }, "*");
+          } else if (account) {
+            // Address matches, just update account metadata
+            store.accountId = account.id;
+            store.accountType = account.type;
+          }
+        });
       }
     };
     document.head
@@ -98,14 +128,44 @@ chrome.runtime.onMessage.addListener((msgObj, sender, sendResponse) => {
         const address = msgObj.msg.address as string;
         const displayAddress = msgObj.msg.displayAddress as string;
 
+        // Only emit accountsChanged if address actually changed
+        const addressChanged = store.address !== address;
+
         store.address = address;
         store.displayAddress = displayAddress;
+
+        // Emit accountsChanged so dapps know the address updated
+        if (addressChanged && address) {
+          window.postMessage({
+            type: "accountsChanged",
+            msg: { address },
+          }, "*");
+        }
         break;
       }
       case "setChainId": {
         const chainName = msgObj.msg.chainName as string;
 
         store.chainName = chainName;
+        break;
+      }
+      case "setAccount": {
+        // Handle account switch - update store and emit accountsChanged
+        const address = msgObj.msg.address as string;
+        const displayAddress = msgObj.msg.displayAddress as string;
+        const accountId = msgObj.msg.accountId as string;
+        const accountType = msgObj.msg.accountType as string;
+
+        store.address = address;
+        store.displayAddress = displayAddress;
+        store.accountId = accountId;
+        store.accountType = accountType;
+
+        // Forward to inpage script to emit accountsChanged
+        window.postMessage({
+          type: "accountsChanged",
+          msg: { address },
+        }, "*");
         break;
       }
       case "getInfo": {
@@ -200,7 +260,7 @@ window.addEventListener("message", async (e) => {
       const { id, from, to, data, value, chainId } = e.data.msg as {
         id: string;
         from: string;
-        to: string;
+        to: string | null;
         data: string;
         value: string;
         chainId: number;

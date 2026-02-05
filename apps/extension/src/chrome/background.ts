@@ -16,6 +16,36 @@ import {
 } from "./bankrApi";
 import { ALLOWED_CHAIN_IDS, CHAIN_NAMES } from "../constants/networks";
 import { CHAIN_CONFIG } from "../constants/chainConfig";
+import type { Account, DecryptedEntry } from "./types";
+import {
+  getAccounts,
+  getAccountById,
+  getActiveAccount,
+  getActiveAccountId,
+  setActiveAccountId,
+  getTabAccount,
+  setTabAccount,
+  clearTabAccount,
+  addBankrAccount,
+  addPrivateKeyAccount as addPKAccountStorage,
+  removeAccount,
+  clearAllAccounts,
+  addressExists,
+} from "./accountStorage";
+import {
+  addKeyToVault,
+  removeKeyFromVault,
+  getPrivateKey,
+  decryptAllKeys,
+  reEncryptVault,
+  clearVault,
+  hasVaultEntries,
+} from "./vaultCrypto";
+import {
+  signAndBroadcastTransaction,
+  handleSignatureRequest as localSignatureRequest,
+  deriveAddress,
+} from "./localSigner";
 import {
   savePendingTxRequest,
   removePendingTxRequest,
@@ -102,6 +132,11 @@ const failedTxResults = new Map<string, FailedTxResult>();
 let cachedApiKey: string | null = null;
 let cachedPassword: string | null = null;
 let cacheTimestamp: number = 0;
+
+// Session cache for decrypted vault entries (cleared on restart/suspend)
+// CRITICAL: Private keys only exist here in memory, never sent via messages
+let cachedVault: DecryptedEntry[] | null = null;
+let vaultCacheTimestamp: number = 0;
 
 // Auto-lock timeout configuration
 const DEFAULT_AUTO_LOCK_TIMEOUT = 15 * 60 * 1000; // 15 minutes default
@@ -223,12 +258,56 @@ function clearCachedApiKey(): void {
 }
 
 /**
+ * Gets cached vault if still valid
+ */
+function getCachedVault(): DecryptedEntry[] | null {
+  const timeout = cachedAutoLockTimeout ?? DEFAULT_AUTO_LOCK_TIMEOUT;
+  // timeout of 0 means "Never" - cache never expires
+  if (cachedVault && (timeout === 0 || Date.now() - vaultCacheTimestamp < timeout)) {
+    return cachedVault;
+  }
+  cachedVault = null;
+  return null;
+}
+
+/**
+ * Caches the decrypted vault entries
+ */
+function setCachedVault(vault: DecryptedEntry[]): void {
+  cachedVault = vault;
+  vaultCacheTimestamp = Date.now();
+}
+
+/**
+ * Clears the cached vault
+ */
+function clearCachedVault(): void {
+  cachedVault = null;
+  vaultCacheTimestamp = 0;
+}
+
+/**
+ * Gets a private key from the cached vault
+ */
+function getPrivateKeyFromCache(accountId: string): `0x${string}` | null {
+  const vault = getCachedVault();
+  if (!vault) {
+    return null;
+  }
+  const entry = vault.find((e) => e.id === accountId);
+  return entry?.privateKey || null;
+}
+
+/**
  * Performs a full security reset - clears ALL sensitive data from memory
  * This should be called when resetting the extension
  */
 function performSecurityReset(): void {
   // 1. Clear cached credentials
   clearCachedApiKey();
+
+  // 1.5. Clear cached vault (private keys)
+  clearCachedVault();
 
   // 2. Abort all active transactions and clear their API keys from memory
   for (const [txId, abortController] of activeAbortControllers.entries()) {
@@ -271,6 +350,7 @@ function performSecurityReset(): void {
 // Clear cache when service worker suspends
 self.addEventListener("suspend", () => {
   clearCachedApiKey();
+  clearCachedVault();
 });
 
 // Clean up expired transactions and signature requests periodically
@@ -1181,6 +1261,307 @@ function isApiKeyCached(): boolean {
 }
 
 /**
+ * Checks if the wallet is unlocked (either API key or vault cached)
+ */
+function isWalletUnlocked(): boolean {
+  return getCachedApiKey() !== null || getCachedVault() !== null;
+}
+
+/**
+ * Processes a local (PK) transaction in background
+ */
+async function processLocalTransactionInBackground(
+  txId: string,
+  pending: PendingTxRequest,
+  account: Account,
+  privateKey: `0x${string}`
+): Promise<void> {
+  // Create AbortController for this transaction
+  const abortController = new AbortController();
+  activeAbortControllers.set(txId, abortController);
+
+  // Save to history as "processing" immediately
+  await addTxToHistory({
+    id: txId,
+    status: "processing",
+    tx: pending.tx,
+    origin: pending.origin,
+    favicon: pending.favicon,
+    chainName: pending.chainName,
+    chainId: pending.tx.chainId,
+    createdAt: pending.timestamp,
+  });
+
+  try {
+    // Get RPC URL for the chain
+    const { networksInfo } = await chrome.storage.sync.get("networksInfo");
+    let rpcUrl: string | undefined;
+    if (networksInfo) {
+      for (const chainName of Object.keys(networksInfo)) {
+        if (networksInfo[chainName].chainId === pending.tx.chainId) {
+          rpcUrl = networksInfo[chainName].rpcUrl;
+          break;
+        }
+      }
+    }
+
+    // Sign and broadcast the transaction
+    const result = await signAndBroadcastTransaction(privateKey, pending.tx, rpcUrl);
+    const txHash = result.txHash;
+
+    // Send result back to content script
+    const resolver = pendingResolvers.get(txId);
+
+    // Update history to "success"
+    await updateTxInHistory(txId, {
+      status: "success",
+      txHash,
+      completedAt: Date.now(),
+    });
+
+    // Show notification
+    const notificationId = `tx-success-${txId}`;
+    const chainConfig = CHAIN_CONFIG[pending.tx.chainId];
+    const explorerUrl = chainConfig?.explorer
+      ? `${chainConfig.explorer}/tx/${txHash}`
+      : null;
+
+    if (explorerUrl) {
+      chrome.storage.local.set({ [`notification-${notificationId}`]: explorerUrl });
+    }
+
+    await showNotification(
+      notificationId,
+      "Transaction Confirmed",
+      `Transaction on ${pending.chainName} was successful. Click to view.`
+    );
+
+    if (resolver) {
+      resolver.resolve({ success: true, txHash });
+    }
+  } catch (error) {
+    const resolver = pendingResolvers.get(txId);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+    await handleTransactionFailure(txId, pending, errorMessage, resolver);
+  } finally {
+    activeAbortControllers.delete(txId);
+    pendingResolvers.delete(txId);
+  }
+}
+
+/**
+ * Handles async confirmation for PK accounts - signs locally
+ */
+async function handleConfirmTransactionAsyncPK(
+  txId: string,
+  password: string,
+  tabId?: number
+): Promise<{ success: boolean; error?: string }> {
+  const pending = await getPendingTxRequestById(txId);
+  if (!pending) {
+    return { success: false, error: "Transaction not found or expired" };
+  }
+
+  // Get the account for this tab
+  const account = tabId ? await getTabAccount(tabId) : await getActiveAccount();
+  if (!account) {
+    return { success: false, error: "No account found" };
+  }
+
+  if (account.type !== "privateKey") {
+    return { success: false, error: "Account is not a private key account" };
+  }
+
+  // Try to get private key from cache first
+  let privateKey = getPrivateKeyFromCache(account.id);
+
+  if (!privateKey) {
+    // Need to decrypt the vault
+    const vault = await decryptAllKeys(password);
+    if (!vault) {
+      return { success: false, error: "Invalid password" };
+    }
+    setCachedVault(vault);
+
+    // Also cache API key and password if we have encrypted API key
+    const hasApiKey = await hasEncryptedApiKey();
+    if (hasApiKey) {
+      const apiKey = await loadDecryptedApiKey(password);
+      if (apiKey) {
+        setCachedApiKey(apiKey, password);
+      }
+    }
+
+    // Get the private key from the now-cached vault
+    privateKey = getPrivateKeyFromCache(account.id);
+    if (!privateKey) {
+      return { success: false, error: "Private key not found for account" };
+    }
+  }
+
+  // Remove from pending storage immediately
+  await removePendingTxRequest(txId);
+
+  // Start background processing
+  processLocalTransactionInBackground(txId, pending, account, privateKey);
+
+  return { success: true };
+}
+
+/**
+ * Handles signature confirmation for PK accounts
+ */
+async function handleConfirmSignatureRequest(
+  sigId: string,
+  password: string,
+  tabId?: number
+): Promise<SignatureResult> {
+  const pending = await getPendingSignatureRequestById(sigId);
+  if (!pending) {
+    return { success: false, error: "Signature request not found or expired" };
+  }
+
+  // Get the account for this tab
+  const account = tabId ? await getTabAccount(tabId) : await getActiveAccount();
+  if (!account) {
+    return { success: false, error: "No account found" };
+  }
+
+  if (account.type !== "privateKey") {
+    return { success: false, error: "Signatures are only supported for Private Key accounts" };
+  }
+
+  // Try to get private key from cache first
+  let privateKey = getPrivateKeyFromCache(account.id);
+
+  if (!privateKey) {
+    // Need to decrypt the vault
+    const vault = await decryptAllKeys(password);
+    if (!vault) {
+      return { success: false, error: "Invalid password" };
+    }
+    setCachedVault(vault);
+
+    // Also cache API key and password if we have encrypted API key
+    const hasApiKey = await hasEncryptedApiKey();
+    if (hasApiKey) {
+      const apiKey = await loadDecryptedApiKey(password);
+      if (apiKey) {
+        setCachedApiKey(apiKey, password);
+      }
+    }
+
+    // Get the private key from the now-cached vault
+    privateKey = getPrivateKeyFromCache(account.id);
+    if (!privateKey) {
+      return { success: false, error: "Private key not found for account" };
+    }
+  }
+
+  try {
+    // Sign the message
+    const signature = await localSignatureRequest(
+      privateKey,
+      pending.signature.method,
+      pending.signature.params,
+      pending.signature.chainId
+    );
+
+    // Remove from pending storage
+    await removePendingSignatureRequest(sigId);
+
+    return { success: true, signature };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Signing failed",
+    };
+  }
+}
+
+/**
+ * Adds a new private key account
+ */
+async function handleAddPrivateKeyAccount(
+  privateKey: `0x${string}`,
+  password: string,
+  displayName?: string
+): Promise<{ success: boolean; account?: Account; error?: string }> {
+  try {
+    // Derive address from private key
+    const address = deriveAddress(privateKey);
+
+    // Check if address already exists
+    if (await addressExists(address)) {
+      return { success: false, error: "An account with this address already exists" };
+    }
+
+    // Add the account metadata
+    const account = await addPKAccountStorage(address, displayName);
+
+    // Add the private key to the vault
+    await addKeyToVault(account.id, privateKey, password);
+
+    // Update the cached vault if it exists
+    const cachedVaultEntries = getCachedVault();
+    if (cachedVaultEntries) {
+      cachedVaultEntries.push({ id: account.id, privateKey });
+      setCachedVault(cachedVaultEntries);
+    }
+
+    // Notify UI of account update
+    chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+
+    return { success: true, account };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to add account",
+    };
+  }
+}
+
+/**
+ * Removes an account (and its private key if PK account)
+ */
+async function handleRemoveAccount(
+  accountId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const account = await getAccountById(accountId);
+    if (!account) {
+      return { success: false, error: "Account not found" };
+    }
+
+    // If it's a PK account, remove from vault
+    if (account.type === "privateKey") {
+      await removeKeyFromVault(accountId);
+
+      // Update the cached vault if it exists
+      const cachedVaultEntries = getCachedVault();
+      if (cachedVaultEntries) {
+        const filtered = cachedVaultEntries.filter((e) => e.id !== accountId);
+        setCachedVault(filtered);
+      }
+    }
+
+    // Remove the account metadata
+    await removeAccount(accountId);
+
+    // Notify UI of account update
+    chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to remove account",
+    };
+  }
+}
+
+/**
  * Handles chat prompt submission - sends to Bankr API and polls for response
  */
 async function handleSubmitChatPrompt(
@@ -1310,14 +1691,39 @@ async function processChatPromptInBackground(
 }
 
 /**
- * Attempts to unlock the wallet by caching the decrypted API key
+ * Attempts to unlock the wallet by caching the decrypted API key and vault
  */
 async function handleUnlockWallet(password: string): Promise<{ success: boolean; error?: string }> {
-  const apiKey = await loadDecryptedApiKey(password);
-  if (!apiKey) {
-    return { success: false, error: "Invalid password" };
+  // Try to decrypt API key (if exists)
+  const hasApiKey = await hasEncryptedApiKey();
+  if (hasApiKey) {
+    const apiKey = await loadDecryptedApiKey(password);
+    if (!apiKey) {
+      return { success: false, error: "Invalid password" };
+    }
+    setCachedApiKey(apiKey, password);
   }
-  setCachedApiKey(apiKey, password);
+
+  // Try to decrypt vault (if exists)
+  const hasVault = await hasVaultEntries();
+  if (hasVault) {
+    const vault = await decryptAllKeys(password);
+    if (!vault) {
+      // If we already decrypted API key but vault fails, password is wrong
+      // This shouldn't happen if passwords are in sync
+      if (!hasApiKey) {
+        return { success: false, error: "Invalid password" };
+      }
+    } else {
+      setCachedVault(vault);
+    }
+  }
+
+  // If we have neither API key nor vault, password can't be verified
+  if (!hasApiKey && !hasVault) {
+    return { success: false, error: "No encrypted data found" };
+  }
+
   return { success: true };
 }
 
@@ -1362,17 +1768,29 @@ async function handleChangePasswordWithCachedPassword(
   try {
     const { loadDecryptedApiKey, saveEncryptedApiKey } = await import("./crypto");
 
-    // Decrypt API key with cached password
-    const apiKey = await loadDecryptedApiKey(currentPassword);
-    if (!apiKey) {
-      return { success: false, error: "Failed to decrypt API key" };
+    // Decrypt API key with cached password (if exists)
+    const hasApiKey = await hasEncryptedApiKey();
+    if (hasApiKey) {
+      const apiKey = await loadDecryptedApiKey(currentPassword);
+      if (!apiKey) {
+        return { success: false, error: "Failed to decrypt API key" };
+      }
+      // Re-encrypt with new password
+      await saveEncryptedApiKey(apiKey, newPassword);
     }
 
-    // Re-encrypt with new password
-    await saveEncryptedApiKey(apiKey, newPassword);
+    // Re-encrypt the vault with new password (if exists)
+    const hasVault = await hasVaultEntries();
+    if (hasVault) {
+      const success = await reEncryptVault(currentPassword, newPassword);
+      if (!success) {
+        return { success: false, error: "Failed to re-encrypt vault" };
+      }
+    }
 
     // Clear the cache - user must unlock with new password
     clearCachedApiKey();
+    clearCachedVault();
 
     return { success: true };
   } catch (error) {
@@ -1552,7 +1970,131 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "lockWallet": {
       clearCachedApiKey();
+      clearCachedVault();
       sendResponse({ success: true });
+      return false;
+    }
+
+    // Account management handlers
+    case "getAccounts": {
+      getAccounts().then((accounts) => {
+        sendResponse(accounts);
+      });
+      return true;
+    }
+
+    case "getActiveAccount": {
+      getActiveAccount().then((account) => {
+        sendResponse(account);
+      });
+      return true;
+    }
+
+    case "setActiveAccount": {
+      (async () => {
+        await setActiveAccountId(message.accountId);
+
+        // Get the account to update storage with its address
+        const account = await getAccountById(message.accountId);
+        if (account) {
+          // Update storage address so inject.ts and new tabs get the correct address
+          // This also triggers the storage listener to broadcast to all existing tabs
+          await chrome.storage.sync.set({
+            address: account.address,
+            displayAddress: account.displayName || account.address,
+          });
+        }
+
+        // Notify UI of account update
+        chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+        sendResponse({ success: true });
+      })();
+      return true;
+    }
+
+    case "getTabAccount": {
+      const tabId = message.tabId || sender.tab?.id;
+      if (tabId) {
+        getTabAccount(tabId).then((account) => {
+          sendResponse(account);
+        });
+      } else {
+        getActiveAccount().then((account) => {
+          sendResponse(account);
+        });
+      }
+      return true;
+    }
+
+    case "setTabAccount": {
+      const tabId = message.tabId || sender.tab?.id;
+      if (tabId) {
+        setTabAccount(tabId, message.accountId).then(() => {
+          sendResponse({ success: true });
+        });
+      } else {
+        sendResponse({ success: false, error: "No tab ID" });
+      }
+      return true;
+    }
+
+    case "addBankrAccount": {
+      addBankrAccount(message.address, message.displayName).then((account) => {
+        // Notify UI of account update
+        chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+        sendResponse({ success: true, account });
+      }).catch((error) => {
+        sendResponse({ success: false, error: error.message });
+      });
+      return true;
+    }
+
+    case "addPrivateKeyAccount": {
+      handleAddPrivateKeyAccount(
+        message.privateKey,
+        message.password,
+        message.displayName
+      ).then((result) => {
+        sendResponse(result);
+      });
+      return true;
+    }
+
+    case "removeAccount": {
+      handleRemoveAccount(message.accountId).then((result) => {
+        sendResponse(result);
+      });
+      return true;
+    }
+
+    case "confirmSignatureRequest": {
+      const tabId = message.tabId || sender.tab?.id;
+      handleConfirmSignatureRequest(message.sigId, message.password, tabId).then(
+        (result) => {
+          // Send result back to content script if resolver exists
+          const resolver = pendingSignatureResolvers.get(message.sigId);
+          if (resolver) {
+            resolver.resolve(result);
+            pendingSignatureResolvers.delete(message.sigId);
+          }
+          sendResponse(result);
+        }
+      );
+      return true;
+    }
+
+    case "confirmTransactionAsyncPK": {
+      const tabId = message.tabId || sender.tab?.id;
+      handleConfirmTransactionAsyncPK(message.txId, message.password, tabId).then(
+        (result) => {
+          sendResponse(result);
+        }
+      );
+      return true;
+    }
+
+    case "isWalletUnlocked": {
+      sendResponse(isWalletUnlocked());
       return false;
     }
 
@@ -1736,9 +2278,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               "pendingTxRequests",
               "pendingSignatureRequests",
               "chatHistory",
+              "pkVault",    // Private key vault
+              "accounts",   // Account metadata
               ...notificationKeys, // Clear notification data (may contain tx hashes)
             ]),
-            chrome.storage.sync.remove(["address", "sidePanelVerified", "sidePanelMode"]),
+            chrome.storage.sync.remove([
+              "address",
+              "displayAddress",
+              "sidePanelVerified",
+              "sidePanelMode",
+              "activeAccountId",
+              "tabAccounts",
+            ]),
           ]);
 
           // Update badge to show no pending transactions

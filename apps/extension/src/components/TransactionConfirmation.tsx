@@ -104,6 +104,8 @@ function TransactionConfirmation({
 
   // Fetch labels for the "to" address
   useEffect(() => {
+    if (!tx.to) return;
+
     const fetchLabels = async () => {
       try {
         const response = await fetch(
@@ -465,30 +467,45 @@ function TransactionConfirmation({
               })()}
             </HStack>
 
-            {/* To Address */}
+            {/* To Address / Contract Deployment */}
             <Box w="full" p={3}>
               <HStack justify="space-between" mb={toLabels.length > 0 ? 2 : 0}>
                 <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                  To
+                  {tx.to ? "To" : "Type"}
                 </Text>
-                <HStack
-                  spacing={1}
-                  px={2}
-                  py={1}
-                  bg="bauhaus.white"
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                >
-                  <Text
-                    fontSize="xs"
-                    color="text.primary"
-                    fontFamily="mono"
-                    fontWeight="700"
+                {tx.to ? (
+                  <HStack
+                    spacing={1}
+                    px={2}
+                    py={1}
+                    bg="bauhaus.white"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
                   >
-                    {tx.to.slice(0, 6)}...{tx.to.slice(-4)}
-                  </Text>
-                  <CopyButton value={tx.to} />
-                </HStack>
+                    <Text
+                      fontSize="xs"
+                      color="text.primary"
+                      fontFamily="mono"
+                      fontWeight="700"
+                    >
+                      {tx.to.slice(0, 6)}...{tx.to.slice(-4)}
+                    </Text>
+                    <CopyButton value={tx.to} />
+                  </HStack>
+                ) : (
+                  <Badge
+                    fontSize="sm"
+                    bg="bauhaus.yellow"
+                    color="bauhaus.black"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    fontWeight="700"
+                    px={3}
+                    py={1}
+                  >
+                    Contract Deployment
+                  </Badge>
+                )}
               </HStack>
               {toLabels.length > 0 && (
                 <Flex justify="flex-end">

@@ -22,10 +22,12 @@ interface SignatureRequestConfirmationProps {
   currentIndex: number;
   totalCount: number;
   isInSidePanel: boolean;
+  accountType?: "bankr" | "privateKey";
   onBack: () => void;
   onCancelled: () => void;
   onCancelAll: () => void;
   onNavigate: (direction: "prev" | "next") => void;
+  onConfirmed?: () => void;
 }
 
 // Copy button component
@@ -135,13 +137,17 @@ function SignatureRequestConfirmation({
   currentIndex,
   totalCount,
   isInSidePanel,
+  accountType = "bankr",
   onBack,
   onCancelled,
   onCancelAll,
   onNavigate,
+  onConfirmed,
 }: SignatureRequestConfirmationProps) {
+  const toast = useBauhausToast();
   const { signature, origin, chainName, favicon } = sigRequest;
   const { message, rawData } = formatSignatureData(signature.method, signature.params);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCancel = () => {
     chrome.runtime.sendMessage(
@@ -150,6 +156,59 @@ function SignatureRequestConfirmation({
         onCancelled();
       }
     );
+  };
+
+  const handleConfirm = async () => {
+    if (accountType !== "privateKey") {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Get the current tab ID
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabId = tab?.id;
+
+      // Send confirm signature request to background
+      const result = await new Promise<{ success: boolean; signature?: string; error?: string }>((resolve) => {
+        chrome.runtime.sendMessage(
+          {
+            type: "confirmSignatureRequest",
+            sigId: sigRequest.id,
+            password: "", // Use cached password
+            tabId,
+          },
+          resolve
+        );
+      });
+
+      if (result.success) {
+        toast({
+          title: "Signed",
+          description: "Message signed successfully",
+          status: "success",
+          duration: 2000,
+        });
+        onConfirmed?.();
+      } else {
+        toast({
+          title: "Signing failed",
+          description: result.error || "Failed to sign message",
+          status: "error",
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to sign",
+        status: "error",
+        duration: 3000,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -460,33 +519,71 @@ function SignatureRequestConfirmation({
           </Box>
         </Box>
 
-        {/* Warning Box - Signatures not supported */}
-        <Box
-          bg="bauhaus.yellow"
-          border="3px solid"
-          borderColor="bauhaus.black"
-          boxShadow="4px 4px 0px 0px #121212"
-          p={3}
-        >
-          <HStack spacing={2}>
-            <Box p={1} bg="bauhaus.black">
-              <WarningTwoIcon color="bauhaus.yellow" boxSize={4} />
-            </Box>
-            <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
-              Signatures are not supported in the Bankr API
-            </Text>
-          </HStack>
-        </Box>
+        {/* Warning Box - Signatures not supported (only for Bankr accounts) */}
+        {accountType === "bankr" && (
+          <Box
+            bg="bauhaus.yellow"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="4px 4px 0px 0px #121212"
+            p={3}
+          >
+            <HStack spacing={2}>
+              <Box p={1} bg="bauhaus.black">
+                <WarningTwoIcon color="bauhaus.yellow" boxSize={4} />
+              </Box>
+              <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
+                Signatures are not supported in the Bankr API
+              </Text>
+            </HStack>
+          </Box>
+        )}
 
-        {/* Reject Button */}
-        <Button
-          variant="danger"
-          w="full"
-          onClick={handleCancel}
-          mt={2}
-        >
-          Reject
-        </Button>
+        {/* Action Buttons */}
+        {accountType === "privateKey" ? (
+          <HStack spacing={3} mt={2}>
+            <Button
+              variant="secondary"
+              flex={1}
+              onClick={handleCancel}
+              isDisabled={isSubmitting}
+            >
+              Reject
+            </Button>
+            <Button
+              flex={1}
+              onClick={handleConfirm}
+              isLoading={isSubmitting}
+              loadingText="Signing..."
+              bg="bauhaus.yellow"
+              color="bauhaus.black"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+              fontWeight="700"
+              _hover={{
+                bg: "bauhaus.yellow",
+                transform: "translateY(-2px)",
+                boxShadow: "6px 6px 0px 0px #121212",
+              }}
+              _active={{
+                transform: "translate(2px, 2px)",
+                boxShadow: "none",
+              }}
+            >
+              Sign
+            </Button>
+          </HStack>
+        ) : (
+          <Button
+            variant="danger"
+            w="full"
+            onClick={handleCancel}
+            mt={2}
+          >
+            Reject
+          </Button>
+        )}
       </VStack>
     </Box>
   );

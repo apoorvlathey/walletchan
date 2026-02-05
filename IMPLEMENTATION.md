@@ -2,10 +2,65 @@
 
 ## Overview
 
-BankrWallet is a Chrome extension that allows users to impersonate blockchain accounts and execute transactions through the Bankr API. This document describes the transaction handling implementation.
+BankrWallet is a Chrome extension that supports two types of accounts:
+
+1. **Bankr API Accounts** - AI-powered wallets that execute transactions through the Bankr API
+2. **Private Key Accounts** - Standard wallets with local key storage for transaction signing
+
+This document describes the core architecture and transaction handling implementation.
 
 **Related Documentation:**
+
+- [PK_ACCOUNTS.md](./PK_ACCOUNTS.md) - Private key accounts implementation (security, signing, storage)
 - [CHAT.md](./CHAT.md) - Chat feature implementation (AI conversations with Bankr agent)
+
+## Account Types
+
+The extension supports two distinct account types that can be used simultaneously:
+
+| Feature               | Bankr API Account         | Private Key Account                 |
+| --------------------- | ------------------------- | ----------------------------------- |
+| Transaction Execution | Via Bankr API             | Local signing + RPC broadcast       |
+| Message Signing       | ❌ Not supported          | ✅ Full support                     |
+| Key Storage           | API key encrypted locally | Private key encrypted locally       |
+| Setup                 | API key + wallet address  | Private key import                  |
+| Use Case              | AI-powered transactions   | Agent wallets, bots, standard usage |
+
+### Account Selection
+
+- Users can configure one or both account types during onboarding
+- When both accounts are set up, the first account added becomes the default active account
+- Each browser tab maintains its own active account selection (similar to per-tab chain)
+- The popup/sidepanel shows the account for the currently active tab
+- Account switching emits `accountsChanged` events to connected dApps
+
+### Address Synchronization
+
+The extension maintains address consistency between storage and the active account:
+
+1. **On Onboarding**: When both account types are configured, the first account's address (PK account) is saved to `chrome.storage.sync.address` since it becomes the active account.
+
+2. **On Account Switch**: When `setActiveAccount` is called, the background worker:
+   - Updates `activeAccountId` in storage
+   - Updates `address` and `displayAddress` in `chrome.storage.sync`
+   - The storage change listener broadcasts `setAddress` to all tabs
+
+3. **On Content Script Init**: The inject.ts script:
+   - Reads the initial address from `chrome.storage.sync`
+   - Verifies with background that the address matches the active account
+   - If mismatched (e.g., stale storage), emits `accountsChanged` with the correct address
+
+4. **On Address Change**: The inject.ts `setAddress` handler now emits `accountsChanged` when the address changes, ensuring dApps are notified of updates from any source.
+
+### Transaction Routing
+
+When a dApp initiates a transaction:
+
+1. Extension checks the active account type for that tab
+2. **Bankr Account**: Transaction submitted to Bankr API → API executes → returns tx hash
+3. **PK Account**: Transaction signed locally with viem → broadcast to RPC → returns tx hash
+
+For detailed implementation of private key accounts, see [PK_ACCOUNTS.md](./PK_ACCOUNTS.md).
 
 ## Architecture
 
@@ -110,7 +165,7 @@ The wallet announces itself with the following EIP-6963 provider info:
 | uuid     | Random UUIDv4 (generated per page session) |
 | name     | "Bankr Wallet"                             |
 | icon     | Data URI of wallet icon (128x128 PNG)      |
-| rdns     | "bot.bankr.wallet"                         |
+| rdns     | "app.bankrwallet"                          |
 
 ### Implementation Details
 
@@ -122,7 +177,7 @@ const providerInfo: EIP6963ProviderInfo = {
   uuid: crypto.randomUUID(),
   name: "Bankr Wallet",
   icon: "data:image/png;base64,...",
-  rdns: "bot.bankr.wallet",
+  rdns: "app.bankrwallet",
 };
 
 // Announce provider to dapps
@@ -132,9 +187,7 @@ function announceProvider() {
     provider: providerInstance,
   });
 
-  window.dispatchEvent(
-    new CustomEvent("eip6963:announceProvider", { detail })
-  );
+  window.dispatchEvent(new CustomEvent("eip6963:announceProvider", { detail }));
 }
 
 // Listen for dapp requests
@@ -210,7 +263,7 @@ function setWindowEthereum(provider: ImpersonatorProvider): boolean {
   } catch (e) {
     console.warn(
       "Bankr Wallet: Could not set window.ethereum (another wallet may have claimed it).",
-      "Dapps supporting EIP-6963 will still be able to discover Bankr Wallet."
+      "Dapps supporting EIP-6963 will still be able to discover Bankr Wallet.",
     );
     return false;
   }
@@ -235,7 +288,11 @@ src/
 │   ├── impersonator.ts      # Inpage script - EIP-6963 provider + window.ethereum
 │   ├── inject.ts            # Content script - message bridge
 │   ├── background.ts        # Service worker - API calls, tx handling, notifications
-│   ├── crypto.ts            # AES-256-GCM encryption for API key
+│   ├── crypto.ts            # AES-256-GCM encryption for API key and vault
+│   ├── types.ts             # Account and vault type definitions
+│   ├── vaultCrypto.ts       # Vault encryption/decryption for private keys
+│   ├── localSigner.ts       # Transaction and message signing with viem
+│   ├── accountStorage.ts    # Account CRUD operations
 │   ├── bankrApi.ts          # Bankr API client
 │   ├── chatApi.ts           # Chat API client for Bankr agent
 │   ├── chatStorage.ts       # Persistent storage for chat conversations
@@ -264,12 +321,14 @@ src/
 │   │   ├── EditChain.tsx    # Edit existing chain
 │   │   ├── ChangePassword.tsx # Password change flow
 │   │   └── AutoLockSettings.tsx # Auto-lock timeout configuration
+│   ├── AccountSwitcher.tsx  # Account dropdown and selection
+│   ├── AddAccount.tsx       # Add new account screen
 │   ├── UnlockScreen.tsx     # Wallet unlock (password entry)
 │   ├── PendingTxBanner.tsx  # Banner showing pending tx/signature count
 │   ├── PendingTxList.tsx    # List of pending transactions and signature requests
 │   ├── TxStatusList.tsx     # Recent transaction history display
 │   ├── TransactionConfirmation.tsx # In-popup tx confirmation with success animation
-│   └── SignatureRequestConfirmation.tsx # Signature request display (reject only)
+│   └── SignatureRequestConfirmation.tsx # Signature request display (confirm for PK, reject for Bankr)
 ├── hooks/
 │   └── useChat.ts           # Chat state management hook
 ├── onboarding.tsx           # React entry point for onboarding page
@@ -299,41 +358,44 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 ### Onboarding Steps
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Step 0: Welcome Screen                                      │
-│  - Bankr logo + branding                                     │
-│  - "Welcome to Bankr Wallet" heading                         │
-│  - "Get Started" button                                      │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│  Step 1: API Key (● ○ ○)                                     │
-│  - API key input field                                       │
-│  - Link: "Don't have an API key? Get one from bankr.bot"     │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│  Step 2: Wallet Address (● ● ○)                              │
-│  - Address input (supports ENS resolution)                   │
-│  - Link: "Find your wallet address at bankr.bot/terminal"    │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│  Step 3: Create Password (● ● ●)                             │
-│  - Password + Confirm password fields (min 6 chars)          │
-│  - Security warning about password recovery                  │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│  Step 4: Success                                             │
-│  - Animated green checkmark                                  │
-│  - "You're all set!" message                                 │
-│  - Floating arrow pointing to extension area                 │
-│  - Extension icon + "BankrWallet" badge                      │
-│  - "Pin & click the extension" instruction                   │
-└─────────────────────────────────────────────────────────────┘
-```
+The onboarding flow varies based on account type selection:
+
+**Step 0: Welcome Screen**
+
+- Bankr logo + branding
+- "Welcome to Bankr Wallet" heading
+- "Get Started" button
+
+**Step 1: Account Type Selection**
+
+- Choose: Bankr Wallet, Private Key, or both
+- Checkbox: "Set up both account types"
+
+**Step 2a: Bankr Setup** (if Bankr or both selected)
+
+- API key input field
+- Wallet address input (supports ENS resolution)
+- Display name (optional) - allows custom naming like "My Bankr Wallet"
+- Links to bankr.bot for API key and terminal
+
+**Step 2b: Private Key Setup** (if PK or both selected)
+
+- Private key input with show/hide toggle
+- Auto-derives and displays address
+- Display name (optional) - allows custom naming like "My Trading Wallet"
+- Security warning about local storage
+
+**Step 3: Create Password**
+
+- Password + Confirm password fields (min 6 chars)
+- Security warning about password recovery
+
+**Step 4: Success**
+
+- Animated green checkmark
+- "You're all set!" message
+- Floating arrow pointing to extension area
+- "Pin & click the extension" instruction
 
 ### Tab Auto-Close
 
@@ -373,9 +435,9 @@ useEffect(() => {
 
 The onboarding page has its own Vite build config:
 
-| Target     | Config File               | Output                          |
-| ---------- | ------------------------- | ------------------------------- |
-| Onboarding | vite.config.onboarding.ts | build/static/js/onboarding.js   |
+| Target     | Config File               | Output                        |
+| ---------- | ------------------------- | ----------------------------- |
+| Onboarding | vite.config.onboarding.ts | build/static/js/onboarding.js |
 
 Build command: `pnpm build:onboarding` (included in `pnpm build`)
 
@@ -412,7 +474,7 @@ await provider.request({
   method: "eth_sendTransaction",
   params: [
     {
-      to: "0x...",
+      to: "0x...", // null for contract deployment
       data: "0x...",
       value: "0x0",
     },
@@ -420,12 +482,15 @@ await provider.request({
 });
 ```
 
+**Contract Deployment**: When the `to` field is `null` (not address zero), the transaction is treated as a contract deployment. This is supported across both Bankr API and Private Key accounts. The confirmation UI shows a "Contract Deployment" badge instead of a recipient address.
+
 ### 3. Impersonator Validates & Forwards
 
 `src/chrome/impersonator.ts`:
 
 - Validates chain ID is in allowed list (1, 137, 8453, 130)
 - Creates unique transaction ID
+- Allows `to` to be null for contract deployment transactions
 - Posts message to content script
 - Returns Promise that resolves when tx completes
 
@@ -472,7 +537,7 @@ The "to" address displays labels fetched from eth.sh API:
 
 ```typescript
 const response = await fetch(
-  `https://eth.sh/api/labels/${tx.to}?chainId=${tx.chainId}`
+  `https://eth.sh/api/labels/${tx.to}?chainId=${tx.chainId}`,
 );
 const labels = await response.json();
 // Displays as badges below the address (e.g., "Uniswap V3: Router")
@@ -517,17 +582,24 @@ Submit this transaction:
 
 ## Signature Request Handling
 
-The Bankr API does not support message signing. When dapps request signatures, the extension displays the request details but only allows rejection.
+Signature support differs by account type:
+
+| Account Type | Signature Support                        |
+| ------------ | ---------------------------------------- |
+| Bankr API    | ❌ Not supported (reject only)           |
+| Private Key  | ✅ Full support (sign locally with viem) |
+
+When dapps request signatures, the extension displays the request details. For Bankr accounts, only rejection is allowed. For Private Key accounts, users can confirm to sign the message locally.
 
 ### Supported Signature Methods
 
-| Method | Description |
-| ------ | ----------- |
-| `personal_sign` | Sign a plain text message |
-| `eth_sign` | Sign arbitrary data (deprecated) |
-| `eth_signTypedData` | Sign typed data (EIP-712) |
-| `eth_signTypedData_v3` | Sign typed data v3 |
-| `eth_signTypedData_v4` | Sign typed data v4 |
+| Method                 | Description                      |
+| ---------------------- | -------------------------------- |
+| `personal_sign`        | Sign a plain text message        |
+| `eth_sign`             | Sign arbitrary data (deprecated) |
+| `eth_signTypedData`    | Sign typed data (EIP-712)        |
+| `eth_signTypedData_v3` | Sign typed data v3               |
+| `eth_signTypedData_v4` | Sign typed data v4               |
 
 ### Flow
 
@@ -540,25 +612,45 @@ The Bankr API does not support message signing. When dapps request signatures, t
 │  3. Request forwarded to background via content script                      │
 │  4. Background stores in pendingSignatureRequests storage                   │
 │  5. Popup/sidepanel shows SignatureRequestConfirmation                      │
-│  6. User can only REJECT (signing not supported)                            │
-│  7. Rejection returns error to dapp                                         │
+│  6. User action depends on account type:                                    │
+│     ┌─────────────────────────────────────────────────────────────────┐    │
+│     │  Bankr API Account:                                              │    │
+│     │    - Only REJECT button shown                                    │    │
+│     │    - Warning: "Signatures not supported"                         │    │
+│     │    - Rejection returns error to dapp                             │    │
+│     ├─────────────────────────────────────────────────────────────────┤    │
+│     │  Private Key Account:                                            │    │
+│     │    - CONFIRM and REJECT buttons shown                            │    │
+│     │    - Confirm: Signs message locally using viem                   │    │
+│     │    - Signature returned to dapp                                  │    │
+│     └─────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### UI Display
 
 The SignatureRequestConfirmation component shows:
+
 - Origin (with favicon)
 - Network badge
 - Method name (e.g., "Personal Sign", "Sign Typed Data v4")
 - Decoded message content (for personal_sign)
 - Raw data with copy button
-- **Warning box**: "Signatures are not supported in the Bankr API"
-- **Reject button**: Only action available
+
+**For Bankr API Accounts:**
+
+- Warning box: "Signatures are not supported for this account type"
+- Reject button only (red) - emphasizes that signing is not possible
+
+**For Private Key Accounts:**
+
+- Sign button (yellow): Signs the message locally
+- Reject button (white/secondary): Cancels the request - matches transaction confirmation style
 
 ### Combined Navigation
 
 When both transaction and signature requests are pending:
+
 - Counter shows combined total (e.g., "1/3" for 2 tx + 1 sig)
 - Transaction requests appear first in the list
 - Navigation arrows allow moving between all request types
@@ -608,6 +700,7 @@ const checkmarkDraw = keyframes`
 ```
 
 The animation shows:
+
 - Green circular badge with animated checkmark
 - "Transaction Sent" heading
 - "Your transaction has been submitted" subtext
@@ -621,10 +714,10 @@ The extension uses Chrome's Notifications API to alert users when transactions c
 
 ### Notification Types
 
-| Event | Title | Message |
-| ----- | ----- | ------- |
+| Event                 | Title                   | Message                                          |
+| --------------------- | ----------------------- | ------------------------------------------------ |
 | Transaction Confirmed | "Transaction Confirmed" | "Your transaction on {chainName} was successful" |
-| Transaction Failed | "Transaction Failed" | "Error: {errorMessage}" |
+| Transaction Failed    | "Transaction Failed"    | "Error: {errorMessage}"                          |
 
 ### Implementation
 
@@ -632,7 +725,7 @@ The extension uses Chrome's Notifications API to alert users when transactions c
 async function showNotification(
   notificationId: string,
   title: string,
-  message: string
+  message: string,
 ): Promise<string> {
   return new Promise((resolve) => {
     chrome.notifications.create(
@@ -649,7 +742,7 @@ async function showNotification(
           console.error("Notification error:", chrome.runtime.lastError);
         }
         resolve(createdId || notificationId);
-      }
+      },
     );
   });
 }
@@ -658,6 +751,7 @@ async function showNotification(
 ### macOS Permissions Note
 
 On macOS, Chrome notifications require explicit permission in System Preferences:
+
 - **System Preferences → Notifications → Google Chrome → Allow Notifications**
 
 Without this permission, `chrome.notifications.create()` will execute without error but no notification will appear.
@@ -666,9 +760,7 @@ Without this permission, `chrome.notifications.create()` will execute without er
 
 ```json
 {
-  "permissions": [
-    "notifications"
-  ]
+  "permissions": ["notifications"]
 }
 ```
 
@@ -700,12 +792,12 @@ export interface CompletedTransaction {
 
 ### Storage Functions
 
-| Function | Description |
-| -------- | ----------- |
-| `getTxHistory()` | Get all history (newest first, max 50) |
-| `addTxToHistory(tx)` | Add new entry with "processing" status |
+| Function                           | Description                               |
+| ---------------------------------- | ----------------------------------------- |
+| `getTxHistory()`                   | Get all history (newest first, max 50)    |
+| `addTxToHistory(tx)`               | Add new entry with "processing" status    |
 | `updateTxInHistory(txId, updates)` | Update status, txHash, error, completedAt |
-| `clearTxHistory()` | Remove all history entries |
+| `clearTxHistory()`                 | Remove all history entries                |
 
 ### Storage Details
 
@@ -720,8 +812,10 @@ export interface CompletedTransaction {
 - **Default view**: 5 most recent transactions
 - **Expandable**: Show/hide older transactions
 - **Empty state**: "No recent transactions" message
+- **Account filtering**: Only shows transactions from the currently selected account (filtered by `tx.from` address)
 
 Each transaction shows:
+
 - Origin favicon and hostname
 - Chain badge with icon
 - Status badge:
@@ -747,6 +841,7 @@ chrome.runtime.onMessage.addListener((message) => {
 ### Clear History
 
 Users can clear transaction history via Settings:
+
 - Navigate to Settings → "Clear Transaction History"
 - Confirmation modal prevents accidental deletion
 - Message: "This will permanently delete all transaction records. This action cannot be undone."
@@ -823,18 +918,18 @@ Each browser tab maintains its own chain selection:
 
 The extension UI stays in sync with chain changes through multiple mechanisms:
 
-| Trigger | Mechanism | Description |
-| ------- | --------- | ----------- |
-| Dapp switches chain | `chrome.storage.onChanged` | Detects `chainName` storage updates |
-| User switches tabs | `chrome.tabs.onActivated` | Queries new tab's content script |
-| User selects chain | `useUpdateEffect` | Sends `setChainId` to content script |
-| Popup opens | `init()` | Queries current tab via `getInfo` |
+| Trigger             | Mechanism                  | Description                          |
+| ------------------- | -------------------------- | ------------------------------------ |
+| Dapp switches chain | `chrome.storage.onChanged` | Detects `chainName` storage updates  |
+| User switches tabs  | `chrome.tabs.onActivated`  | Queries new tab's content script     |
+| User selects chain  | `useUpdateEffect`          | Sends `setChainId` to content script |
+| Popup opens         | `init()`                   | Queries current tab via `getInfo`    |
 
-## API Key Encryption
+## Sensitive Data Encryption
 
-The Bankr API key is encrypted using AES-256-GCM with PBKDF2 key derivation.
+Both the Bankr API key and private keys are encrypted using AES-256-GCM with PBKDF2 key derivation.
 
-`src/chrome/crypto.ts`:
+`src/chrome/crypto.ts` and `src/chrome/vaultCrypto.ts`:
 
 ```
 User Password
@@ -846,44 +941,59 @@ PBKDF2 (600,000 iterations, random salt)
 AES-256-GCM Key
       │
       ▼
-Encrypt API Key (random IV)
+Encrypt Sensitive Data (random IV)
       │
       ▼
 Store in chrome.storage.local:
 {
+  // Bankr API key (for Bankr accounts)
   encryptedApiKey: {
     ciphertext: "base64...",
     iv: "base64...",
     salt: "base64..."
-  }
+  },
+  // Private keys vault (for PK accounts)
+  encryptedVault: {
+    ciphertext: "base64...",
+    iv: "base64...",
+    salt: "base64..."
+  },
+  // Account metadata (no sensitive data)
+  accounts: [
+    { id: "...", type: "bankr", address: "0x...", ... },
+    { id: "...", type: "privateKey", address: "0x...", ... }
+  ]
 }
 ```
 
+**Security Note**: Private keys are ONLY decrypted in the service worker (background.ts) and NEVER exposed to content scripts, inpage scripts, or the UI layer. See [PK_ACCOUNTS.md](./PK_ACCOUNTS.md) for detailed security architecture.
+
 ### Session Caching (Wallet Lock/Unlock)
 
-MetaMask-style wallet lock flow:
+Wallet lock flow for secure credential management:
 
-- Decrypted API key **and password** are cached in background worker memory
+- Decrypted API key, **private keys vault**, and password are cached in background worker memory
+- **Private keys are NEVER sent to UI** - only used internally for signing
 - Cache expires based on **configurable auto-lock timeout** (default: 15 minutes)
 - Cache cleared on browser close or extension suspend
 - When locked, user must enter password before:
   - Viewing the main wallet interface
-  - Confirming any pending transactions
+  - Confirming any pending transactions or signature requests
 - Unlock persists across popup open/close cycles (until cache expires)
 
 #### Auto-Lock Timeout Configuration
 
 Users can configure the auto-lock timeout via Settings → Auto-Lock:
 
-| Option | Value (ms) | Description |
-| ------ | ---------- | ----------- |
-| 1 minute | 60,000 | Quick lock for high security |
-| 5 minutes | 300,000 | Short timeout |
-| **15 minutes** | 900,000 | **Default** |
-| 30 minutes | 1,800,000 | Medium timeout |
-| 1 hour | 3,600,000 | Extended session |
-| 4 hours | 14,400,000 | Long session |
-| Never | 0 | Never auto-lock (manual lock only) |
+| Option         | Value (ms) | Description                        |
+| -------------- | ---------- | ---------------------------------- |
+| 1 minute       | 60,000     | Quick lock for high security       |
+| 5 minutes      | 300,000    | Short timeout                      |
+| **15 minutes** | 900,000    | **Default**                        |
+| 30 minutes     | 1,800,000  | Medium timeout                     |
+| 1 hour         | 3,600,000  | Extended session                   |
+| 4 hours        | 14,400,000 | Long session                       |
+| Never          | 0          | Never auto-lock (manual lock only) |
 
 **Implementation Details**:
 
@@ -896,9 +1006,9 @@ Users can configure the auto-lock timeout via Settings → Auto-Lock:
 
 **Message Types**:
 
-| Type | Description |
-| ---- | ----------- |
-| `getAutoLockTimeout` | Get current timeout value |
+| Type                 | Description                                              |
+| -------------------- | -------------------------------------------------------- |
+| `getAutoLockTimeout` | Get current timeout value                                |
 | `setAutoLockTimeout` | Set new timeout value (validated against allowed values) |
 
 #### Password Caching for API Key Changes
@@ -967,6 +1077,7 @@ async function openExtensionPopup(senderWindowId?: number): Promise<void> {
 ```
 
 **Multi-Monitor Support**:
+
 - Uses `senderWindowId` from the message sender's tab to identify the correct window
 - Falls back to `chrome.windows.getLastFocused()` if sender window not available
 - Allows negative `left` coordinates for monitors positioned left of primary
@@ -992,13 +1103,13 @@ Error is detected by keywords: "missing required", "error", "can't", "cannot", "
 
 The extension has 5 build targets:
 
-| Target     | Config File               | Output                          |
-| ---------- | ------------------------- | ------------------------------- |
-| Popup      | vite.config.ts            | build/static/js/main.js         |
-| Onboarding | vite.config.onboarding.ts | build/static/js/onboarding.js   |
-| Inpage     | vite.config.inpage.ts     | build/static/js/inpage.js       |
-| Inject     | vite.config.inject.ts     | build/static/js/inject.js       |
-| Background | vite.config.background.ts | build/static/js/background.js   |
+| Target     | Config File               | Output                        |
+| ---------- | ------------------------- | ----------------------------- |
+| Popup      | vite.config.ts            | build/static/js/main.js       |
+| Onboarding | vite.config.onboarding.ts | build/static/js/onboarding.js |
+| Inpage     | vite.config.inpage.ts     | build/static/js/inpage.js     |
+| Inject     | vite.config.inject.ts     | build/static/js/inject.js     |
+| Background | vite.config.background.ts | build/static/js/background.js |
 
 Build command: `pnpm build`
 
@@ -1012,98 +1123,103 @@ Build command: `pnpm build`
     "service_worker": "static/js/background.js",
     "type": "module"
   },
-  "permissions": [
-    "activeTab",
-    "storage",
-    "sidePanel",
-    "notifications",
-    "tabs"
-  ]
+  "permissions": ["activeTab", "storage", "sidePanel", "notifications", "tabs"]
 }
 ```
 
 ### Permissions
 
-| Permission    | Purpose                                                |
-| ------------- | ------------------------------------------------------ |
-| `activeTab`   | Access to the currently active tab                     |
-| `storage`     | Store encrypted API key, settings, transaction history |
-| `sidePanel`   | Enable sidepanel mode (Chrome 114+)                    |
-| `notifications` | Show transaction success/failure notifications       |
-| `tabs`        | Query and close extension tabs (e.g., onboarding page) |
+| Permission      | Purpose                                                |
+| --------------- | ------------------------------------------------------ |
+| `activeTab`     | Access to the currently active tab                     |
+| `storage`       | Store encrypted API key, settings, transaction history |
+| `sidePanel`     | Enable sidepanel mode (Chrome 114+)                    |
+| `notifications` | Show transaction success/failure notifications         |
+| `tabs`          | Query and close extension tabs (e.g., onboarding page) |
 
 ## Message Types
 
 ### Inpage → Content Script (postMessage)
 
-| Type                    | Description            |
-| ----------------------- | ---------------------- |
-| `i_sendTransaction`     | Transaction request    |
-| `i_signatureRequest`    | Signature request      |
-| `i_rpcRequest`          | RPC call request       |
-| `i_switchEthereumChain` | Chain switch request   |
+| Type                    | Description          |
+| ----------------------- | -------------------- |
+| `i_sendTransaction`     | Transaction request  |
+| `i_signatureRequest`    | Signature request    |
+| `i_rpcRequest`          | RPC call request     |
+| `i_switchEthereumChain` | Chain switch request |
 
 ### Content Script → Inpage (postMessage)
 
-| Type                       | Description                              |
-| -------------------------- | ---------------------------------------- |
-| `sendTransactionResult`    | Transaction result                       |
-| `signatureRequestResult`   | Signature request result (rejection)     |
-| `rpcResponse`              | RPC call response                        |
-| `switchEthereumChain`      | Chain switch success (chainId, rpcUrl)   |
-| `switchEthereumChainError` | Chain switch error (unsupported chain)   |
+| Type                       | Description                                          |
+| -------------------------- | ---------------------------------------------------- |
+| `sendTransactionResult`    | Transaction result                                   |
+| `signatureRequestResult`   | Signature result (rejection or signature for PK)     |
+| `rpcResponse`              | RPC call response                                    |
+| `switchEthereumChain`      | Chain switch success (chainId, rpcUrl)               |
+| `switchEthereumChainError` | Chain switch error (unsupported chain)               |
+| `setAddress`               | Account changed (address, displayAddress)            |
+| `accountsChanged`          | Emitted when address changes (for dApp notification) |
 
 ### Content Script → Background (chrome.runtime)
 
-| Type               | Description               |
-| ------------------ | ------------------------- |
-| `sendTransaction`  | Submit transaction        |
-| `signatureRequest` | Submit signature request  |
-| `rpcRequest`       | Proxy RPC call            |
+| Type               | Description              |
+| ------------------ | ------------------------ |
+| `sendTransaction`  | Submit transaction       |
+| `signatureRequest` | Submit signature request |
+| `rpcRequest`       | Proxy RPC call           |
 
 ### Popup → Background (chrome.runtime)
 
-| Type                          | Description                           |
-| ----------------------------- | ------------------------------------- |
-| `getPendingTxRequests`        | Get all pending tx requests           |
-| `getPendingTransaction`       | Get specific tx details               |
-| `isApiKeyCached`              | Check if password needed              |
-| `unlockWallet`                | Unlock wallet with password           |
-| `lockWallet`                  | Lock wallet (clear cached credentials)|
-| `confirmTransaction`          | User approved tx (sync, waits)        |
-| `confirmTransactionAsync`     | User approved tx (async, returns immediately) |
-| `rejectTransaction`           | User rejected tx                      |
-| `getPendingSignatureRequests` | Get all pending signature requests    |
-| `rejectSignatureRequest`      | User rejected signature request       |
-| `cancelTransaction`           | User cancelled in-progress tx         |
-| `clearApiKeyCache`            | Clear cached API key                  |
-| `getCachedPassword`           | Check if password is cached           |
-| `getCachedApiKey`             | Get decrypted API key (if cached)     |
-| `saveApiKeyWithCachedPassword`| Save new API key using cached password|
-| `changePasswordWithCachedPassword`| Change password using cached password |
-| `isSidePanelSupported`        | Check if browser supports sidepanel   |
-| `getSidePanelMode`            | Get current sidepanel mode setting    |
-| `setSidePanelMode`            | Set sidepanel mode (true/false)       |
-| `setArcBrowser`               | Mark browser as Arc (disables sidepanel) |
-| `getAutoLockTimeout`          | Get current auto-lock timeout (ms)    |
-| `setAutoLockTimeout`          | Set auto-lock timeout (ms)            |
-| `getTxHistory`                | Get completed transaction history     |
-| `clearTxHistory`              | Clear all transaction history         |
+| Type                               | Description                                             |
+| ---------------------------------- | ------------------------------------------------------- |
+| `getPendingTxRequests`             | Get all pending tx requests                             |
+| `getPendingTransaction`            | Get specific tx details                                 |
+| `isApiKeyCached`                   | Check if password needed                                |
+| `unlockWallet`                     | Unlock wallet with password                             |
+| `lockWallet`                       | Lock wallet (clear cached credentials)                  |
+| `confirmTransaction`               | User approved tx (sync, waits)                          |
+| `confirmTransactionAsync`          | User approved tx (async, returns immediately)           |
+| `rejectTransaction`                | User rejected tx                                        |
+| `getPendingSignatureRequests`      | Get all pending signature requests                      |
+| `rejectSignatureRequest`           | User rejected signature request                         |
+| `cancelTransaction`                | User cancelled in-progress tx                           |
+| `clearApiKeyCache`                 | Clear cached API key                                    |
+| `getCachedPassword`                | Check if password is cached                             |
+| `getCachedApiKey`                  | Get decrypted API key (if cached)                       |
+| `saveApiKeyWithCachedPassword`     | Save new API key using cached password                  |
+| `changePasswordWithCachedPassword` | Change password using cached password                   |
+| `isSidePanelSupported`             | Check if browser supports sidepanel                     |
+| `getSidePanelMode`                 | Get current sidepanel mode setting                      |
+| `setSidePanelMode`                 | Set sidepanel mode (true/false)                         |
+| `setArcBrowser`                    | Mark browser as Arc (disables sidepanel)                |
+| `getAutoLockTimeout`               | Get current auto-lock timeout (ms)                      |
+| `setAutoLockTimeout`               | Set auto-lock timeout (ms)                              |
+| `getTxHistory`                     | Get completed transaction history                       |
+| `clearTxHistory`                   | Clear all transaction history                           |
+| `getAccounts`                      | Get all accounts (metadata only)                        |
+| `getActiveAccount`                 | Get currently active account                            |
+| `setActiveAccount`                 | Set active account by ID (also updates storage address) |
+| `addPrivateKeyAccount`             | Import new private key account                          |
+| `removeAccount`                    | Remove account by ID                                    |
+| `getTabAccount`                    | Get account for specific tab                            |
+| `setTabAccount`                    | Set account for specific tab                            |
+| `confirmSignatureRequest`          | Sign message (PK accounts only)                         |
 
 ### Background → Views (chrome.runtime broadcast)
 
-| Type                        | Description                                      |
-| --------------------------- | ------------------------------------------------ |
-| `txHistoryUpdated`          | Notifies views that transaction history changed  |
-| `newPendingTxRequest`       | Notifies views of new pending transaction        |
-| `newPendingSignatureRequest`| Notifies views of new pending signature request  |
-| `ping`                      | Check if any extension view is open              |
+| Type                         | Description                                     |
+| ---------------------------- | ----------------------------------------------- |
+| `txHistoryUpdated`           | Notifies views that transaction history changed |
+| `newPendingTxRequest`        | Notifies views of new pending transaction       |
+| `newPendingSignatureRequest` | Notifies views of new pending signature request |
+| `accountsUpdated`            | Notifies views that accounts list changed       |
+| `ping`                       | Check if any extension view is open             |
 
 ### Views → Background (response)
 
-| Type   | Description                              |
-| ------ | ---------------------------------------- |
-| `pong` | Response indicating view is open         |
+| Type   | Description                      |
+| ------ | -------------------------------- |
+| `pong` | Response indicating view is open |
 
 ## Sidepanel Support
 
@@ -1125,8 +1241,9 @@ Arc browser has `chrome.sidePanel` defined but it doesn't work properly. The ext
 ```typescript
 function isArcBrowser(): boolean {
   try {
-    const arcPaletteTitle = getComputedStyle(document.documentElement)
-      .getPropertyValue('--arc-palette-title');
+    const arcPaletteTitle = getComputedStyle(
+      document.documentElement,
+    ).getPropertyValue("--arc-palette-title");
     return !!arcPaletteTitle && arcPaletteTitle.trim().length > 0;
   } catch {
     return false;
@@ -1135,6 +1252,7 @@ function isArcBrowser(): boolean {
 ```
 
 This detection happens in:
+
 - **Onboarding page**: Sets `isArcBrowser` flag in storage before user completes setup
 - **App.tsx**: Checks on mount and updates storage if Arc is detected
 
@@ -1168,22 +1286,24 @@ This detection happens in:
 
 ### Configuration
 
-| Setting | Storage Key | Default | Description |
-| ------- | ----------- | ------- | ----------- |
-| Mode    | `sidePanelMode` | `true` (after onboarding, if supported) | Whether to use sidepanel or popup |
-| Verified | `sidePanelVerified` | Set on first successful enable | Whether sidepanel has been tested and works |
-| Arc Browser | `isArcBrowser` | Detected via CSS variable | Whether running in Arc browser |
+| Setting     | Storage Key         | Default                                 | Description                                 |
+| ----------- | ------------------- | --------------------------------------- | ------------------------------------------- |
+| Mode        | `sidePanelMode`     | `true` (after onboarding, if supported) | Whether to use sidepanel or popup           |
+| Verified    | `sidePanelVerified` | Set on first successful enable          | Whether sidepanel has been tested and works |
+| Arc Browser | `isArcBrowser`      | Detected via CSS variable               | Whether running in Arc browser              |
 
 ### UI Toggle
 
 A sidepanel toggle button is available on both the **unlock screen** (top-right corner) and **main view header** (only visible when sidepanel is supported).
 
 When toggling from popup to sidepanel mode:
+
 - The setting is persisted in `chrome.storage.sync`
 - The extension's action behavior is updated via `chrome.sidePanel.setPanelBehavior`
 - A toast notification instructs user to close popup and click extension icon (Chrome doesn't allow programmatic sidepanel opening)
 
 When toggling from sidepanel to popup mode:
+
 - A popup window is opened
 - The sidepanel closes automatically
 
@@ -1206,30 +1326,33 @@ When a dapp requests a transaction, the extension uses a ping/pong mechanism to 
 ```
 
 This ensures:
+
 - If sidepanel is already open → it updates in-place, no popup opened
 - If popup is already open → it updates in-place, no duplicate popup
 - If nothing is open → a popup window is opened (can't programmatically open sidepanel)
 
 ### Message Types for Sidepanel
 
-| Type | Direction | Description |
-| ---- | --------- | ----------- |
-| `ping` | Background → Views | Check if any extension view is open |
-| `pong` | Views → Background | Response indicating view is open |
-| `newPendingTxRequest` | Background → Views | Notify views of new pending transaction |
-| `openPopupWindow` | Views → Background | Request to open a popup window |
-| `setArcBrowser` | Views → Background | Notify background that Arc browser was detected |
-| `isSidePanelSupported` | Views → Background | Check if sidepanel is supported and verified |
-| `setSidePanelMode` | Views → Background | Enable/disable sidepanel mode |
+| Type                   | Direction          | Description                                     |
+| ---------------------- | ------------------ | ----------------------------------------------- |
+| `ping`                 | Background → Views | Check if any extension view is open             |
+| `pong`                 | Views → Background | Response indicating view is open                |
+| `newPendingTxRequest`  | Background → Views | Notify views of new pending transaction         |
+| `openPopupWindow`      | Views → Background | Request to open a popup window                  |
+| `setArcBrowser`        | Views → Background | Notify background that Arc browser was detected |
+| `isSidePanelSupported` | Views → Background | Check if sidepanel is supported and verified    |
+| `setSidePanelMode`     | Views → Background | Enable/disable sidepanel mode                   |
 
 ### Key Design Decisions
 
 **Conservative Default**: The extension defaults to popup mode on startup and only enables sidepanel after verification. This ensures:
+
 - Arc browser users always get a working popup
 - New installs work immediately without sidepanel configuration issues
 - Sidepanel is only enabled after explicit verification that it works
 
 **Detection Timing**: Arc detection happens at multiple points:
+
 1. **Onboarding page** (first install): Earliest possible detection, before user ever clicks extension icon
 2. **App.tsx mount** (subsequent loads): Catches cases where onboarding was skipped or flags were cleared
 3. **Storage persistence**: Once detected, the `isArcBrowser` flag persists across sessions
@@ -1237,10 +1360,12 @@ This ensures:
 ### CSS Handling
 
 The extension detects if it's running in a sidepanel context by checking window dimensions:
+
 - Sidepanel: height > 620px (browser provides more vertical space)
 - Popup: height ≤ 600px (fixed popup dimensions)
 
 When in sidepanel:
+
 - `body.sidepanel-mode` class is added
 - CSS adjusts to use full viewport height (100vh)
 
@@ -1266,16 +1391,19 @@ The confirmation views use a two-row header layout:
 ```
 
 **Row 1:**
+
 - **Back arrow** (left): Returns to pending list (if multiple) or main view
 - **Navigation** (center, absolute): `< 1/2 >` arrows + counter badge
 - **Reject All** (right): Rejects all pending requests (only shown when multiple)
 
 **Row 2:**
+
 - **Title** (centered): "Transaction Request" or "Signature Request" (larger font)
 
 ### Pending Requests List
 
 The list shows both transaction and signature requests. Each request shows:
+
 - Request number badge (#1, #2, etc.)
 - Origin favicon with white background (handles transparent icons)
 - Origin hostname
@@ -1299,7 +1427,9 @@ Origin favicons are displayed with a white background to handle transparent icon
   justifyContent="center"
 >
   <Image
-    src={favicon || `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`}
+    src={
+      favicon || `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`
+    }
     boxSize="16px"
     borderRadius="sm"
   />
@@ -1310,18 +1440,21 @@ Origin favicons are displayed with a white background to handle transparent icon
 
 The main view (after unlock) shows:
 
-1. **Header**: Lock button, Sidepanel toggle (if supported), Settings icon
-2. **Wallet Address Section**:
+1. **Header**: Chat History button (Bankr accounts only), Lock button, Sidepanel toggle (if supported), Settings icon
+2. **Account Switcher**: Dropdown to switch between accounts (if multiple)
+3. **Wallet Address Section**:
    - "Bankr Wallet Address" label
    - Truncated address with copy button
    - Explorer link icon
-3. **Chain Selector**: Dropdown to select network
-4. **Pending Transaction Banner** (if any pending)
-5. **Recent Transactions** (TxStatusList):
-   - Shows last 5 transactions by default
+4. **Chain Selector**: Dropdown to select network
+5. **Pending Transaction Banner** (if any pending)
+6. **Recent Transactions** (TxStatusList):
+   - Shows last 5 transactions by default (filtered by current account)
    - Expandable to show all
    - Empty state: "No recent transactions"
-6. **Footer**: "Built by @apoorveth" with X logo link
+7. **Footer**: "Chat with Bankr" button (Bankr accounts only)
+
+**Note**: The Chat History button in the header and "Chat with Bankr" button in the footer are only visible when the currently selected account is a Bankr API account. Private Key accounts do not have access to the Bankr chat feature.
 
 ### Lock Wallet Button
 
@@ -1391,7 +1524,7 @@ When handling transaction completion:
 
 ```typescript
 const handleTxRejected = async () => {
-  const currentTxId = selectedTxRequest?.id;  // Capture before async
+  const currentTxId = selectedTxRequest?.id; // Capture before async
   const requests = await loadPendingRequests(); // Returns fresh data
 
   // Use fresh data, not stale pendingRequests state

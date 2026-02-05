@@ -21,24 +21,25 @@ import { getChainConfig } from "@/constants/chainConfig";
 
 interface TxStatusListProps {
   maxItems?: number;
+  address?: string; // Filter transactions by this address
 }
 
-function TxStatusList({ maxItems = 5 }: TxStatusListProps) {
-  const [history, setHistory] = useState<CompletedTransaction[]>([]);
+function TxStatusList({ maxItems = 5, address }: TxStatusListProps) {
+  const [allHistory, setAllHistory] = useState<CompletedTransaction[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Load and listen for updates
   useEffect(() => {
     // Initial load
     chrome.runtime.sendMessage({ type: "getTxHistory" }, (result) => {
-      setHistory(result || []);
+      setAllHistory(result || []);
     });
 
     // Listen for updates
     const handleMessage = (message: { type: string }) => {
       if (message.type === "txHistoryUpdated") {
         chrome.runtime.sendMessage({ type: "getTxHistory" }, (result) => {
-          setHistory(result || []);
+          setAllHistory(result || []);
         });
       }
     };
@@ -46,6 +47,11 @@ function TxStatusList({ maxItems = 5 }: TxStatusListProps) {
     chrome.runtime.onMessage.addListener(handleMessage);
     return () => chrome.runtime.onMessage.removeListener(handleMessage);
   }, []);
+
+  // Filter history by address (case-insensitive comparison)
+  const history = address
+    ? allHistory.filter((tx) => tx.tx.from.toLowerCase() === address.toLowerCase())
+    : allHistory;
 
   const displayItems = isExpanded ? history : history.slice(0, maxItems);
   const hasMore = history.length > maxItems;

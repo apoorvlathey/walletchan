@@ -54,6 +54,8 @@ const TransactionConfirmation = lazy(() => import("@/components/TransactionConfi
 const SignatureRequestConfirmation = lazy(() => import("@/components/SignatureRequestConfirmation"));
 const PendingTxList = lazy(() => import("@/components/PendingTxList"));
 const ChatView = lazy(() => import("@/components/Chat/ChatView"));
+const AccountSwitcher = lazy(() => import("@/components/AccountSwitcher"));
+const AddAccount = lazy(() => import("@/components/AddAccount"));
 
 // Eager load components needed immediately
 import UnlockScreen from "@/components/UnlockScreen";
@@ -64,6 +66,7 @@ import { getChainConfig } from "@/constants/chainConfig";
 import { hasEncryptedApiKey } from "@/chrome/crypto";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
+import type { Account } from "@/chrome/types";
 
 // Combined request type for unified ordering
 export type CombinedRequest =
@@ -96,7 +99,7 @@ const LoadingFallback = () => (
   </Box>
 );
 
-type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | "signatureConfirm" | "waitingForOnboarding" | "chat";
+type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | "signatureConfirm" | "waitingForOnboarding" | "chat" | "addAccount";
 
 function App() {
   const { networksInfo, reloadRequired, setReloadRequired } = useNetworks();
@@ -122,6 +125,8 @@ function App() {
   const [returnToChatAfterUnlock, setReturnToChatAfterUnlock] = useState(false);
   const [returnToConversationId, setReturnToConversationId] = useState<string | null>(null);
   const [isWalletUnlocked, setIsWalletUnlocked] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [activeAccount, setActiveAccount] = useState<Account | null>(null);
 
   const currentTab = async () => {
     const [tab] = await chrome.tabs.query({
@@ -206,8 +211,50 @@ function App() {
   };
 
   const checkLockState = async (): Promise<boolean> => {
-    const cached = await sendMessageWithRetry<boolean>({ type: "isApiKeyCached" });
+    const cached = await sendMessageWithRetry<boolean>({ type: "isWalletUnlocked" });
     return cached || false;
+  };
+
+  const loadAccounts = async () => {
+    const accountList = await sendMessageWithRetry<Account[]>({ type: "getAccounts" });
+    setAccounts(accountList || []);
+
+    const active = await sendMessageWithRetry<Account | null>({ type: "getActiveAccount" });
+    setActiveAccount(active);
+
+    return { accounts: accountList || [], activeAccount: active };
+  };
+
+  const handleAccountSwitch = async (account: Account) => {
+    // Set as active account
+    await sendMessageWithRetry({ type: "setActiveAccount", accountId: account.id });
+    setActiveAccount(account);
+
+    // Update address and displayAddress
+    setAddress(account.address);
+    setDisplayAddress(account.displayName || account.address);
+
+    // Update storage for backward compatibility
+    await chrome.storage.sync.set({
+      address: account.address,
+      displayAddress: account.displayName || account.address,
+    });
+
+    // Notify content script about the account change
+    const tab = await currentTab();
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, {
+        type: "setAccount",
+        msg: {
+          address: account.address,
+          displayAddress: account.displayName || account.address,
+          accountId: account.id,
+          accountType: account.type,
+        },
+      }).catch(() => {
+        // Ignore errors if content script not injected
+      });
+    }
   };
 
   // Check sidepanel support and mode on mount
@@ -416,6 +463,9 @@ function App() {
       const requests = await loadPendingRequests();
       const sigRequests = await loadPendingSignatureRequests();
 
+      // Load accounts
+      const { accounts: loadedAccounts, activeAccount: loadedActive } = await loadAccounts();
+
       // Load stored data
       const {
         displayAddress: storedDisplayAddress,
@@ -431,11 +481,16 @@ function App() {
         chainName: string | undefined;
       };
 
-      if (storedDisplayAddress) {
+      // Use active account if available, otherwise fall back to stored address
+      if (loadedActive) {
+        setAddress(loadedActive.address);
+        setDisplayAddress(loadedActive.displayName || loadedActive.address);
+      } else if (storedDisplayAddress) {
         setDisplayAddress(storedDisplayAddress);
-      }
-
-      if (storedAddress) {
+        if (storedAddress) {
+          setAddress(storedAddress);
+        }
+      } else if (storedAddress) {
         setAddress(storedAddress);
       }
 
@@ -527,6 +582,10 @@ function App() {
       if (message.type === "onboardingComplete") {
         // Onboarding finished - reload to show unlock screen
         window.location.reload();
+      }
+      if (message.type === "accountsUpdated") {
+        // Reload accounts when they change
+        loadAccounts();
       }
     };
 
@@ -977,6 +1036,21 @@ function App() {
     );
   }
 
+  // Add Account view
+  if (view === "addAccount") {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <AddAccount
+          onBack={() => setView("main")}
+          onAccountAdded={async () => {
+            await loadAccounts();
+            setView("main");
+          }}
+        />
+      </Suspense>
+    );
+  }
+
   // Pending tx list view
   if (view === "pendingTxList") {
     return (
@@ -1060,6 +1134,7 @@ function App() {
           currentIndex={currentIndex >= 0 ? currentIndex : 0}
           totalCount={totalCount}
           isInSidePanel={isInSidePanel}
+          accountType={activeAccount?.type}
           onBack={() => {
             setSelectedSignatureRequest(null);
             if (totalCount > 1) {
@@ -1070,6 +1145,7 @@ function App() {
           }}
           onCancelled={handleSignatureCancelled}
           onCancelAll={handleCancelAllSignatures}
+          onConfirmed={handleSignatureCancelled}
           onNavigate={(direction) => {
             const currentIdx = combinedRequests.findIndex(
               (r) => r.type === "sig" && r.request.id === selectedSignatureRequest.id
@@ -1122,20 +1198,22 @@ function App() {
         </HStack>
         <Spacer />
         <HStack spacing={1}>
-          <Tooltip label="Chat History" placement="bottom">
-            <IconButton
-              aria-label="Chat History"
-              icon={<ChatIcon />}
-              variant="ghost"
-              size="sm"
-              color="bauhaus.white"
-              _hover={{ bg: "whiteAlpha.200" }}
-              onClick={() => {
-                setStartChatWithNew(false);
-                setView("chat");
-              }}
-            />
-          </Tooltip>
+          {activeAccount?.type === "bankr" && (
+            <Tooltip label="Chat History" placement="bottom">
+              <IconButton
+                aria-label="Chat History"
+                icon={<ChatIcon />}
+                variant="ghost"
+                size="sm"
+                color="bauhaus.white"
+                _hover={{ bg: "whiteAlpha.200" }}
+                onClick={() => {
+                  setStartChatWithNew(false);
+                  setView("chat");
+                }}
+              />
+            </Tooltip>
+          )}
           <Tooltip label="Lock wallet" placement="bottom">
             <IconButton
               aria-label="Lock wallet"
@@ -1286,6 +1364,18 @@ function App() {
               }
             }}
           />
+
+          {/* Account Switcher (if multiple accounts) */}
+          {accounts.length > 0 && (
+            <Suspense fallback={null}>
+              <AccountSwitcher
+                accounts={accounts}
+                activeAccount={activeAccount}
+                onAccountSelect={handleAccountSwitch}
+                onAddAccount={() => setView("addAccount")}
+              />
+            </Suspense>
+          )}
 
           {/* Address Display */}
           <Box
@@ -1540,89 +1630,91 @@ function App() {
             </Box>
           )}
 
-          {/* Transaction Status List */}
-          <TxStatusList maxItems={5} />
+          {/* Transaction Status List - filtered by current account */}
+          <TxStatusList maxItems={5} address={address} />
         </VStack>
       </Container>
 
-      {/* Sticky Footer */}
-      <Box
-        position="sticky"
-        bottom={0}
-        bg="bg.base"
-        borderTop="3px solid"
-        borderColor="bauhaus.black"
-        p={3}
-      >
-        <Box position="relative">
-          {/* Geometric decorations */}
-          <Box
-            position="absolute"
-            top="-8px"
-            left="10px"
-            w="12px"
-            h="12px"
-            bg="bauhaus.red"
-            borderRadius="full"
-            border="2px solid"
-            borderColor="bauhaus.black"
-            zIndex={1}
-          />
-          <Box
-            position="absolute"
-            top="-6px"
-            right="12px"
-            w="10px"
-            h="10px"
-            bg="bauhaus.blue"
-            transform="rotate(45deg)"
-            border="2px solid"
-            borderColor="bauhaus.black"
-            zIndex={1}
-          />
-          <Box
-            position="absolute"
-            bottom="-8px"
-            right="40px"
-            w={0}
-            h={0}
-            borderLeft="7px solid transparent"
-            borderRight="7px solid transparent"
-            borderBottom="12px solid"
-            borderBottomColor="bauhaus.green"
-            zIndex={1}
-          />
+      {/* Sticky Footer - only show for Bankr accounts */}
+      {activeAccount?.type === "bankr" && (
+        <Box
+          position="sticky"
+          bottom={0}
+          bg="bg.base"
+          borderTop="3px solid"
+          borderColor="bauhaus.black"
+          p={3}
+        >
+          <Box position="relative">
+            {/* Geometric decorations */}
+            <Box
+              position="absolute"
+              top="-8px"
+              left="10px"
+              w="12px"
+              h="12px"
+              bg="bauhaus.red"
+              borderRadius="full"
+              border="2px solid"
+              borderColor="bauhaus.black"
+              zIndex={1}
+            />
+            <Box
+              position="absolute"
+              top="-6px"
+              right="12px"
+              w="10px"
+              h="10px"
+              bg="bauhaus.blue"
+              transform="rotate(45deg)"
+              border="2px solid"
+              borderColor="bauhaus.black"
+              zIndex={1}
+            />
+            <Box
+              position="absolute"
+              bottom="-8px"
+              right="40px"
+              w={0}
+              h={0}
+              borderLeft="7px solid transparent"
+              borderRight="7px solid transparent"
+              borderBottom="12px solid"
+              borderBottomColor="bauhaus.green"
+              zIndex={1}
+            />
 
-          <Button
-            w="full"
-            bg="bauhaus.yellow"
-            color="bauhaus.black"
-            border="3px solid"
-            borderColor="bauhaus.black"
-            boxShadow="4px 4px 0px 0px #121212"
-            fontWeight="900"
-            textTransform="uppercase"
-            letterSpacing="wider"
-            py={6}
-            _hover={{
-              bg: "bauhaus.yellow",
-              transform: "translateY(-2px)",
-              boxShadow: "6px 6px 0px 0px #121212",
-            }}
-            _active={{
-              transform: "translate(2px, 2px)",
-              boxShadow: "none",
-            }}
-            onClick={() => {
-              setStartChatWithNew(true);
-              setView("chat");
-            }}
-            leftIcon={<ChatIcon />}
-          >
-            Chat with Bankr
-          </Button>
+            <Button
+              w="full"
+              bg="bauhaus.yellow"
+              color="bauhaus.black"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+              fontWeight="900"
+              textTransform="uppercase"
+              letterSpacing="wider"
+              py={6}
+              _hover={{
+                bg: "bauhaus.yellow",
+                transform: "translateY(-2px)",
+                boxShadow: "6px 6px 0px 0px #121212",
+              }}
+              _active={{
+                transform: "translate(2px, 2px)",
+                boxShadow: "none",
+              }}
+              onClick={() => {
+                setStartChatWithNew(true);
+                setView("chat");
+              }}
+              leftIcon={<ChatIcon />}
+            >
+              Chat with Bankr
+            </Button>
+          </Box>
         </Box>
-      </Box>
+      )}
     </Box>
   );
 }

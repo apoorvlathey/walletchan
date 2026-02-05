@@ -14,6 +14,9 @@ import {
   IconButton,
   Image,
   Link,
+  Code,
+  Icon,
+  Checkbox,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import {
@@ -26,8 +29,10 @@ import { saveEncryptedApiKey, hasEncryptedApiKey } from "@/chrome/crypto";
 import { StaticJsonRpcProvider } from "@ethersproject/providers";
 import { isAddress } from "@ethersproject/address";
 import { DEFAULT_NETWORKS } from "@/constants/networks";
+import { privateKeyToAccount } from "viem/accounts";
 
-type OnboardingStep = "welcome" | "apiKey" | "address" | "password" | "success";
+type OnboardingStep = "welcome" | "accountType" | "bankrSetup" | "privateKey" | "password" | "success";
+type AccountTypeChoice = "bankr" | "privateKey" | "both";
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -95,9 +100,15 @@ const bounceArrow = keyframes`
 function Onboarding({ onComplete }: OnboardingProps) {
   const [step, setStep] = useState<OnboardingStep>("welcome");
   const [isCheckingSetup, setIsCheckingSetup] = useState(true);
+  const [accountTypeChoice, setAccountTypeChoice] = useState<AccountTypeChoice>("bankr");
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
+  const [privateKey, setPrivateKey] = useState("");
+  const [showPrivateKey, setShowPrivateKey] = useState(false);
+  const [derivedAddress, setDerivedAddress] = useState<string | null>(null);
+  const [pkDisplayName, setPkDisplayName] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
+  const [bankrDisplayName, setBankrDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -105,6 +116,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
   const [errors, setErrors] = useState<{
     apiKey?: string;
+    privateKey?: string;
     walletAddress?: string;
     password?: string;
     confirmPassword?: string;
@@ -148,33 +160,58 @@ function Onboarding({ onComplete }: OnboardingProps) {
     }
   };
 
-  const validateApiKey = (): boolean => {
-    if (!apiKey.trim()) {
-      setErrors({ apiKey: "API key is required" });
-      return false;
+  const validateAndDeriveAddress = (key: string): { valid: boolean; address?: string; normalizedKey?: string; error?: string } => {
+    if (!key) {
+      return { valid: false, error: "Private key is required" };
     }
-    setErrors({});
-    return true;
+
+    // Normalize: trim whitespace and auto-prefix "0x" if missing
+    let normalizedKey = key.trim();
+    if (!normalizedKey.startsWith("0x") && !normalizedKey.startsWith("0X")) {
+      normalizedKey = `0x${normalizedKey}`;
+    }
+    // Ensure lowercase 0x prefix
+    if (normalizedKey.startsWith("0X")) {
+      normalizedKey = `0x${normalizedKey.slice(2)}`;
+    }
+
+    // Check length (0x + 64 hex chars)
+    if (normalizedKey.length !== 66) {
+      return { valid: false, error: "Private key must be 64 hex characters (32 bytes)" };
+    }
+
+    // Check if all characters are valid hex
+    if (!/^0x[0-9a-fA-F]{64}$/.test(normalizedKey)) {
+      return { valid: false, error: "Invalid hex characters in private key" };
+    }
+
+    // Try to derive address using viem
+    try {
+      const account = privateKeyToAccount(normalizedKey as `0x${string}`);
+      return { valid: true, address: account.address, normalizedKey };
+    } catch (e) {
+      console.error("Failed to derive address from private key:", e);
+      return { valid: false, error: "Invalid private key format" };
+    }
   };
 
-  const validateAddress = async (): Promise<boolean> => {
-    if (!walletAddress.trim()) {
-      setErrors({ walletAddress: "Wallet address is required" });
-      return false;
+  // Derive address when private key changes
+  useEffect(() => {
+    if (privateKey) {
+      const result = validateAndDeriveAddress(privateKey);
+      if (result.valid && result.address) {
+        setDerivedAddress(result.address);
+        setErrors((prev) => ({ ...prev, privateKey: undefined }));
+      } else {
+        setDerivedAddress(null);
+        if (privateKey.length > 10) {
+          setErrors((prev) => ({ ...prev, privateKey: result.error }));
+        }
+      }
+    } else {
+      setDerivedAddress(null);
     }
-
-    setIsResolvingAddress(true);
-    const resolved = await resolveAddress(walletAddress.trim());
-    setIsResolvingAddress(false);
-
-    if (!resolved) {
-      setErrors({ walletAddress: "Invalid address or ENS name" });
-      return false;
-    }
-
-    setErrors({});
-    return true;
-  };
+  }, [privateKey]);
 
   const validatePassword = (): boolean => {
     const newErrors: typeof errors = {};
@@ -193,15 +230,55 @@ function Onboarding({ onComplete }: OnboardingProps) {
     return Object.keys(newErrors).length === 0;
   };
 
+  const validateBankrSetup = async (): Promise<boolean> => {
+    const newErrors: typeof errors = {};
+
+    if (!apiKey.trim()) {
+      newErrors.apiKey = "API key is required";
+    }
+
+    if (!walletAddress.trim()) {
+      newErrors.walletAddress = "Wallet address is required";
+    } else {
+      setIsResolvingAddress(true);
+      const resolved = await resolveAddress(walletAddress.trim());
+      setIsResolvingAddress(false);
+
+      if (!resolved) {
+        newErrors.walletAddress = "Invalid address or ENS name";
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleContinue = async () => {
     switch (step) {
-      case "apiKey":
-        if (validateApiKey()) {
-          setStep("address");
+      case "accountType":
+        if (accountTypeChoice === "bankr") {
+          setStep("bankrSetup");
+        } else if (accountTypeChoice === "privateKey") {
+          setStep("privateKey");
+        } else {
+          // "both" - start with bankr setup
+          setStep("bankrSetup");
         }
         break;
-      case "address":
-        if (await validateAddress()) {
+      case "bankrSetup":
+        if (await validateBankrSetup()) {
+          if (accountTypeChoice === "both") {
+            setStep("privateKey");
+          } else {
+            setStep("password");
+          }
+        }
+        break;
+      case "privateKey":
+        const pkResult = validateAndDeriveAddress(privateKey);
+        if (!pkResult.valid) {
+          setErrors({ privateKey: pkResult.error || "Invalid private key" });
+        } else {
           setStep("password");
         }
         break;
@@ -215,14 +292,27 @@ function Onboarding({ onComplete }: OnboardingProps) {
 
   const handleBack = () => {
     switch (step) {
-      case "apiKey":
+      case "accountType":
         setStep("welcome");
         break;
-      case "address":
-        setStep("apiKey");
+      case "bankrSetup":
+        setStep("accountType");
+        break;
+      case "privateKey":
+        if (accountTypeChoice === "both") {
+          setStep("bankrSetup");
+        } else {
+          setStep("accountType");
+        }
         break;
       case "password":
-        setStep("address");
+        if (accountTypeChoice === "privateKey") {
+          setStep("privateKey");
+        } else if (accountTypeChoice === "both") {
+          setStep("privateKey");
+        } else {
+          setStep("bankrSetup");
+        }
         break;
     }
   };
@@ -231,32 +321,117 @@ function Onboarding({ onComplete }: OnboardingProps) {
     setIsSubmitting(true);
 
     try {
-      // Resolve address (in case it's ENS)
-      const resolvedAddress = await resolveAddress(walletAddress.trim());
-      if (!resolvedAddress) {
-        setErrors({ walletAddress: "Invalid address or ENS name" });
-        setIsSubmitting(false);
-        return;
+      let finalAddress: string;
+      let finalDisplayAddress: string;
+
+      // Handle Private Key account setup
+      if (accountTypeChoice === "privateKey" || accountTypeChoice === "both") {
+        const pkResult = validateAndDeriveAddress(privateKey);
+        if (!pkResult.valid || !pkResult.address || !pkResult.normalizedKey) {
+          setErrors({ privateKey: pkResult.error || "Invalid private key" });
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Use derived address
+        finalAddress = pkResult.address;
+        finalDisplayAddress = pkDisplayName.trim() || pkResult.address;
+
+        // Use the normalized key from validation (already has 0x prefix)
+        const normalizedKey = pkResult.normalizedKey;
+
+        // For PK accounts, we need to save the private key encrypted
+        // First, we need to create a "dummy" encrypted API key to establish the password
+        // Or we can just save the API key if "both" is selected
+        if (accountTypeChoice === "both") {
+          // Save encrypted API key
+          await saveEncryptedApiKey(apiKey.trim(), password);
+        } else {
+          // For PK-only, we still need to encrypt something to establish password
+          // Save a placeholder that will be checked
+          await saveEncryptedApiKey("pk-only-mode", password);
+        }
+
+        // Unlock wallet to cache credentials
+        await chrome.runtime.sendMessage({ type: "unlockWallet", password });
+
+        // Add the private key account
+        const pkResponse = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+          chrome.runtime.sendMessage(
+            {
+              type: "addPrivateKeyAccount",
+              privateKey: normalizedKey,
+              displayName: pkDisplayName.trim() || undefined,
+            },
+            resolve
+          );
+        });
+
+        if (!pkResponse.success) {
+          setErrors({ privateKey: pkResponse.error || "Failed to add private key account" });
+          setIsSubmitting(false);
+          return;
+        }
       }
 
-      // Save encrypted API key
-      await saveEncryptedApiKey(apiKey.trim(), password);
+      // Handle Bankr account setup
+      if (accountTypeChoice === "bankr" || accountTypeChoice === "both") {
+        // Resolve address (in case it's ENS)
+        const resolvedAddress = await resolveAddress(walletAddress.trim());
+        if (!resolvedAddress) {
+          setErrors({ walletAddress: "Invalid address or ENS name" });
+          setIsSubmitting(false);
+          return;
+        }
 
-      // Unlock wallet to cache credentials
-      await chrome.runtime.sendMessage({ type: "unlockWallet", password });
+        // If bankr only, save encrypted API key
+        if (accountTypeChoice === "bankr") {
+          await saveEncryptedApiKey(apiKey.trim(), password);
 
-      // Save wallet address and default network
+          // Unlock wallet to cache credentials
+          await chrome.runtime.sendMessage({ type: "unlockWallet", password });
+        }
+
+        // Add the Bankr account
+        // Use explicit display name if provided, otherwise use ENS name if different from resolved address
+        const bankrAccountDisplayName = bankrDisplayName.trim()
+          || (walletAddress.trim() !== resolvedAddress ? walletAddress.trim() : undefined);
+        const bankrResponse = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+          chrome.runtime.sendMessage(
+            {
+              type: "addBankrAccount",
+              address: resolvedAddress,
+              displayName: bankrAccountDisplayName,
+            },
+            resolve
+          );
+        });
+
+        if (!bankrResponse.success) {
+          setErrors({ walletAddress: bankrResponse.error || "Failed to add Bankr account" });
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Only use Bankr address as the final address if it's the only account type
+        // When "both" is selected, PK account is added first and becomes active,
+        // so we should keep the PK address as finalAddress
+        if (accountTypeChoice === "bankr") {
+          finalAddress = resolvedAddress;
+          finalDisplayAddress = bankrDisplayName.trim() || walletAddress.trim();
+        }
+      }
+
+      // Save wallet address and default network (use first account's address)
       await chrome.storage.sync.set({
-        address: resolvedAddress,
-        displayAddress: walletAddress.trim(),
+        address: finalAddress!,
+        displayAddress: finalDisplayAddress!,
         chainName: "Base",
       });
 
       // Enable sidepanel mode by default for non-Arc browsers
-      // Arc detection already happened in useEffect, so check storage
       const { isArcBrowser: storedIsArc } = await chrome.storage.sync.get(["isArcBrowser"]);
       if (!storedIsArc) {
-        // Not Arc - try to enable sidepanel mode
         try {
           const response = await chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: true });
           if (response?.success) {
@@ -270,7 +445,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
       // Show success step
       setStep("success");
 
-      // Notify background that onboarding is complete (but don't close tab)
+      // Notify background that onboarding is complete
       chrome.runtime.sendMessage({ type: "onboardingComplete" });
     } catch (error) {
       setErrors({
@@ -286,15 +461,25 @@ function Onboarding({ onComplete }: OnboardingProps) {
 
   const getStepNumber = (): number => {
     switch (step) {
-      case "apiKey":
+      case "accountType":
         return 0;
-      case "address":
+      case "bankrSetup":
         return 1;
+      case "privateKey":
+        return accountTypeChoice === "both" ? 2 : 1;
       case "password":
+        if (accountTypeChoice === "privateKey") return 2;
+        if (accountTypeChoice === "both") return 3;
         return 2;
       default:
         return 0;
     }
+  };
+
+  const getTotalSteps = (): number => {
+    if (accountTypeChoice === "privateKey") return 3; // accountType, privateKey, password
+    if (accountTypeChoice === "both") return 4; // accountType, bankrSetup, privateKey, password
+    return 3; // accountType, bankrSetup, password
   };
 
   // Show loading while checking if already set up
@@ -387,7 +572,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
             size="lg"
             w="full"
             maxW="280px"
-            onClick={() => setStep("apiKey")}
+            onClick={() => setStep("accountType")}
           >
             Get Started
           </Button>
@@ -637,91 +822,123 @@ function Onboarding({ onComplete }: OnboardingProps) {
             size="sm"
             onClick={handleBack}
           />
-          <StepIndicator currentStep={getStepNumber()} totalSteps={3} />
+          <StepIndicator currentStep={getStepNumber()} totalSteps={getTotalSteps()} />
           <Box w="32px" /> {/* Spacer for alignment */}
         </HStack>
 
-        {/* API Key Step */}
-        {step === "apiKey" && (
+        {/* Account Type Selection Step */}
+        {step === "accountType" && (
           <VStack spacing={6} w="full">
             <VStack spacing={2} textAlign="center">
               <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wide">
-                Enter your API Key
+                Choose Account Type
               </Text>
               <Text fontSize="sm" color="text.secondary" fontWeight="500">
-                Your Bankr API key is used to authenticate and execute
-                transactions.
+                Select how you want to use BankrWallet
               </Text>
             </VStack>
 
-            <Box
-              w="full"
-              p={6}
-              bg="bauhaus.white"
-              border="3px solid"
-              borderColor="bauhaus.black"
-              boxShadow="4px 4px 0px 0px #121212"
-              position="relative"
-            >
-              {/* Corner decoration */}
+            <VStack spacing={3} w="full">
+              {/* Bankr API Option (on top, default) */}
               <Box
-                position="absolute"
-                top="-3px"
-                right="-3px"
-                w="10px"
-                h="10px"
-                bg="bauhaus.red"
-                border="2px solid"
-                borderColor="bauhaus.black"
-              />
+                as="button"
+                w="full"
+                p={4}
+                bg={accountTypeChoice === "bankr" || accountTypeChoice === "both" ? "bg.muted" : "bauhaus.white"}
+                border="3px solid"
+                borderColor={accountTypeChoice === "bankr" ? "bauhaus.blue" : "bauhaus.black"}
+                boxShadow="4px 4px 0px 0px #121212"
+                textAlign="left"
+                onClick={() => setAccountTypeChoice(accountTypeChoice === "both" ? "both" : "bankr")}
+                _hover={{ bg: "bg.muted" }}
+              >
+                <HStack spacing={3}>
+                  <Box
+                    bg="bauhaus.blue"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    p={2}
+                  >
+                    <Icon viewBox="0 0 24 24" boxSize="20px" color="white">
+                      <path
+                        fill="currentColor"
+                        d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1H3a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5A2.5 2.5 0 0 0 7.5 18a2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5a2.5 2.5 0 0 0 2.5 2.5a2.5 2.5 0 0 0 2.5-2.5a2.5 2.5 0 0 0-2.5-2.5Z"
+                      />
+                    </Icon>
+                  </Box>
+                  <VStack align="start" spacing={0} flex={1}>
+                    <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase">
+                      Bankr Wallet
+                    </Text>
+                    <Text fontSize="xs" color="text.secondary" fontWeight="500">
+                      Use Bankr API to execute transactions. AI-powered, no seed phrases.
+                    </Text>
+                  </VStack>
+                  {accountTypeChoice === "bankr" && (
+                    <Box w="12px" h="12px" bg="bauhaus.blue" border="2px solid" borderColor="bauhaus.black" borderRadius="full" />
+                  )}
+                </HStack>
+              </Box>
 
-              <FormControl isInvalid={!!errors.apiKey}>
-                <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
-                  Bankr API Key
-                </FormLabel>
-                <InputGroup>
-                  <Input
-                    type={showApiKey ? "text" : "password"}
-                    placeholder="Enter your API key"
-                    value={apiKey}
-                    autoFocus
-                    onChange={(e) => {
-                      setApiKey(e.target.value);
-                      if (errors.apiKey) setErrors({});
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleContinue();
-                    }}
-                    pr="3rem"
-                  />
-                  <InputRightElement>
-                    <IconButton
-                      aria-label={showApiKey ? "Hide API key" : "Show API key"}
-                      icon={showApiKey ? <ViewOffIcon /> : <ViewIcon />}
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      color="text.secondary"
-                      tabIndex={-1}
-                    />
-                  </InputRightElement>
-                </InputGroup>
-                <FormErrorMessage color="bauhaus.red" fontWeight="700">
-                  {errors.apiKey}
-                </FormErrorMessage>
-              </FormControl>
-            </Box>
+              {/* Private Key Option */}
+              <Box
+                as="button"
+                w="full"
+                p={4}
+                bg={accountTypeChoice === "privateKey" || accountTypeChoice === "both" ? "bg.muted" : "bauhaus.white"}
+                border="3px solid"
+                borderColor={accountTypeChoice === "privateKey" ? "bauhaus.yellow" : "bauhaus.black"}
+                boxShadow="4px 4px 0px 0px #121212"
+                textAlign="left"
+                onClick={() => setAccountTypeChoice(accountTypeChoice === "both" ? "both" : "privateKey")}
+                _hover={{ bg: "bg.muted" }}
+              >
+                <HStack spacing={3}>
+                  <Box
+                    bg="bauhaus.yellow"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    p={2}
+                  >
+                    <Icon viewBox="0 0 24 24" boxSize="20px" color="bauhaus.black">
+                      <path
+                        fill="currentColor"
+                        d="M7 14c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm0-4c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm14 8.5l-5.5-5.5.71-.71L17.5 11l-.71-.71-2.5 2.5-2.29-2.29-.71.71.71.71-2 2V14H9v1H8v1H7v1H4v-1l7-7c-.55-.89-.95-1.89-1-3H7c0-2.76 2.24-5 5-5 2.21 0 4.05 1.43 4.71 3.42l.79.79 1.79-1.79.71.71-.71.71 1.79 1.79.71-.71-.71-.71 1.71-1.71 1.5 1.5-8 8-1.29-1.29z"
+                      />
+                    </Icon>
+                  </Box>
+                  <VStack align="start" spacing={0} flex={1}>
+                    <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase">
+                      Private Key
+                    </Text>
+                    <Text fontSize="xs" color="text.secondary" fontWeight="500">
+                      Import your private key to sign transactions locally. Full control, no API needed.
+                    </Text>
+                  </VStack>
+                  {accountTypeChoice === "privateKey" && (
+                    <Box w="12px" h="12px" bg="bauhaus.yellow" border="2px solid" borderColor="bauhaus.black" />
+                  )}
+                </HStack>
+              </Box>
+            </VStack>
 
-            <Link
-              fontSize="sm"
-              color="bauhaus.blue"
-              fontWeight="700"
-              href="https://bankr.bot/api"
-              isExternal
-              _hover={{ color: "bauhaus.red", textDecoration: "underline" }}
+            {/* Both option checkbox */}
+            <Checkbox
+              isChecked={accountTypeChoice === "both"}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setAccountTypeChoice("both");
+                } else {
+                  setAccountTypeChoice("privateKey");
+                }
+              }}
+              colorScheme="yellow"
+              borderColor="bauhaus.black"
             >
-              Don't have an API key? Get one from bankr.bot
-            </Link>
+              <Text fontSize="sm" color="text.secondary" fontWeight="700">
+                Set up both account types
+              </Text>
+            </Checkbox>
 
             <Button variant="primary" w="full" onClick={handleContinue}>
               Continue
@@ -729,15 +946,15 @@ function Onboarding({ onComplete }: OnboardingProps) {
           </VStack>
         )}
 
-        {/* Address Step */}
-        {step === "address" && (
+        {/* Bankr Setup Step - API Key + Wallet Address together */}
+        {step === "bankrSetup" && (
           <VStack spacing={6} w="full">
             <VStack spacing={2} textAlign="center">
               <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wide">
-                Enter your Bankr Wallet Address
+                Setup Bankr Wallet
               </Text>
               <Text fontSize="sm" color="text.secondary" fontWeight="500">
-                This is the wallet address linked to your Bankr account.
+                Enter your Bankr API key and linked wallet address.
               </Text>
             </VStack>
 
@@ -763,45 +980,270 @@ function Onboarding({ onComplete }: OnboardingProps) {
                 borderRadius="full"
               />
 
-              <FormControl isInvalid={!!errors.walletAddress}>
-                <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
-                  Wallet Address
-                </FormLabel>
-                <Input
-                  placeholder="0x... or ENS name (e.g., vitalik.eth)"
-                  value={walletAddress}
-                  autoFocus
-                  onChange={(e) => {
-                    setWalletAddress(e.target.value);
-                    if (errors.walletAddress) setErrors({});
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleContinue();
-                  }}
-                />
-                <FormErrorMessage color="bauhaus.red" fontWeight="700">
-                  {errors.walletAddress}
-                </FormErrorMessage>
-              </FormControl>
+              <VStack spacing={4}>
+                <FormControl isInvalid={!!errors.apiKey}>
+                  <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
+                    Bankr API Key
+                  </FormLabel>
+                  <InputGroup>
+                    <Input
+                      type={showApiKey ? "text" : "password"}
+                      placeholder="Enter your API key"
+                      value={apiKey}
+                      autoFocus
+                      onChange={(e) => {
+                        setApiKey(e.target.value);
+                        if (errors.apiKey) setErrors((prev) => ({ ...prev, apiKey: undefined }));
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleContinue();
+                      }}
+                      pr="3rem"
+                    />
+                    <InputRightElement>
+                      <IconButton
+                        aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                        icon={showApiKey ? <ViewOffIcon /> : <ViewIcon />}
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        color="text.secondary"
+                        tabIndex={-1}
+                      />
+                    </InputRightElement>
+                  </InputGroup>
+                  <FormErrorMessage color="bauhaus.red" fontWeight="700">
+                    {errors.apiKey}
+                  </FormErrorMessage>
+                </FormControl>
+
+                <FormControl isInvalid={!!errors.walletAddress}>
+                  <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
+                    Wallet Address
+                  </FormLabel>
+                  <Input
+                    placeholder="0x... or ENS name (e.g., vitalik.eth)"
+                    value={walletAddress}
+                    onChange={(e) => {
+                      setWalletAddress(e.target.value);
+                      if (errors.walletAddress) setErrors((prev) => ({ ...prev, walletAddress: undefined }));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleContinue();
+                    }}
+                  />
+                  <FormErrorMessage color="bauhaus.red" fontWeight="700">
+                    {errors.walletAddress}
+                  </FormErrorMessage>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
+                    Display Name (Optional)
+                  </FormLabel>
+                  <Input
+                    placeholder="e.g., My Bankr Wallet"
+                    value={bankrDisplayName}
+                    onChange={(e) => setBankrDisplayName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleContinue();
+                    }}
+                  />
+                </FormControl>
+              </VStack>
             </Box>
 
-            <Link
-              fontSize="sm"
-              color="bauhaus.blue"
-              fontWeight="700"
-              href="https://bankr.bot/terminal"
-              isExternal
-              _hover={{ color: "bauhaus.red", textDecoration: "underline" }}
-            >
-              Find your wallet address at bankr.bot/terminal
-            </Link>
+            <VStack spacing={2} w="full">
+              <Link
+                fontSize="sm"
+                color="bauhaus.blue"
+                fontWeight="700"
+                href="https://bankr.bot/api"
+                isExternal
+                _hover={{ color: "bauhaus.red", textDecoration: "underline" }}
+              >
+                Don't have an API key? Get one from bankr.bot
+              </Link>
+              <Link
+                fontSize="sm"
+                color="bauhaus.blue"
+                fontWeight="700"
+                href="https://bankr.bot/terminal"
+                isExternal
+                _hover={{ color: "bauhaus.red", textDecoration: "underline" }}
+              >
+                Find your wallet address at bankr.bot/terminal
+              </Link>
+            </VStack>
 
             <Button
               variant="primary"
               w="full"
               onClick={handleContinue}
               isLoading={isResolvingAddress}
-              loadingText="Resolving..."
+              loadingText="Verifying..."
+            >
+              Continue
+            </Button>
+          </VStack>
+        )}
+
+        {/* Private Key Step */}
+        {step === "privateKey" && (
+          <VStack spacing={6} w="full">
+            <VStack spacing={2} textAlign="center">
+              <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wide">
+                Enter your Private Key
+              </Text>
+              <Text fontSize="sm" color="text.secondary" fontWeight="500">
+                Your private key will be encrypted and stored locally.
+              </Text>
+            </VStack>
+
+            <Box
+              w="full"
+              p={6}
+              bg="bauhaus.white"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+              position="relative"
+            >
+              {/* Corner decoration */}
+              <Box
+                position="absolute"
+                top="-3px"
+                right="-3px"
+                w="10px"
+                h="10px"
+                bg="bauhaus.yellow"
+                border="2px solid"
+                borderColor="bauhaus.black"
+              />
+
+              <FormControl isInvalid={!!errors.privateKey}>
+                <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
+                  Private Key
+                </FormLabel>
+                <InputGroup>
+                  <Input
+                    type={showPrivateKey ? "text" : "password"}
+                    placeholder="0x..."
+                    value={privateKey}
+                    autoFocus
+                    fontFamily="mono"
+                    onChange={(e) => {
+                      setPrivateKey(e.target.value);
+                      if (errors.privateKey) setErrors({});
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleContinue();
+                    }}
+                    pr="3rem"
+                  />
+                  <InputRightElement>
+                    <IconButton
+                      aria-label={showPrivateKey ? "Hide" : "Show"}
+                      icon={showPrivateKey ? <ViewOffIcon /> : <ViewIcon />}
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowPrivateKey(!showPrivateKey)}
+                      color="text.secondary"
+                      tabIndex={-1}
+                    />
+                  </InputRightElement>
+                </InputGroup>
+                <FormErrorMessage color="bauhaus.red" fontWeight="700">
+                  {errors.privateKey}
+                </FormErrorMessage>
+              </FormControl>
+
+              {derivedAddress && (
+                <Box
+                  mt={4}
+                  p={3}
+                  bg="bauhaus.yellow"
+                  border="3px solid"
+                  borderColor="bauhaus.black"
+                  boxShadow="3px 3px 0px 0px #121212"
+                  position="relative"
+                >
+                  {/* Success indicator */}
+                  <Box
+                    position="absolute"
+                    top="-12px"
+                    right="-12px"
+                    w="24px"
+                    h="24px"
+                    bg="bauhaus.blue"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    borderRadius="full"
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <CheckIcon boxSize="12px" color="white" />
+                  </Box>
+                  <HStack spacing={2} mb={2}>
+                    <Box w="8px" h="8px" bg="bauhaus.black" />
+                    <Text fontSize="xs" color="bauhaus.black" fontWeight="900" textTransform="uppercase" letterSpacing="wider">
+                      Derived Address
+                    </Text>
+                  </HStack>
+                  <Code
+                    fontSize="10px"
+                    bg="bauhaus.white"
+                    color="bauhaus.black"
+                    fontFamily="mono"
+                    p={2}
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    display="block"
+                    fontWeight="700"
+                    overflow="hidden"
+                    textOverflow="ellipsis"
+                    whiteSpace="nowrap"
+                    title={derivedAddress}
+                  >
+                    {derivedAddress}
+                  </Code>
+                </Box>
+              )}
+
+              <FormControl mt={4}>
+                <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
+                  Display Name (Optional)
+                </FormLabel>
+                <Input
+                  placeholder="e.g., My Trading Wallet"
+                  value={pkDisplayName}
+                  onChange={(e) => setPkDisplayName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleContinue();
+                  }}
+                />
+              </FormControl>
+            </Box>
+
+            <Box
+              w="full"
+              p={4}
+              bg="bauhaus.yellow"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+            >
+              <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
+                Never share your private key with anyone. It will be encrypted and stored only on this device.
+              </Text>
+            </Box>
+
+            <Button
+              variant="primary"
+              w="full"
+              onClick={handleContinue}
+              isDisabled={!derivedAddress}
             >
               Continue
             </Button>
