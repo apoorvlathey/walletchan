@@ -61,6 +61,7 @@ const AddAccount = lazy(() => import("@/components/AddAccount"));
 const RevealPrivateKeyModal = lazy(() => import("@/components/RevealPrivateKeyModal"));
 const AccountSettingsModal = lazy(() => import("@/components/AccountSettingsModal"));
 const TokenHoldings = lazy(() => import("@/components/TokenHoldings"));
+const TokenTransfer = lazy(() => import("@/components/TokenTransfer"));
 
 // Eager load components needed immediately
 import UnlockScreen from "@/components/UnlockScreen";
@@ -72,6 +73,7 @@ import { hasEncryptedApiKey } from "@/chrome/crypto";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
 import type { Account } from "@/chrome/types";
+import type { PortfolioToken } from "@/chrome/portfolioApi";
 
 // Combined request type for unified ordering
 export type CombinedRequest =
@@ -104,7 +106,7 @@ const LoadingFallback = () => (
   </Box>
 );
 
-type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | "signatureConfirm" | "waitingForOnboarding" | "chat" | "addAccount";
+type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | "signatureConfirm" | "waitingForOnboarding" | "chat" | "addAccount" | "transfer";
 
 function App() {
   const { networksInfo, reloadRequired, setReloadRequired } = useNetworks();
@@ -137,6 +139,7 @@ function App() {
   const [settingsAccount, setSettingsAccount] = useState<Account | null>(null);
   const { isOpen: isRevealKeyOpen, onOpen: onRevealKeyOpen, onClose: onRevealKeyClose } = useDisclosure();
   const { isOpen: isAccountSettingsOpen, onOpen: onAccountSettingsOpen, onClose: onAccountSettingsClose } = useDisclosure();
+  const [transferToken, setTransferToken] = useState<PortfolioToken | null>(null);
   const keepAlivePortRef = useRef<chrome.runtime.Port | null>(null);
   const reconnectingRef = useRef(false);
 
@@ -1166,6 +1169,38 @@ function App() {
     );
   }
 
+  // Transfer view
+  if (view === "transfer" && transferToken) {
+    return (
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
+          <Suspense fallback={<LoadingFallback />}>
+            <TokenTransfer
+              token={transferToken}
+              fromAddress={address}
+              accountType={activeAccount?.type || "bankr"}
+              onBack={() => {
+                setTransferToken(null);
+                setView("main");
+              }}
+              onTransferInitiated={() => {
+                setTransferToken(null);
+                // The newPendingTxRequest listener will auto-switch to txConfirm
+              }}
+            />
+          </Suspense>
+        </Box>
+      </Box>
+    );
+  }
+
   // Pending tx list view
   if (view === "pendingTxList") {
     return (
@@ -1757,7 +1792,13 @@ function App() {
           {/* Token Holdings */}
           {address && (
             <Suspense fallback={<Skeleton h="100px" />}>
-              <TokenHoldings address={address} />
+              <TokenHoldings
+                address={address}
+                onTokenClick={(token) => {
+                  setTransferToken(token);
+                  setView("transfer");
+                }}
+              />
             </Suspense>
           )}
 

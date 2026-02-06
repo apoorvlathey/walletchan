@@ -101,6 +101,7 @@ import {
   handleRemoveAccount,
   openPopupWindow,
   performSecurityReset,
+  handleInitiateTransfer,
   SignatureResult,
 } from "./txHandlers";
 
@@ -754,6 +755,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse(result);
         }
       );
+      return true;
+    }
+
+    case "initiateTransfer": {
+      handleInitiateTransfer(message).then((result) => {
+        sendResponse(result);
+      });
       return true;
     }
 

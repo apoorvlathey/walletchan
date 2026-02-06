@@ -1141,3 +1141,42 @@ export function performSecurityReset(): void {
   // Clear failed transaction results
   failedTxResults.clear();
 }
+
+/**
+ * Handles transfer initiated from within the extension UI (not from a dapp).
+ * Creates a PendingTxRequest and notifies the UI to show TransactionConfirmation.
+ */
+export async function handleInitiateTransfer(
+  message: {
+    tx: TransactionParams;
+    chainName: string;
+  }
+): Promise<{ success: boolean; txId?: string; error?: string }> {
+  const { tx, chainName } = message;
+
+  // Validate chain ID
+  if (!ALLOWED_CHAIN_IDS.has(tx.chainId)) {
+    return {
+      success: false,
+      error: `Chain ${tx.chainId} not supported`,
+    };
+  }
+
+  const txId = crypto.randomUUID();
+
+  const pendingRequest: PendingTxRequest = {
+    id: txId,
+    tx,
+    origin: "BankrWallet",
+    favicon: null,
+    chainName,
+    timestamp: Date.now(),
+  };
+
+  await savePendingTxRequest(pendingRequest);
+
+  // Notify extension UI about the new pending tx
+  chrome.runtime.sendMessage({ type: "newPendingTxRequest", txRequest: pendingRequest }).catch(() => {});
+
+  return { success: true, txId };
+}
