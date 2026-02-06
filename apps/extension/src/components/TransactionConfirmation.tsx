@@ -409,7 +409,7 @@ function TransactionConfirmation({
               </Text>
               <HStack spacing={2}>
                 <Box
-                  bg="bauhaus.white"
+                  bg="bauhaus.black"
                   border="2px solid"
                   borderColor="bauhaus.black"
                   p={1}
@@ -431,7 +431,7 @@ function TransactionConfirmation({
                         target.src = googleFallback;
                       }
                     }}
-                    fallback={<Box boxSize="16px" bg="white" />}
+                    fallback={<Box boxSize="16px" bg="bauhaus.black" />}
                   />
                 </Box>
                 <Text fontSize="sm" fontWeight="700" color="text.primary">

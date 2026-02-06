@@ -8,8 +8,9 @@ import {
   IconButton,
   Spacer,
 } from "@chakra-ui/react";
-import { CopyIcon, CheckIcon } from "@chakra-ui/icons";
+import { CopyIcon, CheckIcon, ExternalLinkIcon } from "@chakra-ui/icons";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
+import { getChainConfig } from "@/constants/chainConfig";
 
 interface TypedDataDisplayProps {
   typedData: any;
@@ -45,6 +46,13 @@ function truncateAddr(addr: string): string {
 
 function AddressValue({ address, chainId }: { address: string; chainId?: number }) {
   const [label, setLabel] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const toast = useBauhausToast();
+
+  const explorerUrl = (() => {
+    const config = getChainConfig(chainId || 1);
+    return config.explorer ? `${config.explorer}/address/${address}` : null;
+  })();
 
   useEffect(() => {
     if (!address || !address.startsWith("0x")) return;
@@ -58,10 +66,39 @@ function AddressValue({ address, chainId }: { address: string; chainId?: number 
   }, [address, chainId]);
 
   return (
-    <HStack spacing={1}>
-      <Code fontSize="xs" fontFamily="mono" bg="transparent" color="bauhaus.blue" fontWeight="600" p={0}>
+    <HStack spacing={0.5}>
+      <Text fontSize="xs" fontFamily="mono" color="bauhaus.blue" fontWeight="600">
         {truncateAddr(address)}
-      </Code>
+      </Text>
+      <IconButton
+        aria-label="Copy address"
+        icon={copied ? <CheckIcon boxSize="10px" /> : <CopyIcon boxSize="10px" />}
+        size="xs"
+        variant="ghost"
+        minW="18px"
+        h="18px"
+        color={copied ? "bauhaus.yellow" : "text.tertiary"}
+        onClick={async () => {
+          await navigator.clipboard.writeText(address);
+          setCopied(true);
+          toast({ title: "Copied!", status: "success", duration: 1500 });
+          setTimeout(() => setCopied(false), 2000);
+        }}
+        _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
+      />
+      {explorerUrl && (
+        <IconButton
+          aria-label="View on explorer"
+          icon={<ExternalLinkIcon boxSize="10px" />}
+          size="xs"
+          variant="ghost"
+          minW="18px"
+          h="18px"
+          color="text.tertiary"
+          onClick={() => window.open(explorerUrl, "_blank")}
+          _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
+        />
+      )}
       {label && (
         <Text fontSize="10px" color="text.secondary" fontWeight="700">
           ({label})
@@ -93,9 +130,9 @@ function MessageField({ name, value, depth = 0, chainId }: { name: string; value
         <Text fontSize="xs" color="text.secondary" fontWeight="700" minW="fit-content">
           {name}:
         </Text>
-        <Code fontSize="xs" fontFamily="mono" bg="transparent" color="#B8860B" fontWeight="600" p={0}>
+        <Text fontSize="xs" fontFamily="mono" color="#B8860B" fontWeight="600">
           {String(value)}
-        </Code>
+        </Text>
       </HStack>
     );
   }
@@ -107,9 +144,9 @@ function MessageField({ name, value, depth = 0, chainId }: { name: string; value
         <Text fontSize="xs" color="text.secondary" fontWeight="700" minW="fit-content">
           {name}:
         </Text>
-        <Code fontSize="xs" fontFamily="mono" bg="transparent" color={value ? "bauhaus.green" : "bauhaus.red"} fontWeight="600" p={0}>
+        <Text fontSize="xs" fontFamily="mono" color={value ? "bauhaus.green" : "bauhaus.red"} fontWeight="600">
           {String(value)}
-        </Code>
+        </Text>
       </HStack>
     );
   }
@@ -121,7 +158,7 @@ function MessageField({ name, value, depth = 0, chainId }: { name: string; value
         <Text fontSize="xs" color="text.secondary" fontWeight="700">
           {name}:
         </Text>
-        <VStack align="start" spacing={1} pl={3} borderLeft="2px solid" borderColor="gray.200">
+        <VStack align="start" spacing={1} pl={3} borderLeft="2px solid" borderColor="bauhaus.black">
           {Object.entries(value).map(([k, v]) => (
             <MessageField key={k} name={k} value={v} depth={0} chainId={chainId} />
           ))}
@@ -137,7 +174,7 @@ function MessageField({ name, value, depth = 0, chainId }: { name: string; value
         <Text fontSize="xs" color="text.secondary" fontWeight="700">
           {name}: [{value.length}]
         </Text>
-        <VStack align="start" spacing={1} pl={3} borderLeft="2px solid" borderColor="gray.200">
+        <VStack align="start" spacing={1} pl={3} borderLeft="2px solid" borderColor="bauhaus.black">
           {value.map((item, i) => (
             <MessageField key={i} name={`[${i}]`} value={item} depth={0} chainId={chainId} />
           ))}
@@ -175,7 +212,7 @@ function TypedDataDisplay({ typedData, rawData }: TypedDataDisplayProps) {
   return (
     <Box
       bg="bauhaus.white"
-      border="3px solid"
+      border="2px solid"
       borderColor="bauhaus.black"
       boxShadow="4px 4px 0px 0px #121212"
     >
@@ -240,7 +277,7 @@ function TypedDataDisplay({ typedData, rawData }: TypedDataDisplayProps) {
                   bg="bauhaus.red"
                   color="white"
                   fontWeight="800"
-                  border="1px solid"
+                  border="2px solid"
                   borderColor="bauhaus.black"
                   textTransform="uppercase"
                 >
@@ -262,9 +299,9 @@ function TypedDataDisplay({ typedData, rawData }: TypedDataDisplayProps) {
                   {domain.chainId && (
                     <HStack spacing={1}>
                       <Text fontSize="xs" color="text.secondary" fontWeight="700">chainId:</Text>
-                      <Code fontSize="xs" fontFamily="mono" bg="transparent" color="#B8860B" fontWeight="600" p={0}>
+                      <Text fontSize="xs" fontFamily="mono" color="#B8860B" fontWeight="600">
                         {String(domain.chainId)}
-                      </Code>
+                      </Text>
                     </HStack>
                   )}
                   {domain.verifyingContract && (
