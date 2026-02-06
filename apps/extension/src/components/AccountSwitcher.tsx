@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState, useEffect } from "react";
 import {
   Menu,
   MenuButton,
@@ -16,7 +16,7 @@ import {
 } from "@chakra-ui/react";
 import { ChevronDownIcon, AddIcon, SettingsIcon } from "@chakra-ui/icons";
 import { blo } from "blo";
-import type { Account } from "@/chrome/types";
+import type { Account, SeedGroup } from "@/chrome/types";
 
 // Blockies avatar for PK accounts using blo
 function BlockieAvatar({ address, size = 20 }: { address: string; size?: number }) {
@@ -62,6 +62,12 @@ function truncateAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+function getSeedLabel(account: Account, seedGroupMap: Map<string, string>): string | null {
+  if (account.type !== "seedPhrase") return null;
+  const groupName = seedGroupMap.get(account.seedGroupId) || "Seed";
+  return `${groupName} · #${account.derivationIndex}`;
+}
+
 function AccountSwitcher({
   accounts,
   activeAccount,
@@ -69,6 +75,18 @@ function AccountSwitcher({
   onAddAccount,
   onAccountSettings,
 }: AccountSwitcherProps) {
+  const [seedGroupMap, setSeedGroupMap] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    const hasSeedAccounts = accounts.some((a) => a.type === "seedPhrase");
+    if (!hasSeedAccounts) return;
+    chrome.runtime.sendMessage({ type: "getSeedGroups" }, (groups: SeedGroup[] | null) => {
+      if (groups) {
+        setSeedGroupMap(new Map(groups.map((g) => [g.id, g.name])));
+      }
+    });
+  }, [accounts]);
+
   return (
     <Menu matchWidth isLazy lazyBehavior="unmount">
       <MenuButton
@@ -132,7 +150,9 @@ function AccountSwitcher({
               )}
               {activeAccount.type === "seedPhrase" && (
                 <Box bg="bauhaus.red" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                  <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Seed</Text>
+                  <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
+                    {getSeedLabel(activeAccount, seedGroupMap) || "Seed"}
+                  </Text>
                 </Box>
               )}
               {activeAccount.type === "impersonator" && (
@@ -193,7 +213,9 @@ function AccountSwitcher({
                 )}
                 {account.type === "seedPhrase" && (
                   <Box bg="bauhaus.red" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Seed</Text>
+                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
+                      {getSeedLabel(account, seedGroupMap) || "Seed"}
+                    </Text>
                   </Box>
                 )}
                 {account.type === "impersonator" && (

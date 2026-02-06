@@ -23,7 +23,7 @@ import {
 } from "@chakra-ui/react";
 import { SettingsIcon, DeleteIcon, ViewIcon, WarningTwoIcon, EditIcon, ViewOffIcon, ArrowBackIcon } from "@chakra-ui/icons";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
-import type { Account, PasswordType } from "@/chrome/types";
+import type { Account, PasswordType, SeedGroup } from "@/chrome/types";
 import { StaticJsonRpcProvider } from "@ethersproject/providers";
 import { isAddress } from "@ethersproject/address";
 
@@ -49,6 +49,11 @@ function AccountSettingsModal({
   const [displayName, setDisplayName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Seed group rename states
+  const [seedGroupName, setSeedGroupName] = useState("");
+  const [originalSeedGroupName, setOriginalSeedGroupName] = useState("");
+  const [isSavingSeedGroup, setIsSavingSeedGroup] = useState(false);
 
   // API Key change states
   const [apiKey, setApiKey] = useState("");
@@ -78,6 +83,20 @@ function AccountSettingsModal({
       setPassword("");
       setShowPassword(false);
       setApiKeyErrors({});
+      // Reset seed group states
+      setSeedGroupName("");
+      setOriginalSeedGroupName("");
+
+      // Fetch seed group name for seed phrase accounts
+      if (account.type === "seedPhrase") {
+        chrome.runtime.sendMessage({ type: "getSeedGroups" }, (groups: SeedGroup[] | null) => {
+          const group = groups?.find((g) => g.id === account.seedGroupId);
+          if (group) {
+            setSeedGroupName(group.name);
+            setOriginalSeedGroupName(group.name);
+          }
+        });
+      }
     }
   }, [isOpen, account]);
 
@@ -120,6 +139,9 @@ function AccountSettingsModal({
     setApiKeyErrors({});
     setHasCachedPassword(false);
     setPasswordType(null);
+    setSeedGroupName("");
+    setOriginalSeedGroupName("");
+    setIsSavingSeedGroup(false);
     onClose();
   };
 
@@ -294,6 +316,42 @@ function AccountSettingsModal({
         } else {
           toast({
             title: "Failed to update",
+            description: result.error,
+            status: "error",
+            duration: 3000,
+          });
+        }
+      }
+    );
+  };
+
+  const handleSaveSeedGroupName = async () => {
+    if (!account || account.type !== "seedPhrase") return;
+
+    const trimmedName = seedGroupName.trim();
+    if (!trimmedName || trimmedName === originalSeedGroupName) return;
+
+    setIsSavingSeedGroup(true);
+
+    chrome.runtime.sendMessage(
+      {
+        type: "renameSeedGroup",
+        seedGroupId: account.seedGroupId,
+        name: trimmedName,
+      },
+      (result: { success: boolean; error?: string }) => {
+        setIsSavingSeedGroup(false);
+        if (result.success) {
+          setOriginalSeedGroupName(trimmedName);
+          toast({
+            title: "Seed group renamed",
+            status: "success",
+            duration: 2000,
+          });
+          onAccountUpdated();
+        } else {
+          toast({
+            title: "Failed to rename",
             description: result.error,
             status: "error",
             duration: 3000,
@@ -731,6 +789,50 @@ function AccountSettingsModal({
                 </Button>
               </HStack>
             </FormControl>
+
+            {/* Seed Group Name (for seed phrase accounts) */}
+            {account.type === "seedPhrase" && (
+              <FormControl>
+                <FormLabel
+                  fontSize="xs"
+                  fontWeight="700"
+                  color="text.primary"
+                  textTransform="uppercase"
+                  letterSpacing="wider"
+                >
+                  Seed Group Name
+                </FormLabel>
+                <HStack spacing={3}>
+                  <Input
+                    value={seedGroupName}
+                    onChange={(e) => setSeedGroupName(e.target.value)}
+                    placeholder="e.g. Main Seed"
+                    bg="white"
+                    border="3px solid"
+                    borderColor="bauhaus.black"
+                    borderRadius="0"
+                    size="md"
+                    _focus={{
+                      borderColor: "bauhaus.blue",
+                      boxShadow: "none",
+                    }}
+                    _hover={{
+                      borderColor: "bauhaus.black",
+                    }}
+                  />
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={handleSaveSeedGroupName}
+                    isLoading={isSavingSeedGroup}
+                    isDisabled={!seedGroupName.trim() || seedGroupName.trim() === originalSeedGroupName}
+                    minW="70px"
+                  >
+                    Save
+                  </Button>
+                </HStack>
+              </FormControl>
+            )}
 
             {/* Actions */}
             <VStack spacing={3} align="stretch" pt={2}>

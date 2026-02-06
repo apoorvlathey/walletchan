@@ -14,8 +14,6 @@ import {
   IconButton,
   Image,
   Link,
-  Code,
-  Icon,
   Checkbox,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
@@ -24,26 +22,18 @@ import {
   ViewOffIcon,
   ArrowBackIcon,
   CheckIcon,
-  RepeatIcon,
-  CopyIcon,
 } from "@chakra-ui/icons";
 import { saveEncryptedApiKey, hasEncryptedApiKey } from "@/chrome/crypto";
 import { StaticJsonRpcProvider } from "@ethersproject/providers";
 import { isAddress } from "@ethersproject/address";
 import { DEFAULT_NETWORKS } from "@/constants/networks";
-import { privateKeyToAccount } from "viem/accounts";
+import { validateAndDeriveAddress } from "@/utils/privateKeyUtils";
+import { RobotIcon, KeyIcon, SeedIcon } from "@/components/shared/AccountTypeIcons";
+import PrivateKeyInput from "@/components/shared/PrivateKeyInput";
+import SeedPhraseSetup from "@/components/SeedPhraseSetup";
 
-type OnboardingStep = "welcome" | "accountType" | "bankrSetup" | "privateKey" | "password" | "success";
-type AccountTypeChoice = "bankr" | "privateKey" | "both";
-type PkMode = "import" | "generate";
-
-/**
- * Generates a cryptographically secure random private key
- */
-function generatePrivateKey(): `0x${string}` {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return `0x${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
-}
+type OnboardingStep = "welcome" | "accountType" | "bankrSetup" | "privateKey" | "seedPhrase" | "password" | "success";
+type AccountTypeChoice = "bankr" | "privateKey" | "seedPhrase" | "both";
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -114,11 +104,8 @@ function Onboarding({ onComplete }: OnboardingProps) {
   const [accountTypeChoice, setAccountTypeChoice] = useState<AccountTypeChoice>("bankr");
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
-  const [pkMode, setPkMode] = useState<PkMode>("import");
   const [privateKey, setPrivateKey] = useState("");
-  const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [derivedAddress, setDerivedAddress] = useState<string | null>(null);
-  const [pkCopied, setPkCopied] = useState(false);
   const [pkDisplayName, setPkDisplayName] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
   const [bankrDisplayName, setBankrDisplayName] = useState("");
@@ -180,41 +167,6 @@ function Onboarding({ onComplete }: OnboardingProps) {
       return resolved;
     } catch {
       return null;
-    }
-  };
-
-  const validateAndDeriveAddress = (key: string): { valid: boolean; address?: string; normalizedKey?: string; error?: string } => {
-    if (!key) {
-      return { valid: false, error: "Private key is required" };
-    }
-
-    // Normalize: trim whitespace and auto-prefix "0x" if missing
-    let normalizedKey = key.trim();
-    if (!normalizedKey.startsWith("0x") && !normalizedKey.startsWith("0X")) {
-      normalizedKey = `0x${normalizedKey}`;
-    }
-    // Ensure lowercase 0x prefix
-    if (normalizedKey.startsWith("0X")) {
-      normalizedKey = `0x${normalizedKey.slice(2)}`;
-    }
-
-    // Check length (0x + 64 hex chars)
-    if (normalizedKey.length !== 66) {
-      return { valid: false, error: "Private key must be 64 hex characters (32 bytes)" };
-    }
-
-    // Check if all characters are valid hex
-    if (!/^0x[0-9a-fA-F]{64}$/.test(normalizedKey)) {
-      return { valid: false, error: "Invalid hex characters in private key" };
-    }
-
-    // Try to derive address using viem
-    try {
-      const account = privateKeyToAccount(normalizedKey as `0x${string}`);
-      return { valid: true, address: account.address, normalizedKey };
-    } catch (e) {
-      console.error("Failed to derive address from private key:", e);
-      return { valid: false, error: "Invalid private key format" };
     }
   };
 
@@ -283,6 +235,9 @@ function Onboarding({ onComplete }: OnboardingProps) {
           setStep("bankrSetup");
         } else if (accountTypeChoice === "privateKey") {
           setStep("privateKey");
+        } else if (accountTypeChoice === "seedPhrase") {
+          // Seed phrase needs password first (to unlock wallet before addSeedPhraseGroup)
+          setStep("password");
         } else {
           // "both" - start with bankr setup
           setStep("bankrSetup");
@@ -307,7 +262,11 @@ function Onboarding({ onComplete }: OnboardingProps) {
         break;
       case "password":
         if (validatePassword()) {
-          await handleSubmit();
+          if (accountTypeChoice === "seedPhrase") {
+            await handleCreateWalletForSeed();
+          } else {
+            await handleSubmit();
+          }
         }
         break;
     }
@@ -329,7 +288,9 @@ function Onboarding({ onComplete }: OnboardingProps) {
         }
         break;
       case "password":
-        if (accountTypeChoice === "privateKey") {
+        if (accountTypeChoice === "seedPhrase") {
+          setStep("accountType");
+        } else if (accountTypeChoice === "privateKey") {
           setStep("privateKey");
         } else if (accountTypeChoice === "both") {
           setStep("privateKey");
@@ -337,6 +298,81 @@ function Onboarding({ onComplete }: OnboardingProps) {
           setStep("bankrSetup");
         }
         break;
+      case "seedPhrase":
+        // Going back from seed phrase step means aborting after wallet was already created
+        // This is a rare case - just go back to account type selection
+        setStep("accountType");
+        break;
+    }
+  };
+
+  /**
+   * For seed phrase flow: create wallet (save placeholder API key + unlock) then show SeedPhraseSetup
+   */
+  const handleCreateWalletForSeed = async () => {
+    setIsSubmitting(true);
+    try {
+      // Save placeholder to establish the password
+      await saveEncryptedApiKey("pk-only-mode", password);
+
+      // Unlock wallet to cache credentials (needed by addSeedPhraseGroup)
+      await chrome.runtime.sendMessage({ type: "unlockWallet", password });
+
+      // Transition to seed phrase setup
+      setStep("seedPhrase");
+    } catch (error) {
+      setErrors({
+        password:
+          error instanceof Error
+            ? error.message
+            : "Failed to set up wallet",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /**
+   * Called when SeedPhraseSetup completes (generate or import)
+   */
+  const handleSeedPhraseComplete = async () => {
+    try {
+      // Get the first account that was just created to use as default
+      const accounts = await new Promise<any[]>((resolve) => {
+        chrome.runtime.sendMessage({ type: "getAccounts" }, resolve);
+      });
+
+      const seedAccount = accounts?.find((a: any) => a.type === "seedPhrase");
+      const defaultAddress = seedAccount?.address || accounts?.[0]?.address;
+      const defaultDisplayName = seedAccount?.displayName || defaultAddress;
+
+      if (defaultAddress) {
+        await chrome.storage.sync.set({
+          address: defaultAddress,
+          displayAddress: defaultDisplayName,
+          chainName: "Base",
+        });
+      }
+
+      // Enable sidepanel mode by default for non-Arc browsers
+      const { isArcBrowser: storedIsArc } = await chrome.storage.sync.get(["isArcBrowser"]);
+      if (!storedIsArc) {
+        try {
+          const response = await chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: true });
+          if (response?.success) {
+            console.log("Sidepanel mode enabled by default");
+          }
+        } catch {
+          // Ignore errors - popup mode is fine as fallback
+        }
+      }
+
+      setStep("success");
+      chrome.runtime.sendMessage({ type: "onboardingComplete" });
+    } catch {
+      // If anything fails getting accounts, still show success
+      setStep("success");
+      chrome.runtime.sendMessage({ type: "onboardingComplete" });
     }
   };
 
@@ -491,8 +527,11 @@ function Onboarding({ onComplete }: OnboardingProps) {
       case "privateKey":
         return accountTypeChoice === "both" ? 2 : 1;
       case "password":
+        if (accountTypeChoice === "seedPhrase") return 1;
         if (accountTypeChoice === "privateKey") return 2;
         if (accountTypeChoice === "both") return 3;
+        return 2;
+      case "seedPhrase":
         return 2;
       default:
         return 0;
@@ -500,6 +539,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   const getTotalSteps = (): number => {
+    if (accountTypeChoice === "seedPhrase") return 3; // accountType, password, seedPhrase
     if (accountTypeChoice === "privateKey") return 3; // accountType, privateKey, password
     if (accountTypeChoice === "both") return 4; // accountType, bankrSetup, privateKey, password
     return 3; // accountType, bankrSetup, password
@@ -800,7 +840,29 @@ function Onboarding({ onComplete }: OnboardingProps) {
     );
   }
 
-  // Form Steps (apiKey, address, password)
+  // Seed Phrase Step - renders the existing SeedPhraseSetup component
+  // Wrapped with centering + maxW to match the onboarding full-screen layout
+  if (step === "seedPhrase") {
+    return (
+      <Box
+        minH="100vh"
+        bg="bg.base"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        p={8}
+      >
+        <Box w="full" maxW="400px">
+          <SeedPhraseSetup
+            onBack={() => setStep("accountType")}
+            onComplete={handleSeedPhraseComplete}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  // Form Steps (accountType, bankrSetup, privateKey, password)
   return (
     <Box
       minH="100vh"
@@ -882,12 +944,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
                     borderColor="bauhaus.black"
                     p={2}
                   >
-                    <Icon viewBox="0 0 24 24" boxSize="20px" color="white">
-                      <path
-                        fill="currentColor"
-                        d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1H3a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5A2.5 2.5 0 0 0 7.5 18a2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5a2.5 2.5 0 0 0 2.5 2.5a2.5 2.5 0 0 0 2.5-2.5a2.5 2.5 0 0 0-2.5-2.5Z"
-                      />
-                    </Icon>
+                    <RobotIcon boxSize="20px" color="white" />
                   </Box>
                   <VStack align="start" spacing={0} flex={1}>
                     <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase">
@@ -923,12 +980,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
                     borderColor="bauhaus.black"
                     p={2}
                   >
-                    <Icon viewBox="0 0 24 24" boxSize="20px" color="bauhaus.black">
-                      <path
-                        fill="currentColor"
-                        d="M7 14c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm0-4c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm14 8.5l-5.5-5.5.71-.71L17.5 11l-.71-.71-2.5 2.5-2.29-2.29-.71.71.71.71-2 2V14H9v1H8v1H7v1H4v-1l7-7c-.55-.89-.95-1.89-1-3H7c0-2.76 2.24-5 5-5 2.21 0 4.05 1.43 4.71 3.42l.79.79 1.79-1.79.71.71-.71.71 1.79 1.79.71-.71-.71-.71 1.71-1.71 1.5 1.5-8 8-1.29-1.29z"
-                      />
-                    </Icon>
+                    <KeyIcon boxSize="20px" color="bauhaus.black" />
                   </Box>
                   <VStack align="start" spacing={0} flex={1}>
                     <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase">
@@ -943,25 +995,63 @@ function Onboarding({ onComplete }: OnboardingProps) {
                   )}
                 </HStack>
               </Box>
+
+              {/* Seed Phrase Option */}
+              <Box
+                as="button"
+                w="full"
+                p={4}
+                bg={accountTypeChoice === "seedPhrase" ? "bg.muted" : "bauhaus.white"}
+                border="3px solid"
+                borderColor={accountTypeChoice === "seedPhrase" ? "bauhaus.red" : "bauhaus.black"}
+                boxShadow="4px 4px 0px 0px #121212"
+                textAlign="left"
+                onClick={() => setAccountTypeChoice("seedPhrase")}
+                _hover={{ bg: "bg.muted" }}
+              >
+                <HStack spacing={3}>
+                  <Box
+                    bg="bauhaus.red"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    p={2}
+                  >
+                    <SeedIcon boxSize="20px" color="white" />
+                  </Box>
+                  <VStack align="start" spacing={0} flex={1}>
+                    <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase">
+                      Seed Phrase
+                    </Text>
+                    <Text fontSize="xs" color="text.secondary" fontWeight="500">
+                      Generate or import a 12-word mnemonic (BIP39). Derive multiple accounts.
+                    </Text>
+                  </VStack>
+                  {accountTypeChoice === "seedPhrase" && (
+                    <Box w="12px" h="12px" bg="bauhaus.red" border="2px solid" borderColor="bauhaus.black" transform="rotate(45deg)" />
+                  )}
+                </HStack>
+              </Box>
             </VStack>
 
-            {/* Both option checkbox */}
-            <Checkbox
-              isChecked={accountTypeChoice === "both"}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setAccountTypeChoice("both");
-                } else {
-                  setAccountTypeChoice("privateKey");
-                }
-              }}
-              colorScheme="yellow"
-              borderColor="bauhaus.black"
-            >
-              <Text fontSize="sm" color="text.secondary" fontWeight="700">
-                Set up both account types
-              </Text>
-            </Checkbox>
+            {/* Both option checkbox - only shown when bankr or privateKey is selected */}
+            {accountTypeChoice !== "seedPhrase" && (
+              <Checkbox
+                isChecked={accountTypeChoice === "both"}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setAccountTypeChoice("both");
+                  } else {
+                    setAccountTypeChoice("privateKey");
+                  }
+                }}
+                colorScheme="yellow"
+                borderColor="bauhaus.black"
+              >
+                <Text fontSize="sm" color="text.secondary" fontWeight="700">
+                  Set up both account types
+                </Text>
+              </Checkbox>
+            )}
 
             <Button variant="primary" w="full" onClick={handleContinue}>
               Continue
@@ -1116,7 +1206,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
           <VStack spacing={6} w="full">
             <VStack spacing={2} textAlign="center">
               <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wide">
-                {pkMode === "generate" ? "Generate Private Key" : "Enter your Private Key"}
+                Enter your Private Key
               </Text>
               <Text fontSize="sm" color="text.secondary" fontWeight="500">
                 Your private key will be encrypted and stored locally.
@@ -1144,206 +1234,15 @@ function Onboarding({ onComplete }: OnboardingProps) {
                 borderColor="bauhaus.black"
               />
 
-              {/* Import / Generate Toggle */}
-              <HStack spacing={2} mb={4}>
-                <Button
-                  size="sm"
-                  bg={pkMode === "import" ? "bauhaus.black" : "bauhaus.white"}
-                  color={pkMode === "import" ? "bauhaus.white" : "text.primary"}
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                  borderRadius="0"
-                  fontWeight="700"
-                  textTransform="uppercase"
-                  fontSize="xs"
-                  onClick={() => {
-                    setPkMode("import");
-                    setPrivateKey("");
-                    setDerivedAddress(null);
-                  }}
-                  _hover={{ opacity: 0.9 }}
-                >
-                  Import Existing
-                </Button>
-                <Button
-                  size="sm"
-                  bg={pkMode === "generate" ? "bauhaus.black" : "bauhaus.white"}
-                  color={pkMode === "generate" ? "bauhaus.white" : "text.primary"}
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                  borderRadius="0"
-                  fontWeight="700"
-                  textTransform="uppercase"
-                  fontSize="xs"
-                  onClick={() => {
-                    setPkMode("generate");
-                    const newKey = generatePrivateKey();
-                    setPrivateKey(newKey);
-                    setShowPrivateKey(false);
-                  }}
-                  _hover={{ opacity: 0.9 }}
-                >
-                  Generate New
-                </Button>
-              </HStack>
-
-              {pkMode === "import" ? (
-              <FormControl isInvalid={!!errors.privateKey}>
-                <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
-                  Private Key
-                </FormLabel>
-                <InputGroup>
-                  <Input
-                    type={showPrivateKey ? "text" : "password"}
-                    placeholder="0x..."
-                    value={privateKey}
-                    autoFocus
-                    fontFamily="mono"
-                    onChange={(e) => {
-                      setPrivateKey(e.target.value);
-                      if (errors.privateKey) setErrors({});
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleContinue();
-                    }}
-                    pr="3rem"
-                  />
-                  <InputRightElement>
-                    <IconButton
-                      aria-label={showPrivateKey ? "Hide" : "Show"}
-                      icon={showPrivateKey ? <ViewOffIcon /> : <ViewIcon />}
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setShowPrivateKey(!showPrivateKey)}
-                      color="text.secondary"
-                      tabIndex={-1}
-                    />
-                  </InputRightElement>
-                </InputGroup>
-                <FormErrorMessage color="bauhaus.red" fontWeight="700">
-                  {errors.privateKey}
-                </FormErrorMessage>
-              </FormControl>
-              ) : (
-              <VStack spacing={4} align="stretch">
-                <FormControl isInvalid={!!errors.privateKey}>
-                  <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
-                    Generated Private Key
-                  </FormLabel>
-                  <InputGroup>
-                    <Input
-                      type={showPrivateKey ? "text" : "password"}
-                      value={privateKey}
-                      readOnly
-                      fontFamily="mono"
-                      fontSize="xs"
-                      pr="4.5rem"
-                    />
-                    <InputRightElement w="4.5rem">
-                      <HStack spacing={0}>
-                        <IconButton
-                          aria-label={showPrivateKey ? "Hide" : "Show"}
-                          icon={showPrivateKey ? <ViewOffIcon /> : <ViewIcon />}
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => setShowPrivateKey(!showPrivateKey)}
-                          color="text.secondary"
-                          tabIndex={-1}
-                        />
-                        <IconButton
-                          aria-label="Copy private key"
-                          icon={pkCopied ? <CheckIcon color="green.500" /> : <CopyIcon />}
-                          size="xs"
-                          variant="ghost"
-                          onClick={async () => {
-                            await navigator.clipboard.writeText(privateKey);
-                            setPkCopied(true);
-                            setTimeout(() => setPkCopied(false), 2000);
-                          }}
-                          color={pkCopied ? "green.500" : "text.secondary"}
-                          tabIndex={-1}
-                        />
-                      </HStack>
-                    </InputRightElement>
-                  </InputGroup>
-                  <FormErrorMessage color="bauhaus.red" fontWeight="700">
-                    {errors.privateKey}
-                  </FormErrorMessage>
-                </FormControl>
-
-                <HStack spacing={2} align="center">
-                  <Text fontSize="xs" color="bauhaus.red" fontWeight="700" whiteSpace="nowrap">
-                    Save this key — cannot be recovered!
-                  </Text>
-                  <Box flex={1} h="2px" bg="bauhaus.red" />
-                  <HStack
-                    as="button"
-                    spacing={1}
-                    onClick={() => {
-                      const newKey = generatePrivateKey();
-                      setPrivateKey(newKey);
-                      setShowPrivateKey(false);
-                      setPkCopied(false);
-                    }}
-                    cursor="pointer"
-                    opacity={0.5}
-                    _hover={{ opacity: 1 }}
-                    transition="opacity 0.15s"
-                    flexShrink={0}
-                  >
-                    <RepeatIcon boxSize="10px" color="text.secondary" />
-                    <Text fontSize="10px" color="text.secondary" fontWeight="700" textTransform="uppercase" letterSpacing="wider">
-                      Regenerate
-                    </Text>
-                  </HStack>
-                </HStack>
-              </VStack>
-              )}
-
-              {derivedAddress && (
-                <Box
-                  mt={4}
-                  p={3}
-                  bg="bauhaus.yellow"
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                  boxShadow="3px 3px 0px 0px #121212"
-                >
-                  <HStack spacing={2} align="center">
-                    <Box
-                      w="22px"
-                      h="22px"
-                      minW="22px"
-                      bg="bauhaus.blue"
-                      border="2px solid"
-                      borderColor="bauhaus.black"
-                      borderRadius="full"
-                      display="flex"
-                      alignItems="center"
-                      justifyContent="center"
-                    >
-                      <CheckIcon boxSize="10px" color="white" />
-                    </Box>
-                    <Code
-                      fontSize="10px"
-                      bg="bauhaus.white"
-                      color="bauhaus.black"
-                      fontFamily="mono"
-                      fontWeight="700"
-                      p={1.5}
-                      border="2px solid"
-                      borderColor="bauhaus.black"
-                      overflow="hidden"
-                      textOverflow="ellipsis"
-                      whiteSpace="nowrap"
-                      title={derivedAddress}
-                      flex={1}
-                    >
-                      {derivedAddress}
-                    </Code>
-                  </HStack>
-                </Box>
-              )}
+              <PrivateKeyInput
+                privateKey={privateKey}
+                onPrivateKeyChange={setPrivateKey}
+                derivedAddress={derivedAddress}
+                error={errors.privateKey}
+                onClearError={() => setErrors({})}
+                onContinue={handleContinue}
+                autoFocus
+              />
 
               <FormControl mt={4}>
                 <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
@@ -1505,7 +1404,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
               isLoading={isSubmitting}
               loadingText="Setting up..."
             >
-              Complete Setup
+              {accountTypeChoice === "seedPhrase" ? "Continue" : "Complete Setup"}
             </Button>
           </VStack>
         )}

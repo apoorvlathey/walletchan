@@ -24,6 +24,7 @@ import {
   addSeedPhraseAccount,
   addSeedGroup,
   getSeedGroups,
+  renameSeedGroup,
   updateSeedGroupCount,
   updateAccountDisplayName,
 } from "./accountStorage";
@@ -533,7 +534,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const address = deriveAddress(privateKey);
 
           // Add account metadata first (to get the UUID)
-          const account = await addSeedPhraseAccount(address, group.id, 0);
+          const account = await addSeedPhraseAccount(address, group.id, 0, message.accountDisplayName || undefined);
           await updateSeedGroupCount(group.id, 1);
 
           // Store derived PK in vault using account UUID (matches vault lookup)
@@ -604,7 +605,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const address = deriveAddress(privateKey);
 
           // Add account first (to get UUID)
-          const account = await addSeedPhraseAccount(address, seedGroupId, nextIndex);
+          const account = await addSeedPhraseAccount(address, seedGroupId, nextIndex, message.displayName || undefined);
           await updateSeedGroupCount(seedGroupId, groupAccounts.length + 1);
 
           // Store in vault using account UUID (matches vault lookup)
@@ -666,6 +667,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "getSeedGroups": {
       getSeedGroups().then((groups) => {
         sendResponse(groups);
+      });
+      return true;
+    }
+
+    case "renameSeedGroup": {
+      const newName = (message.name || "").trim();
+      if (!message.seedGroupId || !newName) {
+        sendResponse({ success: false, error: "Missing seedGroupId or name" });
+        return true;
+      }
+      renameSeedGroup(message.seedGroupId, newName).then(() => {
+        chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+        sendResponse({ success: true });
+      }).catch((error) => {
+        sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to rename" });
       });
       return true;
     }

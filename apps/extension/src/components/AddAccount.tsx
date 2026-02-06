@@ -14,65 +14,18 @@ import {
   IconButton,
   Radio,
   RadioGroup,
-  Code,
-  Icon,
+  Badge,
+  Divider,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import SeedPhraseSetup from "@/components/SeedPhraseSetup";
-import { ViewIcon, ViewOffIcon, ArrowBackIcon, CheckIcon, RepeatIcon, CopyIcon } from "@chakra-ui/icons";
+import { ViewIcon, ViewOffIcon, ArrowBackIcon, AddIcon } from "@chakra-ui/icons";
 import { isAddress } from "@ethersproject/address";
-import { privateKeyToAccount } from "viem/accounts";
-
-// Robot icon for Bankr accounts
-const RobotIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path
-      fill="currentColor"
-      d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1H3a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5A2.5 2.5 0 0 0 7.5 18a2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5a2.5 2.5 0 0 0 2.5 2.5a2.5 2.5 0 0 0 2.5-2.5a2.5 2.5 0 0 0-2.5-2.5Z"
-    />
-  </Icon>
-);
-
-// Key icon for Private Key accounts
-const KeyIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path
-      fill="currentColor"
-      d="M7 14c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm0-4c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm14 8.5l-5.5-5.5.71-.71L17.5 11l-.71-.71-2.5 2.5-2.29-2.29-.71.71.71.71-2 2V14H9v1H8v1H7v1H4v-1l7-7c-.55-.89-.95-1.89-1-3H7c0-2.76 2.24-5 5-5 2.21 0 4.05 1.43 4.71 3.42l.79.79 1.79-1.79.71.71-.71.71 1.79 1.79.71-.71-.71-.71 1.71-1.71 1.5 1.5-8 8-1.29-1.29z"
-    />
-  </Icon>
-);
-
-// Eye icon for Impersonator (view-only) accounts
-const EyeIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path
-      fill="currentColor"
-      d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
-    />
-  </Icon>
-);
-
-// Seed icon for Seed Phrase accounts
-const SeedIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path
-      fill="currentColor"
-      d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.7c.28.33.6.62.94.88A6.003 6.003 0 0 0 17 20a6 6 0 0 0 0-12zm0 10c-1.4 0-2.6-.77-3.26-1.9l3.86-1.42-.66-1.79-3.86 1.42c-.14-.46-.2-.94-.14-1.42A8.55 8.55 0 0 1 17 10a4 4 0 0 1 0 8zM2 4.27l3.11 3.11A20.7 20.7 0 0 0 2.77 12l1.9.66c.38-1.07.86-2.22 1.47-3.38l1.37 1.37c-.5.98-.89 1.94-1.18 2.83l1.89.66c.2-.6.46-1.22.77-1.87l7.44 7.44 1.41-1.41L3.41 2.86 2 4.27z"
-    />
-  </Icon>
-);
-
-/**
- * Generates a cryptographically secure random private key
- */
-function generatePrivateKey(): `0x${string}` {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return `0x${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
-}
+import { validateAndDeriveAddress } from "@/utils/privateKeyUtils";
+import { RobotIcon, KeyIcon, SeedIcon, EyeIcon } from "@/components/shared/AccountTypeIcons";
+import PrivateKeyInput from "@/components/shared/PrivateKeyInput";
 
 type AccountType = "bankr" | "privateKey" | "seedPhrase" | "impersonator";
-type PkMode = "import" | "generate";
 
 interface Account {
   id: string;
@@ -81,66 +34,34 @@ interface Account {
   displayName?: string;
 }
 
+interface SeedGroup {
+  id: string;
+  name: string;
+  accountCount: number;
+}
+
 interface AddAccountProps {
   onBack: () => void;
   onAccountAdded: () => void;
-}
-
-/**
- * Validates a private key format and derives address
- */
-function validateAndDeriveAddress(key: string): { valid: boolean; address?: string; normalizedKey?: string; error?: string } {
-  if (!key) {
-    return { valid: false, error: "Private key is required" };
-  }
-
-  // Normalize: trim whitespace and auto-prefix "0x" if missing
-  let normalizedKey = key.trim();
-  if (!normalizedKey.startsWith("0x") && !normalizedKey.startsWith("0X")) {
-    normalizedKey = `0x${normalizedKey}`;
-  }
-  // Ensure lowercase 0x prefix
-  if (normalizedKey.startsWith("0X")) {
-    normalizedKey = `0x${normalizedKey.slice(2)}`;
-  }
-
-  // Check length (0x + 64 hex chars)
-  if (normalizedKey.length !== 66) {
-    return { valid: false, error: "Private key must be 64 hex characters (32 bytes)" };
-  }
-
-  // Check if all characters are valid hex
-  if (!/^0x[0-9a-fA-F]{64}$/.test(normalizedKey)) {
-    return { valid: false, error: "Invalid hex characters in private key" };
-  }
-
-  // Try to derive address using viem
-  try {
-    const account = privateKeyToAccount(normalizedKey as `0x${string}`);
-    return { valid: true, address: account.address, normalizedKey };
-  } catch (e) {
-    console.error("Failed to derive address from private key:", e);
-    return { valid: false, error: "Invalid private key format" };
-  }
 }
 
 function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
   const toast = useBauhausToast();
 
   const [accountType, setAccountType] = useState<AccountType>("privateKey");
-  const [pkMode, setPkMode] = useState<PkMode>("import");
   const [privateKey, setPrivateKey] = useState("");
-  const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [derivedAddress, setDerivedAddress] = useState<string | null>(null);
-  const [pkCopied, setPkCopied] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [bankrAddress, setBankrAddress] = useState("");
   const [bankrApiKey, setBankrApiKey] = useState("");
   const [showBankrApiKey, setShowBankrApiKey] = useState(false);
   const [impersonatorAddress, setImpersonatorAddress] = useState("");
   const [hasBankrAccount, setHasBankrAccount] = useState(false);
+  const [seedGroups, setSeedGroups] = useState<SeedGroup[]>([]);
   const [showSeedSetup, setShowSeedSetup] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [derivingGroupId, setDerivingGroupId] = useState<string | null>(null);
+  const [deriveDisplayNames, setDeriveDisplayNames] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<{
     privateKey?: string;
     bankrAddress?: string;
@@ -148,11 +69,14 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
     impersonatorAddress?: string;
   }>({});
 
-  // Check if a Bankr account already exists on mount
+  // Check existing accounts and seed groups on mount
   useEffect(() => {
     chrome.runtime.sendMessage({ type: "getAccounts" }, (accounts: Account[]) => {
       const bankrExists = accounts?.some((a) => a.type === "bankr");
       setHasBankrAccount(bankrExists);
+    });
+    chrome.runtime.sendMessage({ type: "getSeedGroups" }, (groups: SeedGroup[]) => {
+      setSeedGroups(groups || []);
     });
   }, []);
 
@@ -349,6 +273,43 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
     }
   };
 
+  const handleDeriveNext = async (seedGroupId: string) => {
+    setDerivingGroupId(seedGroupId);
+    try {
+      const name = deriveDisplayNames[seedGroupId]?.trim() || undefined;
+      const response = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+        chrome.runtime.sendMessage({ type: "deriveSeedAccount", seedGroupId, displayName: name }, resolve);
+      });
+
+      if (!response.success) {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to derive account",
+          status: "error",
+          duration: 3000,
+        });
+        return;
+      }
+
+      toast({
+        title: "Account derived",
+        description: "New address added from seed phrase",
+        status: "success",
+        duration: 2000,
+      });
+      onAccountAdded();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to derive account",
+        status: "error",
+        duration: 3000,
+      });
+    } finally {
+      setDerivingGroupId(null);
+    }
+  };
+
   // Render SeedPhraseSetup when seed phrase is selected
   if (showSeedSetup) {
     return (
@@ -532,199 +493,107 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
             boxShadow="4px 4px 0px 0px #121212"
             p={4}
           >
-            {/* Import / Generate Toggle */}
-            <HStack spacing={2} mb={4}>
-              <Button
-                size="sm"
-                bg={pkMode === "import" ? "bauhaus.black" : "bauhaus.white"}
-                color={pkMode === "import" ? "bauhaus.white" : "text.primary"}
-                border="2px solid"
-                borderColor="bauhaus.black"
-                borderRadius="0"
-                fontWeight="700"
-                textTransform="uppercase"
-                fontSize="xs"
-                onClick={() => {
-                  setPkMode("import");
-                  setPrivateKey("");
-                  setDerivedAddress(null);
-                }}
-                _hover={{ opacity: 0.9 }}
-              >
-                Import
-              </Button>
-              <Button
-                size="sm"
-                bg={pkMode === "generate" ? "bauhaus.black" : "bauhaus.white"}
-                color={pkMode === "generate" ? "bauhaus.white" : "text.primary"}
-                border="2px solid"
-                borderColor="bauhaus.black"
-                borderRadius="0"
-                fontWeight="700"
-                textTransform="uppercase"
-                fontSize="xs"
-                onClick={() => {
-                  setPkMode("generate");
-                  const newKey = generatePrivateKey();
-                  setPrivateKey(newKey);
-                  setShowPrivateKey(false);
-                }}
-                _hover={{ opacity: 0.9 }}
-              >
-                Generate New
-              </Button>
+            <PrivateKeyInput
+              privateKey={privateKey}
+              onPrivateKeyChange={setPrivateKey}
+              derivedAddress={derivedAddress}
+              error={errors.privateKey}
+              onClearError={() => setErrors((prev) => ({ ...prev, privateKey: undefined }))}
+            />
+          </Box>
+        )}
+
+        {/* Seed Phrase: Existing Groups + Derive */}
+        {accountType === "seedPhrase" && seedGroups.length > 0 && (
+          <Box
+            bg="bauhaus.white"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="4px 4px 0px 0px #121212"
+            p={4}
+          >
+            <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase" mb={3}>
+              Existing Seed Phrases
+            </Text>
+            <VStack spacing={3} align="stretch">
+              {seedGroups.map((group) => (
+                <Box
+                  key={group.id}
+                  p={3}
+                  border="2px solid"
+                  borderColor="bauhaus.black"
+                  bg="bg.muted"
+                >
+                  <HStack justify="space-between" align="center">
+                    <HStack spacing={2}>
+                      <Box
+                        bg="bauhaus.red"
+                        border="2px solid"
+                        borderColor="bauhaus.black"
+                        p={1}
+                      >
+                        <SeedIcon boxSize="14px" color="bauhaus.white" />
+                      </Box>
+                      <Text fontSize="sm" fontWeight="700" color="text.primary">
+                        {group.name}
+                      </Text>
+                      <Badge
+                        bg="bauhaus.black"
+                        color="bauhaus.white"
+                        fontSize="xs"
+                        fontWeight="700"
+                        px={2}
+                        borderRadius={0}
+                      >
+                        {group.accountCount} {group.accountCount === 1 ? "account" : "accounts"}
+                      </Badge>
+                    </HStack>
+                  </HStack>
+                  <Input
+                    mt={2}
+                    size="sm"
+                    placeholder={`Display Name for Account #${group.accountCount} (Optional)`}
+                    value={deriveDisplayNames[group.id] || ""}
+                    onChange={(e) =>
+                      setDeriveDisplayNames((prev) => ({ ...prev, [group.id]: e.target.value }))
+                    }
+                  />
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    mt={2}
+                    w="full"
+                    leftIcon={<AddIcon boxSize="10px" />}
+                    onClick={() => handleDeriveNext(group.id)}
+                    isLoading={derivingGroupId === group.id}
+                    loadingText="Deriving..."
+                    isDisabled={derivingGroupId !== null}
+                  >
+                    Derive Next Address
+                  </Button>
+                </Box>
+              ))}
+            </VStack>
+
+            <HStack my={4} align="center">
+              <Divider borderColor="bauhaus.black" />
+              <Text fontSize="xs" color="text.secondary" fontWeight="700" whiteSpace="nowrap" px={2}>
+                OR
+              </Text>
+              <Divider borderColor="bauhaus.black" />
             </HStack>
 
-            {pkMode === "import" ? (
-              <FormControl isInvalid={!!errors.privateKey}>
-                <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                  Private Key
-                </FormLabel>
-                <InputGroup>
-                  <Input
-                    type={showPrivateKey ? "text" : "password"}
-                    placeholder="0x..."
-                    value={privateKey}
-                    onChange={(e) => setPrivateKey(e.target.value)}
-                    fontFamily="mono"
-                    pr="3rem"
-                  />
-                  <InputRightElement>
-                    <IconButton
-                      aria-label={showPrivateKey ? "Hide" : "Show"}
-                      icon={showPrivateKey ? <ViewOffIcon /> : <ViewIcon />}
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setShowPrivateKey(!showPrivateKey)}
-                      color="text.secondary"
-                      tabIndex={-1}
-                    />
-                  </InputRightElement>
-                </InputGroup>
-                <FormErrorMessage color="bauhaus.red" fontWeight="700">
-                  {errors.privateKey}
-                </FormErrorMessage>
-              </FormControl>
-            ) : (
-              <VStack spacing={4} align="stretch">
-                <FormControl isInvalid={!!errors.privateKey}>
-                  <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                    Generated Private Key
-                  </FormLabel>
-                  <InputGroup>
-                    <Input
-                      type={showPrivateKey ? "text" : "password"}
-                      value={privateKey}
-                      readOnly
-                      fontFamily="mono"
-                      fontSize="xs"
-                      pr="4.5rem"
-                    />
-                    <InputRightElement w="4.5rem">
-                      <HStack spacing={0}>
-                        <IconButton
-                          aria-label={showPrivateKey ? "Hide" : "Show"}
-                          icon={showPrivateKey ? <ViewOffIcon /> : <ViewIcon />}
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => setShowPrivateKey(!showPrivateKey)}
-                          color="text.secondary"
-                          tabIndex={-1}
-                        />
-                        <IconButton
-                          aria-label="Copy private key"
-                          icon={pkCopied ? <CheckIcon color="green.500" /> : <CopyIcon />}
-                          size="xs"
-                          variant="ghost"
-                          onClick={async () => {
-                            await navigator.clipboard.writeText(privateKey);
-                            setPkCopied(true);
-                            setTimeout(() => setPkCopied(false), 2000);
-                          }}
-                          color={pkCopied ? "green.500" : "text.secondary"}
-                          tabIndex={-1}
-                        />
-                      </HStack>
-                    </InputRightElement>
-                  </InputGroup>
-                  <FormErrorMessage color="bauhaus.red" fontWeight="700">
-                    {errors.privateKey}
-                  </FormErrorMessage>
-                </FormControl>
-
-                <HStack spacing={2} align="center">
-                  <Text fontSize="xs" color="bauhaus.red" fontWeight="700" whiteSpace="nowrap">
-                    Save this key — cannot be recovered!
-                  </Text>
-                  <Box flex={1} h="2px" bg="bauhaus.red" />
-                  <HStack
-                    as="button"
-                    spacing={1}
-                    onClick={() => {
-                      const newKey = generatePrivateKey();
-                      setPrivateKey(newKey);
-                      setShowPrivateKey(false);
-                      setPkCopied(false);
-                    }}
-                    cursor="pointer"
-                    opacity={0.5}
-                    _hover={{ opacity: 1 }}
-                    transition="opacity 0.15s"
-                    flexShrink={0}
-                  >
-                    <RepeatIcon boxSize="10px" color="text.secondary" />
-                    <Text fontSize="10px" color="text.secondary" fontWeight="700" textTransform="uppercase" letterSpacing="wider">
-                      Regenerate
-                    </Text>
-                  </HStack>
-                </HStack>
-              </VStack>
-            )}
-
-            {derivedAddress && (
-              <Box
-                mt={4}
-                p={3}
-                bg="bauhaus.yellow"
-                border="2px solid"
-                borderColor="bauhaus.black"
-                boxShadow="3px 3px 0px 0px #121212"
-              >
-                <HStack spacing={2} align="center">
-                  <Box
-                    w="22px"
-                    h="22px"
-                    minW="22px"
-                    bg="bauhaus.blue"
-                    border="2px solid"
-                    borderColor="bauhaus.black"
-                    borderRadius="full"
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                  >
-                    <CheckIcon boxSize="10px" color="white" />
-                  </Box>
-                  <Code
-                    fontSize="10px"
-                    bg="bauhaus.white"
-                    color="bauhaus.black"
-                    fontFamily="mono"
-                    fontWeight="700"
-                    p={1.5}
-                    border="2px solid"
-                    borderColor="bauhaus.black"
-                    overflow="hidden"
-                    textOverflow="ellipsis"
-                    whiteSpace="nowrap"
-                    title={derivedAddress}
-                    flex={1}
-                  >
-                    {derivedAddress}
-                  </Code>
-                </HStack>
-              </Box>
-            )}
+            <Button
+              variant="outline"
+              w="full"
+              size="sm"
+              border="2px solid"
+              borderColor="bauhaus.black"
+              fontWeight="700"
+              onClick={() => setShowSeedSetup(true)}
+            >
+              Add New Seed Phrase
+            </Button>
           </Box>
         )}
 
@@ -862,21 +731,23 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
           </Box>
         )}
 
-        {/* Submit Button */}
-        <Button
-          variant="primary"
-          w="full"
-          onClick={accountType === "seedPhrase" ? () => setShowSeedSetup(true) : handleSubmit}
-          isLoading={isSubmitting}
-          loadingText="Adding..."
-          isDisabled={
-            (accountType === "privateKey" && !derivedAddress) ||
-            (accountType === "bankr" && (!bankrAddress.trim() || !bankrApiKey.trim())) ||
-            (accountType === "impersonator" && !impersonatorAddress.trim())
-          }
-        >
-          {accountType === "seedPhrase" ? "Set Up Seed Phrase" : "Add Account"}
-        </Button>
+        {/* Submit Button - hidden when seed groups exist (actions are inline above) */}
+        {!(accountType === "seedPhrase" && seedGroups.length > 0) && (
+          <Button
+            variant="primary"
+            w="full"
+            onClick={accountType === "seedPhrase" ? () => setShowSeedSetup(true) : handleSubmit}
+            isLoading={isSubmitting}
+            loadingText="Adding..."
+            isDisabled={
+              (accountType === "privateKey" && !derivedAddress) ||
+              (accountType === "bankr" && (!bankrAddress.trim() || !bankrApiKey.trim())) ||
+              (accountType === "impersonator" && !impersonatorAddress.trim())
+            }
+          >
+            {accountType === "seedPhrase" ? "Set Up Seed Phrase" : "Add Account"}
+          </Button>
+        )}
       </VStack>
     </Box>
   );

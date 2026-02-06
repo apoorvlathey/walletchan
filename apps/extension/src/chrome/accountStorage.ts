@@ -138,12 +138,7 @@ export async function addBankrAccount(
 
   accounts.push(newAccount);
   await saveAccounts(accounts);
-
-  // If this is the first account, set it as active
-  const activeId = await getActiveAccountId();
-  if (!activeId) {
-    await setActiveAccountId(newAccount.id);
-  }
+  await setActiveAccountId(newAccount.id);
 
   return newAccount;
 }
@@ -168,12 +163,7 @@ export async function addPrivateKeyAccount(
 
   accounts.push(newAccount);
   await saveAccounts(accounts);
-
-  // If this is the first account, set it as active
-  const activeId = await getActiveAccountId();
-  if (!activeId) {
-    await setActiveAccountId(newAccount.id);
-  }
+  await setActiveAccountId(newAccount.id);
 
   return newAccount;
 }
@@ -198,12 +188,7 @@ export async function addImpersonatorAccount(
 
   accounts.push(newAccount);
   await saveAccounts(accounts);
-
-  // If this is the first account, set it as active
-  const activeId = await getActiveAccountId();
-  if (!activeId) {
-    await setActiveAccountId(newAccount.id);
-  }
+  await setActiveAccountId(newAccount.id);
 
   return newAccount;
 }
@@ -305,11 +290,7 @@ export async function addSeedPhraseAccount(
 
   accounts.push(newAccount);
   await saveAccounts(accounts);
-
-  const activeId = await getActiveAccountId();
-  if (!activeId) {
-    await setActiveAccountId(newAccount.id);
-  }
+  await setActiveAccountId(newAccount.id);
 
   return newAccount;
 }
@@ -352,6 +333,21 @@ export async function updateSeedGroupCount(
   const group = groups.find((g) => g.id === seedGroupId);
   if (group) {
     group.accountCount = accountCount;
+    await chrome.storage.local.set({ [SEED_GROUPS_KEY]: groups });
+  }
+}
+
+/**
+ * Renames a seed group
+ */
+export async function renameSeedGroup(
+  seedGroupId: string,
+  newName: string
+): Promise<void> {
+  const groups = await getSeedGroups();
+  const group = groups.find((g) => g.id === seedGroupId);
+  if (group) {
+    group.name = newName;
     await chrome.storage.local.set({ [SEED_GROUPS_KEY]: groups });
   }
 }

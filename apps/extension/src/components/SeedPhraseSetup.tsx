@@ -30,6 +30,7 @@ function SeedPhraseSetup({ onBack, onComplete }: SeedPhraseSetupProps) {
   const [generatedMnemonic, setGeneratedMnemonic] = useState<string | null>(null);
   const [importedMnemonic, setImportedMnemonic] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [accountDisplayName, setAccountDisplayName] = useState("");
   const [showMnemonic, setShowMnemonic] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +60,7 @@ function SeedPhraseSetup({ onBack, onComplete }: SeedPhraseSetupProps) {
           {
             type: "addSeedPhraseGroup",
             name: displayName.trim() || undefined,
+            accountDisplayName: accountDisplayName.trim() || undefined,
             // No mnemonic = generate new one
           },
           resolve
@@ -105,6 +107,7 @@ function SeedPhraseSetup({ onBack, onComplete }: SeedPhraseSetupProps) {
             type: "addSeedPhraseGroup",
             mnemonic: trimmed,
             name: displayName.trim() || undefined,
+            accountDisplayName: accountDisplayName.trim() || undefined,
           },
           resolve
         );
@@ -341,6 +344,17 @@ function SeedPhraseSetup({ onBack, onComplete }: SeedPhraseSetupProps) {
                 onChange={(e) => setDisplayName(e.target.value)}
               />
             </FormControl>
+
+            <FormControl>
+              <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                Account Display Name (Optional)
+              </FormLabel>
+              <Input
+                placeholder="e.g., Main Account"
+                value={accountDisplayName}
+                onChange={(e) => setAccountDisplayName(e.target.value)}
+              />
+            </FormControl>
           </Box>
 
           {error && (
@@ -419,6 +433,17 @@ function SeedPhraseSetup({ onBack, onComplete }: SeedPhraseSetupProps) {
                 placeholder="e.g., My Imported Seed"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                Account Display Name (Optional)
+              </FormLabel>
+              <Input
+                placeholder="e.g., Main Account"
+                value={accountDisplayName}
+                onChange={(e) => setAccountDisplayName(e.target.value)}
               />
             </FormControl>
           </VStack>
