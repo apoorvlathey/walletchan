@@ -589,6 +589,37 @@ function TransactionConfirmation({
           </Box>
         )}
 
+        {/* Simulate on Tenderly */}
+        {tx.to && (
+          <Button
+            size="sm"
+            variant="ghost"
+            w="full"
+            border="2px solid"
+            borderColor="bauhaus.black"
+            fontWeight="700"
+            fontSize="xs"
+            textTransform="uppercase"
+            letterSpacing="wide"
+            onClick={() => {
+              const params = new URLSearchParams({
+                from: tx.from,
+                contractAddress: tx.to!,
+                value: tx.value || "0",
+                rawFunctionInput: tx.data || "0x",
+                network: String(tx.chainId),
+              });
+              chrome.tabs.create({
+                url: `https://dashboard.tenderly.co/simulator/new?${params}`,
+              });
+            }}
+            leftIcon={<Image src="https://www.google.com/s2/favicons?sz=32&domain=tenderly.co" boxSize="14px" />}
+            _hover={{ bg: "bg.muted", transform: "translateY(-1px)" }}
+          >
+            Simulate on Tenderly
+          </Button>
+        )}
+
         {/* Error Display */}
         {error && state === "error" && (
           <Box
