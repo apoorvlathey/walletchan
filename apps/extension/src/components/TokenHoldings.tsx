@@ -62,8 +62,12 @@ function TokenHoldings({ address, onTokenClick }: TokenHoldingsProps) {
     [address, lastFetched, tokens.length]
   );
 
+  // Reset cache and reload when address changes
   useEffect(() => {
-    loadPortfolio();
+    setLastFetched(0);
+    setTokens([]);
+    setTotalValueUsd(0);
+    loadPortfolio(true);
   }, [address]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatUsd = (value: number): string => {
