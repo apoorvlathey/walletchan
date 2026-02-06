@@ -17,15 +17,15 @@ This document describes the core architecture and transaction handling implement
 
 ## Account Types
 
-The extension supports two distinct account types that can be used simultaneously:
+The extension supports three distinct account types that can be used simultaneously:
 
-| Feature               | Bankr API Account         | Private Key Account                 |
-| --------------------- | ------------------------- | ----------------------------------- |
-| Transaction Execution | Via Bankr API             | Local signing + RPC broadcast       |
-| Message Signing       | ❌ Not supported          | ✅ Full support                     |
-| Key Storage           | API key encrypted locally | Private key encrypted locally       |
-| Setup                 | API key + wallet address  | Private key import                  |
-| Use Case              | AI-powered transactions   | Agent wallets, bots, standard usage |
+| Feature               | Bankr API Account         | Private Key Account                 | Impersonator Account      |
+| --------------------- | ------------------------- | ----------------------------------- | ------------------------- |
+| Transaction Execution | Via Bankr API             | Local signing + RPC broadcast       | ❌ Disabled (view-only)  |
+| Message Signing       | ❌ Not supported          | ✅ Full support                     | ❌ Disabled (view-only)  |
+| Key Storage           | API key encrypted locally | Private key encrypted locally       | No secrets stored         |
+| Setup                 | API key + wallet address  | Private key import or generate      | Address only              |
+| Use Case              | AI-powered transactions   | Agent wallets, bots, standard usage | Viewing portfolio/dApps   |
 
 ### Account Selection
 
@@ -238,6 +238,8 @@ src/
 │   ├── localSigner.ts       # Transaction and message signing with viem
 │   ├── accountStorage.ts    # Account CRUD operations
 │   ├── bankrApi.ts          # Bankr API client
+│   ├── portfolioApi.ts      # Portfolio API client (fetches token holdings via website)
+│   ├── transferUtils.ts     # ERC20/native token transfer calldata builders
 │   ├── chatApi.ts           # Chat API client for Bankr agent
 │   ├── chatStorage.ts       # Persistent storage for chat conversations
 │   ├── pendingTxStorage.ts  # Persistent storage for pending transactions
@@ -275,7 +277,11 @@ src/
 │   ├── PendingTxList.tsx    # List of pending transactions and signature requests
 │   ├── TxStatusList.tsx     # Recent transaction history display
 │   ├── TransactionConfirmation.tsx # In-popup tx confirmation with success animation
-│   └── SignatureRequestConfirmation.tsx # Signature request display (confirm for PK, reject for Bankr)
+│   ├── SignatureRequestConfirmation.tsx # Signature request display (confirm for PK, reject for Bankr)
+│   ├── TokenHoldings.tsx    # Portfolio token list with USD values
+│   ├── TokenTransfer.tsx    # Token transfer form (recipient, amount, send)
+│   ├── CalldataDecoder.tsx  # Decoded/Raw tab for transaction calldata (eth.sh API)
+│   └── TypedDataDisplay.tsx # Structured typed data display for EIP-712 signatures
 ├── hooks/
 │   └── useChat.ts           # Chat state management hook
 ├── onboarding.tsx           # React entry point for onboarding page
@@ -743,6 +749,63 @@ Users can clear transaction history via Settings:
 - Navigate to Settings → "Clear Transaction History"
 - Confirmation modal prevents accidental deletion
 - Message: "This will permanently delete all transaction records. This action cannot be undone."
+
+## Token Holdings & Transfers
+
+### Portfolio API
+
+Token holdings are fetched via a website API route that wraps the Octav API:
+
+- **Website route**: `apps/website/app/api/portfolio/route.ts` (GET `/api/portfolio?address=0x...`)
+- **Extension client**: `portfolioApi.ts` fetches from `https://bankrwallet.app/api/portfolio`
+- **Response format**: Provider-agnostic `PortfolioResponse` with `tokens[]` and `totalValueUsd`
+
+### TokenHoldings Component
+
+- Shows token list with symbol, balance, USD value, chain badge
+- Total portfolio value header with hide/show toggle (persisted in `chrome.storage.sync.hidePortfolioValue`)
+- 60-second client-side cache
+- Refresh button, loading skeletons, empty state
+- Click token → opens TokenTransfer view
+
+### Token Transfer Flow
+
+1. User clicks a token in TokenHoldings
+2. App.tsx switches to `"transfer"` view with selected token state
+3. TokenTransfer form: recipient address input, amount input with MAX button
+4. On submit, `buildTransferTx()` creates calldata:
+   - **Native**: `{ to, value: parseEther(amount), data: "0x" }`
+   - **ERC20**: `{ to: contractAddress, data: encodeFunctionData("transfer", [to, amount]), value: "0x0" }`
+5. Sends `initiateTransfer` message to background
+6. Background creates a `PendingTxRequest` with origin "BankrWallet"
+7. Normal TransactionConfirmation flow takes over
+
+### Calldata Decoder
+
+Transaction calldata is decoded using the eth.sh API:
+
+- **API**: POST `https://eth.sh/api/calldata/decoder-recursive` with `{ calldata, address, chainId }`
+- **Component**: `CalldataDecoder.tsx` with Decoded/Raw tab toggle
+- **Parameter display**: Color-coded by type (addresses=blue with labels, numbers=gold, bools=green/red, bytes=muted)
+- **Fallback**: Raw hex if decode fails or for contract deployments (no `to` address)
+
+### Typed Data Display
+
+EIP-712 typed data signatures show structured display:
+
+- **Component**: `TypedDataDisplay.tsx` with Structured/Raw tab toggle
+- **Domain section**: name, version, chainId, verifyingContract (with address label)
+- **Primary type**: highlighted header
+- **Message fields**: recursive display for nested objects/arrays, address labels from eth.sh
+- Personal_sign and eth_sign fall back to plain message + raw data display
+
+### Tenderly Simulation
+
+Transaction confirmation includes a "Simulate on Tenderly" button:
+
+- Opens `https://dashboard.tenderly.co/simulator/new` with pre-filled tx params
+- No API key needed (URL-based simulation)
+- Skipped for contract deployments (no `to` address)
 
 ## RPC Proxy (CSP Bypass)
 
@@ -1278,6 +1341,8 @@ Build command: `pnpm build`
 | `confirmSignatureRequest`          | Sign message (PK accounts only)                         |
 | `revealPrivateKey`                 | Reveal private key (requires password verification)     |
 | `updateAccountDisplayName`         | Update account display name                             |
+| `addImpersonatorAccount`           | Add view-only impersonator account (address only)       |
+| `initiateTransfer`                 | Create pending tx for extension-initiated token transfer |
 
 ### Background → Views (chrome.runtime broadcast)
 

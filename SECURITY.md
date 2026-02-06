@@ -70,7 +70,9 @@ The agent password model restricts what operations are available when the wallet
 | Change master password | Yes | **BLOCKED** | `authHandlers.ts` - `handleChangePasswordWithCachedPassword()` |
 | Add Bankr account (with API key) | Yes | **BLOCKED** | `background.ts` - `addBankrAccount` case |
 | Add private key account | Yes | **BLOCKED** | `background.ts` - `addPrivateKeyAccount` case |
+| Add impersonator account | Yes | **BLOCKED** | `background.ts` - `addImpersonatorAccount` case |
 | Remove account | Yes | **BLOCKED** | `background.ts` - `removeAccount` case |
+| Initiate token transfer | Yes | Yes | `txHandlers.ts` - creates PendingTxRequest |
 | Reset extension | Yes | **BLOCKED** | `background.ts` - `resetExtension` case |
 | Set/remove agent password | Yes | **BLOCKED** | `authHandlers.ts` - `handleSetAgentPassword()` / `handleRemoveAgentPassword()` |
 
@@ -201,6 +203,7 @@ Only these types are sent to content scripts (and thus forwarded to the webpage)
 | `autoLockTimeout` | Auto-lock timeout (ms) |
 | `tabAccounts` | Per-tab account overrides |
 | `sidePanelMode` / `sidePanelVerified` / `isArcBrowser` | UI settings |
+| `hidePortfolioValue` | Boolean - hide/show token USD values |
 
 ---
 

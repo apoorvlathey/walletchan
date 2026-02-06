@@ -436,6 +436,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "addImpersonatorAccount": {
+      // SECURITY: Block when unlocked with agent password
+      if (getPasswordType() === "agent") {
+        sendResponse({ success: false, error: "Adding accounts requires master password" });
+        return false;
+      }
       (async () => {
         try {
           const account = await addImpersonatorAccount(message.address, message.displayName);
