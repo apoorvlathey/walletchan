@@ -44,6 +44,13 @@ const KeyIcon = (props: any) => (
 
 type AccountType = "bankr" | "privateKey";
 
+interface Account {
+  id: string;
+  type: "bankr" | "privateKey";
+  address: string;
+  displayName?: string;
+}
+
 interface AddAccountProps {
   onBack: () => void;
   onAccountAdded: () => void;
@@ -96,11 +103,23 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
   const [derivedAddress, setDerivedAddress] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [bankrAddress, setBankrAddress] = useState("");
+  const [bankrApiKey, setBankrApiKey] = useState("");
+  const [showBankrApiKey, setShowBankrApiKey] = useState(false);
+  const [hasBankrAccount, setHasBankrAccount] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{
     privateKey?: string;
     bankrAddress?: string;
+    bankrApiKey?: string;
   }>({});
+
+  // Check if a Bankr account already exists on mount
+  useEffect(() => {
+    chrome.runtime.sendMessage({ type: "getAccounts" }, (accounts: Account[]) => {
+      const bankrExists = accounts?.some((a) => a.type === "bankr");
+      setHasBankrAccount(bankrExists);
+    });
+  }, []);
 
   // Derive address when private key changes
   useEffect(() => {
@@ -182,6 +201,12 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
         onAccountAdded();
       } else {
         // Bankr account
+        if (!bankrApiKey.trim()) {
+          setErrors({ bankrApiKey: "API key is required" });
+          setIsSubmitting(false);
+          return;
+        }
+
         if (!bankrAddress.trim()) {
           setErrors({ bankrAddress: "Address is required" });
           setIsSubmitting(false);
@@ -194,13 +219,30 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
           return;
         }
 
-        // Add bankr account
+        // Check if wallet is unlocked (required to encrypt API key)
+        const { hasCachedPassword } = await new Promise<{ hasCachedPassword: boolean }>((resolve) => {
+          chrome.runtime.sendMessage({ type: "getCachedPassword" }, resolve);
+        });
+
+        if (!hasCachedPassword) {
+          toast({
+            title: "Wallet locked",
+            description: "Please unlock your wallet first",
+            status: "error",
+            duration: 3000,
+          });
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Add bankr account (background will save the API key)
         const response = await new Promise<{ success: boolean; error?: string }>((resolve) => {
           chrome.runtime.sendMessage(
             {
               type: "addBankrAccount",
               address: bankrAddress.trim(),
               displayName: displayName.trim() || undefined,
+              apiKey: bankrApiKey.trim(),
             },
             resolve
           );
@@ -299,11 +341,18 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                 bg={accountType === "bankr" ? "bg.muted" : "transparent"}
                 border="2px solid"
                 borderColor="bauhaus.black"
-                cursor="pointer"
-                _hover={{ bg: "bg.muted" }}
+                cursor={hasBankrAccount ? "not-allowed" : "pointer"}
+                opacity={hasBankrAccount ? 0.5 : 1}
+                _hover={hasBankrAccount ? {} : { bg: "bg.muted" }}
+                onClick={(e) => {
+                  if (hasBankrAccount) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                }}
               >
                 <HStack spacing={3}>
-                  <Radio value="bankr" colorScheme="blue" />
+                  <Radio value="bankr" colorScheme="blue" isDisabled={hasBankrAccount} />
                   <Box
                     bg="bauhaus.blue"
                     border="2px solid"
@@ -319,6 +368,11 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                     <Text fontSize="xs" color="text.secondary">
                       Use Bankr API for transactions
                     </Text>
+                    {hasBankrAccount && (
+                      <Text fontSize="xs" color="bauhaus.red" fontWeight="700">
+                        Bankr wallet already added
+                      </Text>
+                    )}
                   </VStack>
                 </HStack>
               </Box>
@@ -420,7 +474,7 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
           </Box>
         )}
 
-        {/* Bankr Address Input */}
+        {/* Bankr API Key and Address Input */}
         {accountType === "bankr" && (
           <Box
             bg="bauhaus.white"
@@ -429,23 +483,57 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
             boxShadow="4px 4px 0px 0px #121212"
             p={4}
           >
-            <FormControl isInvalid={!!errors.bankrAddress}>
-              <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                Bankr Wallet Address
-              </FormLabel>
-              <Input
-                placeholder="0x..."
-                value={bankrAddress}
-                onChange={(e) => {
-                  setBankrAddress(e.target.value);
-                  if (errors.bankrAddress) setErrors({});
-                }}
-                fontFamily="mono"
-              />
-              <FormErrorMessage color="bauhaus.red" fontWeight="700">
-                {errors.bankrAddress}
-              </FormErrorMessage>
-            </FormControl>
+            <VStack spacing={4} align="stretch">
+              <FormControl isInvalid={!!errors.bankrApiKey}>
+                <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                  Bankr API Key
+                </FormLabel>
+                <InputGroup>
+                  <Input
+                    type={showBankrApiKey ? "text" : "password"}
+                    placeholder="Enter your API key"
+                    value={bankrApiKey}
+                    onChange={(e) => {
+                      setBankrApiKey(e.target.value);
+                      if (errors.bankrApiKey) setErrors((prev) => ({ ...prev, bankrApiKey: undefined }));
+                    }}
+                    pr="3rem"
+                  />
+                  <InputRightElement>
+                    <IconButton
+                      aria-label={showBankrApiKey ? "Hide API key" : "Show API key"}
+                      icon={showBankrApiKey ? <ViewOffIcon /> : <ViewIcon />}
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowBankrApiKey(!showBankrApiKey)}
+                      color="text.secondary"
+                      tabIndex={-1}
+                    />
+                  </InputRightElement>
+                </InputGroup>
+                <FormErrorMessage color="bauhaus.red" fontWeight="700">
+                  {errors.bankrApiKey}
+                </FormErrorMessage>
+              </FormControl>
+
+              <FormControl isInvalid={!!errors.bankrAddress}>
+                <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                  Bankr Wallet Address
+                </FormLabel>
+                <Input
+                  placeholder="0x..."
+                  value={bankrAddress}
+                  onChange={(e) => {
+                    setBankrAddress(e.target.value);
+                    if (errors.bankrAddress) setErrors((prev) => ({ ...prev, bankrAddress: undefined }));
+                  }}
+                  fontFamily="mono"
+                />
+                <FormErrorMessage color="bauhaus.red" fontWeight="700">
+                  {errors.bankrAddress}
+                </FormErrorMessage>
+              </FormControl>
+            </VStack>
           </Box>
         )}
 
@@ -493,7 +581,7 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
           loadingText="Adding..."
           isDisabled={
             (accountType === "privateKey" && !derivedAddress) ||
-            (accountType === "bankr" && !bankrAddress.trim())
+            (accountType === "bankr" && (!bankrAddress.trim() || !bankrApiKey.trim()))
           }
         >
           Add Account

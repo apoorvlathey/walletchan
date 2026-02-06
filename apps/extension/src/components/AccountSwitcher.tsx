@@ -144,9 +144,25 @@ function AccountSwitcher({
                 <BlockieAvatar address={account.address} size={24} />
               )}
               <VStack align="start" spacing={0} flex={1}>
-                <Text fontSize="sm" color="text.primary" fontWeight="700">
-                  {account.displayName || truncateAddress(account.address)}
-                </Text>
+                <HStack spacing={2}>
+                  <Text fontSize="sm" color="text.primary" fontWeight="700">
+                    {account.displayName || truncateAddress(account.address)}
+                  </Text>
+                  {account.type === "bankr" && (
+                    <Box
+                      bg="bauhaus.blue"
+                      px={1.5}
+                      py={0.5}
+                      borderRadius="sm"
+                      border="1px solid"
+                      borderColor="bauhaus.black"
+                    >
+                      <Text fontSize="9px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
+                        Bankr
+                      </Text>
+                    </Box>
+                  )}
+                </HStack>
                 {account.displayName && (
                   <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
                     {truncateAddress(account.address)}

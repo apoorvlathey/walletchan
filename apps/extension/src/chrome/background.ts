@@ -2060,13 +2060,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "addBankrAccount": {
-      addBankrAccount(message.address, message.displayName).then((account) => {
-        // Notify UI of account update
-        chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
-        sendResponse({ success: true, account });
-      }).catch((error) => {
-        sendResponse({ success: false, error: error.message });
-      });
+      (async () => {
+        try {
+          // If apiKey is provided and wallet is unlocked, save it first
+          if (message.apiKey && cachedPassword) {
+            const { saveEncryptedApiKey } = await import("./crypto");
+            await saveEncryptedApiKey(message.apiKey, cachedPassword);
+            // Update the cached API key
+            setCachedApiKey(message.apiKey, cachedPassword);
+          }
+
+          // Add the Bankr account
+          const account = await addBankrAccount(message.address, message.displayName);
+
+          // Notify UI of account update
+          chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+          sendResponse({ success: true, account });
+        } catch (error) {
+          sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to add account" });
+        }
+      })();
       return true;
     }
 
