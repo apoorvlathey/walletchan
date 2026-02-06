@@ -37,6 +37,7 @@ interface TransactionConfirmationProps {
   currentIndex: number;
   totalCount: number;
   isInSidePanel: boolean;
+  accountType?: "bankr" | "privateKey" | "impersonator";
   onBack: () => void;
   onConfirmed: () => void;
   onRejected: () => void;
@@ -90,6 +91,7 @@ function TransactionConfirmation({
   currentIndex,
   totalCount,
   isInSidePanel,
+  accountType,
   onBack,
   onConfirmed,
   onRejected,
@@ -612,20 +614,37 @@ function TransactionConfirmation({
           </HStack>
         )}
 
+        {/* Impersonator Info Box */}
+        {accountType === "impersonator" && (
+          <Box
+            bg="bauhaus.yellow"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="3px 3px 0px 0px #121212"
+            p={3}
+          >
+            <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
+              Connected via Impersonated account — signing is disabled.
+            </Text>
+          </Box>
+        )}
+
         {/* Action Buttons */}
         {state !== "submitting" && (
           <HStack pt={2} spacing={3}>
             <Button variant="secondary" flex={1} onClick={handleReject}>
               Reject
             </Button>
-            <Button
-              variant="yellow"
-              flex={1}
-              onClick={handleConfirm}
-              isDisabled={state === "error"}
-            >
-              Confirm
-            </Button>
+            {accountType !== "impersonator" && (
+              <Button
+                variant="yellow"
+                flex={1}
+                onClick={handleConfirm}
+                isDisabled={state === "error"}
+              >
+                Confirm
+              </Button>
+            )}
           </HStack>
         )}
       </VStack>

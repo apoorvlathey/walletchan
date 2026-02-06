@@ -20,6 +20,7 @@ import {
   getTabAccount,
   setTabAccount,
   addBankrAccount,
+  addImpersonatorAccount,
   updateAccountDisplayName,
 } from "./accountStorage";
 import {
@@ -424,6 +425,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
 
           const account = await addBankrAccount(message.address, message.displayName);
+          chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+          sendResponse({ success: true, account });
+        } catch (error) {
+          sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to add account" });
+        }
+      })();
+      return true;
+    }
+
+    case "addImpersonatorAccount": {
+      (async () => {
+        try {
+          const account = await addImpersonatorAccount(message.address, message.displayName);
           chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
           sendResponse({ success: true, account });
         } catch (error) {

@@ -33,6 +33,15 @@ import { privateKeyToAccount } from "viem/accounts";
 
 type OnboardingStep = "welcome" | "accountType" | "bankrSetup" | "privateKey" | "password" | "success";
 type AccountTypeChoice = "bankr" | "privateKey" | "both";
+type PkMode = "import" | "generate";
+
+/**
+ * Generates a cryptographically secure random private key
+ */
+function generatePrivateKey(): `0x${string}` {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return `0x${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -103,6 +112,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
   const [accountTypeChoice, setAccountTypeChoice] = useState<AccountTypeChoice>("bankr");
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
+  const [pkMode, setPkMode] = useState<PkMode>("import");
   const [privateKey, setPrivateKey] = useState("");
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [derivedAddress, setDerivedAddress] = useState<string | null>(null);
@@ -1103,7 +1113,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
           <VStack spacing={6} w="full">
             <VStack spacing={2} textAlign="center">
               <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wide">
-                Enter your Private Key
+                {pkMode === "generate" ? "Generate Private Key" : "Enter your Private Key"}
               </Text>
               <Text fontSize="sm" color="text.secondary" fontWeight="500">
                 Your private key will be encrypted and stored locally.
@@ -1131,6 +1141,50 @@ function Onboarding({ onComplete }: OnboardingProps) {
                 borderColor="bauhaus.black"
               />
 
+              {/* Import / Generate Toggle */}
+              <HStack spacing={2} mb={4}>
+                <Button
+                  size="sm"
+                  bg={pkMode === "import" ? "bauhaus.black" : "bauhaus.white"}
+                  color={pkMode === "import" ? "bauhaus.white" : "text.primary"}
+                  border="2px solid"
+                  borderColor="bauhaus.black"
+                  borderRadius="0"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                  fontSize="xs"
+                  onClick={() => {
+                    setPkMode("import");
+                    setPrivateKey("");
+                    setDerivedAddress(null);
+                  }}
+                  _hover={{ opacity: 0.9 }}
+                >
+                  Import Existing
+                </Button>
+                <Button
+                  size="sm"
+                  bg={pkMode === "generate" ? "bauhaus.black" : "bauhaus.white"}
+                  color={pkMode === "generate" ? "bauhaus.white" : "text.primary"}
+                  border="2px solid"
+                  borderColor="bauhaus.black"
+                  borderRadius="0"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                  fontSize="xs"
+                  onClick={() => {
+                    setPkMode("generate");
+                    const newKey = generatePrivateKey();
+                    setPrivateKey(newKey);
+                    setShowPrivateKey(true);
+                  }}
+                  _hover={{ opacity: 0.9 }}
+                >
+                  Generate New
+                </Button>
+              </HStack>
+
+              {pkMode === "import" ? (
               <FormControl isInvalid={!!errors.privateKey}>
                 <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
                   Private Key
@@ -1167,6 +1221,46 @@ function Onboarding({ onComplete }: OnboardingProps) {
                   {errors.privateKey}
                 </FormErrorMessage>
               </FormControl>
+              ) : (
+              <VStack spacing={3} align="stretch">
+                <FormControl isInvalid={!!errors.privateKey}>
+                  <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
+                    Generated Private Key
+                  </FormLabel>
+                  <Input
+                    type={showPrivateKey ? "text" : "password"}
+                    value={privateKey}
+                    readOnly
+                    fontFamily="mono"
+                    fontSize="xs"
+                  />
+                  <FormErrorMessage color="bauhaus.red" fontWeight="700">
+                    {errors.privateKey}
+                  </FormErrorMessage>
+                </FormControl>
+                <Box p={2} bg="bauhaus.red" border="2px solid" borderColor="bauhaus.black">
+                  <Text fontSize="xs" color="bauhaus.white" fontWeight="700">
+                    Save this key now — it cannot be recovered later!
+                  </Text>
+                </Box>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  borderColor="bauhaus.black"
+                  borderWidth="2px"
+                  borderRadius="0"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                  fontSize="xs"
+                  onClick={() => {
+                    const newKey = generatePrivateKey();
+                    setPrivateKey(newKey);
+                  }}
+                >
+                  Generate Another
+                </Button>
+              </VStack>
+              )}
 
               {derivedAddress && (
                 <Box

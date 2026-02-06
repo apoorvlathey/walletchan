@@ -162,6 +162,34 @@ function AccountSwitcher({
                       </Text>
                     </Box>
                   )}
+                  {account.type === "privateKey" && (
+                    <Box
+                      bg="bauhaus.yellow"
+                      px={1.5}
+                      py={0.5}
+                      borderRadius="sm"
+                      border="1px solid"
+                      borderColor="bauhaus.black"
+                    >
+                      <Text fontSize="9px" color="bauhaus.black" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
+                        Private Key
+                      </Text>
+                    </Box>
+                  )}
+                  {account.type === "impersonator" && (
+                    <Box
+                      bg="bauhaus.green"
+                      px={1.5}
+                      py={0.5}
+                      borderRadius="sm"
+                      border="1px solid"
+                      borderColor="bauhaus.black"
+                    >
+                      <Text fontSize="9px" color="bauhaus.black" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
+                        View Only
+                      </Text>
+                    </Box>
+                  )}
                 </HStack>
                 {account.displayName && (
                   <Text fontSize="xs" color="text.tertiary" fontFamily="mono">

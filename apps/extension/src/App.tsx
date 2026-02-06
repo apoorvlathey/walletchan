@@ -1221,6 +1221,7 @@ function App() {
               currentIndex={currentIndex >= 0 ? currentIndex : 0}
               totalCount={totalCount}
               isInSidePanel={isInSidePanel || isFullscreenTab}
+              accountType={activeAccount?.type}
               onBack={() => {
                 if (totalCount > 1) {
                   setView("pendingTxList");
@@ -1558,7 +1559,7 @@ function App() {
             {address ? (
               <VStack align="stretch" spacing={1}>
                 <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                  Bankr Wallet Address
+                  {activeAccount?.type === "impersonator" ? "Impersonated Address" : "Wallet Address"}
                 </Text>
                 <HStack justify="space-between">
                   <HStack

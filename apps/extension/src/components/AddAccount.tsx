@@ -42,7 +42,26 @@ const KeyIcon = (props: any) => (
   </Icon>
 );
 
-type AccountType = "bankr" | "privateKey";
+// Eye icon for Impersonator (view-only) accounts
+const EyeIcon = (props: any) => (
+  <Icon viewBox="0 0 24 24" {...props}>
+    <path
+      fill="currentColor"
+      d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+    />
+  </Icon>
+);
+
+/**
+ * Generates a cryptographically secure random private key
+ */
+function generatePrivateKey(): `0x${string}` {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return `0x${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
+type AccountType = "bankr" | "privateKey" | "impersonator";
+type PkMode = "import" | "generate";
 
 interface Account {
   id: string;
@@ -98,6 +117,7 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
   const toast = useBauhausToast();
 
   const [accountType, setAccountType] = useState<AccountType>("privateKey");
+  const [pkMode, setPkMode] = useState<PkMode>("import");
   const [privateKey, setPrivateKey] = useState("");
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [derivedAddress, setDerivedAddress] = useState<string | null>(null);
@@ -105,12 +125,14 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
   const [bankrAddress, setBankrAddress] = useState("");
   const [bankrApiKey, setBankrApiKey] = useState("");
   const [showBankrApiKey, setShowBankrApiKey] = useState(false);
+  const [impersonatorAddress, setImpersonatorAddress] = useState("");
   const [hasBankrAccount, setHasBankrAccount] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{
     privateKey?: string;
     bankrAddress?: string;
     bankrApiKey?: string;
+    impersonatorAddress?: string;
   }>({});
 
   // Check if a Bankr account already exists on mount
@@ -194,6 +216,45 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
         toast({
           title: "Account added",
           description: "Private key account has been added",
+          status: "success",
+          duration: 2000,
+        });
+
+        onAccountAdded();
+      } else if (accountType === "impersonator") {
+        // Impersonator (view-only) account
+        if (!impersonatorAddress.trim()) {
+          setErrors({ impersonatorAddress: "Address is required" });
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (!isAddress(impersonatorAddress.trim())) {
+          setErrors({ impersonatorAddress: "Invalid Ethereum address" });
+          setIsSubmitting(false);
+          return;
+        }
+
+        const response = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+          chrome.runtime.sendMessage(
+            {
+              type: "addImpersonatorAccount",
+              address: impersonatorAddress.trim(),
+              displayName: displayName.trim() || undefined,
+            },
+            resolve
+          );
+        });
+
+        if (!response.success) {
+          setErrors({ impersonatorAddress: response.error || "Failed to add account" });
+          setIsSubmitting(false);
+          return;
+        }
+
+        toast({
+          title: "Account added",
+          description: "Impersonator (view-only) account has been added",
           status: "success",
           duration: 2000,
         });
@@ -376,6 +437,35 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                   </VStack>
                 </HStack>
               </Box>
+              <Box
+                as="label"
+                p={3}
+                bg={accountType === "impersonator" ? "bg.muted" : "transparent"}
+                border="2px solid"
+                borderColor="bauhaus.black"
+                cursor="pointer"
+                _hover={{ bg: "bg.muted" }}
+              >
+                <HStack spacing={3}>
+                  <Radio value="impersonator" colorScheme="green" />
+                  <Box
+                    bg="bauhaus.green"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    p={1}
+                  >
+                    <EyeIcon boxSize="16px" color="bauhaus.black" />
+                  </Box>
+                  <VStack align="start" spacing={0}>
+                    <Text fontSize="sm" fontWeight="700" color="text.primary">
+                      Impersonator
+                    </Text>
+                    <Text fontSize="xs" color="text.secondary">
+                      View-only, no signing
+                    </Text>
+                  </VStack>
+                </HStack>
+              </Box>
             </VStack>
           </RadioGroup>
         </Box>
@@ -389,35 +479,141 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
             boxShadow="4px 4px 0px 0px #121212"
             p={4}
           >
-            <FormControl isInvalid={!!errors.privateKey}>
-              <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                Private Key
-              </FormLabel>
-              <InputGroup>
-                <Input
-                  type={showPrivateKey ? "text" : "password"}
-                  placeholder="0x..."
-                  value={privateKey}
-                  onChange={(e) => setPrivateKey(e.target.value)}
-                  fontFamily="mono"
-                  pr="3rem"
-                />
-                <InputRightElement>
-                  <IconButton
-                    aria-label={showPrivateKey ? "Hide" : "Show"}
-                    icon={showPrivateKey ? <ViewOffIcon /> : <ViewIcon />}
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setShowPrivateKey(!showPrivateKey)}
-                    color="text.secondary"
-                    tabIndex={-1}
+            {/* Import / Generate Toggle */}
+            <HStack spacing={2} mb={4}>
+              <Button
+                size="sm"
+                bg={pkMode === "import" ? "bauhaus.black" : "bauhaus.white"}
+                color={pkMode === "import" ? "bauhaus.white" : "text.primary"}
+                border="2px solid"
+                borderColor="bauhaus.black"
+                borderRadius="0"
+                fontWeight="700"
+                textTransform="uppercase"
+                fontSize="xs"
+                onClick={() => {
+                  setPkMode("import");
+                  setPrivateKey("");
+                  setDerivedAddress(null);
+                }}
+                _hover={{ opacity: 0.9 }}
+              >
+                Import
+              </Button>
+              <Button
+                size="sm"
+                bg={pkMode === "generate" ? "bauhaus.black" : "bauhaus.white"}
+                color={pkMode === "generate" ? "bauhaus.white" : "text.primary"}
+                border="2px solid"
+                borderColor="bauhaus.black"
+                borderRadius="0"
+                fontWeight="700"
+                textTransform="uppercase"
+                fontSize="xs"
+                onClick={() => {
+                  setPkMode("generate");
+                  const newKey = generatePrivateKey();
+                  setPrivateKey(newKey);
+                  setShowPrivateKey(true);
+                }}
+                _hover={{ opacity: 0.9 }}
+              >
+                Generate New
+              </Button>
+            </HStack>
+
+            {pkMode === "import" ? (
+              <FormControl isInvalid={!!errors.privateKey}>
+                <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                  Private Key
+                </FormLabel>
+                <InputGroup>
+                  <Input
+                    type={showPrivateKey ? "text" : "password"}
+                    placeholder="0x..."
+                    value={privateKey}
+                    onChange={(e) => setPrivateKey(e.target.value)}
+                    fontFamily="mono"
+                    pr="3rem"
                   />
-                </InputRightElement>
-              </InputGroup>
-              <FormErrorMessage color="bauhaus.red" fontWeight="700">
-                {errors.privateKey}
-              </FormErrorMessage>
-            </FormControl>
+                  <InputRightElement>
+                    <IconButton
+                      aria-label={showPrivateKey ? "Hide" : "Show"}
+                      icon={showPrivateKey ? <ViewOffIcon /> : <ViewIcon />}
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowPrivateKey(!showPrivateKey)}
+                      color="text.secondary"
+                      tabIndex={-1}
+                    />
+                  </InputRightElement>
+                </InputGroup>
+                <FormErrorMessage color="bauhaus.red" fontWeight="700">
+                  {errors.privateKey}
+                </FormErrorMessage>
+              </FormControl>
+            ) : (
+              <VStack spacing={3} align="stretch">
+                <FormControl isInvalid={!!errors.privateKey}>
+                  <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                    Generated Private Key
+                  </FormLabel>
+                  <InputGroup>
+                    <Input
+                      type={showPrivateKey ? "text" : "password"}
+                      value={privateKey}
+                      readOnly
+                      fontFamily="mono"
+                      fontSize="xs"
+                      pr="3rem"
+                    />
+                    <InputRightElement>
+                      <IconButton
+                        aria-label="Copy key"
+                        icon={<CheckIcon />}
+                        size="sm"
+                        variant="ghost"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(privateKey);
+                          toast({ title: "Private key copied!", status: "success", duration: 1500 });
+                        }}
+                        color="text.secondary"
+                        tabIndex={-1}
+                      />
+                    </InputRightElement>
+                  </InputGroup>
+                  <FormErrorMessage color="bauhaus.red" fontWeight="700">
+                    {errors.privateKey}
+                  </FormErrorMessage>
+                </FormControl>
+                <Box
+                  p={2}
+                  bg="bauhaus.red"
+                  border="2px solid"
+                  borderColor="bauhaus.black"
+                >
+                  <Text fontSize="xs" color="bauhaus.white" fontWeight="700">
+                    Save this key now — it cannot be recovered later!
+                  </Text>
+                </Box>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  borderColor="bauhaus.black"
+                  borderWidth="2px"
+                  borderRadius="0"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                  fontSize="xs"
+                  onClick={() => {
+                    const newKey = generatePrivateKey();
+                    setPrivateKey(newKey);
+                  }}
+                >
+                  Generate Another
+                </Button>
+              </VStack>
+            )}
 
             {derivedAddress && (
               <Box
@@ -471,6 +667,40 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                 </Code>
               </Box>
             )}
+          </Box>
+        )}
+
+        {/* Impersonator Address Input */}
+        {accountType === "impersonator" && (
+          <Box
+            bg="bauhaus.white"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="4px 4px 0px 0px #121212"
+            p={4}
+          >
+            <FormControl isInvalid={!!errors.impersonatorAddress}>
+              <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                Address to Impersonate
+              </FormLabel>
+              <Input
+                placeholder="0x..."
+                value={impersonatorAddress}
+                onChange={(e) => {
+                  setImpersonatorAddress(e.target.value);
+                  if (errors.impersonatorAddress) setErrors((prev) => ({ ...prev, impersonatorAddress: undefined }));
+                }}
+                fontFamily="mono"
+              />
+              <FormErrorMessage color="bauhaus.red" fontWeight="700">
+                {errors.impersonatorAddress}
+              </FormErrorMessage>
+            </FormControl>
+            <Box mt={3} p={2} bg="bauhaus.yellow" border="2px solid" borderColor="bauhaus.black">
+              <Text fontSize="xs" color="bauhaus.black" fontWeight="700">
+                View-only mode: You can view transactions and signatures but cannot sign or send.
+              </Text>
+            </Box>
           </Box>
         )}
 
@@ -581,7 +811,8 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
           loadingText="Adding..."
           isDisabled={
             (accountType === "privateKey" && !derivedAddress) ||
-            (accountType === "bankr" && (!bankrAddress.trim() || !bankrApiKey.trim()))
+            (accountType === "bankr" && (!bankrAddress.trim() || !bankrApiKey.trim())) ||
+            (accountType === "impersonator" && !impersonatorAddress.trim())
           }
         >
           Add Account

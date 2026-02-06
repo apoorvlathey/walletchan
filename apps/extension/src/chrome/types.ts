@@ -2,7 +2,7 @@
  * Account types and vault structures for multi-account support
  */
 
-export type AccountType = "bankr" | "privateKey";
+export type AccountType = "bankr" | "privateKey" | "impersonator";
 
 /**
  * Password type for unlock sessions
@@ -27,7 +27,11 @@ export interface PrivateKeyAccount extends BaseAccount {
   type: "privateKey";
 }
 
-export type Account = BankrAccount | PrivateKeyAccount;
+export interface ImpersonatorAccount extends BaseAccount {
+  type: "impersonator";
+}
+
+export type Account = BankrAccount | PrivateKeyAccount | ImpersonatorAccount;
 
 /**
  * Encrypted private key entry stored in chrome.storage.local

@@ -4,7 +4,7 @@
  * Active account and tab-specific accounts are stored in chrome.storage.sync
  */
 
-import type { Account, BankrAccount, PrivateKeyAccount } from "./types";
+import type { Account, BankrAccount, PrivateKeyAccount, ImpersonatorAccount } from "./types";
 
 const ACCOUNTS_STORAGE_KEY = "accounts";
 const ACTIVE_ACCOUNT_ID_KEY = "activeAccountId";
@@ -178,6 +178,36 @@ export async function addPrivateKeyAccount(
 }
 
 /**
+ * Adds an Impersonator (view-only) account
+ * No secrets stored - just address metadata
+ */
+export async function addImpersonatorAccount(
+  address: string,
+  displayName?: string
+): Promise<ImpersonatorAccount> {
+  const accounts = await getAccounts();
+
+  const newAccount: ImpersonatorAccount = {
+    id: crypto.randomUUID(),
+    type: "impersonator",
+    address: address.toLowerCase(),
+    displayName,
+    createdAt: Date.now(),
+  };
+
+  accounts.push(newAccount);
+  await saveAccounts(accounts);
+
+  // If this is the first account, set it as active
+  const activeId = await getActiveAccountId();
+  if (!activeId) {
+    await setActiveAccountId(newAccount.id);
+  }
+
+  return newAccount;
+}
+
+/**
  * Removes an account by ID
  * Note: Does NOT remove the private key from vault - caller must do that
  */
@@ -237,7 +267,7 @@ export async function clearAllAccounts(): Promise<void> {
  * Gets accounts by type
  */
 export async function getAccountsByType(
-  type: "bankr" | "privateKey"
+  type: "bankr" | "privateKey" | "impersonator"
 ): Promise<Account[]> {
   const accounts = await getAccounts();
   return accounts.filter((a) => a.type === type);

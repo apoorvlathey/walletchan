@@ -22,7 +22,7 @@ interface SignatureRequestConfirmationProps {
   currentIndex: number;
   totalCount: number;
   isInSidePanel: boolean;
-  accountType?: "bankr" | "privateKey";
+  accountType?: "bankr" | "privateKey" | "impersonator";
   onBack: () => void;
   onCancelled: () => void;
   onCancelAll: () => void;
@@ -536,6 +536,21 @@ function SignatureRequestConfirmation({
                 Signatures are not supported in the Bankr API
               </Text>
             </HStack>
+          </Box>
+        )}
+
+        {/* Impersonator Info Box */}
+        {accountType === "impersonator" && (
+          <Box
+            bg="bauhaus.yellow"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="3px 3px 0px 0px #121212"
+            p={3}
+          >
+            <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
+              Connected via Impersonated account — signing is disabled.
+            </Text>
           </Box>
         )}
 
