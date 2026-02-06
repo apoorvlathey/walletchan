@@ -130,7 +130,7 @@ function getChainIdFromOctav(chain: string): number | null {
   return map[chain?.toLowerCase()] ?? null;
 }
 
-function formatBalance(balance: number | string | undefined, decimals: number = 18): string {
+function formatBalance(balance: number | string | undefined, _decimals: number = 18): string {
   if (!balance) return "0";
   const num = typeof balance === "string" ? parseFloat(balance) : balance;
   if (isNaN(num)) return "0";
