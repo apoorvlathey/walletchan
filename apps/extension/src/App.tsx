@@ -136,6 +136,7 @@ function App() {
   const { isOpen: isRevealKeyOpen, onOpen: onRevealKeyOpen, onClose: onRevealKeyClose } = useDisclosure();
   const { isOpen: isAccountSettingsOpen, onOpen: onAccountSettingsOpen, onClose: onAccountSettingsClose } = useDisclosure();
   const keepAlivePortRef = useRef<chrome.runtime.Port | null>(null);
+  const reconnectingRef = useRef(false);
 
   const currentTab = async () => {
     const [tab] = await chrome.tabs.query({
@@ -206,6 +207,43 @@ function App() {
     }
     return null;
   };
+
+  /**
+   * Establishes and maintains a keepalive port connection to the service worker.
+   * Automatically reconnects if the port disconnects (e.g., service worker restarts).
+   */
+  const establishKeepalivePort = useCallback(() => {
+    if (reconnectingRef.current) return;
+
+    // Disconnect existing port if any
+    if (keepAlivePortRef.current) {
+      try {
+        keepAlivePortRef.current.disconnect();
+      } catch {
+        // Ignore disconnect errors
+      }
+    }
+
+    try {
+      const port = chrome.runtime.connect({ name: "ui-keepalive" });
+      keepAlivePortRef.current = port;
+
+      port.onDisconnect.addListener(() => {
+        keepAlivePortRef.current = null;
+        // Service worker may have restarted - reconnect after a short delay
+        // Only reconnect if extension context is still valid
+        if (chrome.runtime?.id) {
+          reconnectingRef.current = true;
+          setTimeout(() => {
+            reconnectingRef.current = false;
+            establishKeepalivePort();
+          }, 100);
+        }
+      });
+    } catch {
+      keepAlivePortRef.current = null;
+    }
+  }, []);
 
   const loadPendingRequests = async () => {
     const requests = await sendMessageWithRetry<PendingTxRequest[]>({ type: "getPendingTxRequests" });
@@ -454,13 +492,8 @@ function App() {
       }
 
       // Establish keepalive connection to pause auto-lock while UI is open
-      if (!keepAlivePortRef.current) {
-        try {
-          keepAlivePortRef.current = chrome.runtime.connect({ name: "ui-keepalive" });
-        } catch {
-          // Ignore connection errors
-        }
-      }
+      // Use the robust reconnection mechanism
+      establishKeepalivePort();
 
       // Check lock state
       const isUnlocked = await checkLockState();
@@ -1019,21 +1052,41 @@ function App() {
         <Container pt={4} pb={4} flex="1" display="flex" flexDirection="column">
           <Suspense fallback={<LoadingFallback />}>
             <Settings
-              close={() => {
+              close={async () => {
                 // After settings, check if now have API key
-                hasEncryptedApiKey().then((has) => {
-                  setHasApiKey(has);
-                  if (has) {
-                    checkLockState().then((unlocked) => {
-                      setIsWalletUnlocked(unlocked);
-                      if (unlocked) {
+                const has = await hasEncryptedApiKey();
+                setHasApiKey(has);
+
+                if (has) {
+                  // Ensure keepalive port is connected before checking lock state
+                  // (service worker may have restarted while we were in settings)
+                  establishKeepalivePort();
+                  await new Promise((r) => setTimeout(r, 50));
+
+                  const unlocked = await checkLockState();
+
+                  if (unlocked) {
+                    setIsWalletUnlocked(true);
+                    setView("main");
+                  } else {
+                    // Check if this was unexpected (auto-lock is "Never")
+                    // If so, try to restore the session
+                    const { autoLockTimeout } = await chrome.storage.sync.get("autoLockTimeout");
+
+                    if (autoLockTimeout === 0 || autoLockTimeout === undefined) {
+                      // Auto-lock is "Never" - try session restoration
+                      const restored = await sendMessageWithRetry<boolean>({ type: "tryRestoreSession" });
+                      if (restored) {
+                        setIsWalletUnlocked(true);
                         setView("main");
-                      } else {
-                        setView("unlock");
+                        return;
                       }
-                    });
+                    }
+
+                    setIsWalletUnlocked(false);
+                    setView("unlock");
                   }
-                });
+                }
               }}
               showBackButton={hasApiKey}
               onSessionExpired={() => {

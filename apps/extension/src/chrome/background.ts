@@ -159,6 +159,10 @@ let cachedPasswordType: PasswordType | null = null;
 // This is the intermediate key that decrypts actual data (API key, private keys)
 let cachedVaultKey: CryptoKey | null = null;
 
+// Session ID for tracking active sessions across service worker restarts
+// Used with chrome.storage.session for session restoration when auto-lock is "Never"
+let currentSessionId: string | null = null;
+
 // UI connection tracking for auto-lock
 // While any popup/sidepanel is connected, the cache never expires
 let activeUIConnections = 0;
@@ -200,8 +204,25 @@ async function setAutoLockTimeout(timeout: number): Promise<boolean> {
   if (!VALID_AUTO_LOCK_TIMEOUTS.has(timeout)) {
     return false;
   }
+
+  const previousTimeout = cachedAutoLockTimeout ?? DEFAULT_AUTO_LOCK_TIMEOUT;
   await chrome.storage.sync.set({ [AUTO_LOCK_STORAGE_KEY]: timeout });
   cachedAutoLockTimeout = timeout;
+
+  // Handle session storage based on auto-lock setting changes
+  if (timeout !== 0 && previousTimeout === 0) {
+    // Changed from "Never" to a timed setting - clear session storage
+    await clearSessionStorage();
+  } else if (timeout === 0 && previousTimeout !== 0 && (getCachedApiKey() !== null || getCachedVault() !== null)) {
+    // Changed to "Never" while unlocked - store session for restoration
+    const password = getCachedPassword();
+    if (password) {
+      currentSessionId = crypto.randomUUID();
+      await storeSessionMetadata(currentSessionId, true);
+      await storeSessionPassword(password);
+    }
+  }
+
   return true;
 }
 
@@ -311,6 +332,128 @@ function setCachedVault(vault: DecryptedEntry[]): void {
 function clearCachedVault(): void {
   cachedVault = null;
   vaultCacheTimestamp = 0;
+}
+
+/**
+ * Stores encrypted session password in chrome.storage.session for session restoration.
+ * Only used when auto-lock is "Never" to allow seamless session recovery after
+ * service worker restarts.
+ *
+ * Security: The password is encrypted with a random key that is also stored in
+ * session storage. This provides protection against simple session storage reads
+ * while still allowing session restoration. The session storage is cleared when
+ * the browser closes or user manually locks.
+ */
+async function storeSessionPassword(password: string): Promise<void> {
+  const sessionKey = crypto.getRandomValues(new Uint8Array(32));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const key = await crypto.subtle.importKey("raw", sessionKey, "AES-GCM", false, ["encrypt"]);
+  const encoded = new TextEncoder().encode(password);
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
+
+  await chrome.storage.session.set({
+    encryptedSessionPassword: {
+      data: btoa(String.fromCharCode(...new Uint8Array(encrypted))),
+      key: btoa(String.fromCharCode(...sessionKey)),
+      iv: btoa(String.fromCharCode(...iv)),
+    },
+  });
+}
+
+/**
+ * Retrieves and decrypts the session password from chrome.storage.session.
+ * Returns null if no session password is stored or decryption fails.
+ */
+async function getSessionPassword(): Promise<string | null> {
+  const session = await chrome.storage.session.get("encryptedSessionPassword");
+  if (!session.encryptedSessionPassword) {
+    return null;
+  }
+
+  try {
+    const { data, key: keyB64, iv: ivB64 } = session.encryptedSessionPassword;
+
+    // Decode base64
+    const encryptedData = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+    const sessionKey = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
+    const iv = Uint8Array.from(atob(ivB64), (c) => c.charCodeAt(0));
+
+    const key = await crypto.subtle.importKey("raw", sessionKey, "AES-GCM", false, ["decrypt"]);
+    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, encryptedData);
+
+    return new TextDecoder().decode(decrypted);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Stores session metadata in chrome.storage.session.
+ * Called after successful unlock when auto-lock is "Never".
+ */
+async function storeSessionMetadata(sessionId: string, autoLockNever: boolean): Promise<void> {
+  await chrome.storage.session.set({
+    sessionId,
+    sessionStartedAt: Date.now(),
+    autoLockNever,
+  });
+}
+
+/**
+ * Clears all session data from chrome.storage.session.
+ * Called when user manually locks or session expires.
+ */
+async function clearSessionStorage(): Promise<void> {
+  currentSessionId = null;
+  await chrome.storage.session.clear();
+}
+
+/**
+ * Attempts to restore a session after service worker restart.
+ * Only works when auto-lock is "Never" and session data exists.
+ * Returns true if session was successfully restored.
+ */
+async function tryRestoreSession(): Promise<boolean> {
+  const session = await chrome.storage.session.get([
+    "sessionId",
+    "autoLockNever",
+    "encryptedSessionPassword",
+  ]);
+
+  // Check if we have a valid session to restore
+  if (!session.sessionId || !session.autoLockNever || !session.encryptedSessionPassword) {
+    return false;
+  }
+
+  try {
+    // Get the session password
+    const password = await getSessionPassword();
+    if (!password) {
+      await clearSessionStorage();
+      return false;
+    }
+
+    // Try to unlock with the stored password
+    const result = await handleUnlockWallet(password);
+    if (!result.success) {
+      await clearSessionStorage();
+      return false;
+    }
+
+    // Restore session ID
+    currentSessionId = session.sessionId;
+
+    // Re-store the session password for future restarts
+    await storeSessionPassword(password);
+
+    console.log("Session restored successfully after service worker restart");
+    return true;
+  } catch (error) {
+    console.error("Failed to restore session:", error);
+    await clearSessionStorage();
+    return false;
+  }
 }
 
 /**
@@ -1597,7 +1740,21 @@ async function handleSubmitChatPrompt(
   prompt: string
 ): Promise<{ success: boolean; error?: string }> {
   // Get cached API key
-  const apiKey = getCachedApiKey();
+  let apiKey = getCachedApiKey();
+
+  // If no cached API key, try session restoration (for "Never" auto-lock mode)
+  // This handles the case where service worker restarted while user was chatting
+  if (!apiKey) {
+    const autoLockTimeout = await getAutoLockTimeout();
+    if (autoLockTimeout === 0) {
+      // Auto-lock is "Never" - try to restore session
+      const restored = await tryRestoreSession();
+      if (restored) {
+        apiKey = getCachedApiKey();
+      }
+    }
+  }
+
   if (!apiKey) {
     // Notify UI that API key is not available
     chrome.runtime.sendMessage({
@@ -1799,6 +1956,14 @@ async function unlockWithVaultKeySystem(password: string): Promise<{ success: bo
     }
   }
 
+  // Store session data for restoration if auto-lock is "Never"
+  const autoLockTimeout = await getAutoLockTimeout();
+  if (autoLockTimeout === 0) {
+    currentSessionId = crypto.randomUUID();
+    await storeSessionMetadata(currentSessionId, true);
+    await storeSessionPassword(password);
+  }
+
   return { success: true, passwordType };
 }
 
@@ -1844,6 +2009,14 @@ async function unlockWithLegacySystem(password: string): Promise<{ success: bool
 
   // Set password type to master (legacy system only has master password)
   cachedPasswordType = "master";
+
+  // Store session data for restoration if auto-lock is "Never"
+  const autoLockTimeout = await getAutoLockTimeout();
+  if (autoLockTimeout === 0) {
+    currentSessionId = crypto.randomUUID();
+    await storeSessionMetadata(currentSessionId, true);
+    await storeSessionPassword(password);
+  }
 
   return { success: true, passwordType: "master" };
 }
@@ -2004,7 +2177,19 @@ function getPasswordType(): PasswordType | null {
 async function handleSaveApiKeyWithCachedPassword(
   newApiKey: string
 ): Promise<{ success: boolean; error?: string }> {
-  const password = getCachedPassword();
+  let password = getCachedPassword();
+
+  // If no cached password, try session restoration (for "Never" auto-lock mode)
+  if (!password) {
+    const autoLockTimeout = await getAutoLockTimeout();
+    if (autoLockTimeout === 0) {
+      const restored = await tryRestoreSession();
+      if (restored) {
+        password = getCachedPassword();
+      }
+    }
+  }
+
   if (!password) {
     return { success: false, error: "Wallet is locked. Please unlock first." };
   }
@@ -2294,6 +2479,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "lockWallet": {
       clearCachedApiKey();
       clearCachedVault();
+      // Clear session storage to prevent session restoration
+      clearSessionStorage();
       sendResponse({ success: true });
       return false;
     }
@@ -2405,19 +2592,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "addPrivateKeyAccount": {
-      // Use cached password if not provided (wallet must be unlocked)
-      const password = message.password || cachedPassword;
-      if (!password) {
-        sendResponse({ success: false, error: "Wallet is locked" });
-        return true;
-      }
-      handleAddPrivateKeyAccount(
-        message.privateKey,
-        password,
-        message.displayName
-      ).then((result) => {
+      (async () => {
+        // Use cached password if not provided (wallet must be unlocked)
+        let password = message.password || cachedPassword;
+
+        // If no password, try session restoration (for "Never" auto-lock mode)
+        if (!password) {
+          const autoLockTimeout = await getAutoLockTimeout();
+          if (autoLockTimeout === 0) {
+            const restored = await tryRestoreSession();
+            if (restored) {
+              password = cachedPassword;
+            }
+          }
+        }
+
+        if (!password) {
+          sendResponse({ success: false, error: "Wallet is locked" });
+          return;
+        }
+
+        const result = await handleAddPrivateKeyAccount(
+          message.privateKey,
+          password,
+          message.displayName
+        );
         sendResponse(result);
-      });
+      })();
       return true;
     }
 
@@ -2432,6 +2633,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       (async () => {
         try {
           const { accountId, password } = message;
+
+          // If no cached password, try session restoration (for "Never" auto-lock mode)
+          if (!cachedPassword) {
+            const autoLockTimeout = await getAutoLockTimeout();
+            if (autoLockTimeout === 0) {
+              await tryRestoreSession();
+            }
+          }
 
           // Verify password matches cached password (wallet must be unlocked)
           if (!cachedPassword) {
@@ -2508,8 +2717,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "isWalletUnlocked": {
-      sendResponse(isWalletUnlocked());
+      (async () => {
+        let unlocked = isWalletUnlocked();
+
+        // If not unlocked, try session restoration (for "Never" auto-lock mode)
+        if (!unlocked) {
+          const autoLockTimeout = await getAutoLockTimeout();
+          if (autoLockTimeout === 0) {
+            const restored = await tryRestoreSession();
+            if (restored) {
+              unlocked = true;
+            }
+          }
+        }
+
+        sendResponse(unlocked);
+      })();
+      return true;
+    }
+
+    case "validateSession": {
+      sendResponse({
+        valid: currentSessionId !== null && isWalletUnlocked(),
+        sessionId: currentSessionId,
+      });
       return false;
+    }
+
+    case "tryRestoreSession": {
+      tryRestoreSession().then((restored) => {
+        sendResponse(restored);
+      });
+      return true;
     }
 
     case "saveApiKeyWithCachedPassword": {
@@ -2534,9 +2773,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "getCachedApiKey": {
       // Return the cached API key if available (for displaying in settings)
-      const apiKey = getCachedApiKey();
-      sendResponse({ apiKey: apiKey || null });
-      return false;
+      (async () => {
+        let apiKey = getCachedApiKey();
+
+        // If no cached API key, try session restoration (for "Never" auto-lock mode)
+        if (!apiKey) {
+          const autoLockTimeout = await getAutoLockTimeout();
+          if (autoLockTimeout === 0) {
+            const restored = await tryRestoreSession();
+            if (restored) {
+              apiKey = getCachedApiKey();
+            }
+          }
+        }
+
+        sendResponse({ apiKey: apiKey || null });
+      })();
+      return true;
     }
 
     case "setAgentPassword": {

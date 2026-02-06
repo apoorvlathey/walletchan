@@ -1101,6 +1101,113 @@ Users can configure the auto-lock timeout via Settings → Auto-Lock:
 | `getAutoLockTimeout` | Get current timeout value                                |
 | `setAutoLockTimeout` | Set new timeout value (validated against allowed values) |
 
+#### Session Restoration (Auto-Lock "Never" Mode)
+
+When auto-lock is set to "Never", the extension stores session data in `chrome.storage.session` to allow seamless credential recovery after service worker restarts. This prevents the annoying "Wallet is locked" prompts that would otherwise occur when Chrome suspends and restarts the service worker.
+
+**Why This Is Needed**:
+
+Chrome MV3 service workers are frequently suspended/restarted to save resources. When this happens:
+1. All in-memory state is cleared (`cachedApiKey`, `cachedVault`, `cachedVaultKey`, etc.)
+2. The `suspend` event clears cached credentials
+3. Without session restoration, users would see unlock prompts even with auto-lock "Never"
+
+**How It Works**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Session Restoration Architecture                         │
+│                                                                             │
+│  On Unlock (when auto-lock is "Never"):                                     │
+│    1. Generate session ID: crypto.randomUUID()                              │
+│    2. Encrypt password with random AES-256-GCM key                          │
+│    3. Store in chrome.storage.session:                                      │
+│       - sessionId: unique session identifier                                │
+│       - sessionStartedAt: timestamp                                         │
+│       - autoLockNever: true                                                 │
+│       - encryptedSessionPassword: { data, key, iv }                         │
+│                                                                             │
+│  On Service Worker Restart (credentials lost):                              │
+│    1. Handler checks: getCachedApiKey() === null                            │
+│    2. If auto-lock is "Never" (timeout === 0):                              │
+│       - Call tryRestoreSession()                                            │
+│       - Read encryptedSessionPassword from session storage                  │
+│       - Decrypt password                                                    │
+│       - Call handleUnlockWallet(password) to restore credentials            │
+│       - Re-store session password for future restarts                       │
+│    3. Operation continues with restored credentials                         │
+│                                                                             │
+│  On Manual Lock:                                                            │
+│    1. clearSessionStorage() is called                                       │
+│    2. All session data is removed                                           │
+│    3. Session cannot be restored until next unlock                          │
+│                                                                             │
+│  On Auto-Lock Setting Change:                                               │
+│    - "Never" → timed: Clear session storage (no more restoration)           │
+│    - Timed → "Never" (while unlocked): Store session for restoration        │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Security Considerations**:
+
+- Password is encrypted with a random key (not stored in plain text)
+- `chrome.storage.session` is cleared when the browser closes
+- Session storage is not synced across devices
+- Session storage is only accessible to the background service worker
+- Manual lock always clears session storage
+
+**Handlers with Session Restoration**:
+
+The following message handlers attempt session restoration when auto-lock is "Never" and credentials are not cached:
+
+| Handler                          | Purpose                                        |
+| -------------------------------- | ---------------------------------------------- |
+| `isWalletUnlocked`               | Main lock state check (used by UI)             |
+| `submitChatPrompt`               | Chat with Bankr AI                             |
+| `getCachedApiKey`                | Display API key in settings                    |
+| `saveApiKeyWithCachedPassword`   | Update API key while unlocked                  |
+| `addPrivateKeyAccount`           | Add new private key account                    |
+| `revealPrivateKey`               | Reveal private key (security-sensitive)        |
+
+**Storage Schema** (in `chrome.storage.session`):
+
+| Key                        | Type    | Description                           |
+| -------------------------- | ------- | ------------------------------------- |
+| `sessionId`                | string  | Unique session identifier             |
+| `sessionStartedAt`         | number  | Timestamp when session started        |
+| `autoLockNever`            | boolean | Whether auto-lock is "Never"          |
+| `encryptedSessionPassword` | object  | Encrypted password { data, key, iv }  |
+
+**Message Types**:
+
+| Type                 | Description                                              |
+| -------------------- | -------------------------------------------------------- |
+| `validateSession`    | Check if session is valid (returns { valid, sessionId }) |
+| `tryRestoreSession`  | Attempt to restore session (returns boolean)             |
+
+**UI Port Reconnection**:
+
+The UI (App.tsx) maintains a keepalive port to the service worker. When the service worker restarts:
+
+1. The port disconnects
+2. `onDisconnect` listener detects this
+3. After 100ms delay, `establishKeepalivePort()` reconnects
+4. This ensures `activeUIConnections` tracking remains accurate
+
+```typescript
+// Automatic port reconnection in App.tsx
+port.onDisconnect.addListener(() => {
+  keepAlivePortRef.current = null;
+  if (chrome.runtime?.id) {
+    reconnectingRef.current = true;
+    setTimeout(() => {
+      reconnectingRef.current = false;
+      establishKeepalivePort();
+    }, 100);
+  }
+});
+```
+
 #### Password Caching for API Key Changes
 
 When changing the API key while the wallet is unlocked:
