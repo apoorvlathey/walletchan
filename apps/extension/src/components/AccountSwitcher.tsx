@@ -10,32 +10,44 @@ import {
   VStack,
   Text,
   Box,
-  Icon,
+  Image,
   IconButton,
   Tooltip,
 } from "@chakra-ui/react";
 import { ChevronDownIcon, AddIcon, SettingsIcon } from "@chakra-ui/icons";
+import { blo } from "blo";
 import type { Account } from "@/chrome/types";
 
-// Robot icon for Bankr accounts
-const RobotIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path
-      fill="currentColor"
-      d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1H3a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5A2.5 2.5 0 0 0 7.5 18a2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5a2.5 2.5 0 0 0 2.5 2.5a2.5 2.5 0 0 0 2.5-2.5a2.5 2.5 0 0 0-2.5-2.5Z"
+// Blockies avatar for PK accounts using blo
+function BlockieAvatar({ address, size = 20 }: { address: string; size?: number }) {
+  const bloAvatar = blo(address as `0x${string}`);
+  return (
+    <Image
+      src={bloAvatar}
+      alt="Account avatar"
+      w={`${size}px`}
+      h={`${size}px`}
+      borderRadius="sm"
+      border="2px solid"
+      borderColor="bauhaus.black"
     />
-  </Icon>
-);
+  );
+}
 
-// Key icon for Private Key accounts
-const KeyIcon = (props: any) => (
-  <Icon viewBox="0 0 24 24" {...props}>
-    <path
-      fill="currentColor"
-      d="M7 14c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm0-4c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm14 8.5l-5.5-5.5.71-.71L17.5 11l-.71-.71-2.5 2.5-2.29-2.29-.71.71.71.71-2 2V14H9v1H8v1H7v1H4v-1l7-7c-.55-.89-.95-1.89-1-3H7c0-2.76 2.24-5 5-5 2.21 0 4.05 1.43 4.71 3.42l.79.79 1.79-1.79.71.71-.71.71 1.79 1.79.71-.71-.71-.71 1.71-1.71 1.5 1.5-8 8-1.29-1.29z"
+// BankrWallet icon for Bankr API accounts
+function BankrAvatar({ size = 20 }: { size?: number }) {
+  return (
+    <Image
+      src="/bankrwallet-icon.png"
+      alt="Bankr account"
+      w={`${size}px`}
+      h={`${size}px`}
+      borderRadius="sm"
+      border="2px solid"
+      borderColor="bauhaus.black"
     />
-  </Icon>
-);
+  );
+}
 
 interface AccountSwitcherProps {
   accounts: Account[];
@@ -85,21 +97,11 @@ function AccountSwitcher({
       >
         {activeAccount ? (
           <HStack spacing={2}>
-            <Box
-              bg={activeAccount.type === "bankr" ? "bauhaus.blue" : "bauhaus.yellow"}
-              border="2px solid"
-              borderColor="bauhaus.black"
-              p={1}
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-            >
-              {activeAccount.type === "bankr" ? (
-                <RobotIcon boxSize="16px" color="white" />
-              ) : (
-                <KeyIcon boxSize="16px" color="bauhaus.black" />
-              )}
-            </Box>
+            {activeAccount.type === "bankr" ? (
+              <BankrAvatar size={24} />
+            ) : (
+              <BlockieAvatar address={activeAccount.address} size={24} />
+            )}
             <VStack align="start" spacing={0}>
               <Text fontSize="sm" color="text.primary" fontWeight="700">
                 {activeAccount.displayName || truncateAddress(activeAccount.address)}
@@ -136,21 +138,11 @@ function AccountSwitcher({
             onClick={() => onAccountSelect(account)}
           >
             <HStack spacing={3} w="full">
-              <Box
-                bg={account.type === "bankr" ? "bauhaus.blue" : "bauhaus.yellow"}
-                border="2px solid"
-                borderColor="bauhaus.black"
-                p={1}
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-              >
-                {account.type === "bankr" ? (
-                  <RobotIcon boxSize="14px" color="white" />
-                ) : (
-                  <KeyIcon boxSize="14px" color="bauhaus.black" />
-                )}
-              </Box>
+              {account.type === "bankr" ? (
+                <BankrAvatar size={24} />
+              ) : (
+                <BlockieAvatar address={account.address} size={24} />
+              )}
               <VStack align="start" spacing={0} flex={1}>
                 <Text fontSize="sm" color="text.primary" fontWeight="700">
                   {account.displayName || truncateAddress(account.address)}
