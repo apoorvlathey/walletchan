@@ -9,9 +9,10 @@ interface MessageListProps {
   isWalletUnlocked?: boolean;
   onUnlock?: () => void;
   onRetry?: () => void;
+  onResend?: (content: string) => void;
 }
 
-export function MessageList({ messages, isLoading, isWalletUnlocked, onUnlock, onRetry }: MessageListProps) {
+export function MessageList({ messages, isLoading, isWalletUnlocked, onUnlock, onRetry, onResend }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when messages change
@@ -94,6 +95,7 @@ export function MessageList({ messages, isLoading, isWalletUnlocked, onUnlock, o
             isWalletUnlocked={isWalletUnlocked}
             onUnlock={onUnlock}
             onRetry={onRetry}
+            onResend={onResend}
           />
         ))}
         <div ref={bottomRef} />

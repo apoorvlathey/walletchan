@@ -1611,32 +1611,40 @@ function App() {
                       />
                     )}
                   </HStack>
-                  <Box
-                    as="button"
-                    bg="#FD8464"
-                    border="2px solid"
-                    borderColor="bauhaus.black"
-                    boxShadow="2px 2px 0px 0px #121212"
-                    p={1}
-                    cursor="pointer"
-                    transition="all 0.2s ease-out"
-                    _hover={{
-                      transform: "translateY(-1px)",
-                      boxShadow: "3px 3px 0px 0px #121212",
-                    }}
-                    _active={{
-                      transform: "translate(2px, 2px)",
-                      boxShadow: "none",
-                    }}
-                    onClick={() => {
-                      chrome.tabs.create({
-                        url: `https://debank.com/profile/${address}`,
-                      });
-                    }}
-                    title="View on DeBank"
-                  >
-                    <Image src="debank-icon.ico" boxSize="20px" />
-                  </Box>
+                  <HStack spacing={1}>
+                    {[
+                      { name: "Octav", icon: "octav-icon.png", url: `https://app.octav.fi/portfolio/${address}`, bg: "#8B5CF6" },
+                      { name: "DeBank", icon: "debank-icon.ico", url: `https://debank.com/profile/${address}`, bg: "#FD8464" },
+                      { name: "Zapper", icon: "zapper-icon.png", url: `https://zapper.xyz/account/${address}`, bg: "#784FFE" },
+                      { name: "Nansen", icon: "nansen-icon.png", url: `https://app.nansen.ai/address/${address}`, bg: "#2081E2" },
+                    ].map((site) => (
+                      <Box
+                        key={site.name}
+                        as="button"
+                        bg={site.bg}
+                        border="2px solid"
+                        borderColor="bauhaus.black"
+                        boxShadow="2px 2px 0px 0px #121212"
+                        p={1}
+                        cursor="pointer"
+                        transition="all 0.2s ease-out"
+                        _hover={{
+                          transform: "translateY(-1px)",
+                          boxShadow: "3px 3px 0px 0px #121212",
+                        }}
+                        _active={{
+                          transform: "translate(2px, 2px)",
+                          boxShadow: "none",
+                        }}
+                        onClick={() => {
+                          chrome.tabs.create({ url: site.url });
+                        }}
+                        title={`View on ${site.name}`}
+                      >
+                        <Image src={site.icon} boxSize="20px" />
+                      </Box>
+                    ))}
+                  </HStack>
                 </HStack>
               </VStack>
             ) : (

@@ -192,6 +192,7 @@ export function ChatView({ onBack, startWithNewChat = false, returnToConversatio
           isWalletUnlocked={isWalletUnlocked}
           onUnlock={handleUnlock}
           onRetry={retryLastMessage}
+          onResend={sendMessage}
         />
 
         <Box w="100%" p={2} borderTop="2px solid" borderColor="bauhaus.black">

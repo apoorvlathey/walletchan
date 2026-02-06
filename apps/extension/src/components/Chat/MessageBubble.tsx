@@ -1,6 +1,7 @@
-import { Box, Text, Link, Button, HStack } from "@chakra-ui/react";
-import { LockIcon, RepeatIcon } from "@chakra-ui/icons";
+import { Box, Text, Link, Button, HStack, IconButton } from "@chakra-ui/react";
+import { LockIcon, RepeatIcon, CopyIcon } from "@chakra-ui/icons";
 import { Message } from "@/chrome/chatStorage";
+import { useBauhausToast } from "@/hooks/useBauhausToast";
 import ShapesLoader from "./ShapesLoader";
 
 
@@ -47,9 +48,11 @@ interface MessageBubbleProps {
   isWalletUnlocked?: boolean;
   onUnlock?: () => void;
   onRetry?: () => void;
+  onResend?: (content: string) => void;
 }
 
-export function MessageBubble({ message, isWalletUnlocked, onUnlock, onRetry }: MessageBubbleProps) {
+export function MessageBubble({ message, isWalletUnlocked, onUnlock, onRetry, onResend }: MessageBubbleProps) {
+  const toast = useBauhausToast();
   const isUser = message.role === "user";
   const isPending = message.status === "pending";
   const isError = message.status === "error";
@@ -171,6 +174,7 @@ export function MessageBubble({ message, isWalletUnlocked, onUnlock, onRetry }: 
         boxShadow="3px 3px 0px 0px #121212"
         p={2}
         position="relative"
+        role="group"
       >
         {/* Geometric decoration */}
         <Box
@@ -200,18 +204,63 @@ export function MessageBubble({ message, isWalletUnlocked, onUnlock, onRetry }: 
         </Text>
 
         <HStack justify="space-between" align="center" mt={2}>
-          <Text
-            fontSize="xs"
-            opacity={0.7}
-            fontWeight="700"
-            textTransform="uppercase"
-            letterSpacing="wider"
-          >
-            {new Date(message.timestamp).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </Text>
+          <HStack spacing={1}>
+            <Text
+              fontSize="xs"
+              opacity={0.7}
+              fontWeight="700"
+              textTransform="uppercase"
+              letterSpacing="wider"
+            >
+              {new Date(message.timestamp).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </Text>
+
+            {/* Copy button - visible on hover */}
+            {message.content && (
+              <IconButton
+                aria-label="Copy message"
+                icon={<CopyIcon />}
+                size="xs"
+                variant="ghost"
+                color={styles.color}
+                opacity={0}
+                _groupHover={{ opacity: 0.7 }}
+                _hover={{ opacity: "1 !important" }}
+                minW="auto"
+                h="auto"
+                p={0.5}
+                onClick={async () => {
+                  await navigator.clipboard.writeText(message.content);
+                  toast({
+                    title: "Copied!",
+                    status: "success",
+                    duration: 1500,
+                  });
+                }}
+              />
+            )}
+
+            {/* Resend button - only on user messages, visible on hover */}
+            {isUser && onResend && (
+              <IconButton
+                aria-label="Resend message"
+                icon={<RepeatIcon />}
+                size="xs"
+                variant="ghost"
+                color={styles.color}
+                opacity={0}
+                _groupHover={{ opacity: 0.7 }}
+                _hover={{ opacity: "1 !important" }}
+                minW="auto"
+                h="auto"
+                p={0.5}
+                onClick={() => onResend(message.content)}
+              />
+            )}
+          </HStack>
 
           {/* Show Unlock/Retry button for wallet locked errors */}
           {isError && message.isWalletLockedError && (
