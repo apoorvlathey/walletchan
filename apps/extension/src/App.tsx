@@ -20,6 +20,7 @@ import {
   Icon,
   Link,
   Spinner,
+  useDisclosure,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon, LockIcon, WarningIcon, InfoIcon, ChatIcon } from "@chakra-ui/icons";
@@ -56,6 +57,8 @@ const PendingTxList = lazy(() => import("@/components/PendingTxList"));
 const ChatView = lazy(() => import("@/components/Chat/ChatView"));
 const AccountSwitcher = lazy(() => import("@/components/AccountSwitcher"));
 const AddAccount = lazy(() => import("@/components/AddAccount"));
+const RevealPrivateKeyModal = lazy(() => import("@/components/RevealPrivateKeyModal"));
+const AccountSettingsModal = lazy(() => import("@/components/AccountSettingsModal"));
 
 // Eager load components needed immediately
 import UnlockScreen from "@/components/UnlockScreen";
@@ -127,6 +130,10 @@ function App() {
   const [isWalletUnlocked, setIsWalletUnlocked] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [activeAccount, setActiveAccount] = useState<Account | null>(null);
+  const [revealAccount, setRevealAccount] = useState<Account | null>(null);
+  const [settingsAccount, setSettingsAccount] = useState<Account | null>(null);
+  const { isOpen: isRevealKeyOpen, onOpen: onRevealKeyOpen, onClose: onRevealKeyClose } = useDisclosure();
+  const { isOpen: isAccountSettingsOpen, onOpen: onAccountSettingsOpen, onClose: onAccountSettingsClose } = useDisclosure();
   const keepAlivePortRef = useRef<chrome.runtime.Port | null>(null);
 
   const currentTab = async () => {
@@ -1383,6 +1390,10 @@ function App() {
                 activeAccount={activeAccount}
                 onAccountSelect={handleAccountSwitch}
                 onAddAccount={() => setView("addAccount")}
+                onAccountSettings={(account) => {
+                  setSettingsAccount(account);
+                  onAccountSettingsOpen();
+                }}
               />
             </Suspense>
           )}
@@ -1725,6 +1736,35 @@ function App() {
           </Box>
         </Box>
       )}
+
+      {/* Reveal Private Key Modal */}
+      <Suspense fallback={null}>
+        <RevealPrivateKeyModal
+          isOpen={isRevealKeyOpen}
+          onClose={() => {
+            onRevealKeyClose();
+            setRevealAccount(null);
+          }}
+          account={revealAccount}
+        />
+      </Suspense>
+
+      {/* Account Settings Modal */}
+      <Suspense fallback={null}>
+        <AccountSettingsModal
+          isOpen={isAccountSettingsOpen}
+          onClose={() => {
+            onAccountSettingsClose();
+            setSettingsAccount(null);
+          }}
+          account={settingsAccount}
+          onRevealPrivateKey={(account) => {
+            setRevealAccount(account);
+            onRevealKeyOpen();
+          }}
+          onAccountUpdated={loadAccounts}
+        />
+      </Suspense>
     </Box>
   );
 }

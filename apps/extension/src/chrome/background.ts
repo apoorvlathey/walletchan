@@ -31,6 +31,7 @@ import {
   removeAccount,
   clearAllAccounts,
   addressExists,
+  updateAccountDisplayName,
 } from "./accountStorage";
 import {
   addKeyToVault,
@@ -2069,10 +2070,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
+    case "updateAccountDisplayName": {
+      updateAccountDisplayName(message.accountId, message.displayName || "").then(() => {
+        // Notify UI of account update
+        chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+        sendResponse({ success: true });
+      }).catch((error) => {
+        sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to update" });
+      });
+      return true;
+    }
+
     case "addPrivateKeyAccount": {
+      // Use cached password if not provided (wallet must be unlocked)
+      const password = message.password || cachedPassword;
+      if (!password) {
+        sendResponse({ success: false, error: "Wallet is locked" });
+        return true;
+      }
       handleAddPrivateKeyAccount(
         message.privateKey,
-        message.password,
+        password,
         message.displayName
       ).then((result) => {
         sendResponse(result);
@@ -2084,6 +2102,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       handleRemoveAccount(message.accountId).then((result) => {
         sendResponse(result);
       });
+      return true;
+    }
+
+    case "revealPrivateKey": {
+      (async () => {
+        try {
+          const { accountId, password } = message;
+
+          // Verify password matches cached password (wallet must be unlocked)
+          if (!cachedPassword) {
+            sendResponse({ success: false, error: "Wallet is locked" });
+            return;
+          }
+          if (password !== cachedPassword) {
+            sendResponse({ success: false, error: "Invalid password" });
+            return;
+          }
+
+          // Try cached vault first
+          let privateKey = getPrivateKeyFromCache(accountId);
+          if (!privateKey) {
+            // Need to decrypt vault with the verified password
+            const vault = await decryptAllKeys(cachedPassword);
+            if (!vault) {
+              sendResponse({ success: false, error: "Failed to decrypt vault" });
+              return;
+            }
+            setCachedVault(vault);
+            privateKey = getPrivateKeyFromCache(accountId);
+          }
+          if (!privateKey) {
+            sendResponse({ success: false, error: "Private key not found for this account" });
+            return;
+          }
+          sendResponse({ success: true, privateKey });
+        } catch (error) {
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to reveal private key",
+          });
+        }
+      })();
       return true;
     }
 

@@ -322,6 +322,8 @@ src/
 │   │   ├── ChangePassword.tsx # Password change flow
 │   │   └── AutoLockSettings.tsx # Auto-lock timeout configuration
 │   ├── AccountSwitcher.tsx  # Account dropdown and selection
+│   ├── AccountSettingsModal.tsx # Account settings (rename, reveal key, remove)
+│   ├── RevealPrivateKeyModal.tsx # Password-protected private key reveal
 │   ├── AddAccount.tsx       # Add new account screen
 │   ├── UnlockScreen.tsx     # Wallet unlock (password entry)
 │   ├── PendingTxBanner.tsx  # Banner showing pending tx/signature count
@@ -1204,6 +1206,8 @@ Build command: `pnpm build`
 | `getTabAccount`                    | Get account for specific tab                            |
 | `setTabAccount`                    | Set account for specific tab                            |
 | `confirmSignatureRequest`          | Sign message (PK accounts only)                         |
+| `revealPrivateKey`                 | Reveal private key (requires password verification)     |
+| `updateAccountDisplayName`         | Update account display name                             |
 
 ### Background → Views (chrome.runtime broadcast)
 

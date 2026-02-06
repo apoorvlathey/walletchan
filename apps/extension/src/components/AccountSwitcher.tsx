@@ -11,8 +11,10 @@ import {
   Text,
   Box,
   Icon,
+  IconButton,
+  Tooltip,
 } from "@chakra-ui/react";
-import { ChevronDownIcon, AddIcon } from "@chakra-ui/icons";
+import { ChevronDownIcon, AddIcon, SettingsIcon } from "@chakra-ui/icons";
 import type { Account } from "@/chrome/types";
 
 // Robot icon for Bankr accounts
@@ -40,6 +42,7 @@ interface AccountSwitcherProps {
   activeAccount: Account | null;
   onAccountSelect: (account: Account) => void;
   onAddAccount: () => void;
+  onAccountSettings: (account: Account) => void;
 }
 
 function truncateAddress(address: string): string {
@@ -52,6 +55,7 @@ function AccountSwitcher({
   activeAccount,
   onAccountSelect,
   onAddAccount,
+  onAccountSettings,
 }: AccountSwitcherProps) {
   return (
     <Menu matchWidth isLazy lazyBehavior="unmount">
@@ -157,6 +161,20 @@ function AccountSwitcher({
                   </Text>
                 )}
               </VStack>
+              <Tooltip label="Account Settings" hasArrow placement="top">
+                <IconButton
+                  aria-label="Account Settings"
+                  icon={<SettingsIcon boxSize="12px" />}
+                  size="xs"
+                  variant="ghost"
+                  color="text.secondary"
+                  _hover={{ color: "bauhaus.blue", bg: "transparent" }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAccountSettings(account);
+                  }}
+                />
+              </Tooltip>
               {account.id === activeAccount?.id && (
                 <Box
                   w="8px"

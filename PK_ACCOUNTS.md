@@ -76,6 +76,117 @@ This matches industry standards and NIST recommendations for password-based encr
    - Service worker suspension event clears all sensitive data
    - Extension reset performs full security wipe
 
+## Account Settings & Management
+
+### Account Settings Modal
+
+Each account has a settings gear icon in the account switcher dropdown. Clicking it opens a modal with:
+
+1. **Display Name**: Editable field to set a friendly name for the account
+2. **Reveal Private Key** (PK accounts only): Password-protected key reveal
+3. **Remove Account**: Delete account with confirmation warning
+
+### Reveal Private Key Feature
+
+For Private Key accounts, users can reveal their private key through a secure, password-protected flow.
+
+**Security Architecture:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        Reveal Private Key Flow                               │
+│                                                                             │
+│  1. User clicks settings gear icon next to account in dropdown              │
+│  2. AccountSettingsModal opens                                              │
+│  3. User clicks "Reveal Private Key" button (yellow, PK accounts only)      │
+│  4. RevealPrivateKeyModal opens with password entry                         │
+│  5. User enters password → sent to background.ts                            │
+│  6. Background verifies password matches cached session password            │
+│  7. If valid: decrypt vault, return private key to modal                    │
+│  8. Modal displays key (masked by default, with show/hide toggle)           │
+│  9. User can copy key to clipboard                                          │
+│  10. On modal close: private key cleared from component state               │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Message Type:**
+
+| Type | Direction | Payload | Response |
+| ---- | --------- | ------- | -------- |
+| `revealPrivateKey` | UI → Background | `{ accountId, password }` | `{ success, privateKey? }` or `{ success: false, error }` |
+
+**Security Guarantees:**
+
+1. **Password Required**: User must re-enter password each time (no auto-reveal)
+2. **Session Verification**: Password is verified against the cached session password
+3. **Memory Cleanup**: Private key is cleared from React state when modal closes
+4. **No Persistence**: Revealed key is never stored - only held in component state briefly
+5. **Vault Decryption**: If vault not cached, full decryption is performed with the password
+
+**UI States:**
+
+```
+State 1: Password Entry
+┌─────────────────────────────────────────────────────────────────┐
+│  [Warning icon]  REVEAL PRIVATE KEY                              │
+│                                                                  │
+│  ⚠️ Never share your private key. Anyone with it has full       │
+│     control of your wallet.                                      │
+│                                                                  │
+│  Password                                                        │
+│  ┌───────────────────────────────────────────────────────┐      │
+│  │  [••••••••••••]                              [👁]      │      │
+│  └───────────────────────────────────────────────────────┘      │
+│                                                                  │
+│  [Error message if wrong password]                               │
+│                                                                  │
+│  ┌────────────────┐  ┌────────────────────────┐                 │
+│  │    Cancel      │  │  Reveal  (yellow)      │                 │
+│  └────────────────┘  └────────────────────────┘                 │
+└─────────────────────────────────────────────────────────────────┘
+
+State 2: Key Revealed
+┌─────────────────────────────────────────────────────────────────┐
+│  [Key icon]  YOUR PRIVATE KEY                                    │
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────┐      │
+│  │  0x1234...abcd (or full key if show toggle on)  [👁]  │      │
+│  └───────────────────────────────────────────────────────┘      │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────┐         │
+│  │              [📋 Copy to Clipboard]                 │         │
+│  └────────────────────────────────────────────────────┘         │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────┐         │
+│  │                    [Done]                           │         │
+│  └────────────────────────────────────────────────────┘         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Remove Account
+
+Users can remove accounts from the wallet:
+
+1. **Confirmation Required**: A confirmation dialog warns about the action
+2. **PK Warning**: For Private Key accounts, an additional warning emphasizes backing up the key first
+3. **Data Cleanup**: Removes account from accounts list and private key from vault
+
+**Message Type:**
+
+| Type | Direction | Payload | Response |
+| ---- | --------- | ------- | -------- |
+| `removeAccount` | UI → Background | `{ accountId }` | `{ success }` or `{ success: false, error }` |
+
+### Update Display Name
+
+Users can set or change the display name for any account:
+
+**Message Type:**
+
+| Type | Direction | Payload | Response |
+| ---- | --------- | ------- | -------- |
+| `updateAccountDisplayName` | UI → Background | `{ accountId, displayName }` | `{ success }` or `{ success: false, error }` |
+
 ## Account Types
 
 ### Bankr API Account (Existing)
@@ -479,6 +590,10 @@ export async function signMessage(
 // Signing (PK accounts only)
 | "confirmTransactionPK"     | Sign and broadcast transaction
 | "confirmSignatureRequest"  | Sign message request
+
+// Account Settings
+| "revealPrivateKey"         | Reveal private key (password verification required)
+| "updateAccountDisplayName" | Update account display name
 ```
 
 ### setActiveAccount Behavior
@@ -889,6 +1004,8 @@ Note: For Bankr accounts (which don't support signing), the Reject button is red
 | `src/chrome/localSigner.ts` | Transaction and message signing with viem |
 | `src/chrome/accountStorage.ts` | Account CRUD operations |
 | `src/components/AccountSwitcher.tsx` | Account dropdown component |
+| `src/components/AccountSettingsModal.tsx` | Account settings (rename, reveal, remove) |
+| `src/components/RevealPrivateKeyModal.tsx` | Password-protected private key reveal |
 | `src/components/AddAccount.tsx` | Add new account screen |
 
 ### Modified Files
