@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const params = new URLSearchParams({ addresses: address });
+    const params = new URLSearchParams({ addresses: address, includeImages: "true" });
 
     const response = await fetch(
       `${OCTAV_API_URL}/v1/portfolio?${params.toString()}`,
@@ -53,34 +53,43 @@ export async function GET(request: NextRequest) {
     // Octav returns an array; take first item
     const portfolio = Array.isArray(data) ? data[0] : data;
 
-    // Transform to provider-agnostic format
-    const tokens: PortfolioToken[] = [];
-    let totalValueUsd = 0;
+    // Transform Octav response to provider-agnostic format
+    // Octav structure: assetByProtocols -> protocol -> chains -> chain -> protocolPositions -> type -> assets[]
+    const tokenMap = new Map<string, PortfolioToken>();
+    const totalValueUsd = parseFloat(portfolio?.networth || "0");
 
-    if (portfolio?.chains) {
-      for (const chain of portfolio.chains) {
-        const chainId = getChainIdFromOctav(chain.chain);
-        if (!chainId) continue;
+    if (portfolio?.assetByProtocols) {
+      for (const [, protocol] of Object.entries(portfolio.assetByProtocols)) {
+        const proto = protocol as OctavProtocol;
+        if (!proto.chains) continue;
 
-        for (const token of chain.tokens || []) {
-          const valueUsd = token.value_usd ?? 0;
-          totalValueUsd += valueUsd;
-          tokens.push({
-            symbol: token.symbol || "???",
-            name: token.name || token.symbol || "Unknown",
-            contractAddress: token.address || "native",
-            chainId,
-            decimals: token.decimals ?? 18,
-            balance: token.balance?.toString() || "0",
-            balanceFormatted: token.balance_formatted?.toString() || formatBalance(token.balance, token.decimals),
-            priceUsd: token.price_usd ?? 0,
-            valueUsd,
-            logoUrl: token.logo_url || token.icon_url || undefined,
-          });
+        for (const [chainKey, chainData] of Object.entries(proto.chains)) {
+          const chainId = getChainIdFromOctav(chainKey);
+          if (!chainId) continue;
+
+          const chain = chainData as OctavChain;
+          if (!chain.protocolPositions) continue;
+
+          for (const [, positionType] of Object.entries(chain.protocolPositions)) {
+            const pos = positionType as OctavPositionType;
+            // Collect assets from all position sub-types
+            collectAssets(pos.assets, chainId, tokenMap);
+
+            // Nested protocol positions (e.g. lending, LP)
+            if (pos.protocolPositions) {
+              for (const subPos of pos.protocolPositions) {
+                collectAssets(subPos.assets, chainId, tokenMap);
+                collectAssets(subPos.supplyAssets, chainId, tokenMap);
+                collectAssets(subPos.rewardAssets, chainId, tokenMap);
+                // borrowAssets are liabilities - skip them from holdings
+              }
+            }
+          }
         }
       }
     }
 
+    const tokens = Array.from(tokenMap.values());
     // Sort by USD value descending
     tokens.sort((a, b) => b.valueUsd - a.valueUsd);
 
@@ -117,6 +126,86 @@ interface PortfolioResponse {
   totalValueUsd: number;
 }
 
+// Octav API response types
+interface OctavAsset {
+  name: string;
+  symbol: string;
+  balance: string;
+  price: string;
+  value: string;
+  imgSmall?: string;
+  imgLarge?: string;
+}
+
+interface OctavSubPosition {
+  name: string;
+  value: string;
+  assets?: OctavAsset[];
+  supplyAssets?: OctavAsset[];
+  borrowAssets?: OctavAsset[];
+  rewardAssets?: OctavAsset[];
+}
+
+interface OctavPositionType {
+  name: string;
+  value: string;
+  assets?: OctavAsset[];
+  protocolPositions?: OctavSubPosition[];
+}
+
+interface OctavChain {
+  name: string;
+  value: string;
+  protocolPositions?: Record<string, OctavPositionType>;
+}
+
+interface OctavProtocol {
+  name: string;
+  value: string;
+  imgSmall?: string;
+  imgLarge?: string;
+  chains?: Record<string, OctavChain>;
+}
+
+// Collect assets into a deduped token map (key: symbol+chainId)
+function collectAssets(
+  assets: OctavAsset[] | undefined,
+  chainId: number,
+  tokenMap: Map<string, PortfolioToken>
+) {
+  if (!assets) return;
+  for (const asset of assets) {
+    const valueUsd = parseFloat(asset.value || "0");
+    const balance = parseFloat(asset.balance || "0");
+    const priceUsd = parseFloat(asset.price || "0");
+    if (balance === 0 && valueUsd === 0) continue;
+
+    const key = `${asset.symbol}-${chainId}`;
+    const existing = tokenMap.get(key);
+    if (existing) {
+      // Aggregate balances for the same token on the same chain
+      const existingBal = parseFloat(existing.balance);
+      const newBal = existingBal + balance;
+      existing.balance = newBal.toString();
+      existing.balanceFormatted = formatBalance(newBal);
+      existing.valueUsd += valueUsd;
+    } else {
+      tokenMap.set(key, {
+        symbol: asset.symbol || "???",
+        name: asset.name || asset.symbol || "Unknown",
+        contractAddress: "native",
+        chainId,
+        decimals: 18,
+        balance: asset.balance || "0",
+        balanceFormatted: formatBalance(balance),
+        priceUsd,
+        valueUsd,
+        logoUrl: asset.imgSmall || asset.imgLarge || undefined,
+      });
+    }
+  }
+}
+
 // Map Octav chain names to chain IDs
 function getChainIdFromOctav(chain: string): number | null {
   const map: Record<string, number> = {
@@ -130,11 +219,10 @@ function getChainIdFromOctav(chain: string): number | null {
   return map[chain?.toLowerCase()] ?? null;
 }
 
-function formatBalance(balance: number | string | undefined, _decimals: number = 18): string {
+function formatBalance(balance: number | string | undefined): string {
   if (!balance) return "0";
   const num = typeof balance === "string" ? parseFloat(balance) : balance;
   if (isNaN(num)) return "0";
-  // Show up to 6 significant digits
   if (num < 0.000001) return "<0.000001";
   if (num < 1) return num.toPrecision(4);
   if (num < 1000) return num.toFixed(4);
