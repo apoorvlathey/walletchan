@@ -19,6 +19,7 @@ import { keyframes } from "@emotion/react";
 import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon } from "@chakra-ui/icons";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { getChainConfig } from "@/constants/chainConfig";
+import CalldataDecoder from "@/components/CalldataDecoder";
 
 // Success animation keyframes
 const scaleIn = keyframes`
@@ -541,8 +542,12 @@ function TransactionConfirmation({
           </VStack>
         </Box>
 
-        {/* Calldata */}
-        {tx.data && tx.data !== "0x" && (
+        {/* Calldata (Decoded + Raw) */}
+        {tx.data && tx.data !== "0x" && tx.to && (
+          <CalldataDecoder calldata={tx.data} to={tx.to} chainId={tx.chainId} />
+        )}
+        {/* Raw-only fallback for contract deployments */}
+        {tx.data && tx.data !== "0x" && !tx.to && (
           <Box
             bg="bauhaus.white"
             p={3}
@@ -552,7 +557,7 @@ function TransactionConfirmation({
           >
             <HStack mb={2} alignItems="center">
               <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                Data
+                Deploy Data
               </Text>
               <Spacer />
               <CopyButton value={tx.data} />
@@ -565,24 +570,12 @@ function TransactionConfirmation({
               maxH="100px"
               overflowY="auto"
               css={{
-                "&::-webkit-scrollbar": {
-                  width: "6px",
-                },
-                "&::-webkit-scrollbar-track": {
-                  background: "#E0E0E0",
-                },
-                "&::-webkit-scrollbar-thumb": {
-                  background: "#121212",
-                },
+                "&::-webkit-scrollbar": { width: "6px" },
+                "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
+                "&::-webkit-scrollbar-thumb": { background: "#121212" },
               }}
             >
-              <Text
-                fontSize="xs"
-                fontFamily="mono"
-                color="text.tertiary"
-                wordBreak="break-all"
-                whiteSpace="pre-wrap"
-              >
+              <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
                 {tx.data}
               </Text>
             </Box>
