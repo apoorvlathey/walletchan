@@ -130,7 +130,7 @@ function TokenHoldings({ address, onTokenClick }: TokenHoldingsProps) {
             </Text>
           )}
         </HStack>
-        <HStack spacing={0}>
+        <HStack spacing={1}>
           <Tooltip label={hideValue ? "Show values" : "Hide values"} hasArrow>
             <IconButton
               aria-label={hideValue ? "Show values" : "Hide values"}
@@ -211,7 +211,7 @@ function TokenHoldings({ address, onTokenClick }: TokenHoldingsProps) {
                   bg="bg.muted"
                   border="2px solid"
                   borderColor="bauhaus.black"
-                  borderRadius="sm"
+                  borderRadius="full"
                   w="24px"
                   h="24px"
                   display="flex"
