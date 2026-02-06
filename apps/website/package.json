@@ -14,6 +14,7 @@
     "@chakra-ui/react": "^2.9.4",
     "@emotion/react": "^11.13.3",
     "@emotion/styled": "^11.13.0",
+    "@impersonator/iframe": "^0.4.0",
     "framer-motion": "^11.11.17",
     "lucide-react": "^0.460.0",
     "next": "^14.2.18",
