@@ -25,12 +25,12 @@ import {
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon, LockIcon, WarningIcon, InfoIcon, ChatIcon } from "@chakra-ui/icons";
 
-// Sidepanel icon
-const SidePanelIcon = (props: any) => (
+// Fullscreen icon (two diagonal arrows pointing outward)
+const FullscreenIcon = (props: any) => (
   <Icon viewBox="0 0 24 24" {...props}>
     <path
       fill="currentColor"
-      d="M3 3h18a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm12 2v14h5V5h-5zM4 5v14h10V5H4z"
+      d="M14 3v2h3.59l-4.3 4.29 1.42 1.42L19 6.41V10h2V3h-7zM5 17.59V14H3v7h7v-2H6.41l4.3-4.29-1.42-1.42L5 17.59z"
     />
   </Icon>
 );
@@ -122,6 +122,7 @@ function App() {
   const [sidePanelSupported, setSidePanelSupported] = useState(false);
   const [sidePanelMode, setSidePanelMode] = useState(false);
   const [isInSidePanel, setIsInSidePanel] = useState(false);
+  const [isFullscreenTab, setIsFullscreenTab] = useState(false);
   const [failedTxError, setFailedTxError] = useState<{ error: string; origin: string } | null>(null);
   const [onboardingTabId, setOnboardingTabId] = useState<number | null>(null);
   const [startChatWithNew, setStartChatWithNew] = useState(false);
@@ -302,6 +303,16 @@ function App() {
       return isWideEnough && isTall;
     };
 
+    const detectFullscreenContext = () => {
+      // Fullscreen tab has much larger width than popup (360px) or sidepanel (~400px)
+      // Also check if we're not in a popup window context
+      const isWide = window.innerWidth > 500;
+      const isTall = window.innerHeight > 700;
+      // Check if we're a top-level window (not popup)
+      const isTopLevel = window.top === window.self;
+      return isWide && isTall && isTopLevel;
+    };
+
     const initSidePanel = async () => {
       const supported = await checkSidePanelSupport();
       setSidePanelSupported(supported);
@@ -328,28 +339,41 @@ function App() {
         }
       }
 
-      // Detect if currently in sidepanel
-      const inSidePanel = detectSidePanelContext();
+      // Detect if currently in fullscreen tab first (takes priority)
+      const inFullscreen = detectFullscreenContext();
+      setIsFullscreenTab(inFullscreen);
+
+      // Detect if currently in sidepanel (only if not fullscreen)
+      const inSidePanel = !inFullscreen && detectSidePanelContext();
       setIsInSidePanel(inSidePanel);
 
       // Add/remove body class for CSS
-      if (inSidePanel) {
+      document.body.classList.remove("sidepanel-mode", "fullscreen-mode");
+      if (inFullscreen) {
+        document.body.classList.add("fullscreen-mode");
+      } else if (inSidePanel) {
         document.body.classList.add("sidepanel-mode");
-      } else {
-        document.body.classList.remove("sidepanel-mode");
       }
     };
 
     initSidePanel();
 
-    // Listen for window resize to update sidepanel detection
+    // Listen for window resize to update sidepanel/fullscreen detection
     const handleResize = () => {
-      const inSidePanel = window.innerHeight > 700;
+      const isWide = window.innerWidth > 500;
+      const isTall = window.innerHeight > 700;
+      const isTopLevel = window.top === window.self;
+      const inFullscreen = isWide && isTall && isTopLevel;
+      const inSidePanel = !inFullscreen && isTall;
+
+      setIsFullscreenTab(inFullscreen);
       setIsInSidePanel(inSidePanel);
-      if (inSidePanel) {
+
+      document.body.classList.remove("sidepanel-mode", "fullscreen-mode");
+      if (inFullscreen) {
+        document.body.classList.add("fullscreen-mode");
+      } else if (inSidePanel) {
         document.body.classList.add("sidepanel-mode");
-      } else {
-        document.body.classList.remove("sidepanel-mode");
       }
     };
 
@@ -377,48 +401,13 @@ function App() {
     }
   }, []);
 
-  const toggleSidePanelMode = async () => {
-    const newMode = !sidePanelMode;
-
-    // Update the mode setting
-    const response = await new Promise<{ success: boolean; sidePanelWorks: boolean }>((resolve) => {
-      chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: newMode }, (res) => {
-        resolve(res || { success: false, sidePanelWorks: false });
-      });
-    });
-
-    // If trying to enable sidepanel but it doesn't work, show error and keep popup mode
-    if (newMode && !response.success) {
-      toast({
-        title: "Sidepanel not supported",
-        description: "This browser doesn't support sidepanel. Using popup mode instead.",
-        status: "warning",
-        duration: 4000,
-        isClosable: true,
-      });
-      setSidePanelSupported(false);
-      setSidePanelMode(false);
-      return;
-    }
-
-    setSidePanelMode(newMode);
-
-    if (!newMode && isInSidePanel) {
-      // Switching from sidepanel to popup mode while in sidepanel
-      // Open popup window, then close sidepanel
-      chrome.runtime.sendMessage({ type: "openPopupWindow" }, () => {
-        window.close();
-      });
-    } else if (newMode && !isInSidePanel) {
-      // Switching from popup to sidepanel mode while in popup
-      // Chrome doesn't allow programmatic sidepanel open, show toast
-      toast({
-        title: "Sidepanel mode enabled",
-        description: "Close popup and click the extension icon to open in sidepanel",
-        status: "info",
-        duration: null,
-        isClosable: true,
-      });
+  const openInFullscreenTab = async () => {
+    // Open the extension in a new tab
+    const extensionUrl = chrome.runtime.getURL("index.html");
+    await chrome.tabs.create({ url: extensionUrl });
+    // Close popup if we're in popup mode
+    if (!isInSidePanel && !isFullscreenTab) {
+      window.close();
     }
   };
 
@@ -765,15 +754,15 @@ function App() {
     if (remaining.length > 0) {
       setSelectedTxRequest(remaining[0]);
     } else {
-      // Only close popup when no more pending requests (not sidepanel)
-      if (isInSidePanel) {
+      // Only close popup when no more pending requests (not sidepanel or fullscreen)
+      if (isInSidePanel || isFullscreenTab) {
         setSelectedTxRequest(null);
         setView("main");
       } else {
         window.close();
       }
     }
-  }, [selectedTxRequest?.id, isInSidePanel]);
+  }, [selectedTxRequest?.id, isInSidePanel, isFullscreenTab]);
 
   const handleRejectAll = useCallback(async () => {
     // Reject all pending transactions
@@ -794,8 +783,8 @@ function App() {
         );
       });
     }
-    // Only close popup after rejecting all (not sidepanel)
-    if (isInSidePanel) {
+    // Only close popup after rejecting all (not sidepanel or fullscreen)
+    if (isInSidePanel || isFullscreenTab) {
       setPendingRequests([]);
       setPendingSignatureRequests([]);
       setSelectedTxRequest(null);
@@ -804,7 +793,7 @@ function App() {
     } else {
       window.close();
     }
-  }, [pendingRequests, pendingSignatureRequests, isInSidePanel]);
+  }, [pendingRequests, pendingSignatureRequests, isInSidePanel, isFullscreenTab]);
 
   const handleSignatureCancelled = useCallback(async () => {
     const currentSigId = selectedSignatureRequest?.id;
@@ -821,14 +810,14 @@ function App() {
         setSelectedSignatureRequest(null);
         setSelectedTxRequest(txRequests[0]);
         setView("txConfirm");
-      } else if (isInSidePanel) {
+      } else if (isInSidePanel || isFullscreenTab) {
         setSelectedSignatureRequest(null);
         setView("main");
       } else {
         window.close();
       }
     }
-  }, [selectedSignatureRequest?.id, isInSidePanel]);
+  }, [selectedSignatureRequest?.id, isInSidePanel, isFullscreenTab]);
 
   const handleCancelAllSignatures = useCallback(async () => {
     // Cancel all pending signature requests
@@ -847,14 +836,14 @@ function App() {
       setSelectedSignatureRequest(null);
       setSelectedTxRequest(txRequests[0]);
       setView("txConfirm");
-    } else if (isInSidePanel) {
+    } else if (isInSidePanel || isFullscreenTab) {
       setPendingSignatureRequests([]);
       setSelectedSignatureRequest(null);
       setView("main");
     } else {
       window.close();
     }
-  }, [pendingSignatureRequests, isInSidePanel]);
+  }, [pendingSignatureRequests, isInSidePanel, isFullscreenTab]);
 
   const truncateAddress = (addr: string): string => {
     if (!addr) return "";
@@ -880,17 +869,37 @@ function App() {
   // Unlock screen
   if (view === "unlock") {
     return (
-      <UnlockScreen
-        onUnlock={handleUnlock}
-        pendingTxCount={pendingRequests.length}
-        pendingSignatureCount={pendingSignatureRequests.length}
-      />
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
+          <UnlockScreen
+            onUnlock={handleUnlock}
+            pendingTxCount={pendingRequests.length}
+            pendingSignatureCount={pendingSignatureRequests.length}
+          />
+        </Box>
+      </Box>
     );
   }
 
   // Waiting for onboarding to complete
   if (view === "waitingForOnboarding") {
     return (
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
       <Box
         minH="300px"
         bg="bg.base"
@@ -901,6 +910,7 @@ function App() {
         p={6}
         textAlign="center"
         position="relative"
+        flex="1"
       >
         {/* Geometric decorations */}
         <Box
@@ -989,6 +999,8 @@ function App() {
           </HStack>
         </VStack>
       </Box>
+        </Box>
+      </Box>
     );
   }
 
@@ -996,6 +1008,14 @@ function App() {
   if (view === "settings") {
     return (
       <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
         <Container pt={4} pb={4} flex="1" display="flex" flexDirection="column">
           <Suspense fallback={<LoadingFallback />}>
             <Settings
@@ -1023,6 +1043,7 @@ function App() {
             />
           </Suspense>
         </Container>
+        </Box>
       </Box>
     );
   }
@@ -1030,6 +1051,15 @@ function App() {
   // Chat view
   if (view === "chat") {
     return (
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "600px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
       <Suspense fallback={<LoadingFallback />}>
         <ChatView
           onBack={() => {
@@ -1050,43 +1080,67 @@ function App() {
           }}
         />
       </Suspense>
+        </Box>
+      </Box>
     );
   }
 
   // Add Account view
   if (view === "addAccount") {
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <AddAccount
-          onBack={() => setView("main")}
-          onAccountAdded={async () => {
-            await loadAccounts();
-            setView("main");
-          }}
-        />
-      </Suspense>
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
+          <Suspense fallback={<LoadingFallback />}>
+            <AddAccount
+              onBack={() => setView("main")}
+              onAccountAdded={async () => {
+                await loadAccounts();
+                setView("main");
+              }}
+            />
+          </Suspense>
+        </Box>
+      </Box>
     );
   }
 
   // Pending tx list view
   if (view === "pendingTxList") {
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <PendingTxList
-          txRequests={pendingRequests}
-          signatureRequests={pendingSignatureRequests}
-          onBack={() => setView("main")}
-          onSelectTx={(tx) => {
-            setSelectedTxRequest(tx);
-            setView("txConfirm");
-          }}
-          onSelectSignature={(sig) => {
-            setSelectedSignatureRequest(sig);
-            setView("signatureConfirm");
-          }}
-          onRejectAll={handleRejectAll}
-        />
-      </Suspense>
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
+          <Suspense fallback={<LoadingFallback />}>
+            <PendingTxList
+              txRequests={pendingRequests}
+              signatureRequests={pendingSignatureRequests}
+              onBack={() => setView("main")}
+              onSelectTx={(tx) => {
+                setSelectedTxRequest(tx);
+                setView("txConfirm");
+              }}
+              onSelectSignature={(sig) => {
+                setSelectedSignatureRequest(sig);
+                setView("signatureConfirm");
+              }}
+              onRejectAll={handleRejectAll}
+            />
+          </Suspense>
+        </Box>
+      </Box>
     );
   }
 
@@ -1098,41 +1152,52 @@ function App() {
     );
     const totalCount = combinedRequests.length;
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <TransactionConfirmation
-          key={selectedTxRequest.id}
-          txRequest={selectedTxRequest}
-          currentIndex={currentIndex >= 0 ? currentIndex : 0}
-          totalCount={totalCount}
-          isInSidePanel={isInSidePanel}
-          onBack={() => {
-            if (totalCount > 1) {
-              setView("pendingTxList");
-            } else {
-              setView("main");
-            }
-          }}
-          onConfirmed={handleTxConfirmed}
-          onRejected={handleTxRejected}
-          onRejectAll={handleRejectAll}
-          onNavigate={(direction) => {
-            const currentIdx = combinedRequests.findIndex(
-              (r) => r.type === "tx" && r.request.id === selectedTxRequest.id
-            );
-            const newIdx = direction === "prev" ? currentIdx - 1 : currentIdx + 1;
-            if (newIdx >= 0 && newIdx < combinedRequests.length) {
-              const nextRequest = combinedRequests[newIdx];
-              if (nextRequest.type === "tx") {
-                setSelectedTxRequest(nextRequest.request);
-              } else {
-                setSelectedTxRequest(null);
-                setSelectedSignatureRequest(nextRequest.request);
-                setView("signatureConfirm");
-              }
-            }
-          }}
-        />
-      </Suspense>
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
+          <Suspense fallback={<LoadingFallback />}>
+            <TransactionConfirmation
+              key={selectedTxRequest.id}
+              txRequest={selectedTxRequest}
+              currentIndex={currentIndex >= 0 ? currentIndex : 0}
+              totalCount={totalCount}
+              isInSidePanel={isInSidePanel || isFullscreenTab}
+              onBack={() => {
+                if (totalCount > 1) {
+                  setView("pendingTxList");
+                } else {
+                  setView("main");
+                }
+              }}
+              onConfirmed={handleTxConfirmed}
+              onRejected={handleTxRejected}
+              onRejectAll={handleRejectAll}
+              onNavigate={(direction) => {
+                const currentIdx = combinedRequests.findIndex(
+                  (r) => r.type === "tx" && r.request.id === selectedTxRequest.id
+                );
+                const newIdx = direction === "prev" ? currentIdx - 1 : currentIdx + 1;
+                if (newIdx >= 0 && newIdx < combinedRequests.length) {
+                  const nextRequest = combinedRequests[newIdx];
+                  if (nextRequest.type === "tx") {
+                    setSelectedTxRequest(nextRequest.request);
+                  } else {
+                    setSelectedTxRequest(null);
+                    setSelectedSignatureRequest(nextRequest.request);
+                    setView("signatureConfirm");
+                  }
+                }
+              }}
+            />
+          </Suspense>
+        </Box>
+      </Box>
     );
   }
 
@@ -1144,49 +1209,69 @@ function App() {
     );
     const totalCount = combinedRequests.length;
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <SignatureRequestConfirmation
-          key={selectedSignatureRequest.id}
-          sigRequest={selectedSignatureRequest}
-          currentIndex={currentIndex >= 0 ? currentIndex : 0}
-          totalCount={totalCount}
-          isInSidePanel={isInSidePanel}
-          accountType={activeAccount?.type}
-          onBack={() => {
-            setSelectedSignatureRequest(null);
-            if (totalCount > 1) {
-              setView("pendingTxList");
-            } else {
-              setView("main");
-            }
-          }}
-          onCancelled={handleSignatureCancelled}
-          onCancelAll={handleCancelAllSignatures}
-          onConfirmed={handleSignatureCancelled}
-          onNavigate={(direction) => {
-            const currentIdx = combinedRequests.findIndex(
-              (r) => r.type === "sig" && r.request.id === selectedSignatureRequest.id
-            );
-            const newIdx = direction === "prev" ? currentIdx - 1 : currentIdx + 1;
-            if (newIdx >= 0 && newIdx < combinedRequests.length) {
-              const nextRequest = combinedRequests[newIdx];
-              if (nextRequest.type === "sig") {
-                setSelectedSignatureRequest(nextRequest.request);
-              } else {
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
+          <Suspense fallback={<LoadingFallback />}>
+            <SignatureRequestConfirmation
+              key={selectedSignatureRequest.id}
+              sigRequest={selectedSignatureRequest}
+              currentIndex={currentIndex >= 0 ? currentIndex : 0}
+              totalCount={totalCount}
+              isInSidePanel={isInSidePanel || isFullscreenTab}
+              accountType={activeAccount?.type}
+              onBack={() => {
                 setSelectedSignatureRequest(null);
-                setSelectedTxRequest(nextRequest.request);
-                setView("txConfirm");
-              }
-            }
-          }}
-        />
-      </Suspense>
+                if (totalCount > 1) {
+                  setView("pendingTxList");
+                } else {
+                  setView("main");
+                }
+              }}
+              onCancelled={handleSignatureCancelled}
+              onCancelAll={handleCancelAllSignatures}
+              onConfirmed={handleSignatureCancelled}
+              onNavigate={(direction) => {
+                const currentIdx = combinedRequests.findIndex(
+                  (r) => r.type === "sig" && r.request.id === selectedSignatureRequest.id
+                );
+                const newIdx = direction === "prev" ? currentIdx - 1 : currentIdx + 1;
+                if (newIdx >= 0 && newIdx < combinedRequests.length) {
+                  const nextRequest = combinedRequests[newIdx];
+                  if (nextRequest.type === "sig") {
+                    setSelectedSignatureRequest(nextRequest.request);
+                  } else {
+                    setSelectedSignatureRequest(null);
+                    setSelectedTxRequest(nextRequest.request);
+                    setView("txConfirm");
+                  }
+                }
+              }}
+            />
+          </Suspense>
+        </Box>
+      </Box>
     );
   }
 
   // Main view
   return (
     <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+      {/* Fullscreen centered wrapper */}
+      <Box
+        maxW={isFullscreenTab ? "480px" : "100%"}
+        mx="auto"
+        w="100%"
+        h="100%"
+        display="flex"
+        flexDirection="column"
+      >
       {/* Header */}
       <Flex
         py={3}
@@ -1246,19 +1331,16 @@ function App() {
               }}
             />
           </Tooltip>
-          {sidePanelSupported && (
-            <Tooltip
-              label={sidePanelMode ? "Switch to popup mode" : "Switch to sidepanel mode"}
-              placement="bottom"
-            >
+          {!isFullscreenTab && (
+            <Tooltip label="Open in new tab" placement="bottom">
               <IconButton
-                aria-label={sidePanelMode ? "Switch to popup mode" : "Switch to sidepanel mode"}
-                icon={<SidePanelIcon />}
+                aria-label="Open in new tab"
+                icon={<FullscreenIcon />}
                 variant="ghost"
                 size="sm"
                 color="bauhaus.white"
                 _hover={{ bg: "whiteAlpha.200" }}
-                onClick={toggleSidePanelMode}
+                onClick={openInFullscreenTab}
               />
             </Tooltip>
           )}
@@ -1736,6 +1818,8 @@ function App() {
           </Box>
         </Box>
       )}
+      </Box>
+      {/* End fullscreen centered wrapper */}
 
       {/* Reveal Private Key Modal */}
       <Suspense fallback={null}>
