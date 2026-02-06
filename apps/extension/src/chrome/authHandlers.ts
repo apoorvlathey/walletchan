@@ -267,7 +267,19 @@ export async function handleSetAgentPassword(agentPassword: string): Promise<{ s
       return { success: false, error: "No vault key found" };
     }
 
-    const password = getCachedPassword();
+    let password = getCachedPassword();
+
+    // If no cached password, try session restoration (for "Never" auto-lock mode)
+    if (!password) {
+      const autoLockTimeout = await getAutoLockTimeout();
+      if (autoLockTimeout === 0) {
+        const restored = await tryRestoreSession(handleUnlockWallet);
+        if (restored) {
+          password = getCachedPassword();
+        }
+      }
+    }
+
     if (!password) {
       return { success: false, error: "Session expired. Please unlock the wallet again." };
     }
@@ -390,7 +402,19 @@ export async function handleChangePasswordWithCachedPassword(
     return { success: false, error: "Password changes require master password" };
   }
 
-  const currentPassword = getCachedPassword();
+  let currentPassword = getCachedPassword();
+
+  // If no cached password, try session restoration (for "Never" auto-lock mode)
+  if (!currentPassword) {
+    const autoLockTimeout = await getAutoLockTimeout();
+    if (autoLockTimeout === 0) {
+      const restored = await tryRestoreSession(handleUnlockWallet);
+      if (restored) {
+        currentPassword = getCachedPassword();
+      }
+    }
+  }
+
   if (!currentPassword) {
     return { success: false, error: "Session expired. Please unlock your wallet again." };
   }

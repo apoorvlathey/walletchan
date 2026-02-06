@@ -279,6 +279,13 @@ When reviewing or making changes to extension code, verify the following:
 - [ ] Does manual lock (`lockWallet`) still clear all caches and session storage?
 - [ ] Does session restore still require `autoLockTimeout === 0`?
 
+### If you added a new message handler that uses getCachedPassword() or getCachedApiKey():
+
+- [ ] Does the handler include session restoration logic for "Never" auto-lock mode?
+- [ ] Pattern: if credentials are null, check `autoLockTimeout === 0`, then call `tryRestoreSession(handleUnlockWallet)`
+- [ ] Is the handler added to the "Handlers with Session Restoration" table in IMPLEMENTATION.md?
+- [ ] Without this, the handler will fail after service worker restarts when auto-lock is "Never"
+
 ### If you added new storage keys:
 
 - [ ] Is sensitive data encrypted before storage?

@@ -1129,14 +1129,50 @@ Chrome MV3 service workers are frequently suspended/restarted to save resources.
 
 The following message handlers attempt session restoration when auto-lock is "Never" and credentials are not cached:
 
-| Handler                          | Purpose                                        |
-| -------------------------------- | ---------------------------------------------- |
-| `isWalletUnlocked`               | Main lock state check (used by UI)             |
-| `submitChatPrompt`               | Chat with Bankr AI                             |
-| `getCachedApiKey`                | Display API key in settings                    |
-| `saveApiKeyWithCachedPassword`   | Update API key while unlocked                  |
-| `addPrivateKeyAccount`           | Add new private key account                    |
-| `revealPrivateKey`               | Reveal private key (security-sensitive)        |
+| Handler                            | Purpose                                        |
+| ---------------------------------- | ---------------------------------------------- |
+| `isWalletUnlocked`                 | Main lock state check (used by UI)             |
+| `getCachedPassword`                | Check if password is cached (used by UI)       |
+| `getCachedApiKey`                  | Display API key in settings                    |
+| `submitChatPrompt`                 | Chat with Bankr AI                             |
+| `saveApiKeyWithCachedPassword`     | Update API key while unlocked                  |
+| `changePasswordWithCachedPassword` | Change wallet password while unlocked          |
+| `addBankrAccount`                  | Add new Bankr account with API key             |
+| `addPrivateKeyAccount`             | Add new private key account                    |
+| `addSeedPhraseGroup`               | Generate/import seed phrase                    |
+| `deriveSeedAccount`                | Derive new account from seed phrase            |
+| `revealPrivateKey`                 | Reveal private key (security-sensitive)        |
+| `revealSeedPhrase`                 | Reveal seed phrase (security-sensitive)        |
+| `setAgentPassword`                 | Set agent password (in authHandlers.ts)        |
+| `cancelTransaction`                | Cancel in-progress transaction                 |
+
+**CRITICAL: Adding New Handlers**
+
+When adding any new message handler that requires `getCachedPassword()` or `getCachedApiKey()`, you MUST include session restoration logic. Without it, the handler will fail when auto-lock is "Never" and the service worker has restarted.
+
+**Required pattern:**
+
+```typescript
+let password = getCachedPassword();
+
+// If no cached password, try session restoration (for "Never" auto-lock mode)
+if (!password) {
+  const autoLockTimeout = await getAutoLockTimeout();
+  if (autoLockTimeout === 0) {
+    const restored = await tryRestoreSession(handleUnlockWallet);
+    if (restored) {
+      password = getCachedPassword();
+    }
+  }
+}
+
+if (!password) {
+  sendResponse({ success: false, error: "Wallet must be unlocked" });
+  return;
+}
+```
+
+**Why this matters**: Chrome MV3 service workers are frequently suspended and restarted. When this happens, all in-memory state (including cached credentials) is lost. The session restoration mechanism recovers credentials from `chrome.storage.session`, but only if the handler explicitly calls it.
 
 **Storage Schema** (in `chrome.storage.session`):
 

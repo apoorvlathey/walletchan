@@ -429,16 +429,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
 
           // If apiKey is provided and wallet is unlocked, save it first
-          if (message.apiKey && getCachedPassword()) {
-            const vaultKey = getCachedVaultKey();
-            if (vaultKey) {
-              const encrypted = await encryptWithVaultKey(vaultKey, message.apiKey);
-              await chrome.storage.local.set({ encryptedApiKeyVault: encrypted });
-            } else {
-              const { saveEncryptedApiKey } = await import("./crypto");
-              await saveEncryptedApiKey(message.apiKey, getCachedPassword()!);
+          if (message.apiKey) {
+            let password = getCachedPassword();
+
+            // If no cached password, try session restoration (for "Never" auto-lock mode)
+            if (!password) {
+              const autoLockTimeout = await getAutoLockTimeout();
+              if (autoLockTimeout === 0) {
+                const restored = await tryRestoreSession(handleUnlockWallet);
+                if (restored) {
+                  password = getCachedPassword();
+                }
+              }
             }
-            setCachedApiKeyDirect(message.apiKey);
+
+            if (password) {
+              const vaultKey = getCachedVaultKey();
+              if (vaultKey) {
+                const encrypted = await encryptWithVaultKey(vaultKey, message.apiKey);
+                await chrome.storage.local.set({ encryptedApiKeyVault: encrypted });
+              } else {
+                const { saveEncryptedApiKey } = await import("./crypto");
+                await saveEncryptedApiKey(message.apiKey, password);
+              }
+              setCachedApiKeyDirect(message.apiKey);
+            }
           }
 
           const account = await addBankrAccount(message.address, message.displayName);
@@ -477,7 +492,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       (async () => {
         try {
-          const password = getCachedPassword();
+          let password = getCachedPassword();
+
+          // If no cached password, try session restoration (for "Never" auto-lock mode)
+          if (!password) {
+            const autoLockTimeout = await getAutoLockTimeout();
+            if (autoLockTimeout === 0) {
+              const restored = await tryRestoreSession(handleUnlockWallet);
+              if (restored) {
+                password = getCachedPassword();
+              }
+            }
+          }
+
           if (!password) {
             sendResponse({ success: false, error: "Wallet must be unlocked" });
             return;
@@ -538,7 +565,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       (async () => {
         try {
-          const password = getCachedPassword();
+          let password = getCachedPassword();
+
+          // If no cached password, try session restoration (for "Never" auto-lock mode)
+          if (!password) {
+            const autoLockTimeout = await getAutoLockTimeout();
+            if (autoLockTimeout === 0) {
+              const restored = await tryRestoreSession(handleUnlockWallet);
+              if (restored) {
+                password = getCachedPassword();
+              }
+            }
+          }
+
           if (!password) {
             sendResponse({ success: false, error: "Wallet must be unlocked" });
             return;
@@ -592,7 +631,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       (async () => {
         try {
-          const password = getCachedPassword();
+          let password = getCachedPassword();
+
+          // If no cached password, try session restoration (for "Never" auto-lock mode)
+          if (!password) {
+            const autoLockTimeout = await getAutoLockTimeout();
+            if (autoLockTimeout === 0) {
+              const restored = await tryRestoreSession(handleUnlockWallet);
+              if (restored) {
+                password = getCachedPassword();
+              }
+            }
+          }
+
           if (!password) {
             sendResponse({ success: false, error: "Wallet must be unlocked" });
             return;
@@ -800,8 +851,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "getCachedPassword": {
-      sendResponse({ hasCachedPassword: getCachedPassword() !== null });
-      return false;
+      (async () => {
+        let hasCached = getCachedPassword() !== null;
+
+        // If no cached password, try session restoration (for "Never" auto-lock mode)
+        if (!hasCached) {
+          const autoLockTimeout = await getAutoLockTimeout();
+          if (autoLockTimeout === 0) {
+            const restored = await tryRestoreSession(handleUnlockWallet);
+            if (restored) {
+              hasCached = getCachedPassword() !== null;
+            }
+          }
+        }
+
+        sendResponse({ hasCachedPassword: hasCached });
+      })();
+      return true;
     }
 
     case "changePasswordWithCachedPassword": {

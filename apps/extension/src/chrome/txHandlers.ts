@@ -63,7 +63,10 @@ import {
   getCachedVault,
   setCachedVault,
   getPrivateKeyFromCache,
+  getAutoLockTimeout,
+  tryRestoreSession,
 } from "./sessionCache";
+import { handleUnlockWallet } from "./authHandlers";
 import { getSidePanelMode, isSidePanelSupported } from "./sidepanelManager";
 
 // In-memory map for resolving transaction promises back to content script
@@ -1255,7 +1258,19 @@ export async function handleCancelProcessingTx(
     return { success: false, error: "No job ID available for cancellation" };
   }
 
-  const apiKey = getCachedApiKey();
+  let apiKey = getCachedApiKey();
+
+  // If no cached API key, try session restoration (for "Never" auto-lock mode)
+  if (!apiKey) {
+    const autoLockTimeout = await getAutoLockTimeout();
+    if (autoLockTimeout === 0) {
+      const restored = await tryRestoreSession(handleUnlockWallet);
+      if (restored) {
+        apiKey = getCachedApiKey();
+      }
+    }
+  }
+
   if (!apiKey) {
     return { success: false, error: "Wallet locked - cannot cancel" };
   }

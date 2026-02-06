@@ -186,6 +186,34 @@ When working on features, refer to these docs:
 - If a feature doesn't fit existing modules, create a new focused module rather than growing an existing one.
 - Update `IMPLEMENTATION.md` and this file's Key Extension Files section if you add new modules.
 
+### When Adding New Handlers That Need Credentials
+
+**CRITICAL**: Any message handler that uses `getCachedPassword()` or `getCachedApiKey()` MUST include session restoration logic. Without it, the handler will fail when auto-lock is "Never" and Chrome restarts the service worker.
+
+**Required pattern:**
+
+```typescript
+let password = getCachedPassword();
+
+// If no cached password, try session restoration (for "Never" auto-lock mode)
+if (!password) {
+  const autoLockTimeout = await getAutoLockTimeout();
+  if (autoLockTimeout === 0) {
+    const restored = await tryRestoreSession(handleUnlockWallet);
+    if (restored) {
+      password = getCachedPassword();
+    }
+  }
+}
+
+if (!password) {
+  sendResponse({ success: false, error: "Wallet must be unlocked" });
+  return;
+}
+```
+
+See `IMPLEMENTATION.md` → "Handlers with Session Restoration" for the full list of handlers that implement this pattern.
+
 ## Development Practices
 
 ### Storage/Encryption Changes
