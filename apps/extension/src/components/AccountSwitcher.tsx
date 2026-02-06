@@ -90,7 +90,7 @@ function AccountSwitcher({
         rightIcon={<ChevronDownIcon />}
         textAlign="left"
         fontWeight="700"
-        h="auto"
+        h="full"
         py={3}
         borderRadius="0"
         transition="all 0.2s ease-out"
@@ -106,11 +106,33 @@ function AccountSwitcher({
               <Text fontSize="sm" color="text.primary" fontWeight="700">
                 {activeAccount.displayName || truncateAddress(activeAccount.address)}
               </Text>
-              {activeAccount.displayName && (
-                <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
-                  {truncateAddress(activeAccount.address)}
-                </Text>
-              )}
+              <HStack spacing={1}>
+                {activeAccount.displayName && (
+                  <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
+                    {truncateAddress(activeAccount.address)}
+                  </Text>
+                )}
+                {activeAccount.type === "bankr" && (
+                  <Box bg="bauhaus.blue" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black">
+                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Bankr</Text>
+                  </Box>
+                )}
+                {activeAccount.type === "privateKey" && (
+                  <Box bg="bauhaus.yellow" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black">
+                    <Text fontSize="8px" color="bauhaus.black" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Private Key</Text>
+                  </Box>
+                )}
+                {activeAccount.type === "seedPhrase" && (
+                  <Box bg="bauhaus.red" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black">
+                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Seed</Text>
+                  </Box>
+                )}
+                {activeAccount.type === "impersonator" && (
+                  <Box bg="bauhaus.green" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black">
+                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">View Only</Text>
+                  </Box>
+                )}
+              </HStack>
             </VStack>
           </HStack>
         ) : (
@@ -199,7 +221,7 @@ function AccountSwitcher({
                       border="1px solid"
                       borderColor="bauhaus.black"
                     >
-                      <Text fontSize="9px" color="bauhaus.black" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
+                      <Text fontSize="9px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
                         View Only
                       </Text>
                     </Box>

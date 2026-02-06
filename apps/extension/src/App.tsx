@@ -1555,21 +1555,115 @@ function App() {
             }}
           />
 
-          {/* Account Switcher (if multiple accounts) */}
-          {accounts.length > 0 && (
-            <Suspense fallback={null}>
-              <AccountSwitcher
-                accounts={accounts}
-                activeAccount={activeAccount}
-                onAccountSelect={handleAccountSwitch}
-                onAddAccount={() => setView("addAccount")}
-                onAccountSettings={(account) => {
-                  setSettingsAccount(account);
-                  onAccountSettingsOpen();
+          {/* Account Switcher + Chain Selector Row */}
+          <HStack spacing={3} align="stretch">
+            {accounts.length > 0 && (
+              <Box flex={1} minW={0}>
+                <Suspense fallback={null}>
+                  <AccountSwitcher
+                    accounts={accounts}
+                    activeAccount={activeAccount}
+                    onAccountSelect={handleAccountSwitch}
+                    onAddAccount={() => setView("addAccount")}
+                    onAccountSettings={(account) => {
+                      setSettingsAccount(account);
+                      onAccountSettingsOpen();
+                    }}
+                  />
+                </Suspense>
+              </Box>
+            )}
+
+            {/* Chain Selector */}
+            <Menu isLazy lazyBehavior="unmount">
+              <MenuButton
+                as={Button}
+                variant="ghost"
+                bg="bauhaus.white"
+                border="3px solid"
+                borderColor="bauhaus.black"
+                boxShadow="4px 4px 0px 0px #121212"
+                _hover={{
+                  transform: "translateY(-2px)",
+                  boxShadow: "6px 6px 0px 0px #121212",
                 }}
-              />
-            </Suspense>
-          )}
+                _active={{
+                  transform: "translate(2px, 2px)",
+                  boxShadow: "none",
+                }}
+                rightIcon={<ChevronDownIcon />}
+                fontWeight="700"
+                h="full"
+                py={3}
+                px={3}
+                borderRadius="0"
+                transition="all 0.2s ease-out"
+              >
+                {chainName && networksInfo ? (
+                  <HStack spacing={2}>
+                    {getChainConfig(networksInfo[chainName].chainId).icon && (
+                      <Image
+                        src={getChainConfig(networksInfo[chainName].chainId).icon}
+                        alt={chainName}
+                        boxSize="18px"
+                      />
+                    )}
+                    <Text color="text.primary" fontSize="sm">{chainName}</Text>
+                  </HStack>
+                ) : (
+                  <Text color="text.tertiary" fontSize="sm">Network</Text>
+                )}
+              </MenuButton>
+              <MenuList
+                bg="bauhaus.white"
+                border="3px solid"
+                borderColor="bauhaus.black"
+                boxShadow="4px 4px 0px 0px #121212"
+                borderRadius="0"
+                py={0}
+                minW="160px"
+              >
+                {networksInfo &&
+                  Object.keys(networksInfo).map((_chainName, i) => {
+                    const config = getChainConfig(networksInfo[_chainName].chainId);
+                    return (
+                      <MenuItem
+                        key={i}
+                        bg="bauhaus.white"
+                        _hover={{ bg: "bg.muted" }}
+                        borderBottom={i < Object.keys(networksInfo).length - 1 ? "2px solid" : "none"}
+                        borderColor="bauhaus.black"
+                        py={3}
+                        onClick={() => {
+                          if (!chainName) {
+                            setReloadRequired(true);
+                          }
+                          setChainName(_chainName);
+                        }}
+                      >
+                        <HStack spacing={2}>
+                          {config.icon && (
+                            <Box
+                              bg="bauhaus.white"
+                              border="2px solid"
+                              borderColor="bauhaus.black"
+                              p={0.5}
+                            >
+                              <Image
+                                src={config.icon}
+                                alt={_chainName}
+                                boxSize="18px"
+                              />
+                            </Box>
+                          )}
+                          <Text color="text.primary" fontWeight="700">{_chainName}</Text>
+                        </HStack>
+                      </MenuItem>
+                    );
+                  })}
+              </MenuList>
+            </Menu>
+          </HStack>
 
           {/* Address Display */}
           <Box
@@ -1651,10 +1745,10 @@ function App() {
                   </HStack>
                   <HStack spacing={1}>
                     {[
-                      { name: "Octav", icon: "octav-icon.png", url: `https://app.octav.fi/portfolio/${address}`, bg: "#8B5CF6" },
-                      { name: "DeBank", icon: "debank-icon.ico", url: `https://debank.com/profile/${address}`, bg: "#FD8464" },
-                      { name: "Zapper", icon: "zapper-icon.png", url: `https://zapper.xyz/account/${address}`, bg: "#784FFE" },
-                      { name: "Nansen", icon: "nansen-icon.png", url: `https://app.nansen.ai/address/${address}`, bg: "#2081E2" },
+                      { name: "Octav", icon: "octav-icon.png", url: `https://pro.octav.fi/?addresses=${address}`, bg: "#FFFFFF" },
+                      { name: "DeBank", icon: "debank-icon.ico", url: `https://debank.com/profile/${address}`, bg: "#FFFFFF" },
+                      { name: "Zapper", icon: "zapper-icon.png", url: `https://zapper.xyz/account/${address}`, bg: "#FFFFFF" },
+                      { name: "Nansen", icon: "nansen-icon.png", url: `https://app.nansen.ai/address/${address}`, bg: "#FFFFFF" },
                     ].map((site) => (
                       <Box
                         key={site.name}
@@ -1691,103 +1785,6 @@ function App() {
               </Text>
             )}
           </Box>
-
-          {/* Chain Selector */}
-          <Menu matchWidth isLazy lazyBehavior="unmount">
-            <MenuButton
-              as={Button}
-              w="full"
-              variant="ghost"
-              bg="bauhaus.white"
-              border="3px solid"
-              borderColor="bauhaus.black"
-              boxShadow="4px 4px 0px 0px #121212"
-              _hover={{
-                transform: "translateY(-2px)",
-                boxShadow: "6px 6px 0px 0px #121212",
-              }}
-              _active={{
-                transform: "translate(2px, 2px)",
-                boxShadow: "none",
-              }}
-              rightIcon={<ChevronDownIcon />}
-              textAlign="left"
-              fontWeight="700"
-              h="auto"
-              py={3}
-              borderRadius="0"
-              transition="all 0.2s ease-out"
-            >
-              {chainName && networksInfo ? (
-                <HStack spacing={2}>
-                  {getChainConfig(networksInfo[chainName].chainId).icon && (
-                    <Box
-                      bg="bauhaus.white"
-                      border="2px solid"
-                      borderColor="bauhaus.black"
-                      p={0.5}
-                    >
-                      <Image
-                        src={getChainConfig(networksInfo[chainName].chainId).icon}
-                        alt={chainName}
-                        boxSize="18px"
-                      />
-                    </Box>
-                  )}
-                  <Text color="text.primary">{chainName}</Text>
-                </HStack>
-              ) : (
-                <Text color="text.tertiary">Select Network</Text>
-              )}
-            </MenuButton>
-            <MenuList
-              bg="bauhaus.white"
-              border="3px solid"
-              borderColor="bauhaus.black"
-              boxShadow="4px 4px 0px 0px #121212"
-              borderRadius="0"
-              py={0}
-            >
-              {networksInfo &&
-                Object.keys(networksInfo).map((_chainName, i) => {
-                  const config = getChainConfig(networksInfo[_chainName].chainId);
-                  return (
-                    <MenuItem
-                      key={i}
-                      bg="bauhaus.white"
-                      _hover={{ bg: "bg.muted" }}
-                      borderBottom={i < Object.keys(networksInfo).length - 1 ? "2px solid" : "none"}
-                      borderColor="bauhaus.black"
-                      py={3}
-                      onClick={() => {
-                        if (!chainName) {
-                          setReloadRequired(true);
-                        }
-                        setChainName(_chainName);
-                      }}
-                    >
-                      <HStack spacing={2}>
-                        {config.icon && (
-                          <Box
-                            bg="bauhaus.white"
-                            border="2px solid"
-                            borderColor="bauhaus.black"
-                            p={0.5}
-                          >
-                            <Image
-                              src={config.icon}
-                              alt={_chainName}
-                              boxSize="18px"
-                            />
-                          </Box>
-                        )}
-                        <Text color="text.primary" fontWeight="700">{_chainName}</Text>
-                      </HStack>
-                    </MenuItem>
-                  );
-                })}
-            </MenuList>
-          </Menu>
 
           {/* Token Holdings */}
           {address && (
