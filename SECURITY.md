@@ -71,6 +71,9 @@ The agent password model restricts what operations are available when the wallet
 | Add Bankr account (with API key) | Yes | **BLOCKED** | `background.ts` - `addBankrAccount` case |
 | Add private key account | Yes | **BLOCKED** | `background.ts` - `addPrivateKeyAccount` case |
 | Add impersonator account | Yes | **BLOCKED** | `background.ts` - `addImpersonatorAccount` case |
+| Add seed phrase group | Yes | **BLOCKED** | `background.ts` - `addSeedPhraseGroup` case |
+| Derive seed account | Yes | **BLOCKED** | `background.ts` - `deriveSeedAccount` case |
+| Reveal seed phrase | Yes | **BLOCKED** | `background.ts` - `revealSeedPhrase` case |
 | Remove account | Yes | **BLOCKED** | `background.ts` - `removeAccount` case |
 | Initiate token transfer | Yes | Yes | `txHandlers.ts` - creates PendingTxRequest |
 | Reset extension | Yes | **BLOCKED** | `background.ts` - `resetExtension` case |
@@ -178,6 +181,8 @@ Only these types are sent to content scripts (and thus forwarded to the webpage)
 | `encryptedVaultKeyAgent` | Yes (encrypted) | Vault key encrypted with agent password |
 | `pkVault` | Yes (encrypted) | Private key vault with encrypted entries |
 | `agentPasswordEnabled` | No | Boolean flag |
+| `mnemonicVault` | Yes (encrypted) | Seed phrase mnemonics encrypted with PBKDF2+AES-256-GCM |
+| `seedGroups` | No | Seed group metadata (names, counts) |
 | `accounts` | No | Account metadata (addresses, names, types) |
 | `pendingTxRequests` | No | Pending transaction queue |
 | `pendingSignatureRequests` | No | Pending signature queue |
@@ -225,7 +230,7 @@ Only these types are sent to content scripts (and thus forwarded to the webpage)
 
 These must always hold true. Violations indicate a security bug.
 
-1. **Private keys never leave the service worker** - They are decrypted in `sessionCache.ts`, used for signing in `txHandlers.ts` / `localSigner.ts`, and never sent via `chrome.runtime.sendMessage` to UI or content scripts (except the single `revealPrivateKey` handler which is password-gated and agent-blocked).
+1. **Private keys and mnemonics never leave the service worker** - They are decrypted in `sessionCache.ts` / `mnemonicStorage.ts`, used for signing in `txHandlers.ts` / `localSigner.ts`, and never sent via `chrome.runtime.sendMessage` to UI or content scripts (except the `revealPrivateKey` and `revealSeedPhrase` handlers which are password-gated and agent-blocked).
 
 2. **No secrets in console logs** - Never `console.log` passwords, API keys, private keys, or vault keys. Grep for `console.log` near sensitive variables when reviewing changes.
 

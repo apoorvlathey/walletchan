@@ -4,11 +4,12 @@
  * Active account and tab-specific accounts are stored in chrome.storage.sync
  */
 
-import type { Account, BankrAccount, PrivateKeyAccount, ImpersonatorAccount } from "./types";
+import type { Account, BankrAccount, PrivateKeyAccount, SeedPhraseAccount, ImpersonatorAccount, SeedGroup } from "./types";
 
 const ACCOUNTS_STORAGE_KEY = "accounts";
 const ACTIVE_ACCOUNT_ID_KEY = "activeAccountId";
 const TAB_ACCOUNTS_KEY = "tabAccounts";
+const SEED_GROUPS_KEY = "seedGroups";
 
 /**
  * Gets all accounts from storage
@@ -267,7 +268,7 @@ export async function clearAllAccounts(): Promise<void> {
  * Gets accounts by type
  */
 export async function getAccountsByType(
-  type: "bankr" | "privateKey" | "impersonator"
+  type: "bankr" | "privateKey" | "seedPhrase" | "impersonator"
 ): Promise<Account[]> {
   const accounts = await getAccounts();
   return accounts.filter((a) => a.type === type);
@@ -279,6 +280,89 @@ export async function getAccountsByType(
 export async function addressExists(address: string): Promise<boolean> {
   const accounts = await getAccounts();
   return accounts.some((a) => a.address.toLowerCase() === address.toLowerCase());
+}
+
+/**
+ * Adds a Seed Phrase derived account
+ */
+export async function addSeedPhraseAccount(
+  address: string,
+  seedGroupId: string,
+  derivationIndex: number,
+  displayName?: string
+): Promise<SeedPhraseAccount> {
+  const accounts = await getAccounts();
+
+  const newAccount: SeedPhraseAccount = {
+    id: crypto.randomUUID(),
+    type: "seedPhrase",
+    address: address.toLowerCase(),
+    seedGroupId,
+    derivationIndex,
+    displayName,
+    createdAt: Date.now(),
+  };
+
+  accounts.push(newAccount);
+  await saveAccounts(accounts);
+
+  const activeId = await getActiveAccountId();
+  if (!activeId) {
+    await setActiveAccountId(newAccount.id);
+  }
+
+  return newAccount;
+}
+
+/**
+ * Gets all seed groups
+ */
+export async function getSeedGroups(): Promise<SeedGroup[]> {
+  const result = await chrome.storage.local.get(SEED_GROUPS_KEY);
+  return result[SEED_GROUPS_KEY] || [];
+}
+
+/**
+ * Adds a new seed group
+ */
+export async function addSeedGroup(name?: string): Promise<SeedGroup> {
+  const groups = await getSeedGroups();
+  const nextNum = groups.length + 1;
+
+  const group: SeedGroup = {
+    id: crypto.randomUUID(),
+    name: name || `Seed #${nextNum}`,
+    createdAt: Date.now(),
+    accountCount: 0,
+  };
+
+  groups.push(group);
+  await chrome.storage.local.set({ [SEED_GROUPS_KEY]: groups });
+  return group;
+}
+
+/**
+ * Updates seed group account count
+ */
+export async function updateSeedGroupCount(
+  seedGroupId: string,
+  accountCount: number
+): Promise<void> {
+  const groups = await getSeedGroups();
+  const group = groups.find((g) => g.id === seedGroupId);
+  if (group) {
+    group.accountCount = accountCount;
+    await chrome.storage.local.set({ [SEED_GROUPS_KEY]: groups });
+  }
+}
+
+/**
+ * Removes a seed group
+ */
+export async function removeSeedGroup(seedGroupId: string): Promise<void> {
+  const groups = await getSeedGroups();
+  const filtered = groups.filter((g) => g.id !== seedGroupId);
+  await chrome.storage.local.set({ [SEED_GROUPS_KEY]: filtered });
 }
 
 /**

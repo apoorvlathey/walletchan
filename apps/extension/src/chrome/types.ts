@@ -2,7 +2,7 @@
  * Account types and vault structures for multi-account support
  */
 
-export type AccountType = "bankr" | "privateKey" | "impersonator";
+export type AccountType = "bankr" | "privateKey" | "seedPhrase" | "impersonator";
 
 /**
  * Password type for unlock sessions
@@ -27,11 +27,27 @@ export interface PrivateKeyAccount extends BaseAccount {
   type: "privateKey";
 }
 
+export interface SeedPhraseAccount extends BaseAccount {
+  type: "seedPhrase";
+  seedGroupId: string;
+  derivationIndex: number;
+}
+
 export interface ImpersonatorAccount extends BaseAccount {
   type: "impersonator";
 }
 
-export type Account = BankrAccount | PrivateKeyAccount | ImpersonatorAccount;
+export type Account = BankrAccount | PrivateKeyAccount | SeedPhraseAccount | ImpersonatorAccount;
+
+/**
+ * Seed group metadata (stored alongside accounts)
+ */
+export interface SeedGroup {
+  id: string;
+  name: string; // "Seed #1", "Seed #2"
+  createdAt: number;
+  accountCount: number;
+}
 
 /**
  * Encrypted private key entry stored in chrome.storage.local

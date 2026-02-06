@@ -18,6 +18,7 @@ import {
   Icon,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
+import SeedPhraseSetup from "@/components/SeedPhraseSetup";
 import { ViewIcon, ViewOffIcon, ArrowBackIcon, CheckIcon } from "@chakra-ui/icons";
 import { isAddress } from "@ethersproject/address";
 import { privateKeyToAccount } from "viem/accounts";
@@ -52,6 +53,16 @@ const EyeIcon = (props: any) => (
   </Icon>
 );
 
+// Seed icon for Seed Phrase accounts
+const SeedIcon = (props: any) => (
+  <Icon viewBox="0 0 24 24" {...props}>
+    <path
+      fill="currentColor"
+      d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.7c.28.33.6.62.94.88A6.003 6.003 0 0 0 17 20a6 6 0 0 0 0-12zm0 10c-1.4 0-2.6-.77-3.26-1.9l3.86-1.42-.66-1.79-3.86 1.42c-.14-.46-.2-.94-.14-1.42A8.55 8.55 0 0 1 17 10a4 4 0 0 1 0 8zM2 4.27l3.11 3.11A20.7 20.7 0 0 0 2.77 12l1.9.66c.38-1.07.86-2.22 1.47-3.38l1.37 1.37c-.5.98-.89 1.94-1.18 2.83l1.89.66c.2-.6.46-1.22.77-1.87l7.44 7.44 1.41-1.41L3.41 2.86 2 4.27z"
+    />
+  </Icon>
+);
+
 /**
  * Generates a cryptographically secure random private key
  */
@@ -60,7 +71,7 @@ function generatePrivateKey(): `0x${string}` {
   return `0x${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
-type AccountType = "bankr" | "privateKey" | "impersonator";
+type AccountType = "bankr" | "privateKey" | "seedPhrase" | "impersonator";
 type PkMode = "import" | "generate";
 
 interface Account {
@@ -127,6 +138,7 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
   const [showBankrApiKey, setShowBankrApiKey] = useState(false);
   const [impersonatorAddress, setImpersonatorAddress] = useState("");
   const [hasBankrAccount, setHasBankrAccount] = useState(false);
+  const [showSeedSetup, setShowSeedSetup] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{
     privateKey?: string;
@@ -336,6 +348,16 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
     }
   };
 
+  // Render SeedPhraseSetup when seed phrase is selected
+  if (showSeedSetup) {
+    return (
+      <SeedPhraseSetup
+        onBack={() => setShowSeedSetup(false)}
+        onComplete={onAccountAdded}
+      />
+    );
+  }
+
   return (
     <Box p={4} minH="100%" bg="bg.base">
       <VStack spacing={4} align="stretch">
@@ -391,6 +413,36 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                     </Text>
                     <Text fontSize="xs" color="text.secondary">
                       Sign transactions locally
+                    </Text>
+                  </VStack>
+                </HStack>
+              </Box>
+
+              <Box
+                as="label"
+                p={3}
+                bg={accountType === "seedPhrase" ? "bg.muted" : "transparent"}
+                border="2px solid"
+                borderColor="bauhaus.black"
+                cursor="pointer"
+                _hover={{ bg: "bg.muted" }}
+              >
+                <HStack spacing={3}>
+                  <Radio value="seedPhrase" colorScheme="red" />
+                  <Box
+                    bg="bauhaus.red"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    p={1}
+                  >
+                    <SeedIcon boxSize="16px" color="bauhaus.white" />
+                  </Box>
+                  <VStack align="start" spacing={0}>
+                    <Text fontSize="sm" fontWeight="700" color="text.primary">
+                      Seed Phrase
+                    </Text>
+                    <Text fontSize="xs" color="text.secondary">
+                      12-word mnemonic (BIP39)
                     </Text>
                   </VStack>
                 </HStack>
@@ -767,25 +819,27 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
           </Box>
         )}
 
-        {/* Display Name (Optional) */}
-        <Box
-          bg="bauhaus.white"
-          border="3px solid"
-          borderColor="bauhaus.black"
-          boxShadow="4px 4px 0px 0px #121212"
-          p={4}
-        >
-          <FormControl>
-            <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
-              Display Name (Optional)
-            </FormLabel>
-            <Input
-              placeholder="My Wallet"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-            />
-          </FormControl>
-        </Box>
+        {/* Display Name (Optional) - not shown for seed phrase */}
+        {accountType !== "seedPhrase" && (
+          <Box
+            bg="bauhaus.white"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="4px 4px 0px 0px #121212"
+            p={4}
+          >
+            <FormControl>
+              <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                Display Name (Optional)
+              </FormLabel>
+              <Input
+                placeholder="My Wallet"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+              />
+            </FormControl>
+          </Box>
+        )}
 
         {/* Security Warning for PK */}
         {accountType === "privateKey" && (
@@ -806,7 +860,7 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
         <Button
           variant="primary"
           w="full"
-          onClick={handleSubmit}
+          onClick={accountType === "seedPhrase" ? () => setShowSeedSetup(true) : handleSubmit}
           isLoading={isSubmitting}
           loadingText="Adding..."
           isDisabled={
@@ -815,7 +869,7 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
             (accountType === "impersonator" && !impersonatorAddress.trim())
           }
         >
-          Add Account
+          {accountType === "seedPhrase" ? "Set Up Seed Phrase" : "Add Account"}
         </Button>
       </VStack>
     </Box>

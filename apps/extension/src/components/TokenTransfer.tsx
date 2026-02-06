@@ -20,7 +20,7 @@ import { getChainConfig } from "@/constants/chainConfig";
 interface TokenTransferProps {
   token: PortfolioToken;
   fromAddress: string;
-  accountType: "bankr" | "privateKey" | "impersonator";
+  accountType: "bankr" | "privateKey" | "seedPhrase" | "impersonator";
   onBack: () => void;
   onTransferInitiated: () => void;
 }

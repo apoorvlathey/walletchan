@@ -21,11 +21,26 @@ import {
   setTabAccount,
   addBankrAccount,
   addImpersonatorAccount,
+  addSeedPhraseAccount,
+  addSeedGroup,
+  getSeedGroups,
+  updateSeedGroupCount,
   updateAccountDisplayName,
 } from "./accountStorage";
 import {
   decryptAllKeys,
+  addKeyToVault,
 } from "./vaultCrypto";
+import {
+  generateNewMnemonic,
+  isValidMnemonic,
+  derivePrivateKey as deriveSeedPrivateKey,
+} from "./seedPhraseUtils";
+import {
+  storeMnemonic,
+  getMnemonic,
+} from "./mnemonicStorage";
+import { deriveAddress } from "./localSigner";
 import {
   removePendingTxRequest,
   getPendingTxRequests,
@@ -451,6 +466,156 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to add account" });
         }
       })();
+      return true;
+    }
+
+    case "addSeedPhraseGroup": {
+      // SECURITY: Block when unlocked with agent password
+      if (getPasswordType() === "agent") {
+        sendResponse({ success: false, error: "Adding seed phrases requires master password" });
+        return false;
+      }
+      (async () => {
+        try {
+          const password = getCachedPassword();
+          if (!password) {
+            sendResponse({ success: false, error: "Wallet must be unlocked" });
+            return;
+          }
+
+          // Generate or validate mnemonic
+          let mnemonic: string;
+          if (message.mnemonic) {
+            if (!isValidMnemonic(message.mnemonic)) {
+              sendResponse({ success: false, error: "Invalid seed phrase (must be 12 words)" });
+              return;
+            }
+            mnemonic = message.mnemonic.trim();
+          } else {
+            mnemonic = generateNewMnemonic();
+          }
+
+          // Create seed group
+          const group = await addSeedGroup(message.name);
+
+          // Encrypt and store mnemonic
+          await storeMnemonic(group.id, mnemonic, password);
+
+          // Derive first account (index 0)
+          const privateKey = deriveSeedPrivateKey(mnemonic, 0);
+          const address = deriveAddress(privateKey);
+
+          // Add account metadata first (to get the UUID)
+          const account = await addSeedPhraseAccount(address, group.id, 0);
+          await updateSeedGroupCount(group.id, 1);
+
+          // Store derived PK in vault using account UUID (matches vault lookup)
+          await addKeyToVault(account.id, privateKey, password);
+
+          // Update cached vault
+          const vault = await decryptAllKeys(password);
+          if (vault) setCachedVault(vault);
+
+          chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+          sendResponse({
+            success: true,
+            account,
+            group,
+            mnemonic: message.mnemonic ? undefined : mnemonic, // Only return if generated
+          });
+        } catch (error) {
+          sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to create seed phrase" });
+        }
+      })();
+      return true;
+    }
+
+    case "deriveSeedAccount": {
+      // SECURITY: Block when unlocked with agent password
+      if (getPasswordType() === "agent") {
+        sendResponse({ success: false, error: "Deriving accounts requires master password" });
+        return false;
+      }
+      (async () => {
+        try {
+          const password = getCachedPassword();
+          if (!password) {
+            sendResponse({ success: false, error: "Wallet must be unlocked" });
+            return;
+          }
+
+          const { seedGroupId } = message;
+          const mnemonic = await getMnemonic(seedGroupId, password);
+          if (!mnemonic) {
+            sendResponse({ success: false, error: "Seed phrase not found or wrong password" });
+            return;
+          }
+
+          // Find next index
+          const accounts = await getAccounts();
+          const groupAccounts = accounts.filter(
+            (a) => a.type === "seedPhrase" && (a as any).seedGroupId === seedGroupId
+          );
+          const nextIndex = groupAccounts.length > 0
+            ? Math.max(...groupAccounts.map((a) => (a as any).derivationIndex)) + 1
+            : 0;
+
+          // Derive key
+          const privateKey = deriveSeedPrivateKey(mnemonic, nextIndex);
+          const address = deriveAddress(privateKey);
+
+          // Add account first (to get UUID)
+          const account = await addSeedPhraseAccount(address, seedGroupId, nextIndex);
+          await updateSeedGroupCount(seedGroupId, groupAccounts.length + 1);
+
+          // Store in vault using account UUID (matches vault lookup)
+          await addKeyToVault(account.id, privateKey, password);
+
+          // Update cached vault
+          const vault = await decryptAllKeys(password);
+          if (vault) setCachedVault(vault);
+
+          chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+          sendResponse({ success: true, account });
+        } catch (error) {
+          sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to derive account" });
+        }
+      })();
+      return true;
+    }
+
+    case "revealSeedPhrase": {
+      // SECURITY: Block when unlocked with agent password
+      if (getPasswordType() === "agent") {
+        sendResponse({ success: false, error: "Revealing seed phrase requires master password" });
+        return false;
+      }
+      (async () => {
+        try {
+          const password = getCachedPassword();
+          if (!password) {
+            sendResponse({ success: false, error: "Wallet must be unlocked" });
+            return;
+          }
+
+          const mnemonic = await getMnemonic(message.seedGroupId, password);
+          if (!mnemonic) {
+            sendResponse({ success: false, error: "Seed phrase not found" });
+            return;
+          }
+
+          sendResponse({ success: true, mnemonic });
+        } catch (error) {
+          sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to reveal seed phrase" });
+        }
+      })();
+      return true;
+    }
+
+    case "getSeedGroups": {
+      getSeedGroups().then((groups) => {
+        sendResponse(groups);
+      });
       return true;
     }
 

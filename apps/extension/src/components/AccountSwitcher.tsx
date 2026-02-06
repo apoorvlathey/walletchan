@@ -176,6 +176,20 @@ function AccountSwitcher({
                       </Text>
                     </Box>
                   )}
+                  {account.type === "seedPhrase" && (
+                    <Box
+                      bg="bauhaus.red"
+                      px={1.5}
+                      py={0.5}
+                      borderRadius="sm"
+                      border="1px solid"
+                      borderColor="bauhaus.black"
+                    >
+                      <Text fontSize="9px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
+                        Seed
+                      </Text>
+                    </Box>
+                  )}
                   {account.type === "impersonator" && (
                     <Box
                       bg="bauhaus.green"

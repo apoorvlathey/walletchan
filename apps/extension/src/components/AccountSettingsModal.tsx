@@ -600,7 +600,7 @@ function AccountSettingsModal({
                 </Text>
               </Box>
 
-              {account.type === "privateKey" && (
+              {(account.type === "privateKey" || account.type === "seedPhrase") && (
                 <Box
                   w="full"
                   p={3}
@@ -609,7 +609,9 @@ function AccountSettingsModal({
                   borderColor="bauhaus.black"
                 >
                   <Text color="white" fontSize="sm" fontWeight="700">
-                    Make sure you have backed up your private key before removing this account!
+                    {account.type === "seedPhrase"
+                      ? "Make sure you have backed up your seed phrase before removing this account!"
+                      : "Make sure you have backed up your private key before removing this account!"}
                   </Text>
                 </Box>
               )}
@@ -677,13 +679,13 @@ function AccountSettingsModal({
                 <Box
                   w={2}
                   h={2}
-                  bg={account.type === "privateKey" ? "bauhaus.yellow" : "bauhaus.blue"}
+                  bg={account.type === "privateKey" ? "bauhaus.yellow" : account.type === "seedPhrase" ? "bauhaus.red" : account.type === "impersonator" ? "bauhaus.green" : "bauhaus.blue"}
                   border="1px solid"
                   borderColor="bauhaus.black"
-                  borderRadius={account.type === "privateKey" ? "none" : "full"}
+                  borderRadius={account.type === "privateKey" || account.type === "seedPhrase" ? "none" : "full"}
                 />
                 <Text fontSize="xs" color="text.tertiary" fontWeight="600" textTransform="uppercase">
-                  {account.type === "privateKey" ? "Private Key Account" : "Bankr Account"}
+                  {account.type === "privateKey" ? "Private Key Account" : account.type === "seedPhrase" ? "Seed Phrase Account" : account.type === "impersonator" ? "View-Only Account" : "Bankr Account"}
                 </Text>
               </HStack>
             </Box>
@@ -732,7 +734,7 @@ function AccountSettingsModal({
 
             {/* Actions */}
             <VStack spacing={3} align="stretch" pt={2}>
-              {account.type === "privateKey" && (
+              {(account.type === "privateKey" || account.type === "seedPhrase") && (
                 <Button
                   variant="yellow"
                   size="sm"

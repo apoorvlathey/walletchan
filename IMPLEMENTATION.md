@@ -17,15 +17,23 @@ This document describes the core architecture and transaction handling implement
 
 ## Account Types
 
-The extension supports three distinct account types that can be used simultaneously:
+The extension supports four distinct account types that can be used simultaneously:
 
-| Feature               | Bankr API Account         | Private Key Account                 | Impersonator Account      |
-| --------------------- | ------------------------- | ----------------------------------- | ------------------------- |
-| Transaction Execution | Via Bankr API             | Local signing + RPC broadcast       | ❌ Disabled (view-only)  |
-| Message Signing       | ❌ Not supported          | ✅ Full support                     | ❌ Disabled (view-only)  |
-| Key Storage           | API key encrypted locally | Private key encrypted locally       | No secrets stored         |
-| Setup                 | API key + wallet address  | Private key import or generate      | Address only              |
-| Use Case              | AI-powered transactions   | Agent wallets, bots, standard usage | Viewing portfolio/dApps   |
+| Feature               | Bankr API Account         | Private Key Account                 | Seed Phrase Account                  | Impersonator Account      |
+| --------------------- | ------------------------- | ----------------------------------- | ------------------------------------ | ------------------------- |
+| Transaction Execution | Via Bankr API             | Local signing + RPC broadcast       | Local signing + RPC broadcast        | ❌ Disabled (view-only)  |
+| Message Signing       | ❌ Not supported          | ✅ Full support                     | ✅ Full support                      | ❌ Disabled (view-only)  |
+| Key Storage           | API key encrypted locally | Private key encrypted locally       | Mnemonic + derived keys encrypted    | No secrets stored         |
+| Setup                 | API key + wallet address  | Private key import or generate      | 12-word BIP39 import or generate     | Address only              |
+| Use Case              | AI-powered transactions   | Agent wallets, bots, standard usage | HD wallets, multiple derived accounts | Viewing portfolio/dApps   |
+
+### Seed Phrase Architecture
+
+- **BIP39**: 12-word mnemonics (128-bit entropy) using `@scure/bip39`
+- **BIP44**: Derivation path `m/44'/60'/0'/0/{index}` using `@scure/bip32`
+- **Seed Groups**: Each mnemonic creates a "group" that can derive multiple accounts
+- **Storage**: Mnemonics encrypted separately in `mnemonicVault` (PBKDF2+AES-256-GCM). Derived private keys stored in regular `pkVault` keyed by account UUID
+- **Files**: `seedPhraseUtils.ts` (BIP39/44), `mnemonicStorage.ts` (encrypted CRUD), `SeedPhraseSetup.tsx` (UI)
 
 ### Account Selection
 
@@ -234,9 +242,11 @@ src/
 │   ├── cryptoUtils.ts       # Shared crypto utilities (PBKDF2, base64, constants)
 │   ├── crypto.ts            # AES-256-GCM encryption for API key and vault
 │   ├── vaultCrypto.ts       # Vault encryption/decryption for private keys
+│   ├── seedPhraseUtils.ts   # BIP39 mnemonic + BIP44 key derivation
+│   ├── mnemonicStorage.ts   # Encrypted mnemonic storage (PBKDF2+AES-256-GCM)
 │   ├── types.ts             # Account and vault type definitions
 │   ├── localSigner.ts       # Transaction and message signing with viem
-│   ├── accountStorage.ts    # Account CRUD operations
+│   ├── accountStorage.ts    # Account CRUD operations (includes seed groups)
 │   ├── bankrApi.ts          # Bankr API client
 │   ├── portfolioApi.ts      # Portfolio API client (fetches token holdings via website)
 │   ├── transferUtils.ts     # ERC20/native token transfer calldata builders
@@ -280,6 +290,7 @@ src/
 │   ├── SignatureRequestConfirmation.tsx # Signature request display (confirm for PK, reject for Bankr)
 │   ├── TokenHoldings.tsx    # Portfolio token list with USD values
 │   ├── TokenTransfer.tsx    # Token transfer form (recipient, amount, send)
+│   ├── SeedPhraseSetup.tsx  # Seed phrase generate/import flow (12-word grid)
 │   ├── CalldataDecoder.tsx  # Decoded/Raw tab for transaction calldata (eth.sh API)
 │   └── TypedDataDisplay.tsx # Structured typed data display for EIP-712 signatures
 ├── hooks/
@@ -1342,6 +1353,10 @@ Build command: `pnpm build`
 | `revealPrivateKey`                 | Reveal private key (requires password verification)     |
 | `updateAccountDisplayName`         | Update account display name                             |
 | `addImpersonatorAccount`           | Add view-only impersonator account (address only)       |
+| `addSeedPhraseGroup`              | Generate/import mnemonic, create seed group, derive first account |
+| `deriveSeedAccount`               | Derive next account from existing seed group             |
+| `revealSeedPhrase`                | Reveal mnemonic (requires master password)               |
+| `getSeedGroups`                   | Get all seed group metadata                              |
 | `initiateTransfer`                 | Create pending tx for extension-initiated token transfer |
 
 ### Background → Views (chrome.runtime broadcast)

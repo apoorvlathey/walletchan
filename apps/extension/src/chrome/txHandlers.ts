@@ -20,11 +20,15 @@ import type { Account } from "./types";
 import {
   getActiveAccount,
   getAccountById,
+  getAccounts,
   getTabAccount,
   addPrivateKeyAccount as addPKAccountStorage,
   removeAccount,
   addressExists,
+  removeSeedGroup,
+  updateSeedGroupCount,
 } from "./accountStorage";
+import { removeMnemonic } from "./mnemonicStorage";
 import {
   addKeyToVault,
   removeKeyFromVault,
@@ -914,8 +918,8 @@ export async function handleConfirmTransactionAsyncPK(
     return { success: false, error: "No account found" };
   }
 
-  if (account.type !== "privateKey") {
-    return { success: false, error: "Account is not a private key account" };
+  if (account.type !== "privateKey" && account.type !== "seedPhrase") {
+    return { success: false, error: "Account does not support local signing" };
   }
 
   // Try to get private key from cache first
@@ -973,8 +977,8 @@ export async function handleConfirmSignatureRequest(
     return { success: false, error: "No account found" };
   }
 
-  if (account.type !== "privateKey") {
-    return { success: false, error: "Signatures are only supported for Private Key accounts" };
+  if (account.type !== "privateKey" && account.type !== "seedPhrase") {
+    return { success: false, error: "Signatures are only supported for Private Key and Seed Phrase accounts" };
   }
 
   // Try to get private key from cache first
@@ -1079,8 +1083,8 @@ export async function handleRemoveAccount(
       return { success: false, error: "Account not found" };
     }
 
-    // If it's a PK account, remove from vault
-    if (account.type === "privateKey") {
+    // If it's a PK or seed phrase account, remove from vault
+    if (account.type === "privateKey" || account.type === "seedPhrase") {
       await removeKeyFromVault(accountId);
 
       // Update the cached vault if it exists
@@ -1088,6 +1092,22 @@ export async function handleRemoveAccount(
       if (cachedVaultEntries) {
         const filtered = cachedVaultEntries.filter((e) => e.id !== accountId);
         setCachedVault(filtered);
+      }
+    }
+
+    // For seed phrase accounts: clean up group if this is the last account
+    if (account.type === "seedPhrase") {
+      const seedGroupId = (account as any).seedGroupId;
+      const allAccounts = await getAccounts();
+      const remaining = allAccounts.filter(
+        (a) => a.type === "seedPhrase" && (a as any).seedGroupId === seedGroupId && a.id !== accountId
+      );
+      if (remaining.length === 0) {
+        // Last account in this group - remove mnemonic and group
+        await removeMnemonic(seedGroupId);
+        await removeSeedGroup(seedGroupId);
+      } else {
+        await updateSeedGroupCount(seedGroupId, remaining.length);
       }
     }
 
