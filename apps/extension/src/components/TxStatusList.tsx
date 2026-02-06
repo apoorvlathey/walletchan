@@ -25,9 +25,11 @@ import { getChainConfig } from "@/constants/chainConfig";
 interface TxStatusListProps {
   maxItems?: number;
   address?: string; // Filter transactions by this address
+  hideHeader?: boolean;
+  hideCard?: boolean;
 }
 
-function TxStatusList({ maxItems = 5, address }: TxStatusListProps) {
+function TxStatusList({ maxItems = 5, address, hideHeader, hideCard }: TxStatusListProps) {
   const [allHistory, setAllHistory] = useState<CompletedTransaction[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -59,22 +61,62 @@ function TxStatusList({ maxItems = 5, address }: TxStatusListProps) {
   const displayItems = isExpanded ? history : history.slice(0, maxItems);
   const hasMore = history.length > maxItems;
 
+  const txContent = history.length === 0 ? (
+    <Box p={4} textAlign="center">
+      <Text fontSize="sm" color="text.tertiary" fontWeight="500">
+        No recent transactions
+      </Text>
+    </Box>
+  ) : (
+    <VStack spacing={hideCard ? 3 : 3} align="stretch" p={hideCard ? 0 : 0}>
+      {displayItems.map((tx) => (
+        <TxStatusItem key={tx.id} tx={tx} />
+      ))}
+    </VStack>
+  );
+
+  if (hideCard) {
+    return (
+      <Box>
+        {!hideHeader && (
+          <HStack justify="space-between" mb={3}>
+            <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
+              Recent Transactions
+            </Text>
+            {hasMore && (
+              <IconButton
+                aria-label={isExpanded ? "Show less" : "Show more"}
+                icon={isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                size="xs"
+                variant="ghost"
+                onClick={() => setIsExpanded(!isExpanded)}
+              />
+            )}
+          </HStack>
+        )}
+        {txContent}
+      </Box>
+    );
+  }
+
   return (
     <Box pt={4}>
-      <HStack justify="space-between" mb={3}>
-        <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
-          Recent Transactions
-        </Text>
-        {hasMore && (
-          <IconButton
-            aria-label={isExpanded ? "Show less" : "Show more"}
-            icon={isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
-            size="xs"
-            variant="ghost"
-            onClick={() => setIsExpanded(!isExpanded)}
-          />
-        )}
-      </HStack>
+      {!hideHeader ? (
+        <HStack justify="space-between" mb={3}>
+          <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
+            Recent Transactions
+          </Text>
+          {hasMore && (
+            <IconButton
+              aria-label={isExpanded ? "Show less" : "Show more"}
+              icon={isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+              size="xs"
+              variant="ghost"
+              onClick={() => setIsExpanded(!isExpanded)}
+            />
+          )}
+        </HStack>
+      ) : null}
 
       {history.length === 0 ? (
         <Box

@@ -87,52 +87,59 @@ function AccountSwitcher({
           transform: "translate(2px, 2px)",
           boxShadow: "none",
         }}
-        rightIcon={<ChevronDownIcon />}
         textAlign="left"
         fontWeight="700"
         h="full"
         py={3}
+        pr={5}
         borderRadius="0"
         transition="all 0.2s ease-out"
+        overflow="hidden"
+        position="relative"
       >
+        <ChevronDownIcon
+          position="absolute"
+          top="6px"
+          right="6px"
+          boxSize="14px"
+          color="text.secondary"
+        />
         {activeAccount ? (
-          <HStack spacing={2}>
+          <HStack spacing={2} minW={0} flex={1}>
             {activeAccount.type === "bankr" ? (
               <BankrAvatar size={24} />
             ) : (
               <BlockieAvatar address={activeAccount.address} size={24} />
             )}
-            <VStack align="start" spacing={0}>
-              <Text fontSize="sm" color="text.primary" fontWeight="700">
+            <VStack align="start" spacing={0} minW={0} flex={1}>
+              <Text fontSize="sm" color="text.primary" fontWeight="700" noOfLines={1}>
                 {activeAccount.displayName || truncateAddress(activeAccount.address)}
               </Text>
-              <HStack spacing={1}>
-                {activeAccount.displayName && (
-                  <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
-                    {truncateAddress(activeAccount.address)}
-                  </Text>
-                )}
-                {activeAccount.type === "bankr" && (
-                  <Box bg="bauhaus.blue" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black">
-                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Bankr</Text>
-                  </Box>
-                )}
-                {activeAccount.type === "privateKey" && (
-                  <Box bg="bauhaus.yellow" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black">
-                    <Text fontSize="8px" color="bauhaus.black" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Private Key</Text>
-                  </Box>
-                )}
-                {activeAccount.type === "seedPhrase" && (
-                  <Box bg="bauhaus.red" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black">
-                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Seed</Text>
-                  </Box>
-                )}
-                {activeAccount.type === "impersonator" && (
-                  <Box bg="bauhaus.green" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black">
-                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">View Only</Text>
-                  </Box>
-                )}
-              </HStack>
+              {activeAccount.displayName && (
+                <Text fontSize="xs" color="text.tertiary" fontFamily="mono" noOfLines={1}>
+                  {truncateAddress(activeAccount.address)}
+                </Text>
+              )}
+              {activeAccount.type === "bankr" && (
+                <Box bg="bauhaus.blue" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
+                  <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Bankr</Text>
+                </Box>
+              )}
+              {activeAccount.type === "privateKey" && (
+                <Box bg="bauhaus.yellow" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
+                  <Text fontSize="8px" color="bauhaus.black" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Private Key</Text>
+                </Box>
+              )}
+              {activeAccount.type === "seedPhrase" && (
+                <Box bg="bauhaus.red" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
+                  <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Seed</Text>
+                </Box>
+              )}
+              {activeAccount.type === "impersonator" && (
+                <Box bg="bauhaus.green" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
+                  <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">View Only</Text>
+                </Box>
+              )}
             </VStack>
           </HStack>
         ) : (
@@ -165,72 +172,34 @@ function AccountSwitcher({
               ) : (
                 <BlockieAvatar address={account.address} size={24} />
               )}
-              <VStack align="start" spacing={0} flex={1}>
-                <HStack spacing={2}>
-                  <Text fontSize="sm" color="text.primary" fontWeight="700">
-                    {account.displayName || truncateAddress(account.address)}
-                  </Text>
-                  {account.type === "bankr" && (
-                    <Box
-                      bg="bauhaus.blue"
-                      px={1.5}
-                      py={0.5}
-                      borderRadius="sm"
-                      border="1px solid"
-                      borderColor="bauhaus.black"
-                    >
-                      <Text fontSize="9px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
-                        Bankr
-                      </Text>
-                    </Box>
-                  )}
-                  {account.type === "privateKey" && (
-                    <Box
-                      bg="bauhaus.yellow"
-                      px={1.5}
-                      py={0.5}
-                      borderRadius="sm"
-                      border="1px solid"
-                      borderColor="bauhaus.black"
-                    >
-                      <Text fontSize="9px" color="bauhaus.black" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
-                        Private Key
-                      </Text>
-                    </Box>
-                  )}
-                  {account.type === "seedPhrase" && (
-                    <Box
-                      bg="bauhaus.red"
-                      px={1.5}
-                      py={0.5}
-                      borderRadius="sm"
-                      border="1px solid"
-                      borderColor="bauhaus.black"
-                    >
-                      <Text fontSize="9px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
-                        Seed
-                      </Text>
-                    </Box>
-                  )}
-                  {account.type === "impersonator" && (
-                    <Box
-                      bg="bauhaus.green"
-                      px={1.5}
-                      py={0.5}
-                      borderRadius="sm"
-                      border="1px solid"
-                      borderColor="bauhaus.black"
-                    >
-                      <Text fontSize="9px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
-                        View Only
-                      </Text>
-                    </Box>
-                  )}
-                </HStack>
+              <VStack align="start" spacing={0} flex={1} minW={0}>
+                <Text fontSize="sm" color="text.primary" fontWeight="700" noOfLines={1}>
+                  {account.displayName || truncateAddress(account.address)}
+                </Text>
                 {account.displayName && (
                   <Text fontSize="xs" color="text.tertiary" fontFamily="mono">
                     {truncateAddress(account.address)}
                   </Text>
+                )}
+                {account.type === "bankr" && (
+                  <Box bg="bauhaus.blue" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
+                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Bankr</Text>
+                  </Box>
+                )}
+                {account.type === "privateKey" && (
+                  <Box bg="bauhaus.yellow" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
+                    <Text fontSize="8px" color="bauhaus.black" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Private Key</Text>
+                  </Box>
+                )}
+                {account.type === "seedPhrase" && (
+                  <Box bg="bauhaus.red" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
+                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Seed</Text>
+                  </Box>
+                )}
+                {account.type === "impersonator" && (
+                  <Box bg="bauhaus.green" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
+                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">View Only</Text>
+                  </Box>
                 )}
               </VStack>
               <Box

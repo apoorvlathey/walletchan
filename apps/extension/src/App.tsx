@@ -20,7 +20,6 @@ import {
   Icon,
   Link,
   Spinner,
-  Skeleton,
   useDisclosure,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
@@ -60,13 +59,12 @@ const AccountSwitcher = lazy(() => import("@/components/AccountSwitcher"));
 const AddAccount = lazy(() => import("@/components/AddAccount"));
 const RevealPrivateKeyModal = lazy(() => import("@/components/RevealPrivateKeyModal"));
 const AccountSettingsModal = lazy(() => import("@/components/AccountSettingsModal"));
-const TokenHoldings = lazy(() => import("@/components/TokenHoldings"));
 const TokenTransfer = lazy(() => import("@/components/TokenTransfer"));
 
 // Eager load components needed immediately
 import UnlockScreen from "@/components/UnlockScreen";
 import PendingTxBanner from "@/components/PendingTxBanner";
-import TxStatusList from "@/components/TxStatusList";
+import PortfolioTabs from "@/components/PortfolioTabs";
 import { useNetworks } from "@/contexts/NetworksContext";
 import { getChainConfig } from "@/constants/chainConfig";
 import { hasEncryptedApiKey } from "@/chrome/crypto";
@@ -1598,20 +1596,21 @@ function App() {
                 px={3}
                 borderRadius="0"
                 transition="all 0.2s ease-out"
+                flexShrink={0}
               >
                 {chainName && networksInfo ? (
-                  <HStack spacing={2}>
-                    {getChainConfig(networksInfo[chainName].chainId).icon && (
-                      <Image
-                        src={getChainConfig(networksInfo[chainName].chainId).icon}
-                        alt={chainName}
-                        boxSize="18px"
-                      />
-                    )}
-                    <Text color="text.primary" fontSize="sm">{chainName}</Text>
+                  <HStack spacing={1.5}>
+                    <Image
+                      src={getChainConfig(networksInfo[chainName].chainId).icon}
+                      alt={chainName}
+                      boxSize="18px"
+                    />
+                    <Text fontSize="xs" fontWeight="700" noOfLines={1}>
+                      {chainName}
+                    </Text>
                   </HStack>
                 ) : (
-                  <Text color="text.tertiary" fontSize="sm">Network</Text>
+                  <Text color="text.tertiary" fontSize="sm">Net</Text>
                 )}
               </MenuButton>
               <MenuList
@@ -1688,16 +1687,19 @@ function App() {
             />
 
             {address ? (
-              <VStack align="stretch" spacing={1}>
+              <VStack align="stretch" spacing={2}>
                 <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                   {activeAccount?.type === "impersonator" ? "Impersonated Address" : "Wallet Address"}
                 </Text>
-                <HStack justify="space-between">
+                {/* Two columns: address pill | explorer icons (2x2 when narrow, 1x4 when wide) */}
+                <HStack spacing={2} align="center">
+                  {/* Column 1: Address pill */}
                   <HStack
                     bg="bauhaus.black"
                     px={2}
                     py={1}
                     spacing={2}
+                    flexShrink={0}
                   >
                     <Code
                       fontSize="md"
@@ -1706,6 +1708,7 @@ function App() {
                       color="bauhaus.white"
                       p={0}
                       fontWeight="700"
+                      whiteSpace="nowrap"
                     >
                       {truncateAddress(address)}
                     </Code>
@@ -1743,7 +1746,20 @@ function App() {
                       />
                     )}
                   </HStack>
-                  <HStack spacing={1}>
+                  {/* Column 2: Explorer icons - 2x2 grid (<390px, centered) or 1x4 row (>=390px, right-aligned) */}
+                  <Box
+                    display="grid"
+                    gridTemplateColumns="repeat(2, 32px)"
+                    justifyContent="center"
+                    gap={1}
+                    flex={1}
+                    sx={{
+                      '@media (min-width: 390px)': {
+                        gridTemplateColumns: 'repeat(4, 32px)',
+                        justifyContent: 'flex-end',
+                      },
+                    }}
+                  >
                     {[
                       { name: "Octav", icon: "octav-icon.png", url: `https://pro.octav.fi/?addresses=${address}`, bg: "#FFFFFF" },
                       { name: "DeBank", icon: "debank-icon.ico", url: `https://debank.com/profile/${address}`, bg: "#FFFFFF" },
@@ -1776,7 +1792,7 @@ function App() {
                         <Image src={site.icon} boxSize="20px" />
                       </Box>
                     ))}
-                  </HStack>
+                  </Box>
                 </HStack>
               </VStack>
             ) : (
@@ -1786,17 +1802,15 @@ function App() {
             )}
           </Box>
 
-          {/* Token Holdings */}
+          {/* Portfolio Tabs (Holdings + Activity) */}
           {address && (
-            <Suspense fallback={<Skeleton h="100px" />}>
-              <TokenHoldings
-                address={address}
-                onTokenClick={(token) => {
-                  setTransferToken(token);
-                  setView("transfer");
-                }}
-              />
-            </Suspense>
+            <PortfolioTabs
+              address={address}
+              onTokenClick={(token) => {
+                setTransferToken(token);
+                setView("transfer");
+              }}
+            />
           )}
 
           {/* Reload Required Alert */}
@@ -1842,8 +1856,6 @@ function App() {
             </Box>
           )}
 
-          {/* Transaction Status List - filtered by current account */}
-          <TxStatusList maxItems={5} address={address} />
         </VStack>
       </Container>
 
