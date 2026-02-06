@@ -8,6 +8,15 @@ export const SALT_LENGTH = 16;
 export const IV_LENGTH = 12;
 
 /**
+ * Converts a Uint8Array to a hexadecimal string
+ */
+export function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
  * Converts an ArrayBuffer to a base64 string
  */
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {

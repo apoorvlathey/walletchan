@@ -9,6 +9,7 @@
 import { generateMnemonic, mnemonicToSeedSync, validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { HDKey } from "@scure/bip32";
+import { bytesToHex } from "./cryptoUtils";
 
 const BIP44_ETH = "m/44'/60'/0'/0";
 
@@ -41,5 +42,5 @@ export function derivePrivateKey(mnemonic: string, index: number): `0x${string}`
     throw new Error(`Failed to derive key at index ${index}`);
   }
 
-  return `0x${Buffer.from(child.privateKey).toString("hex")}` as `0x${string}`;
+  return `0x${bytesToHex(child.privateKey)}` as `0x${string}`;
 }
