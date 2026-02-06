@@ -20,6 +20,7 @@ import {
   Icon,
   Link,
   Spinner,
+  Skeleton,
   useDisclosure,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
@@ -59,6 +60,7 @@ const AccountSwitcher = lazy(() => import("@/components/AccountSwitcher"));
 const AddAccount = lazy(() => import("@/components/AddAccount"));
 const RevealPrivateKeyModal = lazy(() => import("@/components/RevealPrivateKeyModal"));
 const AccountSettingsModal = lazy(() => import("@/components/AccountSettingsModal"));
+const TokenHoldings = lazy(() => import("@/components/TokenHoldings"));
 
 // Eager load components needed immediately
 import UnlockScreen from "@/components/UnlockScreen";
@@ -1751,6 +1753,13 @@ function App() {
                 })}
             </MenuList>
           </Menu>
+
+          {/* Token Holdings */}
+          {address && (
+            <Suspense fallback={<Skeleton h="100px" />}>
+              <TokenHoldings address={address} />
+            </Suspense>
+          )}
 
           {/* Reload Required Alert */}
           {reloadRequired && (
