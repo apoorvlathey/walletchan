@@ -58,6 +58,7 @@ const ChatView = lazy(() => import("@/components/Chat/ChatView"));
 const AccountSwitcher = lazy(() => import("@/components/AccountSwitcher"));
 const AddAccount = lazy(() => import("@/components/AddAccount"));
 const RevealPrivateKeyModal = lazy(() => import("@/components/RevealPrivateKeyModal"));
+const RevealSeedPhraseModal = lazy(() => import("@/components/RevealSeedPhraseModal"));
 const AccountSettingsModal = lazy(() => import("@/components/AccountSettingsModal"));
 const TokenTransfer = lazy(() => import("@/components/TokenTransfer"));
 
@@ -134,8 +135,10 @@ function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [activeAccount, setActiveAccount] = useState<Account | null>(null);
   const [revealAccount, setRevealAccount] = useState<Account | null>(null);
+  const [revealSeedAccount, setRevealSeedAccount] = useState<Account | null>(null);
   const [settingsAccount, setSettingsAccount] = useState<Account | null>(null);
   const { isOpen: isRevealKeyOpen, onOpen: onRevealKeyOpen, onClose: onRevealKeyClose } = useDisclosure();
+  const { isOpen: isRevealSeedOpen, onOpen: onRevealSeedOpen, onClose: onRevealSeedClose } = useDisclosure();
   const { isOpen: isAccountSettingsOpen, onOpen: onAccountSettingsOpen, onClose: onAccountSettingsClose } = useDisclosure();
   const [transferToken, setTransferToken] = useState<PortfolioToken | null>(null);
   const keepAlivePortRef = useRef<chrome.runtime.Port | null>(null);
@@ -1954,6 +1957,18 @@ function App() {
         />
       </Suspense>
 
+      {/* Reveal Seed Phrase Modal */}
+      <Suspense fallback={null}>
+        <RevealSeedPhraseModal
+          isOpen={isRevealSeedOpen}
+          onClose={() => {
+            onRevealSeedClose();
+            setRevealSeedAccount(null);
+          }}
+          account={revealSeedAccount}
+        />
+      </Suspense>
+
       {/* Account Settings Modal */}
       <Suspense fallback={null}>
         <AccountSettingsModal
@@ -1966,6 +1981,10 @@ function App() {
           onRevealPrivateKey={(account) => {
             setRevealAccount(account);
             onRevealKeyOpen();
+          }}
+          onRevealSeedPhrase={(account) => {
+            setRevealSeedAccount(account);
+            onRevealSeedOpen();
           }}
           onAccountUpdated={loadAccounts}
         />

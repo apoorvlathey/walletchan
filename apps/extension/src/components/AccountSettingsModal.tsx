@@ -32,6 +32,7 @@ interface AccountSettingsModalProps {
   onClose: () => void;
   account: Account | null;
   onRevealPrivateKey: (account: Account) => void;
+  onRevealSeedPhrase: (account: Account) => void;
   onAccountUpdated: () => void;
 }
 
@@ -42,6 +43,7 @@ function AccountSettingsModal({
   onClose,
   account,
   onRevealPrivateKey,
+  onRevealSeedPhrase,
   onAccountUpdated,
 }: AccountSettingsModalProps) {
   const toast = useBauhausToast();
@@ -365,6 +367,13 @@ function AccountSettingsModal({
     if (account) {
       handleClose();
       onRevealPrivateKey(account);
+    }
+  };
+
+  const handleRevealSeedPhrase = () => {
+    if (account) {
+      handleClose();
+      onRevealSeedPhrase(account);
     }
   };
 
@@ -846,6 +855,19 @@ function AccountSettingsModal({
                   w="full"
                 >
                   Reveal Private Key
+                </Button>
+              )}
+
+              {account.type === "seedPhrase" && (
+                <Button
+                  variant="yellow"
+                  size="sm"
+                  leftIcon={<ViewIcon />}
+                  onClick={handleRevealSeedPhrase}
+                  justifyContent="flex-start"
+                  w="full"
+                >
+                  Reveal Seed Phrase
                 </Button>
               )}
 

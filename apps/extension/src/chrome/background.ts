@@ -625,32 +625,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "revealSeedPhrase": {
-      // SECURITY: Block when unlocked with agent password
-      if (getPasswordType() === "agent") {
-        sendResponse({ success: false, error: "Revealing seed phrase requires master password" });
-        return false;
-      }
       (async () => {
         try {
-          let password = getCachedPassword();
+          const { seedGroupId, password } = message;
 
-          // If no cached password, try session restoration (for "Never" auto-lock mode)
-          if (!password) {
+          if (!getCachedPassword()) {
             const autoLockTimeout = await getAutoLockTimeout();
             if (autoLockTimeout === 0) {
-              const restored = await tryRestoreSession(handleUnlockWallet);
-              if (restored) {
-                password = getCachedPassword();
-              }
+              await tryRestoreSession(handleUnlockWallet);
             }
           }
 
-          if (!password) {
-            sendResponse({ success: false, error: "Wallet must be unlocked" });
+          const cachedPwd = getCachedPassword();
+          if (!cachedPwd) {
+            sendResponse({ success: false, error: "Wallet is locked" });
             return;
           }
 
-          const mnemonic = await getMnemonic(message.seedGroupId, password);
+          // SECURITY: Block when unlocked with agent password
+          if (getPasswordType() === "agent") {
+            sendResponse({
+              success: false,
+              error: "Seed phrase reveal requires master password",
+              requiresMasterPassword: true,
+            });
+            return;
+          }
+
+          if (password !== cachedPwd) {
+            sendResponse({ success: false, error: "Invalid password" });
+            return;
+          }
+
+          const mnemonic = await getMnemonic(seedGroupId, cachedPwd);
           if (!mnemonic) {
             sendResponse({ success: false, error: "Seed phrase not found" });
             return;
