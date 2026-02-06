@@ -1,94 +1,46 @@
 /**
- * Background service worker for handling transactions
- * - Receives transaction requests from content script
- * - Stores pending transactions persistently
- * - Submits approved transactions to Bankr API
- * - Returns results to content script
+ * Background service worker - message router and Chrome event listeners
+ *
+ * All business logic has been extracted into focused modules:
+ * - sessionCache.ts: Credential caching, session persistence, auto-lock
+ * - authHandlers.ts: Wallet unlock, vault key system, password management
+ * - txHandlers.ts: Transaction/signature requests, notifications
+ * - chatHandlers.ts: Bankr AI chat prompt handling
+ * - sidepanelManager.ts: Side panel detection and mode management
  */
 
 import {
-  loadDecryptedApiKey,
-  hasEncryptedApiKey,
-  hasVaultKeySystem,
-  isAgentPasswordEnabled,
-  generateVaultKey,
-  encryptVaultKey,
-  tryDecryptVaultKey,
-  importVaultKey,
   encryptWithVaultKey,
-  decryptWithVaultKey,
-  EncryptedData,
 } from "./crypto";
-import {
-  submitTransaction,
-  pollJobUntilComplete,
-  cancelJob,
-  TransactionParams,
-  BankrApiError,
-} from "./bankrApi";
-import { ALLOWED_CHAIN_IDS, CHAIN_NAMES } from "../constants/networks";
-import { CHAIN_CONFIG } from "../constants/chainConfig";
-import type { Account, DecryptedEntry, PasswordType } from "./types";
 import {
   getAccounts,
   getAccountById,
   getActiveAccount,
-  getActiveAccountId,
   setActiveAccountId,
   getTabAccount,
   setTabAccount,
-  clearTabAccount,
   addBankrAccount,
-  addPrivateKeyAccount as addPKAccountStorage,
-  removeAccount,
-  clearAllAccounts,
-  addressExists,
   updateAccountDisplayName,
 } from "./accountStorage";
 import {
-  addKeyToVault,
-  removeKeyFromVault,
-  getPrivateKey,
   decryptAllKeys,
-  reEncryptVault,
-  clearVault,
-  hasVaultEntries,
 } from "./vaultCrypto";
 import {
-  signAndBroadcastTransaction,
-  handleSignatureRequest as localSignatureRequest,
-  deriveAddress,
-} from "./localSigner";
-import {
-  savePendingTxRequest,
   removePendingTxRequest,
-  getPendingTxRequestById,
   getPendingTxRequests,
   clearExpiredTxRequests,
   updateBadge,
-  PendingTxRequest,
 } from "./pendingTxStorage";
 import {
-  savePendingSignatureRequest,
   removePendingSignatureRequest,
-  getPendingSignatureRequestById,
   getPendingSignatureRequests,
   clearExpiredSignatureRequests,
-  PendingSignatureRequest,
-  SignatureParams,
 } from "./pendingSignatureStorage";
 import {
-  addTxToHistory,
-  updateTxInHistory,
   getTxHistory,
   getProcessingTxs,
   clearTxHistory,
 } from "./txHistoryStorage";
-import {
-  submitChatPrompt,
-  pollChatJobUntilComplete,
-  ChatMessage,
-} from "./chatApi";
 import {
   getConversations,
   getConversation,
@@ -96,2206 +48,73 @@ import {
   deleteConversation,
   addMessageToConversation,
   updateMessageInConversation,
-  Message,
 } from "./chatStorage";
 
-// In-memory map for resolving transaction promises back to content script
-interface PendingResolver {
-  resolve: (result: TransactionResult) => void;
-}
-
-interface TransactionResult {
-  success: boolean;
-  txHash?: string;
-  error?: string;
-}
-
-const pendingResolvers = new Map<string, PendingResolver>();
-
-// In-memory map for resolving signature requests back to content script
-interface PendingSignatureResolver {
-  resolve: (result: SignatureResult) => void;
-}
-
-interface SignatureResult {
-  success: boolean;
-  signature?: string;
-  error?: string;
-}
-
-const pendingSignatureResolvers = new Map<string, PendingSignatureResolver>();
-
-// Active transaction AbortControllers for cancellation
-const activeAbortControllers = new Map<string, AbortController>();
-
-// Active job IDs and API keys for cancellation via Bankr API
-const activeJobs = new Map<string, { jobId: string; apiKey: string }>();
-
-// Store failed transaction results for display when opening from notification
-interface FailedTxResult {
-  txId: string;
-  error: string;
-  origin: string;
-  chainId: number;
-  timestamp: number;
-}
-const failedTxResults = new Map<string, FailedTxResult>();
-
-// Session cache for decrypted API key and password (cleared on restart/suspend)
-let cachedApiKey: string | null = null;
-let cachedPassword: string | null = null;
-let cacheTimestamp: number = 0;
-
-// Session cache for decrypted vault entries (cleared on restart/suspend)
-// CRITICAL: Private keys only exist here in memory, never sent via messages
-let cachedVault: DecryptedEntry[] | null = null;
-let vaultCacheTimestamp: number = 0;
-
-// Session cache for password type (master or agent)
-// Used to restrict certain operations (like private key reveal) for agent sessions
-let cachedPasswordType: PasswordType | null = null;
-
-// Session cache for decrypted vault key
-// This is the intermediate key that decrypts actual data (API key, private keys)
-let cachedVaultKey: CryptoKey | null = null;
-
-// Session ID for tracking active sessions across service worker restarts
-// Used with chrome.storage.session for session restoration when auto-lock is "Never"
-let currentSessionId: string | null = null;
-
-// UI connection tracking for auto-lock
-// While any popup/sidepanel is connected, the cache never expires
-let activeUIConnections = 0;
-
-// Auto-lock timeout configuration
-const DEFAULT_AUTO_LOCK_TIMEOUT = 0; // Never (infinite) by default
-const AUTO_LOCK_STORAGE_KEY = "autoLockTimeout";
-let cachedAutoLockTimeout: number | null = null;
-
-// Valid auto-lock timeout values (in milliseconds)
-const VALID_AUTO_LOCK_TIMEOUTS = new Set([
-  60000,      // 1 minute
-  300000,     // 5 minutes
-  900000,     // 15 minutes
-  1800000,    // 30 minutes
-  3600000,    // 1 hour
-  14400000,   // 4 hours
-  0,          // Never (default)
-]);
-
-/**
- * Gets the auto-lock timeout from storage (with caching)
- */
-async function getAutoLockTimeout(): Promise<number> {
-  if (cachedAutoLockTimeout !== null) {
-    return cachedAutoLockTimeout;
-  }
-  const result = await chrome.storage.sync.get(AUTO_LOCK_STORAGE_KEY);
-  const timeout = result[AUTO_LOCK_STORAGE_KEY] ?? DEFAULT_AUTO_LOCK_TIMEOUT;
-  cachedAutoLockTimeout = timeout;
-  return timeout;
-}
-
-/**
- * Sets the auto-lock timeout in storage
- * Returns false if the timeout value is not in the allowed list
- */
-async function setAutoLockTimeout(timeout: number): Promise<boolean> {
-  if (!VALID_AUTO_LOCK_TIMEOUTS.has(timeout)) {
-    return false;
-  }
-
-  const previousTimeout = cachedAutoLockTimeout ?? DEFAULT_AUTO_LOCK_TIMEOUT;
-  await chrome.storage.sync.set({ [AUTO_LOCK_STORAGE_KEY]: timeout });
-  cachedAutoLockTimeout = timeout;
-
-  // Handle session storage based on auto-lock setting changes
-  if (timeout !== 0 && previousTimeout === 0) {
-    // Changed from "Never" to a timed setting - clear session storage
-    await clearSessionStorage();
-  } else if (timeout === 0 && previousTimeout !== 0 && (getCachedApiKey() !== null || getCachedVault() !== null)) {
-    // Changed to "Never" while unlocked - store session for restoration
-    const password = getCachedPassword();
-    if (password) {
-      currentSessionId = crypto.randomUUID();
-      await storeSessionMetadata(currentSessionId, true);
-      await storeSessionPassword(password);
-    }
-  }
-
-  return true;
-}
-
-// Listen for storage changes to update cached timeout and broadcast address changes
-chrome.storage.onChanged.addListener(async (changes, areaName) => {
-  if (areaName === "sync") {
-    if (changes[AUTO_LOCK_STORAGE_KEY]) {
-      cachedAutoLockTimeout = changes[AUTO_LOCK_STORAGE_KEY].newValue ?? DEFAULT_AUTO_LOCK_TIMEOUT;
-    }
-
-    // Broadcast address changes to all tabs so dapps receive accountsChanged event
-    if (changes.address) {
-      const newAddress = changes.address.newValue;
-      const newDisplayAddress = changes.displayAddress?.newValue || newAddress;
-
-      if (newAddress) {
-        // Get all tabs and send setAddress message
-        const tabs = await chrome.tabs.query({});
-        for (const tab of tabs) {
-          if (tab.id && tab.url && !tab.url.startsWith("chrome://") && !tab.url.startsWith("chrome-extension://")) {
-            chrome.tabs.sendMessage(tab.id, {
-              type: "setAddress",
-              msg: { address: newAddress, displayAddress: newDisplayAddress },
-            }).catch(() => {
-              // Ignore errors for tabs without content script
-            });
-          }
-        }
-      }
-    }
-  }
-});
-
-/**
- * Gets cached API key if still valid
- */
-function getCachedApiKey(): string | null {
-  const timeout = cachedAutoLockTimeout ?? DEFAULT_AUTO_LOCK_TIMEOUT;
-  // Skip timeout check while UI is open, or if timeout is 0 ("Never")
-  if (cachedApiKey && (activeUIConnections > 0 || timeout === 0 || Date.now() - cacheTimestamp < timeout)) {
-    return cachedApiKey;
-  }
-  cachedApiKey = null;
-  cachedPassword = null;
-  return null;
-}
-
-/**
- * Gets cached password if still valid
- */
-function getCachedPassword(): string | null {
-  const timeout = cachedAutoLockTimeout ?? DEFAULT_AUTO_LOCK_TIMEOUT;
-  // Skip timeout check while UI is open, or if timeout is 0 ("Never")
-  if (cachedPassword && (activeUIConnections > 0 || timeout === 0 || Date.now() - cacheTimestamp < timeout)) {
-    return cachedPassword;
-  }
-  cachedPassword = null;
-  return null;
-}
-
-/**
- * Caches the decrypted API key and password
- */
-function setCachedApiKey(apiKey: string, password?: string): void {
-  cachedApiKey = apiKey;
-  if (password) {
-    cachedPassword = password;
-  }
-  cacheTimestamp = Date.now();
-}
-
-/**
- * Clears the cached API key, password, vault key, and password type
- */
-function clearCachedApiKey(): void {
-  cachedApiKey = null;
-  cachedPassword = null;
-  cachedPasswordType = null;
-  cachedVaultKey = null;
-  cacheTimestamp = 0;
-}
-
-/**
- * Gets cached vault if still valid
- */
-function getCachedVault(): DecryptedEntry[] | null {
-  const timeout = cachedAutoLockTimeout ?? DEFAULT_AUTO_LOCK_TIMEOUT;
-  // Skip timeout check while UI is open, or if timeout is 0 ("Never")
-  if (cachedVault && (activeUIConnections > 0 || timeout === 0 || Date.now() - vaultCacheTimestamp < timeout)) {
-    return cachedVault;
-  }
-  cachedVault = null;
-  return null;
-}
-
-/**
- * Caches the decrypted vault entries
- */
-function setCachedVault(vault: DecryptedEntry[]): void {
-  cachedVault = vault;
-  vaultCacheTimestamp = Date.now();
-}
-
-/**
- * Clears the cached vault
- */
-function clearCachedVault(): void {
-  cachedVault = null;
-  vaultCacheTimestamp = 0;
-}
-
-/**
- * Stores encrypted session password in chrome.storage.session for session restoration.
- * Only used when auto-lock is "Never" to allow seamless session recovery after
- * service worker restarts.
- *
- * Security: The password is encrypted with a random key that is also stored in
- * session storage. This provides protection against simple session storage reads
- * while still allowing session restoration. The session storage is cleared when
- * the browser closes or user manually locks.
- */
-async function storeSessionPassword(password: string): Promise<void> {
-  const sessionKey = crypto.getRandomValues(new Uint8Array(32));
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-
-  const key = await crypto.subtle.importKey("raw", sessionKey, "AES-GCM", false, ["encrypt"]);
-  const encoded = new TextEncoder().encode(password);
-  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
-
-  await chrome.storage.session.set({
-    encryptedSessionPassword: {
-      data: btoa(String.fromCharCode(...new Uint8Array(encrypted))),
-      key: btoa(String.fromCharCode(...sessionKey)),
-      iv: btoa(String.fromCharCode(...iv)),
-    },
-  });
-}
-
-/**
- * Retrieves and decrypts the session password from chrome.storage.session.
- * Returns null if no session password is stored or decryption fails.
- */
-async function getSessionPassword(): Promise<string | null> {
-  const session = await chrome.storage.session.get("encryptedSessionPassword");
-  if (!session.encryptedSessionPassword) {
-    return null;
-  }
-
-  try {
-    const { data, key: keyB64, iv: ivB64 } = session.encryptedSessionPassword;
-
-    // Decode base64
-    const encryptedData = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
-    const sessionKey = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
-    const iv = Uint8Array.from(atob(ivB64), (c) => c.charCodeAt(0));
-
-    const key = await crypto.subtle.importKey("raw", sessionKey, "AES-GCM", false, ["decrypt"]);
-    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, encryptedData);
-
-    return new TextDecoder().decode(decrypted);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Stores session metadata in chrome.storage.session.
- * Called after successful unlock when auto-lock is "Never".
- */
-async function storeSessionMetadata(sessionId: string, autoLockNever: boolean): Promise<void> {
-  await chrome.storage.session.set({
-    sessionId,
-    sessionStartedAt: Date.now(),
-    autoLockNever,
-  });
-}
-
-/**
- * Clears all session data from chrome.storage.session.
- * Called when user manually locks or session expires.
- */
-async function clearSessionStorage(): Promise<void> {
-  currentSessionId = null;
-  await chrome.storage.session.clear();
-}
-
-/**
- * Attempts to restore a session after service worker restart.
- * Only works when auto-lock is "Never" and session data exists.
- * Returns true if session was successfully restored.
- */
-async function tryRestoreSession(): Promise<boolean> {
-  const session = await chrome.storage.session.get([
-    "sessionId",
-    "autoLockNever",
-    "encryptedSessionPassword",
-  ]);
-
-  // Check if we have a valid session to restore
-  if (!session.sessionId || !session.autoLockNever || !session.encryptedSessionPassword) {
-    return false;
-  }
-
-  try {
-    // Get the session password
-    const password = await getSessionPassword();
-    if (!password) {
-      await clearSessionStorage();
-      return false;
-    }
-
-    // Try to unlock with the stored password
-    const result = await handleUnlockWallet(password);
-    if (!result.success) {
-      await clearSessionStorage();
-      return false;
-    }
-
-    // Restore session ID
-    currentSessionId = session.sessionId;
-
-    // Re-store the session password for future restarts
-    await storeSessionPassword(password);
-
-    console.log("Session restored successfully after service worker restart");
-    return true;
-  } catch (error) {
-    console.error("Failed to restore session:", error);
-    await clearSessionStorage();
-    return false;
-  }
-}
-
-/**
- * Gets a private key from the cached vault
- */
-function getPrivateKeyFromCache(accountId: string): `0x${string}` | null {
-  const vault = getCachedVault();
-  if (!vault) {
-    return null;
-  }
-  const entry = vault.find((e) => e.id === accountId);
-  return entry?.privateKey || null;
-}
-
-/**
- * Performs a full security reset - clears ALL sensitive data from memory
- * This should be called when resetting the extension
- */
-function performSecurityReset(): void {
-  // 1. Clear cached credentials
-  clearCachedApiKey();
-
-  // 1.5. Clear cached vault (private keys)
-  clearCachedVault();
-
-  // 2. Abort all active transactions and clear their API keys from memory
-  for (const [txId, abortController] of activeAbortControllers.entries()) {
-    try {
-      abortController.abort();
-    } catch {
-      // Ignore abort errors
-    }
-  }
-  activeAbortControllers.clear();
-
-  // 3. Clear activeJobs which contains decrypted API keys for in-flight transactions
-  // This is critical - API keys must not persist after reset
-  activeJobs.clear();
-
-  // 4. Reject all pending resolvers with reset error
-  for (const [txId, resolver] of pendingResolvers.entries()) {
-    try {
-      resolver.resolve({ success: false, error: "Extension was reset" });
-    } catch {
-      // Ignore errors
-    }
-  }
-  pendingResolvers.clear();
-
-  // 5. Reject all pending signature resolvers with reset error
-  for (const [sigId, resolver] of pendingSignatureResolvers.entries()) {
-    try {
-      resolver.resolve({ success: false, error: "Extension was reset" });
-    } catch {
-      // Ignore errors
-    }
-  }
-  pendingSignatureResolvers.clear();
-
-  // 6. Clear failed transaction results
-  failedTxResults.clear();
-}
-
-// Clear cache when service worker suspends
-self.addEventListener("suspend", () => {
-  clearCachedApiKey();
-  clearCachedVault();
-});
-
-// Clean up expired transactions and signature requests periodically
-setInterval(() => {
-  clearExpiredTxRequests();
-  clearExpiredSignatureRequests();
-}, 60000); // Every minute
-
-// Initialize badge on startup
-updateBadge();
-
-// Initialize auto-lock timeout cache on startup
-getAutoLockTimeout();
-
-// Handle extension install/update
-chrome.runtime.onInstalled.addListener(async (details) => {
-  if (details.reason === "install") {
-    // First time install - open onboarding page
-    const onboardingUrl = chrome.runtime.getURL("onboarding.html");
-    await chrome.tabs.create({ url: onboardingUrl });
-  }
-});
-
-/**
- * Checks if we're running in Arc browser
- * Arc has chrome.sidePanel but it doesn't work properly
- * Note: In service worker context, we can't check CSS variables, so we use storage
- */
-function isArcBrowser(): boolean {
-  try {
-    // Arc browser identifies itself in the user agent
-    return navigator.userAgent.includes("Arc/");
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Checks if the browser supports the sidePanel API
- * Note: Some browsers (like Arc) may have chrome.sidePanel defined but non-functional
- */
-function isSidePanelSupported(): boolean {
-  try {
-    // Arc browser has broken sidepanel support - skip entirely
-    if (isArcBrowser()) {
-      return false;
-    }
-    return typeof chrome !== "undefined" &&
-      typeof chrome.sidePanel !== "undefined" &&
-      chrome.sidePanel !== null &&
-      typeof chrome.sidePanel.setPanelBehavior === "function";
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Tests if sidepanel actually works by attempting to set panel behavior
- * Returns true only if the API call succeeds
- */
-async function testSidePanelWorks(): Promise<boolean> {
-  try {
-    if (!isSidePanelSupported()) {
-      return false;
-    }
-
-    // Try to set panel behavior - if this fails, the API is broken
-    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
-    return true;
-  } catch (error) {
-    console.warn("SidePanel API exists but is non-functional:", error);
-    return false;
-  }
-}
-
-/**
- * Gets the current sidepanel mode setting
- */
-async function getSidePanelMode(): Promise<boolean> {
-  if (!isSidePanelSupported()) {
-    return false;
-  }
-  // Check if we've previously determined sidepanel doesn't work (e.g., Arc browser)
-  const { sidePanelMode, sidePanelVerified } = await chrome.storage.sync.get(["sidePanelMode", "sidePanelVerified"]);
-
-  // If we haven't verified yet, or verification found it doesn't work, return false
-  if (sidePanelVerified === false) {
-    return false;
-  }
-
-  // Default to true (sidepanel mode) if supported and not explicitly set to false
-  return sidePanelMode !== false;
-}
-
-/**
- * Sets the sidepanel mode setting
- * Returns false if setting sidepanel behavior failed (browser doesn't support it properly)
- */
-async function setSidePanelMode(enabled: boolean): Promise<boolean> {
-  // Check if Arc browser first - sidepanel is broken there
-  const { isArcBrowser: storedIsArc } = await chrome.storage.sync.get(["isArcBrowser"]);
-  if (storedIsArc && enabled) {
-    // Can't enable sidepanel in Arc
-    return false;
-  }
-
-  if (!isSidePanelSupported()) {
-    // No sidepanel support at all
-    if (enabled) {
-      return false;
-    }
-    await chrome.storage.sync.set({ sidePanelMode: false });
-    return true; // Successfully set to popup mode (the only option)
-  }
-
-  try {
-    if (enabled) {
-      // Trying to enable sidepanel - test first
-      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-      // If we get here, it worked
-      await chrome.storage.sync.set({ sidePanelMode: true, sidePanelVerified: true });
-      return true;
-    } else {
-      // Disabling sidepanel (going to popup mode)
-      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
-      await chrome.storage.sync.set({ sidePanelMode: false });
-      return true;
-    }
-  } catch (error) {
-    console.warn("Failed to set sidepanel behavior:", error);
-    // Mark sidepanel as not working for this browser
-    await chrome.storage.sync.set({ sidePanelVerified: false, sidePanelMode: false });
-    return false;
-  }
-}
-
-// Initialize sidepanel behavior on startup
-// IMPORTANT: We default to popup mode and only enable sidepanel when explicitly requested by UI
-// This ensures Arc browser (where sidepanel is broken) works properly with popup
-(async () => {
-  try {
-    // Check if we've stored that this is Arc browser (detected by UI via CSS variable)
-    const { isArcBrowser: storedIsArc, sidePanelMode, sidePanelVerified } = await chrome.storage.sync.get([
-      "isArcBrowser",
-      "sidePanelMode",
-      "sidePanelVerified"
-    ]);
-
-    if (storedIsArc) {
-      // Arc browser - sidepanel doesn't work, ensure popup mode
-      console.log("Arc browser detected, ensuring popup mode");
-      // Make absolutely sure sidepanel won't intercept clicks
-      if (chrome.sidePanel?.setPanelBehavior) {
-        try {
-          await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
-        } catch {
-          // Ignore errors
-        }
-      }
-      return;
-    }
-
-    // If sidepanel has been verified as not working, ensure popup mode
-    if (sidePanelVerified === false) {
-      if (chrome.sidePanel?.setPanelBehavior) {
-        try {
-          await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
-        } catch {
-          // Ignore errors
-        }
-      }
-      return;
-    }
-
-    // Only enable sidepanel if it's explicitly been enabled by user AND verified to work
-    // This is the key change: we don't auto-enable sidepanel on first run
-    if (isSidePanelSupported() && sidePanelMode === true && sidePanelVerified === true) {
-      try {
-        await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-      } catch (error) {
-        // If setting sidepanel fails, disable it
-        console.warn("Failed to enable sidepanel:", error);
-        await chrome.storage.sync.set({ sidePanelVerified: false, sidePanelMode: false });
-      }
-    } else {
-      // Default: ensure popup mode (sidepanel won't intercept clicks)
-      if (chrome.sidePanel?.setPanelBehavior) {
-        try {
-          await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
-        } catch {
-          // Ignore errors - some browsers don't have this API
-        }
-      }
-    }
-  } catch (error) {
-    // If anything fails during sidepanel initialization, log and continue
-    // The extension will fall back to popup mode (which is the safe default)
-    console.error("Error during sidepanel initialization:", error);
-  }
-})();
-
-/**
- * Handles incoming transaction requests from content script
- */
-async function handleTransactionRequest(
-  message: {
-    type: string;
-    tx: TransactionParams;
-    origin: string;
-    favicon?: string | null;
-  },
-  sendResponse: (response: TransactionResult) => void,
-  senderWindowId?: number
-): Promise<void> {
-  const { tx, origin, favicon } = message;
-
-  // Validate chain ID
-  if (!ALLOWED_CHAIN_IDS.has(tx.chainId)) {
-    sendResponse({
-      success: false,
-      error: `Chain ${tx.chainId} not supported. Supported chains: ${Array.from(
-        ALLOWED_CHAIN_IDS
-      )
-        .map((id) => CHAIN_NAMES[id] || id)
-        .join(", ")}`,
-    });
-    return;
-  }
-
-  // Check if API key is configured
-  const hasKey = await hasEncryptedApiKey();
-  if (!hasKey) {
-    sendResponse({
-      success: false,
-      error: "API key not configured. Please configure your Bankr API key in the extension settings.",
-    });
-    return;
-  }
-
-  // Create pending transaction request
-  const txId = crypto.randomUUID();
-  const chainName = CHAIN_NAMES[tx.chainId] || `Chain ${tx.chainId}`;
-
-  const pendingRequest: PendingTxRequest = {
-    id: txId,
-    tx,
-    origin,
-    favicon: favicon || null,
-    chainName,
-    timestamp: Date.now(),
-  };
-
-  // Store the pending request persistently
-  await savePendingTxRequest(pendingRequest);
-
-  // Store the resolver to respond when user confirms/rejects
-  pendingResolvers.set(txId, { resolve: sendResponse });
-
-  // Notify any open extension views (sidepanel/popup) about the new tx request
-  chrome.runtime.sendMessage({ type: "newPendingTxRequest", txRequest: pendingRequest }).catch(() => {
-    // Ignore errors if no listeners (popup/sidepanel not open)
-  });
-
-  // Open the extension popup/sidepanel for user to confirm
-  openExtensionPopup(senderWindowId);
-}
-
-/**
- * Handles incoming signature requests from content script
- */
-async function handleSignatureRequest(
-  message: {
-    type: string;
-    signature: SignatureParams;
-    origin: string;
-    favicon?: string | null;
-  },
-  sendResponse: (response: SignatureResult) => void,
-  senderWindowId?: number
-): Promise<void> {
-  const { signature, origin, favicon } = message;
-
-  // Create pending signature request
-  const sigId = crypto.randomUUID();
-  const chainName = CHAIN_NAMES[signature.chainId] || `Chain ${signature.chainId}`;
-
-  const pendingRequest: PendingSignatureRequest = {
-    id: sigId,
-    signature,
-    origin,
-    favicon: favicon || null,
-    chainName,
-    timestamp: Date.now(),
-  };
-
-  // Store the pending request persistently
-  await savePendingSignatureRequest(pendingRequest);
-
-  // Store the resolver to respond when user cancels
-  pendingSignatureResolvers.set(sigId, { resolve: sendResponse });
-
-  // Notify any open extension views (sidepanel/popup) about the new signature request
-  chrome.runtime.sendMessage({ type: "newPendingSignatureRequest", sigRequest: pendingRequest }).catch(() => {
-    // Ignore errors if no listeners (popup/sidepanel not open)
-  });
-
-  // Open the extension popup/sidepanel for user to view
-  openExtensionPopup(senderWindowId);
-}
-
-/**
- * Opens the extension popup window for transaction confirmation
- * Respects user preference, falls back to popup for unsupported browsers (e.g., Arc)
- */
-async function openExtensionPopup(senderWindowId?: number): Promise<void> {
-  const useSidePanel = await getSidePanelMode();
-
-  // If sidepanel mode is enabled, check if we can detect an open sidepanel
-  // by trying to send a ping message - if a view responds, it's open
-  if (useSidePanel && isSidePanelSupported()) {
-    try {
-      // Try to ping any open extension views
-      const response = await chrome.runtime.sendMessage({ type: "ping" }).catch(() => null);
-      if (response === "pong") {
-        // An extension view is open and responded, don't open popup
-        return;
-      }
-    } catch {
-      // No views responded, continue to open popup
-    }
-  }
-  const existingWindows = await chrome.windows.getAll({ windowTypes: ["popup"] });
-  const popupUrl = chrome.runtime.getURL("index.html");
-
-  for (const win of existingWindows) {
-    if (win.id) {
-      const tabs = await chrome.tabs.query({ windowId: win.id });
-      if (tabs.some(tab => tab.url?.startsWith(popupUrl))) {
-        // Focus existing popup window
-        await chrome.windows.update(win.id, { focused: true });
-        return;
-      }
-    }
-  }
-
-  // Get the window where the dapp is running
-  // Try multiple methods to ensure we get the correct window
-  let targetWindow: chrome.windows.Window | null = null;
-
-  // Method 1: Use sender's window ID (most accurate)
-  if (senderWindowId) {
-    try {
-      targetWindow = await chrome.windows.get(senderWindowId, { populate: false });
-    } catch {
-      // Window might have been closed
-      targetWindow = null;
-    }
-  }
-
-  // Method 2: Fall back to last focused window
-  if (!targetWindow || targetWindow.left === undefined) {
-    try {
-      targetWindow = await chrome.windows.getLastFocused({ populate: false });
-    } catch {
-      targetWindow = null;
-    }
-  }
-
-  const popupWidth = 360;
-  const popupHeight = 680;
-
-  // Calculate position: top-right of target window
-  // Use the window's actual coordinates (which include multi-monitor offsets)
-  let left: number | undefined;
-  let top: number | undefined;
-
-  if (targetWindow &&
-      targetWindow.left !== undefined &&
-      targetWindow.width !== undefined &&
-      targetWindow.top !== undefined) {
-    // Position at right edge of target window, with small margin
-    left = targetWindow.left + targetWindow.width - popupWidth - 10;
-    // Position at top of target window, with margin for toolbar
-    top = targetWindow.top + 80;
-  }
-
-  // Create new popup window
-  const createOptions: chrome.windows.CreateData = {
-    url: popupUrl,
-    type: "popup",
-    width: popupWidth,
-    height: popupHeight,
-    focused: true,
-  };
-
-  // Only set position if we have valid coordinates
-  // This allows Chrome to handle positioning on the correct monitor
-  if (left !== undefined && top !== undefined) {
-    createOptions.left = left;
-    createOptions.top = top;
-  }
-
-  await chrome.windows.create(createOptions);
-}
-
-/**
- * Opens a popup window (used when switching from sidepanel to popup mode)
- */
-async function openPopupWindow(): Promise<void> {
-  const popupUrl = chrome.runtime.getURL("index.html");
-
-  // Check if popup window already exists
-  const existingWindows = await chrome.windows.getAll({ windowTypes: ["popup"] });
-  for (const win of existingWindows) {
-    if (win.id) {
-      const tabs = await chrome.tabs.query({ windowId: win.id });
-      if (tabs.some(tab => tab.url?.startsWith(popupUrl))) {
-        await chrome.windows.update(win.id, { focused: true });
-        return;
-      }
-    }
-  }
-
-  // Get last focused window for positioning
-  let targetWindow: chrome.windows.Window | null = null;
-  try {
-    targetWindow = await chrome.windows.getLastFocused({ populate: false });
-  } catch {
-    targetWindow = null;
-  }
-
-  const popupWidth = 360;
-  const popupHeight = 680;
-
-  let left: number | undefined;
-  let top: number | undefined;
-
-  if (targetWindow &&
-      targetWindow.left !== undefined &&
-      targetWindow.width !== undefined &&
-      targetWindow.top !== undefined) {
-    left = targetWindow.left + targetWindow.width - popupWidth - 10;
-    top = targetWindow.top + 80;
-  }
-
-  const createOptions: chrome.windows.CreateData = {
-    url: popupUrl,
-    type: "popup",
-    width: popupWidth,
-    height: popupHeight,
-    focused: true,
-  };
-
-  if (left !== undefined && top !== undefined) {
-    createOptions.left = left;
-    createOptions.top = top;
-  }
-
-  await chrome.windows.create(createOptions);
-}
-
-/**
- * Handles confirmation from the popup
- */
-async function handleConfirmTransaction(
-  txId: string,
-  password: string
-): Promise<TransactionResult> {
-  const pending = await getPendingTxRequestById(txId);
-  if (!pending) {
-    return { success: false, error: "Transaction not found or expired" };
-  }
-
-  // Try to use cached API key first
-  let apiKey = getCachedApiKey();
-
-  if (!apiKey) {
-    // Decrypt API key with provided password
-    apiKey = await loadDecryptedApiKey(password);
-    if (!apiKey) {
-      return { success: false, error: "Invalid password" };
-    }
-    // Cache the API key and password for future transactions
-    setCachedApiKey(apiKey, password);
-  }
-
-  // Create AbortController for this transaction
-  const abortController = new AbortController();
-  activeAbortControllers.set(txId, abortController);
-
-  try {
-    // Submit transaction to Bankr API
-    const { jobId } = await submitTransaction(apiKey, pending.tx, abortController.signal);
-
-    // Store job ID and API key for potential cancellation
-    activeJobs.set(txId, { jobId, apiKey });
-
-    // Poll for completion
-    const status = await pollJobUntilComplete(apiKey, jobId, {
-      pollInterval: 2000,
-      maxDuration: 300000, // 5 minutes
-      signal: abortController.signal,
-    });
-
-    if (status.status === "completed") {
-      // Check for txHash in result
-      const txHash = status.result?.txHash;
-      if (txHash) {
-        return { success: true, txHash };
-      }
-
-      const response = status.response || "";
-
-      // Extract transaction hash from response (0x + 64 hex chars)
-      const txHashMatch = response.match(/0x[a-fA-F0-9]{64}/);
-
-      if (txHashMatch) {
-        return {
-          success: true,
-          txHash: txHashMatch[0],
-        };
-      }
-
-      // Check if response contains a transaction URL (indicates success but couldn't extract hash)
-      const hasExplorerUrl =
-        response.includes("basescan.org/tx/") ||
-        response.includes("etherscan.io/tx/") ||
-        response.includes("polygonscan.com/tx/") ||
-        response.includes("uniscan.xyz/tx/") ||
-        response.includes("unichain.org/tx/");
-
-      if (hasExplorerUrl) {
-        return {
-          success: true,
-          txHash: response,
-        };
-      }
-
-      // Check if response indicates an error
-      const isErrorResponse =
-        response.toLowerCase().includes("missing required") ||
-        response.toLowerCase().includes("error") ||
-        response.toLowerCase().includes("can't execute") ||
-        response.toLowerCase().includes("cannot") ||
-        response.toLowerCase().includes("unable to") ||
-        response.toLowerCase().includes("invalid") ||
-        response.toLowerCase().includes("not supported");
-
-      if (isErrorResponse) {
-        return {
-          success: false,
-          error: response,
-        };
-      }
-
-      // If we have status updates, it likely succeeded
-      if (status.statusUpdates && status.statusUpdates.length > 0) {
-        return {
-          success: true,
-          txHash: response || "Transaction completed"
-        };
-      }
-
-      // Fallback - assume success if status is completed
-      return {
-        success: true,
-        txHash: response || "Transaction completed",
-      };
-    } else if (status.status === "failed") {
-      return {
-        success: false,
-        error: status.result?.error || status.response || "Transaction failed",
-      };
-    } else {
-      return { success: false, error: "Unexpected job status" };
-    }
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      return { success: false, error: "Transaction cancelled by user" };
-    }
-    if (error instanceof BankrApiError) {
-      return { success: false, error: error.message };
-    }
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  } finally {
-    activeAbortControllers.delete(txId);
-    activeJobs.delete(txId);
-  }
-}
-
-/**
- * Handles rejection from the popup
- */
-function handleRejectTransaction(txId: string): TransactionResult {
-  return { success: false, error: "Transaction rejected by user" };
-}
-
-/**
- * Handles cancellation of an in-progress transaction
- */
-async function handleCancelTransaction(txId: string): Promise<{ success: boolean; error?: string }> {
-  const abortController = activeAbortControllers.get(txId);
-  const activeJob = activeJobs.get(txId);
-
-  if (!abortController && !activeJob) {
-    return { success: false, error: "No active transaction to cancel" };
-  }
-
-  // Abort local polling
-  if (abortController) {
-    abortController.abort();
-    activeAbortControllers.delete(txId);
-  }
-
-  // Cancel job via Bankr API
-  if (activeJob) {
-    try {
-      await cancelJob(activeJob.apiKey, activeJob.jobId);
-    } catch (error) {
-      // Log but don't fail - local abort is enough
-      console.error("Failed to cancel job via API:", error);
-    }
-    activeJobs.delete(txId);
-  }
-
-  return { success: true };
-}
-
-/**
- * Shows a browser notification
- */
-async function showNotification(
-  notificationId: string,
-  title: string,
-  message: string
-): Promise<string> {
-  return new Promise((resolve) => {
-    chrome.notifications.create(
-      notificationId,
-      {
-        type: "basic",
-        iconUrl: chrome.runtime.getURL("icons/icon128.png"),
-        title,
-        message,
-        priority: 2,
-      },
-      (createdId) => {
-        if (chrome.runtime.lastError) {
-          console.error("Notification error:", chrome.runtime.lastError);
-        }
-        resolve(createdId || notificationId);
-      }
-    );
-  });
-}
-
-/**
- * Handles async confirmation - returns immediately and polls in background
- */
-async function handleConfirmTransactionAsync(
-  txId: string,
-  password: string
-): Promise<{ success: boolean; error?: string }> {
-  const pending = await getPendingTxRequestById(txId);
-  if (!pending) {
-    return { success: false, error: "Transaction not found or expired" };
-  }
-
-  // Try to use cached API key first
-  let apiKey = getCachedApiKey();
-
-  if (!apiKey) {
-    // Decrypt API key with provided password
-    apiKey = await loadDecryptedApiKey(password);
-    if (!apiKey) {
-      return { success: false, error: "Invalid password" };
-    }
-    // Cache the API key and password for future transactions
-    setCachedApiKey(apiKey, password);
-  }
-
-  // Remove from pending storage immediately
-  await removePendingTxRequest(txId);
-
-  // Start background processing
-  processTransactionInBackground(txId, pending, apiKey);
-
-  return { success: true };
-}
-
-/**
- * Processes transaction in background and shows notification on completion
- */
-async function processTransactionInBackground(
-  txId: string,
-  pending: PendingTxRequest,
-  apiKey: string
-): Promise<void> {
-  // Create AbortController for this transaction
-  const abortController = new AbortController();
-  activeAbortControllers.set(txId, abortController);
-
-  // Save to history as "processing" immediately
-  await addTxToHistory({
-    id: txId,
-    status: "processing",
-    tx: pending.tx,
-    origin: pending.origin,
-    favicon: pending.favicon,
-    chainName: pending.chainName,
-    chainId: pending.tx.chainId,
-    createdAt: pending.timestamp,
-  });
-
-  try {
-    // Submit transaction to Bankr API
-    const { jobId } = await submitTransaction(apiKey, pending.tx, abortController.signal);
-
-    // Store job ID and API key for potential cancellation
-    activeJobs.set(txId, { jobId, apiKey });
-
-    // Poll for completion
-    const status = await pollJobUntilComplete(apiKey, jobId, {
-      pollInterval: 2000,
-      maxDuration: 300000, // 5 minutes
-      signal: abortController.signal,
-    });
-
-    // Send result back to content script
-    const resolver = pendingResolvers.get(txId);
-
-    if (status.status === "completed") {
-      // Check for txHash in result
-      let txHash = status.result?.txHash;
-      const response = status.response || "";
-
-      if (!txHash) {
-        // Extract transaction hash from response (0x + 64 hex chars)
-        const txHashMatch = response.match(/0x[a-fA-F0-9]{64}/);
-        if (txHashMatch) {
-          txHash = txHashMatch[0];
-        }
-      }
-
-      if (txHash) {
-        // Update history to "success"
-        await updateTxInHistory(txId, {
-          status: "success",
-          txHash,
-          completedAt: Date.now(),
-        });
-
-        // Success with hash - show notification
-        const notificationId = `tx-success-${txId}`;
-        const chainConfig = CHAIN_CONFIG[pending.tx.chainId];
-        const explorerUrl = chainConfig?.explorer
-          ? `${chainConfig.explorer}/tx/${txHash}`
-          : null;
-
-        // Store explorer URL for notification click
-        if (explorerUrl) {
-          chrome.storage.local.set({ [`notification-${notificationId}`]: explorerUrl });
-        }
-
-        await showNotification(
-          notificationId,
-          "Transaction Confirmed",
-          `Transaction on ${pending.chainName} was successful. Click to view.`
-        );
-
-        if (resolver) {
-          resolver.resolve({ success: true, txHash });
-        }
-      } else {
-        // Check if response contains a transaction URL
-        const hasExplorerUrl =
-          response.includes("basescan.org/tx/") ||
-          response.includes("etherscan.io/tx/") ||
-          response.includes("polygonscan.com/tx/") ||
-          response.includes("uniscan.xyz/tx/") ||
-          response.includes("unichain.org/tx/");
-
-        if (hasExplorerUrl || (status.statusUpdates && status.statusUpdates.length > 0)) {
-          // Update history to "success"
-          await updateTxInHistory(txId, {
-            status: "success",
-            txHash: response || undefined,
-            completedAt: Date.now(),
-          });
-
-          await showNotification(
-            `tx-success-${txId}`,
-            "Transaction Completed",
-            `Transaction on ${pending.chainName} completed.`
-          );
-
-          if (resolver) {
-            resolver.resolve({ success: true, txHash: response || "Transaction completed" });
-          }
-        } else {
-          // Check if response indicates an error
-          const isErrorResponse =
-            response.toLowerCase().includes("missing required") ||
-            response.toLowerCase().includes("error") ||
-            response.toLowerCase().includes("can't execute") ||
-            response.toLowerCase().includes("cannot") ||
-            response.toLowerCase().includes("unable to") ||
-            response.toLowerCase().includes("invalid") ||
-            response.toLowerCase().includes("not supported");
-
-          if (isErrorResponse) {
-            await handleTransactionFailure(txId, pending, response, resolver);
-          } else {
-            // Assume success - update history
-            await updateTxInHistory(txId, {
-              status: "success",
-              txHash: response || undefined,
-              completedAt: Date.now(),
-            });
-
-            await showNotification(
-              `tx-success-${txId}`,
-              "Transaction Completed",
-              `Transaction on ${pending.chainName} completed.`
-            );
-
-            if (resolver) {
-              resolver.resolve({ success: true, txHash: response || "Transaction completed" });
-            }
-          }
-        }
-      }
-    } else if (status.status === "failed") {
-      const error = status.result?.error || status.response || "Transaction failed";
-      await handleTransactionFailure(txId, pending, error, resolver);
-    } else {
-      await handleTransactionFailure(txId, pending, "Unexpected job status", resolver);
-    }
-  } catch (error) {
-    const resolver = pendingResolvers.get(txId);
-    let errorMessage = "Unknown error";
-
-    if (error instanceof Error) {
-      if (error.name === "AbortError") {
-        errorMessage = "Transaction cancelled by user";
-      } else {
-        errorMessage = error.message;
-      }
-    }
-
-    await handleTransactionFailure(txId, pending, errorMessage, resolver);
-  } finally {
-    activeAbortControllers.delete(txId);
-    activeJobs.delete(txId);
-    pendingResolvers.delete(txId);
-  }
-}
-
-/**
- * Handles transaction failure - shows notification and stores error for display
- */
-async function handleTransactionFailure(
-  txId: string,
-  pending: PendingTxRequest,
-  error: string,
-  resolver?: PendingResolver
-): Promise<void> {
-  const notificationId = `tx-failed-${txId}`;
-
-  // Update history to "failed"
-  await updateTxInHistory(txId, {
-    status: "failed",
-    error,
-    completedAt: Date.now(),
-  });
-
-  // Store failed result for display when opening from notification
-  failedTxResults.set(notificationId, {
-    txId,
-    error,
-    origin: pending.origin,
-    chainId: pending.tx.chainId,
-    timestamp: Date.now(),
-  });
-
-  // Store notification ID for click handler
-  chrome.storage.local.set({ [`notification-${notificationId}`]: { type: "error", txId: notificationId } });
-
-  await showNotification(
-    notificationId,
-    "Transaction Failed",
-    error.length > 100 ? error.substring(0, 100) + "..." : error
-  );
-
-  if (resolver) {
-    resolver.resolve({ success: false, error });
-  }
-}
-
-/**
- * Checks if the API key is currently cached (no password needed)
- */
-function isApiKeyCached(): boolean {
-  return getCachedApiKey() !== null;
-}
-
-/**
- * Checks if the wallet is unlocked (either API key or vault cached)
- */
-function isWalletUnlocked(): boolean {
-  return getCachedApiKey() !== null || getCachedVault() !== null;
-}
-
-/**
- * Processes a local (PK) transaction in background
- */
-async function processLocalTransactionInBackground(
-  txId: string,
-  pending: PendingTxRequest,
-  account: Account,
-  privateKey: `0x${string}`
-): Promise<void> {
-  // Create AbortController for this transaction
-  const abortController = new AbortController();
-  activeAbortControllers.set(txId, abortController);
-
-  // Save to history as "processing" immediately
-  await addTxToHistory({
-    id: txId,
-    status: "processing",
-    tx: pending.tx,
-    origin: pending.origin,
-    favicon: pending.favicon,
-    chainName: pending.chainName,
-    chainId: pending.tx.chainId,
-    createdAt: pending.timestamp,
-  });
-
-  try {
-    // Get RPC URL for the chain
-    const { networksInfo } = await chrome.storage.sync.get("networksInfo");
-    let rpcUrl: string | undefined;
-    if (networksInfo) {
-      for (const chainName of Object.keys(networksInfo)) {
-        if (networksInfo[chainName].chainId === pending.tx.chainId) {
-          rpcUrl = networksInfo[chainName].rpcUrl;
-          break;
-        }
-      }
-    }
-
-    // Sign and broadcast the transaction
-    const result = await signAndBroadcastTransaction(privateKey, pending.tx, rpcUrl);
-    const txHash = result.txHash;
-
-    // Send result back to content script
-    const resolver = pendingResolvers.get(txId);
-
-    // Update history to "success"
-    await updateTxInHistory(txId, {
-      status: "success",
-      txHash,
-      completedAt: Date.now(),
-    });
-
-    // Show notification
-    const notificationId = `tx-success-${txId}`;
-    const chainConfig = CHAIN_CONFIG[pending.tx.chainId];
-    const explorerUrl = chainConfig?.explorer
-      ? `${chainConfig.explorer}/tx/${txHash}`
-      : null;
-
-    if (explorerUrl) {
-      chrome.storage.local.set({ [`notification-${notificationId}`]: explorerUrl });
-    }
-
-    await showNotification(
-      notificationId,
-      "Transaction Confirmed",
-      `Transaction on ${pending.chainName} was successful. Click to view.`
-    );
-
-    if (resolver) {
-      resolver.resolve({ success: true, txHash });
-    }
-  } catch (error) {
-    const resolver = pendingResolvers.get(txId);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
-    await handleTransactionFailure(txId, pending, errorMessage, resolver);
-  } finally {
-    activeAbortControllers.delete(txId);
-    pendingResolvers.delete(txId);
-  }
-}
-
-/**
- * Handles async confirmation for PK accounts - signs locally
- */
-async function handleConfirmTransactionAsyncPK(
-  txId: string,
-  password: string,
-  tabId?: number
-): Promise<{ success: boolean; error?: string }> {
-  const pending = await getPendingTxRequestById(txId);
-  if (!pending) {
-    return { success: false, error: "Transaction not found or expired" };
-  }
-
-  // Get the account for this tab
-  const account = tabId ? await getTabAccount(tabId) : await getActiveAccount();
-  if (!account) {
-    return { success: false, error: "No account found" };
-  }
-
-  if (account.type !== "privateKey") {
-    return { success: false, error: "Account is not a private key account" };
-  }
-
-  // Try to get private key from cache first
-  let privateKey = getPrivateKeyFromCache(account.id);
-
-  if (!privateKey) {
-    // Need to decrypt the vault
-    const vault = await decryptAllKeys(password);
-    if (!vault) {
-      return { success: false, error: "Invalid password" };
-    }
-    setCachedVault(vault);
-
-    // Also cache API key and password if we have encrypted API key
-    const hasApiKey = await hasEncryptedApiKey();
-    if (hasApiKey) {
-      const apiKey = await loadDecryptedApiKey(password);
-      if (apiKey) {
-        setCachedApiKey(apiKey, password);
-      }
-    }
-
-    // Get the private key from the now-cached vault
-    privateKey = getPrivateKeyFromCache(account.id);
-    if (!privateKey) {
-      return { success: false, error: "Private key not found for account" };
-    }
-  }
-
-  // Remove from pending storage immediately
-  await removePendingTxRequest(txId);
-
-  // Start background processing
-  processLocalTransactionInBackground(txId, pending, account, privateKey);
-
-  return { success: true };
-}
-
-/**
- * Handles signature confirmation for PK accounts
- */
-async function handleConfirmSignatureRequest(
-  sigId: string,
-  password: string,
-  tabId?: number
-): Promise<SignatureResult> {
-  const pending = await getPendingSignatureRequestById(sigId);
-  if (!pending) {
-    return { success: false, error: "Signature request not found or expired" };
-  }
-
-  // Get the account for this tab
-  const account = tabId ? await getTabAccount(tabId) : await getActiveAccount();
-  if (!account) {
-    return { success: false, error: "No account found" };
-  }
-
-  if (account.type !== "privateKey") {
-    return { success: false, error: "Signatures are only supported for Private Key accounts" };
-  }
-
-  // Try to get private key from cache first
-  let privateKey = getPrivateKeyFromCache(account.id);
-
-  if (!privateKey) {
-    // Need to decrypt the vault
-    const vault = await decryptAllKeys(password);
-    if (!vault) {
-      return { success: false, error: "Invalid password" };
-    }
-    setCachedVault(vault);
-
-    // Also cache API key and password if we have encrypted API key
-    const hasApiKey = await hasEncryptedApiKey();
-    if (hasApiKey) {
-      const apiKey = await loadDecryptedApiKey(password);
-      if (apiKey) {
-        setCachedApiKey(apiKey, password);
-      }
-    }
-
-    // Get the private key from the now-cached vault
-    privateKey = getPrivateKeyFromCache(account.id);
-    if (!privateKey) {
-      return { success: false, error: "Private key not found for account" };
-    }
-  }
-
-  try {
-    // Sign the message
-    const signature = await localSignatureRequest(
-      privateKey,
-      pending.signature.method,
-      pending.signature.params,
-      pending.signature.chainId
-    );
-
-    // Remove from pending storage
-    await removePendingSignatureRequest(sigId);
-
-    return { success: true, signature };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Signing failed",
-    };
-  }
-}
-
-/**
- * Adds a new private key account
- */
-async function handleAddPrivateKeyAccount(
-  privateKey: `0x${string}`,
-  password: string,
-  displayName?: string
-): Promise<{ success: boolean; account?: Account; error?: string }> {
-  try {
-    // Derive address from private key
-    const address = deriveAddress(privateKey);
-
-    // Check if address already exists
-    if (await addressExists(address)) {
-      return { success: false, error: "An account with this address already exists" };
-    }
-
-    // Add the account metadata
-    const account = await addPKAccountStorage(address, displayName);
-
-    // Add the private key to the vault
-    await addKeyToVault(account.id, privateKey, password);
-
-    // Update the cached vault if it exists
-    const cachedVaultEntries = getCachedVault();
-    if (cachedVaultEntries) {
-      cachedVaultEntries.push({ id: account.id, privateKey });
-      setCachedVault(cachedVaultEntries);
-    }
-
-    // Notify UI of account update
-    chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
-
-    return { success: true, account };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to add account",
-    };
-  }
-}
-
-/**
- * Removes an account (and its private key if PK account)
- */
-async function handleRemoveAccount(
-  accountId: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const account = await getAccountById(accountId);
-    if (!account) {
-      return { success: false, error: "Account not found" };
-    }
-
-    // If it's a PK account, remove from vault
-    if (account.type === "privateKey") {
-      await removeKeyFromVault(accountId);
-
-      // Update the cached vault if it exists
-      const cachedVaultEntries = getCachedVault();
-      if (cachedVaultEntries) {
-        const filtered = cachedVaultEntries.filter((e) => e.id !== accountId);
-        setCachedVault(filtered);
-      }
-    }
-
-    // Remove the account metadata
-    await removeAccount(accountId);
-
-    // Notify UI of account update
-    chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
-
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to remove account",
-    };
-  }
-}
-
-/**
- * Handles chat prompt submission - sends to Bankr API and polls for response
- */
-async function handleSubmitChatPrompt(
-  conversationId: string,
-  messageId: string,
-  prompt: string
-): Promise<{ success: boolean; error?: string }> {
-  // Get cached API key
-  let apiKey = getCachedApiKey();
-
-  // If no cached API key, try session restoration (for "Never" auto-lock mode)
-  // This handles the case where service worker restarted while user was chatting
-  if (!apiKey) {
-    const autoLockTimeout = await getAutoLockTimeout();
-    if (autoLockTimeout === 0) {
-      // Auto-lock is "Never" - try to restore session
-      const restored = await tryRestoreSession();
-      if (restored) {
-        apiKey = getCachedApiKey();
-      }
-    }
-  }
-
-  if (!apiKey) {
-    // Notify UI that API key is not available
-    chrome.runtime.sendMessage({
-      type: "chatJobComplete",
-      conversationId,
-      messageId,
-      error: "Wallet is locked. Please unlock first.",
-    }).catch(() => {});
-    return { success: false, error: "Wallet is locked. Please unlock first." };
-  }
-
-  // Fetch conversation history to provide context
-  let history: ChatMessage[] = [];
-  try {
-    const conversation = await getConversation(conversationId);
-    if (conversation && conversation.messages.length > 0) {
-      // Get all completed messages except the current pending assistant message
-      // and the current user message (which is already in 'prompt')
-      history = conversation.messages
-        .filter((msg) => {
-          // Skip the pending assistant message we just created
-          if (msg.id === messageId) return false;
-          // Only include completed messages with content
-          if (msg.status === "pending" || msg.status === "error") return false;
-          if (!msg.content || msg.content.trim() === "") return false;
-          return true;
-        })
-        .map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        }));
-
-      // Remove the last user message since it's the current prompt
-      // (it was just added to the conversation before the pending assistant message)
-      if (history.length > 0 && history[history.length - 1].role === "user") {
-        history.pop();
-      }
-    }
-  } catch (error) {
-    // If we can't get history, continue without it
-    console.error("Failed to fetch conversation history:", error);
-  }
-
-  // Start background processing with history
-  processChatPromptInBackground(conversationId, messageId, prompt, apiKey, history);
-
-  return { success: true };
-}
-
-/**
- * Processes chat prompt in background and sends updates to UI
- */
-async function processChatPromptInBackground(
-  conversationId: string,
-  messageId: string,
-  prompt: string,
-  apiKey: string,
-  history: ChatMessage[] = []
-): Promise<void> {
-  try {
-    // Submit prompt to Bankr API with conversation history for context
-    const { jobId } = await submitChatPrompt(apiKey, prompt, history);
-
-    // Poll for completion with status updates
-    const result = await pollChatJobUntilComplete(apiKey, jobId, {
-      pollInterval: 2000,
-      maxDuration: 300000, // 5 minutes
-      onStatusUpdate: (status) => {
-        // Send status updates to UI
-        chrome.runtime.sendMessage({
-          type: "chatJobUpdate",
-          conversationId,
-          messageId,
-          status: status.status,
-          statusUpdates: status.statusUpdates,
-        }).catch(() => {});
-      },
-    });
-
-    // Update message with result
-    if (result.success) {
-      await updateMessageInConversation(conversationId, messageId, {
-        content: result.response,
-        status: "complete",
-      });
-    } else {
-      await updateMessageInConversation(conversationId, messageId, {
-        content: result.error || "Request failed",
-        status: "error",
-      });
-    }
-
-    // Notify UI
-    chrome.runtime.sendMessage({
-      type: "chatJobComplete",
-      conversationId,
-      messageId,
-      content: result.success ? result.response : result.error,
-      error: result.success ? undefined : result.error,
-    }).catch(() => {});
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
-    // Update message with error
-    await updateMessageInConversation(conversationId, messageId, {
-      content: errorMessage,
-      status: "error",
-    });
-
-    // Notify UI
-    chrome.runtime.sendMessage({
-      type: "chatJobComplete",
-      conversationId,
-      messageId,
-      error: errorMessage,
-    }).catch(() => {});
-  }
-}
-
-/**
- * Attempts to unlock the wallet by caching the decrypted API key and vault
- * Supports both legacy format (direct password encryption) and new vault key system
- * With vault key system, both master and agent passwords can unlock the wallet
- */
-async function handleUnlockWallet(password: string): Promise<{ success: boolean; error?: string; passwordType?: PasswordType }> {
-  const hasVaultKeySystem = await checkHasVaultKeySystem();
-
-  if (hasVaultKeySystem) {
-    // New vault key system - try to decrypt vault key with either password
-    return await unlockWithVaultKeySystem(password);
-  } else {
-    // Legacy system - decrypt directly with password, then migrate if successful
-    return await unlockWithLegacySystem(password);
-  }
-}
-
-/**
- * Checks if vault key system is in use
- */
-async function checkHasVaultKeySystem(): Promise<boolean> {
-  const { encryptedVaultKeyMaster } = await chrome.storage.local.get("encryptedVaultKeyMaster");
-  return !!encryptedVaultKeyMaster;
-}
-
-/**
- * Unlocks using the new vault key system
- * Tries master password first, then agent password
- */
-async function unlockWithVaultKeySystem(password: string): Promise<{ success: boolean; error?: string; passwordType?: PasswordType }> {
-  const { encryptedVaultKeyMaster, encryptedVaultKeyAgent, agentPasswordEnabled } =
-    await chrome.storage.local.get(["encryptedVaultKeyMaster", "encryptedVaultKeyAgent", "agentPasswordEnabled"]);
-
-  if (!encryptedVaultKeyMaster) {
-    return { success: false, error: "No encrypted vault key found" };
-  }
-
-  let vaultKeyBytes: Uint8Array | null = null;
-  let passwordType: PasswordType = "master";
-
-  // Try master password first
-  vaultKeyBytes = await tryDecryptVaultKey(encryptedVaultKeyMaster, password);
-
-  // If master failed and agent password is enabled, try agent password
-  if (!vaultKeyBytes && agentPasswordEnabled && encryptedVaultKeyAgent) {
-    vaultKeyBytes = await tryDecryptVaultKey(encryptedVaultKeyAgent, password);
-    if (vaultKeyBytes) {
-      passwordType = "agent";
-    }
-  }
-
-  if (!vaultKeyBytes) {
-    return { success: false, error: "Invalid password" };
-  }
-
-  // Import the vault key
-  const vaultKey = await importVaultKey(vaultKeyBytes);
-  cachedVaultKey = vaultKey;
-  cachedPasswordType = passwordType;
-
-  // Always cache the password for session management
-  cachedPassword = password;
-  cacheTimestamp = Date.now();
-
-  // Decrypt API key using vault key (if exists)
-  const { encryptedApiKeyVault } = await chrome.storage.local.get("encryptedApiKeyVault");
-  if (encryptedApiKeyVault) {
-    const apiKey = await decryptWithVaultKey(vaultKey, encryptedApiKeyVault);
-    if (apiKey) {
-      cachedApiKey = apiKey;
-    }
-  }
-
-  // Decrypt vault entries (private keys) using the vault key
-  const hasVault = await hasVaultEntries();
-  if (hasVault) {
-    const vault = await decryptAllKeysWithVaultKey(vaultKey);
-    if (vault) {
-      setCachedVault(vault);
-    }
-  }
-
-  // Store session data for restoration if auto-lock is "Never"
-  const autoLockTimeout = await getAutoLockTimeout();
-  if (autoLockTimeout === 0) {
-    currentSessionId = crypto.randomUUID();
-    await storeSessionMetadata(currentSessionId, true);
-    await storeSessionPassword(password);
-  }
-
-  return { success: true, passwordType };
-}
-
-/**
- * Unlocks using legacy system (direct password encryption)
- * Also migrates to vault key system after successful unlock
- */
-async function unlockWithLegacySystem(password: string): Promise<{ success: boolean; error?: string; passwordType?: PasswordType }> {
-  // Try to decrypt API key (if exists)
-  const hasApiKey = await hasEncryptedApiKey();
-  let apiKey: string | null = null;
-
-  if (hasApiKey) {
-    apiKey = await loadDecryptedApiKey(password);
-    if (!apiKey) {
-      return { success: false, error: "Invalid password" };
-    }
-    setCachedApiKey(apiKey, password);
-  }
-
-  // Try to decrypt vault (if exists)
-  const hasVault = await hasVaultEntries();
-  if (hasVault) {
-    const vault = await decryptAllKeys(password);
-    if (!vault) {
-      // If we already decrypted API key but vault fails, password is wrong
-      // This shouldn't happen if passwords are in sync
-      if (!hasApiKey) {
-        return { success: false, error: "Invalid password" };
-      }
-    } else {
-      setCachedVault(vault);
-    }
-  }
-
-  // If we have neither API key nor vault, password can't be verified
-  if (!hasApiKey && !hasVault) {
-    return { success: false, error: "No encrypted data found" };
-  }
-
-  // Migration: Create vault key system
-  await migrateToVaultKeySystem(password, apiKey);
-
-  // Set password type to master (legacy system only has master password)
-  cachedPasswordType = "master";
-
-  // Store session data for restoration if auto-lock is "Never"
-  const autoLockTimeout = await getAutoLockTimeout();
-  if (autoLockTimeout === 0) {
-    currentSessionId = crypto.randomUUID();
-    await storeSessionMetadata(currentSessionId, true);
-    await storeSessionPassword(password);
-  }
-
-  return { success: true, passwordType: "master" };
-}
-
-/**
- * Migrates from legacy direct-password encryption to vault key system
- */
-async function migrateToVaultKeySystem(password: string, apiKey: string | null): Promise<void> {
-  try {
-    // Generate a new vault key
-    const vaultKeyBytes = generateVaultKey();
-    const vaultKey = await importVaultKey(vaultKeyBytes);
-
-    // Encrypt vault key with master password
-    const encryptedVaultKeyMaster = await encryptVaultKey(vaultKeyBytes, password);
-
-    // Re-encrypt API key with vault key (if exists)
-    let encryptedApiKeyVault: EncryptedData | null = null;
-    if (apiKey) {
-      encryptedApiKeyVault = await encryptWithVaultKey(vaultKey, apiKey);
-    }
-
-    // Save to storage
-    const storageData: Record<string, any> = {
-      encryptedVaultKeyMaster,
-      agentPasswordEnabled: false,
-    };
-    if (encryptedApiKeyVault) {
-      storageData.encryptedApiKeyVault = encryptedApiKeyVault;
-    }
-    await chrome.storage.local.set(storageData);
-
-    // Cache the vault key
-    cachedVaultKey = vaultKey;
-
-    console.log("Migration to vault key system completed");
-  } catch (error) {
-    console.error("Failed to migrate to vault key system:", error);
-    // Continue without migration - will try again next unlock
-  }
-}
-
-/**
- * Decrypts all private keys using the vault key
- * Note: This requires the vault entries to be re-encrypted with vault key
- * For now, falls back to password-based decryption during transition
- */
-async function decryptAllKeysWithVaultKey(vaultKey: CryptoKey): Promise<DecryptedEntry[] | null> {
-  // During transition, the vault entries are still password-encrypted
-  // We need to use the cached password to decrypt them
-  // In a full implementation, we would re-encrypt vault entries with vault key
-
-  // For now, since we don't have vault entries encrypted with vault key yet,
-  // we'll try using the cached password
-  const password = getCachedPassword();
-  if (!password) {
-    return [];
-  }
-
-  return await decryptAllKeys(password);
-}
-
-/**
- * Sets an agent password for the wallet
- * Requires the wallet to be unlocked with master password
- */
-async function handleSetAgentPassword(agentPassword: string): Promise<{ success: boolean; error?: string }> {
-  // Must be unlocked with master password to set agent password
-  if (cachedPasswordType !== "master") {
-    return { success: false, error: "Must be unlocked with master password to set agent password" };
-  }
-
-  if (!cachedVaultKey) {
-    return { success: false, error: "Vault key not available. Please unlock the wallet first." };
-  }
-
-  if (!agentPassword || agentPassword.length < 6) {
-    return { success: false, error: "Agent password must be at least 6 characters" };
-  }
-
-  try {
-    // Get the vault key bytes by decrypting with master password
-    const { encryptedVaultKeyMaster } = await chrome.storage.local.get("encryptedVaultKeyMaster");
-    if (!encryptedVaultKeyMaster) {
-      return { success: false, error: "No vault key found" };
-    }
-
-    const password = getCachedPassword();
-    if (!password) {
-      return { success: false, error: "Session expired. Please unlock the wallet again." };
-    }
-
-    // Decrypt vault key with master password to get raw bytes
-    const vaultKeyBytes = await tryDecryptVaultKey(encryptedVaultKeyMaster, password);
-    if (!vaultKeyBytes) {
-      return { success: false, error: "Failed to decrypt vault key" };
-    }
-
-    // Encrypt vault key with agent password
-    const encryptedVaultKeyAgent = await encryptVaultKey(vaultKeyBytes, agentPassword);
-
-    // Save to storage
-    await chrome.storage.local.set({
-      encryptedVaultKeyAgent,
-      agentPasswordEnabled: true,
-    });
-
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to set agent password",
-    };
-  }
-}
-
-/**
- * Removes the agent password
- * Requires verification of master password
- */
-async function handleRemoveAgentPassword(masterPassword: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    // Verify master password by trying to decrypt vault key
-    const { encryptedVaultKeyMaster } = await chrome.storage.local.get("encryptedVaultKeyMaster");
-    if (!encryptedVaultKeyMaster) {
-      return { success: false, error: "No vault key found" };
-    }
-
-    const vaultKeyBytes = await tryDecryptVaultKey(encryptedVaultKeyMaster, masterPassword);
-    if (!vaultKeyBytes) {
-      return { success: false, error: "Invalid master password" };
-    }
-
-    // Remove agent password from storage
-    await chrome.storage.local.remove("encryptedVaultKeyAgent");
-    await chrome.storage.local.set({ agentPasswordEnabled: false });
-
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to remove agent password",
-    };
-  }
-}
-
-/**
- * Returns the current session's password type
- */
-function getPasswordType(): PasswordType | null {
-  return cachedPasswordType;
-}
-
-/**
- * Saves a new API key using the currently cached password
- * This is used when changing API key while already unlocked
- */
-async function handleSaveApiKeyWithCachedPassword(
-  newApiKey: string
-): Promise<{ success: boolean; error?: string }> {
-  let password = getCachedPassword();
-
-  // If no cached password, try session restoration (for "Never" auto-lock mode)
-  if (!password) {
-    const autoLockTimeout = await getAutoLockTimeout();
-    if (autoLockTimeout === 0) {
-      const restored = await tryRestoreSession();
-      if (restored) {
-        password = getCachedPassword();
-      }
-    }
-  }
-
-  if (!password) {
-    return { success: false, error: "Wallet is locked. Please unlock first." };
-  }
-
-  try {
-    // Check if vault key system is in use
-    if (cachedVaultKey) {
-      // Encrypt API key with vault key and save to new location
-      const encrypted = await encryptWithVaultKey(cachedVaultKey, newApiKey);
-      await chrome.storage.local.set({ encryptedApiKeyVault: encrypted });
-    } else {
-      // Legacy system - encrypt with password
-      const { saveEncryptedApiKey } = await import("./crypto");
-      await saveEncryptedApiKey(newApiKey, password);
-    }
-    // Update the cached API key
-    cachedApiKey = newApiKey;
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to save API key"
-    };
-  }
-}
-
-/**
- * Changes the wallet password using the currently cached password
- * This is used when changing password while already unlocked
- */
-async function handleChangePasswordWithCachedPassword(
-  newPassword: string
-): Promise<{ success: boolean; error?: string }> {
-  const currentPassword = getCachedPassword();
-  if (!currentPassword) {
-    return { success: false, error: "Session expired. Please unlock your wallet again." };
-  }
-
-  try {
-    // Check if using vault key system
-    const hasVaultKeySystem = await checkHasVaultKeySystem();
-
-    if (hasVaultKeySystem) {
-      // New vault key system: re-encrypt the vault key with new password
-      // The actual data (API key, private keys) stays encrypted with the vault key
-      const { encryptedVaultKeyMaster } = await chrome.storage.local.get("encryptedVaultKeyMaster");
-      if (!encryptedVaultKeyMaster) {
-        return { success: false, error: "No vault key found" };
-      }
-
-      // Decrypt vault key with old password to get raw bytes
-      const vaultKeyBytes = await tryDecryptVaultKey(encryptedVaultKeyMaster, currentPassword);
-      if (!vaultKeyBytes) {
-        return { success: false, error: "Failed to decrypt vault key" };
-      }
-
-      // Re-encrypt vault key with new password
-      const newEncryptedVaultKeyMaster = await encryptVaultKey(vaultKeyBytes, newPassword);
-
-      // Save the new encrypted vault key
-      await chrome.storage.local.set({
-        encryptedVaultKeyMaster: newEncryptedVaultKeyMaster,
-      });
-
-      // Note: encryptedVaultKeyAgent (if exists) stays unchanged - agent password remains valid
-    } else {
-      // Legacy system: re-encrypt data directly with new password
-      const { loadDecryptedApiKey, saveEncryptedApiKey } = await import("./crypto");
-
-      // Decrypt API key with cached password (if exists)
-      const hasApiKey = await hasEncryptedApiKey();
-      if (hasApiKey) {
-        const apiKey = await loadDecryptedApiKey(currentPassword);
-        if (!apiKey) {
-          return { success: false, error: "Failed to decrypt API key" };
-        }
-        // Re-encrypt with new password
-        await saveEncryptedApiKey(apiKey, newPassword);
-      }
-
-      // Re-encrypt the vault with new password (if exists)
-      const hasVault = await hasVaultEntries();
-      if (hasVault) {
-        const success = await reEncryptVault(currentPassword, newPassword);
-        if (!success) {
-          return { success: false, error: "Failed to re-encrypt vault" };
-        }
-      }
-    }
-
-    // Clear the cache - user must unlock with new password
-    clearCachedApiKey();
-    clearCachedVault();
-
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to change password"
-    };
-  }
-}
-
-/**
- * Handles RPC requests proxied from inpage script (to bypass page CSP)
- */
+// Session & cache management
+import {
+  AUTO_LOCK_STORAGE_KEY,
+  updateCachedAutoLockTimeout,
+  getCachedApiKey,
+  setCachedApiKeyDirect,
+  clearCachedApiKey,
+  getCachedPassword,
+  setCachedVault,
+  clearCachedVault,
+  getCachedVaultKey,
+  getPasswordType,
+  getAutoLockTimeout,
+  setAutoLockTimeout,
+  isApiKeyCached,
+  isWalletUnlocked,
+  getPrivateKeyFromCache,
+  getCurrentSessionId,
+  clearSessionStorage,
+  tryRestoreSession,
+  incrementUIConnections,
+  decrementUIConnections,
+} from "./sessionCache";
+
+// Auth handlers
+import {
+  handleUnlockWallet,
+  handleSetAgentPassword,
+  handleRemoveAgentPassword,
+  handleSaveApiKeyWithCachedPassword,
+  handleChangePasswordWithCachedPassword,
+} from "./authHandlers";
+
+// Transaction handlers
+import {
+  pendingResolvers,
+  pendingSignatureResolvers,
+  failedTxResults,
+  handleTransactionRequest,
+  handleSignatureRequest,
+  handleConfirmTransaction,
+  handleRejectTransaction,
+  handleCancelTransaction,
+  handleConfirmTransactionAsync,
+  handleConfirmTransactionAsyncPK,
+  handleConfirmSignatureRequest,
+  handleAddPrivateKeyAccount,
+  handleRemoveAccount,
+  openPopupWindow,
+  performSecurityReset,
+  SignatureResult,
+} from "./txHandlers";
+
+// Chat handlers
+import { handleSubmitChatPrompt } from "./chatHandlers";
+
+// Sidepanel management
+import {
+  isSidePanelSupported,
+  getSidePanelMode,
+  setSidePanelMode,
+  initSidePanel,
+} from "./sidepanelManager";
+
+// Handles RPC requests proxied from inpage script (to bypass page CSP)
 async function handleRpcRequest(
   rpcUrl: string,
   method: string,
@@ -2327,47 +146,95 @@ async function handleRpcRequest(
   return data.result;
 }
 
+// ─── Chrome Event Listeners ──────────────────────────────────────────────────
+
+// Listen for storage changes to update cached timeout and broadcast address changes
+chrome.storage.onChanged.addListener(async (changes, areaName) => {
+  if (areaName === "sync") {
+    if (changes[AUTO_LOCK_STORAGE_KEY]) {
+      updateCachedAutoLockTimeout(changes[AUTO_LOCK_STORAGE_KEY].newValue);
+    }
+
+    // Broadcast address changes to all tabs so dapps receive accountsChanged event
+    if (changes.address) {
+      const newAddress = changes.address.newValue;
+      const newDisplayAddress = changes.displayAddress?.newValue || newAddress;
+
+      if (newAddress) {
+        // Get all tabs and send setAddress message
+        const tabs = await chrome.tabs.query({});
+        for (const tab of tabs) {
+          if (tab.id && tab.url && !tab.url.startsWith("chrome://") && !tab.url.startsWith("chrome-extension://")) {
+            chrome.tabs.sendMessage(tab.id, {
+              type: "setAddress",
+              msg: { address: newAddress, displayAddress: newDisplayAddress },
+            }).catch(() => {
+              // Ignore errors for tabs without content script
+            });
+          }
+        }
+      }
+    }
+  }
+});
+
+// Clear cache when service worker suspends
+self.addEventListener("suspend", () => {
+  clearCachedApiKey();
+  clearCachedVault();
+});
+
+// Clean up expired transactions and signature requests periodically
+setInterval(() => {
+  clearExpiredTxRequests();
+  clearExpiredSignatureRequests();
+}, 60000); // Every minute
+
+// Initialize badge on startup
+updateBadge();
+
+// Initialize auto-lock timeout cache on startup
+getAutoLockTimeout();
+
+// Handle extension install/update
+chrome.runtime.onInstalled.addListener(async (details) => {
+  if (details.reason === "install") {
+    // First time install - open onboarding page
+    const onboardingUrl = chrome.runtime.getURL("onboarding.html");
+    await chrome.tabs.create({ url: onboardingUrl });
+  }
+});
+
+// Initialize sidepanel behavior on startup
+initSidePanel();
+
 // Port connection listener - used for waking up the service worker and UI keepalive
-// Some browsers (like Arc) don't auto-wake the service worker when popup opens
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "popup-wake") {
     // Just acknowledge the connection - the popup is waking us up
     console.log("Service worker woken up by popup");
   } else if (port.name === "ui-keepalive") {
     // UI view (popup/sidepanel/onboarding) connected - pause auto-lock timer
-    activeUIConnections++;
+    incrementUIConnections();
     port.onDisconnect.addListener(() => {
-      activeUIConnections--;
-      if (activeUIConnections <= 0) {
-        activeUIConnections = 0;
-        // Reset timestamps so the countdown starts fresh from now
-        if (cachedApiKey) {
-          cacheTimestamp = Date.now();
-        }
-        if (cachedVault) {
-          vaultCacheTimestamp = Date.now();
-        }
-      }
+      decrementUIConnections();
     });
   }
 });
 
-// Message listener
+// ─── Message Router ──────────────────────────────────────────────────────────
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.type) {
     case "sendTransaction": {
-      // Handle async response, pass sender's window ID for popup positioning
       const senderWindowId = sender.tab?.windowId;
       handleTransactionRequest(message, sendResponse, senderWindowId);
-      // Return true to indicate we will send response asynchronously
       return true;
     }
 
     case "signatureRequest": {
-      // Handle signature request, pass sender's window ID for popup positioning
       const senderWindowId = sender.tab?.windowId;
       handleSignatureRequest(message, sendResponse, senderWindowId);
-      // Return true to indicate we will send response asynchronously
       return true;
     }
 
@@ -2380,10 +247,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "rejectSignatureRequest": {
       const result: SignatureResult = { success: false, error: "Signature request cancelled by user" };
-
-      // Remove from pending storage
       removePendingSignatureRequest(message.sigId).then(() => {
-        // Send result back to content script if resolver exists
         const resolver = pendingSignatureResolvers.get(message.sigId);
         if (resolver) {
           resolver.resolve(result);
@@ -2402,7 +266,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "getPendingTransaction": {
-      getPendingTxRequestById(message.txId).then((request) => {
+      (async () => {
+        const { getPendingTxRequestById } = await import("./pendingTxStorage");
+        const request = await getPendingTxRequestById(message.txId);
         if (request) {
           sendResponse({
             tx: request.tx,
@@ -2413,7 +279,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         } else {
           sendResponse(null);
         }
-      });
+      })();
       return true;
     }
 
@@ -2425,10 +291,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "confirmTransaction": {
       handleConfirmTransaction(message.txId, message.password).then(
         async (result) => {
-          // Remove from pending storage
           await removePendingTxRequest(message.txId);
-
-          // Send result back to content script if resolver exists
           const resolver = pendingResolvers.get(message.txId);
           if (resolver) {
             resolver.resolve(result);
@@ -2442,10 +305,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "rejectTransaction": {
       const result = handleRejectTransaction(message.txId);
-
-      // Remove from pending storage
       removePendingTxRequest(message.txId).then(() => {
-        // Send result back to content script if resolver exists
         const resolver = pendingResolvers.get(message.txId);
         if (resolver) {
           resolver.resolve(result);
@@ -2460,7 +320,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       handleCancelTransaction(message.txId).then((result) => {
         sendResponse(result);
       });
-      return true; // Will respond asynchronously
+      return true;
     }
 
     case "clearApiKeyCache": {
@@ -2479,7 +339,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "lockWallet": {
       clearCachedApiKey();
       clearCachedVault();
-      // Clear session storage to prevent session restoration
       clearSessionStorage();
       sendResponse({ success: true });
       return false;
@@ -2503,19 +362,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "setActiveAccount": {
       (async () => {
         await setActiveAccountId(message.accountId);
-
-        // Get the account to update storage with its address
         const account = await getAccountById(message.accountId);
         if (account) {
-          // Update storage address so inject.ts and new tabs get the correct address
-          // This also triggers the storage listener to broadcast to all existing tabs
           await chrome.storage.sync.set({
             address: account.address,
             displayAddress: account.displayName || account.address,
           });
         }
-
-        // Notify UI of account update
         chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
         sendResponse({ success: true });
       })();
@@ -2552,25 +405,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       (async () => {
         try {
           // If apiKey is provided and wallet is unlocked, save it first
-          if (message.apiKey && cachedPassword) {
-            // Check if vault key system is in use
-            if (cachedVaultKey) {
-              // Encrypt API key with vault key and save to new location
-              const encrypted = await encryptWithVaultKey(cachedVaultKey, message.apiKey);
+          if (message.apiKey && getCachedPassword()) {
+            const vaultKey = getCachedVaultKey();
+            if (vaultKey) {
+              const encrypted = await encryptWithVaultKey(vaultKey, message.apiKey);
               await chrome.storage.local.set({ encryptedApiKeyVault: encrypted });
             } else {
-              // Legacy system - encrypt with password
               const { saveEncryptedApiKey } = await import("./crypto");
-              await saveEncryptedApiKey(message.apiKey, cachedPassword);
+              await saveEncryptedApiKey(message.apiKey, getCachedPassword()!);
             }
-            // Update the cached API key
-            cachedApiKey = message.apiKey;
+            setCachedApiKeyDirect(message.apiKey);
           }
 
-          // Add the Bankr account
           const account = await addBankrAccount(message.address, message.displayName);
-
-          // Notify UI of account update
           chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
           sendResponse({ success: true, account });
         } catch (error) {
@@ -2582,7 +429,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "updateAccountDisplayName": {
       updateAccountDisplayName(message.accountId, message.displayName || "").then(() => {
-        // Notify UI of account update
         chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
         sendResponse({ success: true });
       }).catch((error) => {
@@ -2593,16 +439,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "addPrivateKeyAccount": {
       (async () => {
-        // Use cached password if not provided (wallet must be unlocked)
-        let password = message.password || cachedPassword;
+        let password = message.password || getCachedPassword();
 
-        // If no password, try session restoration (for "Never" auto-lock mode)
         if (!password) {
           const autoLockTimeout = await getAutoLockTimeout();
           if (autoLockTimeout === 0) {
-            const restored = await tryRestoreSession();
+            const restored = await tryRestoreSession(handleUnlockWallet);
             if (restored) {
-              password = cachedPassword;
+              password = getCachedPassword();
             }
           }
         }
@@ -2634,22 +478,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         try {
           const { accountId, password } = message;
 
-          // If no cached password, try session restoration (for "Never" auto-lock mode)
-          if (!cachedPassword) {
+          if (!getCachedPassword()) {
             const autoLockTimeout = await getAutoLockTimeout();
             if (autoLockTimeout === 0) {
-              await tryRestoreSession();
+              await tryRestoreSession(handleUnlockWallet);
             }
           }
 
-          // Verify password matches cached password (wallet must be unlocked)
-          if (!cachedPassword) {
+          const cachedPwd = getCachedPassword();
+          if (!cachedPwd) {
             sendResponse({ success: false, error: "Wallet is locked" });
             return;
           }
 
           // SECURITY: Block private key reveal when unlocked with agent password
-          if (cachedPasswordType === "agent") {
+          if (getPasswordType() === "agent") {
             sendResponse({
               success: false,
               error: "Private key reveal requires master password",
@@ -2658,7 +501,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return;
           }
 
-          if (password !== cachedPassword) {
+          if (password !== cachedPwd) {
             sendResponse({ success: false, error: "Invalid password" });
             return;
           }
@@ -2666,8 +509,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           // Try cached vault first
           let privateKey = getPrivateKeyFromCache(accountId);
           if (!privateKey) {
-            // Need to decrypt vault with the verified password
-            const vault = await decryptAllKeys(cachedPassword);
+            const vault = await decryptAllKeys(cachedPwd);
             if (!vault) {
               sendResponse({ success: false, error: "Failed to decrypt vault" });
               return;
@@ -2694,7 +536,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const tabId = message.tabId || sender.tab?.id;
       handleConfirmSignatureRequest(message.sigId, message.password, tabId).then(
         (result) => {
-          // Send result back to content script if resolver exists
           const resolver = pendingSignatureResolvers.get(message.sigId);
           if (resolver) {
             resolver.resolve(result);
@@ -2719,18 +560,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "isWalletUnlocked": {
       (async () => {
         let unlocked = isWalletUnlocked();
-
-        // If not unlocked, try session restoration (for "Never" auto-lock mode)
         if (!unlocked) {
           const autoLockTimeout = await getAutoLockTimeout();
           if (autoLockTimeout === 0) {
-            const restored = await tryRestoreSession();
+            const restored = await tryRestoreSession(handleUnlockWallet);
             if (restored) {
               unlocked = true;
             }
           }
         }
-
         sendResponse(unlocked);
       })();
       return true;
@@ -2738,14 +576,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "validateSession": {
       sendResponse({
-        valid: currentSessionId !== null && isWalletUnlocked(),
-        sessionId: currentSessionId,
+        valid: getCurrentSessionId() !== null && isWalletUnlocked(),
+        sessionId: getCurrentSessionId(),
       });
       return false;
     }
 
     case "tryRestoreSession": {
-      tryRestoreSession().then((restored) => {
+      tryRestoreSession(handleUnlockWallet).then((restored) => {
         sendResponse(restored);
       });
       return true;
@@ -2759,7 +597,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "getCachedPassword": {
-      // Return whether password is cached (not the actual password for security)
       sendResponse({ hasCachedPassword: getCachedPassword() !== null });
       return false;
     }
@@ -2772,21 +609,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "getCachedApiKey": {
-      // Return the cached API key if available (for displaying in settings)
       (async () => {
         let apiKey = getCachedApiKey();
-
-        // If no cached API key, try session restoration (for "Never" auto-lock mode)
         if (!apiKey) {
           const autoLockTimeout = await getAutoLockTimeout();
           if (autoLockTimeout === 0) {
-            const restored = await tryRestoreSession();
+            const restored = await tryRestoreSession(handleUnlockWallet);
             if (restored) {
               apiKey = getCachedApiKey();
             }
           }
         }
-
         sendResponse({ apiKey: apiKey || null });
       })();
       return true;
@@ -2820,23 +653,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "rpcRequest": {
-      // Proxy RPC requests to bypass page CSP
       handleRpcRequest(message.rpcUrl, message.method, message.params)
         .then((result) => sendResponse({ result }))
         .catch((error) => sendResponse({ error: error.message }));
-      return true; // Will respond asynchronously
+      return true;
     }
 
     case "setArcBrowser": {
-      // UI detected Arc browser - disable sidepanel
       if (message.isArc) {
-        // Update storage
         chrome.storage.sync.set({ sidePanelVerified: false, sidePanelMode: false, isArcBrowser: true });
-        // Also immediately disable sidepanel behavior to ensure popup mode works
         if (chrome.sidePanel?.setPanelBehavior) {
-          chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {
-            // Ignore errors
-          });
+          chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
         }
       }
       sendResponse({ success: true });
@@ -2844,15 +671,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "isSidePanelSupported": {
-      // Return true only if sidepanel API exists AND has been verified to work
       (async () => {
         if (!isSidePanelSupported()) {
           sendResponse({ supported: false });
           return;
         }
         const { sidePanelVerified } = await chrome.storage.sync.get(["sidePanelVerified"]);
-        // If not yet verified, assume supported (will be verified on first use)
-        // If verified as false, not supported
         sendResponse({ supported: sidePanelVerified !== false });
       })();
       return true;
@@ -2905,7 +729,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "getFailedTxResult": {
       const result = failedTxResults.get(message.notificationId);
       if (result) {
-        // Clear after retrieving
         failedTxResults.delete(message.notificationId);
         chrome.storage.local.remove(`notification-${message.notificationId}`);
       }
@@ -2921,10 +744,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "onboardingComplete": {
-      // Broadcast to all extension views that onboarding is complete
-      chrome.runtime.sendMessage({ type: "onboardingComplete" }).catch(() => {
-        // Ignore errors if no listeners
-      });
+      chrome.runtime.sendMessage({ type: "onboardingComplete" }).catch(() => {});
       sendResponse({ success: true });
       return false;
     }
@@ -2952,19 +772,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "resetExtension": {
       // SECURITY: Perform full memory cleanup first (before async operations)
-      // This ensures API keys are cleared from memory immediately
       performSecurityReset();
+      clearCachedApiKey();
+      clearCachedVault();
 
-      // Clear all stored data - API key, address, transaction history, and notifications
       (async () => {
         try {
-          // Get all storage keys to find notification-related entries
           const allLocalStorage = await chrome.storage.local.get(null);
           const notificationKeys = Object.keys(allLocalStorage).filter(
             (key) => key.startsWith("notification-")
           );
 
-          // Remove all sensitive data from storage
           await Promise.all([
             chrome.storage.local.remove([
               "encryptedApiKey",
@@ -2972,9 +790,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               "pendingTxRequests",
               "pendingSignatureRequests",
               "chatHistory",
-              "pkVault",    // Private key vault
-              "accounts",   // Account metadata
-              ...notificationKeys, // Clear notification data (may contain tx hashes)
+              "pkVault",
+              "accounts",
+              ...notificationKeys,
             ]),
             chrome.storage.sync.remove([
               "address",
@@ -2986,10 +804,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             ]),
           ]);
 
-          // Update badge to show no pending transactions
           await chrome.action.setBadgeText({ text: "" });
 
-          // Clear any active notifications
           const notifications = await chrome.notifications.getAll();
           for (const notificationId of Object.keys(notifications)) {
             chrome.notifications.clear(notificationId);
@@ -3070,23 +886,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Handle notification clicks
 chrome.notifications.onClicked.addListener(async (notificationId) => {
-  // Get stored data for this notification
   const storageKey = `notification-${notificationId}`;
   const data = await chrome.storage.local.get([storageKey]);
   const notificationData = data[storageKey];
 
   if (notificationData) {
     if (typeof notificationData === "string") {
-      // It's an explorer URL - open in new tab
       chrome.tabs.create({ url: notificationData });
       chrome.storage.local.remove(storageKey);
     } else if (notificationData.type === "error") {
-      // It's an error - open popup/sidepanel to show error
       const useSidePanel = await getSidePanelMode();
 
       if (useSidePanel && isSidePanelSupported()) {
-        // Try to open sidepanel - but Chrome doesn't allow programmatic open
-        // So we open a popup instead with the error info
         const popupUrl = chrome.runtime.getURL(`index.html?showError=${notificationData.txId}`);
         await chrome.windows.create({
           url: popupUrl,
@@ -3096,7 +907,6 @@ chrome.notifications.onClicked.addListener(async (notificationId) => {
           focused: true,
         });
       } else {
-        // Open popup with error info
         const popupUrl = chrome.runtime.getURL(`index.html?showError=${notificationData.txId}`);
         await chrome.windows.create({
           url: popupUrl,
@@ -3109,7 +919,6 @@ chrome.notifications.onClicked.addListener(async (notificationId) => {
     }
   }
 
-  // Clear the notification
   chrome.notifications.clear(notificationId);
 });
 

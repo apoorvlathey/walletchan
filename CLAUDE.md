@@ -95,11 +95,18 @@ For detailed architecture, message types, and flows, see `IMPLEMENTATION.md`.
 ```
 apps/extension/src/
 ├── chrome/
-│   ├── impersonator.ts    # Inpage provider (EIP-6963)
-│   ├── inject.ts          # Content script bridge
-│   ├── background.ts      # Service worker
-│   ├── crypto.ts          # AES-256-GCM encryption
-│   └── bankrApi.ts        # Bankr API client
+│   ├── background.ts        # Service worker (message router)
+│   ├── authHandlers.ts      # Unlock, password change, vault key migration
+│   ├── sessionCache.ts      # Credential caching, auto-lock, session restore
+│   ├── txHandlers.ts        # Transaction/signature handling, account mgmt
+│   ├── chatHandlers.ts      # Bankr AI chat prompt handling
+│   ├── sidepanelManager.ts  # Sidepanel/popup mode, Arc browser detection
+│   ├── crypto.ts            # AES-256-GCM encryption for API keys
+│   ├── cryptoUtils.ts       # Shared crypto utilities (PBKDF2, base64)
+│   ├── vaultCrypto.ts       # Vault encryption for private keys
+│   ├── bankrApi.ts          # Bankr API client
+│   ├── impersonator.ts      # Inpage provider (EIP-6963)
+│   └── inject.ts            # Content script bridge
 ├── components/
 │   ├── TransactionConfirmation.tsx
 │   ├── SignatureRequestConfirmation.tsx
@@ -107,7 +114,7 @@ apps/extension/src/
 │   └── Settings/
 ├── pages/
 │   └── Onboarding.tsx
-└── App.tsx                # Main popup app
+└── App.tsx                   # Main popup app
 ```
 
 ## Key Website Files
@@ -142,6 +149,30 @@ When working on features, refer to these docs:
 - **Per-tab chain state**: Each browser tab maintains its own selected chain
 - **Transaction persistence**: Pending transactions survive popup close (stored in chrome.storage.local)
 - **EIP-6963**: Modern wallet discovery alongside legacy window.ethereum
+
+## Code Quality Guidelines
+
+### File Size & Modularity
+- **Keep files under ~400 lines.** If a file grows beyond that, split it into focused modules by responsibility.
+- **One concern per file.** Each module should have a clear, single purpose (e.g., `sessionCache.ts` owns all credential caching, `authHandlers.ts` owns all unlock/password logic).
+- **background.ts is a message router only.** It registers Chrome event listeners and delegates to handler modules. Never add business logic directly to it.
+
+### Reuse Over Duplication
+- **Extract shared utilities** when the same logic appears in 2+ files. See `cryptoUtils.ts` for the pattern (shared constants + functions used by both `crypto.ts` and `vaultCrypto.ts`).
+- **Reuse existing React components** before creating new ones. Check `components/` for existing UI patterns.
+- **Use dependency injection** to avoid circular imports (e.g., `tryRestoreSession(unlockFn)` in `sessionCache.ts` takes a callback instead of importing `authHandlers.ts` directly).
+
+### Naming & Organization
+- **Handler files**: `*Handlers.ts` (e.g., `authHandlers.ts`, `txHandlers.ts`, `chatHandlers.ts`)
+- **State/cache files**: descriptive names (e.g., `sessionCache.ts`, `pendingTxStorage.ts`)
+- **Utility files**: `*Utils.ts` (e.g., `cryptoUtils.ts`)
+- **Keep related functions together** - if functions share state (like in-memory Maps), they belong in the same module.
+
+### When Adding New Features
+- Place new message handlers in the appropriate `*Handlers.ts` file, not in `background.ts`.
+- Add the message routing case to the switch in `background.ts` (just a 1-3 line delegation).
+- If a feature doesn't fit existing modules, create a new focused module rather than growing an existing one.
+- Update `IMPLEMENTATION.md` and this file's Key Extension Files section if you add new modules.
 
 ## Development Practices
 

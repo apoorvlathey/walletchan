@@ -94,12 +94,11 @@ For detailed implementation of private key accounts, see [PK_ACCOUNTS.md](./PK_A
                                     ▼ chrome.runtime.sendMessage
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                     Background Service Worker (background.js)               │
-│                     - Handles transaction requests                          │
-│                     - Stores pending txs in chrome.storage.local            │
-│                     - Updates extension badge with pending count            │
-│                     - Makes Bankr API calls                                 │
-│                     - Proxies RPC calls (bypasses page CSP)                 │
-│                     - Manages encrypted API key cache                       │
+│                     - Message router + Chrome event listeners               │
+│                     - Delegates to: sessionCache, authHandlers,             │
+│                       txHandlers, chatHandlers, sidepanelManager            │
+│                     - Makes Bankr API calls, proxies RPC calls              │
+│                     - Manages encrypted credential cache                    │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                     ┌───────────────┴───────────────┐
@@ -169,30 +168,7 @@ The wallet announces itself with the following EIP-6963 provider info:
 
 ### Implementation Details
 
-`src/chrome/impersonator.ts`:
-
-```typescript
-// EIP-6963 provider info
-const providerInfo: EIP6963ProviderInfo = {
-  uuid: crypto.randomUUID(),
-  name: "Bankr Wallet",
-  icon: "data:image/png;base64,...",
-  rdns: "app.bankrwallet",
-};
-
-// Announce provider to dapps
-function announceProvider() {
-  const detail = Object.freeze({
-    info: Object.freeze({ ...providerInfo }),
-    provider: providerInstance,
-  });
-
-  window.dispatchEvent(new CustomEvent("eip6963:announceProvider", { detail }));
-}
-
-// Listen for dapp requests
-window.addEventListener("eip6963:requestProvider", announceProvider);
-```
+The provider info, announcement function, and request listener are in `src/chrome/impersonator.ts`. The wallet announces on init and re-announces on `eip6963:requestProvider` events.
 
 ### Backward Compatibility
 
@@ -229,46 +205,7 @@ Some wallets (like Rabby) aggressively claim `window.ethereum` using `Object.def
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Implementation** (`src/chrome/impersonator.ts`):
-
-```typescript
-function setWindowEthereum(provider: ImpersonatorProvider): boolean {
-  try {
-    // First, try to delete any existing property
-    try {
-      delete (window as any).ethereum;
-    } catch {
-      // Ignore - property might not be configurable
-    }
-
-    // Try direct assignment first
-    try {
-      (window as Window).ethereum = provider;
-      if ((window as Window).ethereum === provider) {
-        return true;
-      }
-    } catch {
-      // Direct assignment failed, try Object.defineProperty
-    }
-
-    // Use Object.defineProperty as fallback
-    Object.defineProperty(window, "ethereum", {
-      value: provider,
-      writable: true,
-      configurable: true,
-      enumerable: true,
-    });
-
-    return (window as Window).ethereum === provider;
-  } catch (e) {
-    console.warn(
-      "Bankr Wallet: Could not set window.ethereum (another wallet may have claimed it).",
-      "Dapps supporting EIP-6963 will still be able to discover Bankr Wallet.",
-    );
-    return false;
-  }
-}
-```
+**See**: `src/chrome/impersonator.ts` → `setWindowEthereum()` for the full claim strategy implementation.
 
 **Internal Provider References**:
 
@@ -287,10 +224,16 @@ src/
 ├── chrome/
 │   ├── impersonator.ts      # Inpage script - EIP-6963 provider + window.ethereum
 │   ├── inject.ts            # Content script - message bridge
-│   ├── background.ts        # Service worker - API calls, tx handling, notifications
+│   ├── background.ts        # Service worker - message router + Chrome event listeners
+│   ├── sessionCache.ts      # Credential caching, session persistence, auto-lock
+│   ├── authHandlers.ts      # Wallet unlock, vault key system, password management
+│   ├── txHandlers.ts        # Transaction/signature handlers, notifications
+│   ├── chatHandlers.ts      # Bankr AI chat prompt handling
+│   ├── sidepanelManager.ts  # Side panel detection and mode management
+│   ├── cryptoUtils.ts       # Shared crypto utilities (PBKDF2, base64, constants)
 │   ├── crypto.ts            # AES-256-GCM encryption for API key and vault
-│   ├── types.ts             # Account and vault type definitions
 │   ├── vaultCrypto.ts       # Vault encryption/decryption for private keys
+│   ├── types.ts             # Account and vault type definitions
 │   ├── localSigner.ts       # Transaction and message signing with viem
 │   ├── accountStorage.ts    # Account CRUD operations
 │   ├── bankrApi.ts          # Bankr API client
@@ -722,34 +665,7 @@ The extension uses Chrome's Notifications API to alert users when transactions c
 | Transaction Confirmed | "Transaction Confirmed" | "Your transaction on {chainName} was successful" |
 | Transaction Failed    | "Transaction Failed"    | "Error: {errorMessage}"                          |
 
-### Implementation
-
-```typescript
-async function showNotification(
-  notificationId: string,
-  title: string,
-  message: string,
-): Promise<string> {
-  return new Promise((resolve) => {
-    chrome.notifications.create(
-      notificationId,
-      {
-        type: "basic",
-        iconUrl: chrome.runtime.getURL("icons/icon128.png"),
-        title,
-        message,
-        priority: 2,
-      },
-      (createdId) => {
-        if (chrome.runtime.lastError) {
-          console.error("Notification error:", chrome.runtime.lastError);
-        }
-        resolve(createdId || notificationId);
-      },
-    );
-  });
-}
-```
+**See**: `src/chrome/txHandlers.ts` → `showNotification()` for implementation.
 
 ### macOS Permissions Note
 
@@ -761,11 +677,7 @@ Without this permission, `chrome.notifications.create()` will execute without er
 
 ### Manifest Permission
 
-```json
-{
-  "permissions": ["notifications"]
-}
-```
+The `"notifications"` permission is required in `manifest.json`.
 
 ## Transaction History
 
@@ -773,25 +685,7 @@ Completed transactions (confirmed or failed) are stored persistently and display
 
 ### Data Model
 
-`src/chrome/txHistoryStorage.ts`:
-
-```typescript
-export type TxStatus = "processing" | "success" | "failed";
-
-export interface CompletedTransaction {
-  id: string;
-  status: TxStatus;
-  tx: TransactionParams;
-  origin: string;
-  favicon: string | null;
-  chainName: string;
-  chainId: number;
-  createdAt: number;
-  completedAt?: number;
-  txHash?: string;
-  error?: string;
-}
-```
+**See**: `src/chrome/txHistoryStorage.ts` for `CompletedTransaction` interface and `TxStatus` type. Each entry tracks the transaction params, origin, chain, status (processing/success/failed), timestamps, and result (txHash or error).
 
 ### Storage Functions
 
@@ -1194,19 +1088,7 @@ The UI (App.tsx) maintains a keepalive port to the service worker. When the serv
 3. After 100ms delay, `establishKeepalivePort()` reconnects
 4. This ensures `activeUIConnections` tracking remains accurate
 
-```typescript
-// Automatic port reconnection in App.tsx
-port.onDisconnect.addListener(() => {
-  keepAlivePortRef.current = null;
-  if (chrome.runtime?.id) {
-    reconnectingRef.current = true;
-    setTimeout(() => {
-      reconnectingRef.current = false;
-      establishKeepalivePort();
-    }, 100);
-  }
-});
-```
+**See**: `src/App.tsx` → `establishKeepalivePort()` for the automatic reconnection implementation.
 
 #### Password Caching for API Key Changes
 
@@ -1261,28 +1143,9 @@ When multiple transactions are pending:
 
 ## Popup Window Positioning
 
-When a transaction request is received, the background worker automatically opens a popup window:
+When a transaction request is received, the background worker automatically opens a popup window positioned at the top-right of the dapp's window.
 
-```typescript
-async function openExtensionPopup(senderWindowId?: number): Promise<void> {
-  // Get the window where the dapp is running
-  let targetWindow = await chrome.windows.get(senderWindowId);
-
-  // Position at top-right of target window
-  const left = targetWindow.left + targetWindow.width - popupWidth - 10;
-  const top = targetWindow.top + 80;
-
-  await chrome.windows.create({
-    url: popupUrl,
-    type: "popup",
-    width: 380,
-    height: 540,
-    left,
-    top,
-    focused: true,
-  });
-}
-```
+**See**: `src/chrome/txHandlers.ts` → `openExtensionPopup()` for implementation.
 
 **Multi-Monitor Support**:
 
@@ -1625,26 +1488,7 @@ The list shows both transaction and signature requests. Each request shows:
 
 ### Origin Favicon Styling
 
-Origin favicons are displayed with a white background to handle transparent icons:
-
-```tsx
-<Box
-  bg="white"
-  p="2px"
-  borderRadius="md"
-  display="flex"
-  alignItems="center"
-  justifyContent="center"
->
-  <Image
-    src={
-      favicon || `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`
-    }
-    boxSize="16px"
-    borderRadius="sm"
-  />
-</Box>
-```
+Origin favicons are displayed with a white background container to handle transparent icons. Falls back to Google's favicon service if no favicon is available.
 
 ### Homepage Layout
 
@@ -1674,18 +1518,7 @@ The header includes a lock icon button that allows users to manually lock the wa
 - Redirects to the unlock screen
 - Useful for security when stepping away from the computer
 
-```typescript
-// In App.tsx header
-<IconButton
-  aria-label="Lock wallet"
-  icon={<LockIcon />}
-  onClick={() => {
-    chrome.runtime.sendMessage({ type: "lockWallet" }, () => {
-      setView("unlock");
-    });
-  }}
-/>
-```
+Sends `lockWallet` message to background and redirects to the unlock screen.
 
 ### Footer Attribution
 
@@ -1730,17 +1563,4 @@ The `TransactionConfirmation` component uses `key={selectedTxRequest.id}` to for
 
 ### Avoiding Stale State
 
-When handling transaction completion:
-
-```typescript
-const handleTxRejected = async () => {
-  const currentTxId = selectedTxRequest?.id; // Capture before async
-  const requests = await loadPendingRequests(); // Returns fresh data
-
-  // Use fresh data, not stale pendingRequests state
-  const remaining = requests.filter((r) => r.id !== currentTxId);
-  // ...
-};
-```
-
-This pattern prevents the common React bug where async operations use stale closure values.
+When handling transaction completion, always capture the current transaction ID before async operations and reload pending requests fresh from storage rather than using React state. This prevents the common bug where async operations use stale closure values.
