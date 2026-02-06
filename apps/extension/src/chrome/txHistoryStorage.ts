@@ -19,6 +19,7 @@ export interface CompletedTransaction {
   completedAt?: number;
   txHash?: string;
   error?: string;
+  jobId?: string;
 }
 
 const TX_HISTORY_KEY = "txHistory";

@@ -8,6 +8,7 @@ import {
   Spinner,
   Image,
   IconButton,
+  Button,
 } from "@chakra-ui/react";
 import {
   CheckCircleIcon,
@@ -15,7 +16,9 @@ import {
   ExternalLinkIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  CloseIcon,
 } from "@chakra-ui/icons";
+import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { CompletedTransaction } from "@/chrome/txHistoryStorage";
 import { getChainConfig } from "@/constants/chainConfig";
 
@@ -99,6 +102,29 @@ function TxStatusList({ maxItems = 5, address }: TxStatusListProps) {
 
 function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
   const config = getChainConfig(tx.chainId);
+  const toast = useBauhausToast();
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleCancel = async () => {
+    setCancelling(true);
+    try {
+      const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "cancelProcessingTx", txId: tx.id },
+          resolve
+        );
+      });
+      if (result.success) {
+        toast({ title: "Transaction cancelled", status: "info", duration: 2000 });
+      } else {
+        toast({ title: result.error || "Cancel failed", status: "error", duration: 2000 });
+      }
+    } catch {
+      toast({ title: "Cancel failed", status: "error", duration: 2000 });
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const formatTimeAgo = (timestamp: number): string => {
     const diff = Date.now() - timestamp;
@@ -277,6 +303,21 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
             onClick={handleViewTx}
             _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
           />
+        )}
+        {tx.status === "processing" && (
+          <Button
+            size="xs"
+            color="bauhaus.red"
+            variant="ghost"
+            fontWeight="700"
+            onClick={handleCancel}
+            isLoading={cancelling}
+            loadingText=""
+            leftIcon={<CloseIcon boxSize="8px" />}
+            _hover={{ bg: "bauhaus.red", color: "white" }}
+          >
+            Cancel
+          </Button>
         )}
       </HStack>
 

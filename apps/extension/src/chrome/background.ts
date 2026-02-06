@@ -102,6 +102,7 @@ import {
   openPopupWindow,
   performSecurityReset,
   handleInitiateTransfer,
+  handleCancelProcessingTx,
   SignatureResult,
 } from "./txHandlers";
 
@@ -765,6 +766,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "initiateTransfer": {
       handleInitiateTransfer(message).then((result) => {
+        sendResponse(result);
+      });
+      return true;
+    }
+
+    case "cancelProcessingTx": {
+      handleCancelProcessingTx(message.txId).then((result) => {
         sendResponse(result);
       });
       return true;

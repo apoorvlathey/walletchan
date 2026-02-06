@@ -51,6 +51,7 @@ import {
 import {
   addTxToHistory,
   updateTxInHistory,
+  getTxById,
 } from "./txHistoryStorage";
 import {
   getCachedApiKey,
@@ -399,6 +400,9 @@ export async function handleConfirmTransaction(
     // Store job ID and API key for potential cancellation
     activeJobs.set(txId, { jobId, apiKey });
 
+    // Store jobId in history for UI-based cancel
+    await updateTxInHistory(txId, { jobId });
+
     // Poll for completion
     const status = await pollJobUntilComplete(apiKey, jobId, {
       pollInterval: 2000,
@@ -626,6 +630,9 @@ async function processTransactionInBackground(
 
     // Store job ID and API key for potential cancellation
     activeJobs.set(txId, { jobId, apiKey });
+
+    // Store jobId in history for UI-based cancel
+    await updateTxInHistory(txId, { jobId });
 
     // Poll for completion
     const status = await pollJobUntilComplete(apiKey, jobId, {
@@ -1179,4 +1186,71 @@ export async function handleInitiateTransfer(
   chrome.runtime.sendMessage({ type: "newPendingTxRequest", txRequest: pendingRequest }).catch(() => {});
 
   return { success: true, txId };
+}
+
+/**
+ * Cancels a processing transaction via the Bankr API.
+ * Uses activeJobs map first (in-memory), falls back to jobId from history.
+ */
+export async function handleCancelProcessingTx(
+  txId: string
+): Promise<{ success: boolean; error?: string }> {
+  // Try in-memory active jobs first
+  const active = activeJobs.get(txId);
+  if (active) {
+    try {
+      await cancelJob(active.apiKey, active.jobId);
+    } catch {
+      // Job may have already completed
+    }
+
+    // Abort local polling
+    const controller = activeAbortControllers.get(txId);
+    if (controller) controller.abort();
+
+    // Update history
+    await updateTxInHistory(txId, {
+      status: "failed",
+      error: "Cancelled by user",
+      completedAt: Date.now(),
+    });
+
+    activeJobs.delete(txId);
+    activeAbortControllers.delete(txId);
+
+    return { success: true };
+  }
+
+  // Fallback: look up jobId from tx history
+  const tx = await getTxById(txId);
+  if (!tx) {
+    return { success: false, error: "Transaction not found" };
+  }
+
+  if (tx.status !== "processing") {
+    return { success: false, error: "Transaction already completed" };
+  }
+
+  if (!tx.jobId) {
+    return { success: false, error: "No job ID available for cancellation" };
+  }
+
+  const apiKey = getCachedApiKey();
+  if (!apiKey) {
+    return { success: false, error: "Wallet locked - cannot cancel" };
+  }
+
+  try {
+    await cancelJob(apiKey, tx.jobId);
+  } catch {
+    // Job may have already completed
+  }
+
+  await updateTxInHistory(txId, {
+    status: "failed",
+    error: "Cancelled by user",
+    completedAt: Date.now(),
+  });
+
+  return { success: true };
 }
