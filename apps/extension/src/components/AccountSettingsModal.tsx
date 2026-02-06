@@ -14,10 +14,18 @@ import {
   ModalFooter,
   FormControl,
   FormLabel,
+  FormErrorMessage,
+  InputGroup,
+  InputRightElement,
+  IconButton,
+  Alert,
+  AlertIcon,
 } from "@chakra-ui/react";
-import { SettingsIcon, DeleteIcon, ViewIcon, WarningTwoIcon } from "@chakra-ui/icons";
+import { SettingsIcon, DeleteIcon, ViewIcon, WarningTwoIcon, EditIcon, ViewOffIcon, ArrowBackIcon } from "@chakra-ui/icons";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
-import type { Account } from "@/chrome/types";
+import type { Account, PasswordType } from "@/chrome/types";
+import { StaticJsonRpcProvider } from "@ethersproject/providers";
+import { isAddress } from "@ethersproject/address";
 
 interface AccountSettingsModalProps {
   isOpen: boolean;
@@ -27,7 +35,7 @@ interface AccountSettingsModalProps {
   onAccountUpdated: () => void;
 }
 
-type ModalView = "settings" | "confirmDelete";
+type ModalView = "settings" | "confirmDelete" | "changeApiKey";
 
 function AccountSettingsModal({
   isOpen,
@@ -42,20 +50,219 @@ function AccountSettingsModal({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // API Key change states
+  const [apiKey, setApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [walletAddress, setWalletAddress] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmittingApiKey, setIsSubmittingApiKey] = useState(false);
+  const [isResolvingAddress, setIsResolvingAddress] = useState(false);
+  const [hasCachedPassword, setHasCachedPassword] = useState(false);
+  const [passwordType, setPasswordType] = useState<PasswordType | null>(null);
+  const [apiKeyErrors, setApiKeyErrors] = useState<{
+    apiKey?: string;
+    walletAddress?: string;
+    password?: string;
+  }>({});
+
   // Reset state when modal opens/account changes
   useEffect(() => {
     if (isOpen && account) {
       setDisplayName(account.displayName || "");
       setView("settings");
+      // Reset API key form states
+      setApiKey("");
+      setShowApiKey(false);
+      setWalletAddress("");
+      setPassword("");
+      setShowPassword(false);
+      setApiKeyErrors({});
     }
   }, [isOpen, account]);
+
+  // Load data when switching to changeApiKey view
+  useEffect(() => {
+    if (view === "changeApiKey" && account?.type === "bankr") {
+      // Check if password is cached
+      chrome.runtime.sendMessage({ type: "getCachedPassword" }, (response) => {
+        setHasCachedPassword(response?.hasCachedPassword || false);
+      });
+
+      // Check password type
+      chrome.runtime.sendMessage({ type: "getPasswordType" }, (response: { passwordType: PasswordType | null }) => {
+        setPasswordType(response.passwordType);
+      });
+
+      // Load existing API key if cached
+      chrome.runtime.sendMessage({ type: "getCachedApiKey" }, (response) => {
+        if (response?.apiKey) {
+          setApiKey(response.apiKey);
+        }
+      });
+
+      // Load existing Bankr wallet address from the account object
+      setWalletAddress(account.address);
+    }
+  }, [view, account]);
 
   const handleClose = () => {
     setView("settings");
     setDisplayName("");
     setIsSaving(false);
     setIsDeleting(false);
+    // Reset API key form states
+    setApiKey("");
+    setShowApiKey(false);
+    setWalletAddress("");
+    setPassword("");
+    setShowPassword(false);
+    setApiKeyErrors({});
+    setHasCachedPassword(false);
+    setPasswordType(null);
     onClose();
+  };
+
+  // API Key change helpers
+  const resolveAddress = async (input: string): Promise<string | null> => {
+    if (isAddress(input)) {
+      return input;
+    }
+    try {
+      const mainnetProvider = new StaticJsonRpcProvider("https://rpc.ankr.com/eth");
+      const resolved = await mainnetProvider.resolveName(input);
+      return resolved;
+    } catch {
+      return null;
+    }
+  };
+
+  const needsPassword = !hasCachedPassword;
+
+  const validateApiKeyForm = async (): Promise<boolean> => {
+    const newErrors: typeof apiKeyErrors = {};
+
+    if (!apiKey.trim()) {
+      newErrors.apiKey = "API key is required";
+    }
+
+    if (!walletAddress.trim()) {
+      newErrors.walletAddress = "Wallet address is required";
+    } else {
+      setIsResolvingAddress(true);
+      const resolved = await resolveAddress(walletAddress.trim());
+      setIsResolvingAddress(false);
+
+      if (!resolved) {
+        newErrors.walletAddress = "Invalid address or ENS name";
+      }
+    }
+
+    if (needsPassword && !password) {
+      newErrors.password = "Password is required";
+    }
+
+    setApiKeyErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSaveApiKey = async () => {
+    const isValid = await validateApiKeyForm();
+    if (!isValid) return;
+
+    setIsSubmittingApiKey(true);
+
+    try {
+      const resolvedAddress = await resolveAddress(walletAddress.trim());
+      if (!resolvedAddress) {
+        setApiKeyErrors({ walletAddress: "Invalid address or ENS name" });
+        setIsSubmittingApiKey(false);
+        return;
+      }
+
+      if (hasCachedPassword) {
+        // Use cached password to save new API key
+        const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: "saveApiKeyWithCachedPassword", apiKey: apiKey.trim() },
+            resolve
+          );
+        });
+
+        if (!result.success) {
+          toast({
+            title: "Error saving API key",
+            description: result.error || "Failed to save API key",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+          });
+          setIsSubmittingApiKey(false);
+          return;
+        }
+      } else {
+        // Unlock first to establish the session
+        const unlockResult = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+          chrome.runtime.sendMessage({ type: "unlockWallet", password }, resolve);
+        });
+        if (!unlockResult.success) {
+          toast({
+            title: "Invalid password",
+            description: unlockResult.error || "Failed to unlock wallet",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+          });
+          setIsSubmittingApiKey(false);
+          return;
+        }
+        // Now save API key using the background handler (handles vault key vs legacy)
+        const saveResult = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: "saveApiKeyWithCachedPassword", apiKey: apiKey.trim() },
+            resolve
+          );
+        });
+        if (!saveResult.success) {
+          toast({
+            title: "Error saving API key",
+            description: saveResult.error || "Failed to save API key",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+          });
+          setIsSubmittingApiKey(false);
+          return;
+        }
+      }
+
+      // Save wallet address
+      await chrome.storage.sync.set({
+        address: resolvedAddress,
+        displayAddress: walletAddress.trim(),
+      });
+
+      toast({
+        title: "Configuration saved",
+        description: "Your API key and wallet address have been saved.",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+
+      onAccountUpdated();
+      setView("settings");
+    } catch (error) {
+      toast({
+        title: "Error saving configuration",
+        description: error instanceof Error ? error.message : "Unknown error",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsSubmittingApiKey(false);
+    }
   };
 
   const handleSaveDisplayName = async () => {
@@ -133,6 +340,223 @@ function AccountSettingsModal({
   };
 
   if (!account) return null;
+
+  // Change API Key view (for Bankr accounts)
+  if (view === "changeApiKey") {
+    const isAgentSession = passwordType === "agent";
+
+    return (
+      <Modal isOpen={isOpen} onClose={handleClose} isCentered>
+        <ModalOverlay bg="blackAlpha.700" />
+        <ModalContent
+          bg="bauhaus.white"
+          border="4px solid"
+          borderColor="bauhaus.black"
+          borderRadius="0"
+          boxShadow="8px 8px 0px 0px #121212"
+          mx={4}
+        >
+          <ModalHeader color="text.primary" fontSize="md" pb={2} textTransform="uppercase" letterSpacing="wider">
+            <HStack>
+              <IconButton
+                aria-label="Back"
+                icon={<ArrowBackIcon />}
+                variant="ghost"
+                size="sm"
+                onClick={() => setView("settings")}
+              />
+              <Text>Change API Key & Address</Text>
+            </HStack>
+          </ModalHeader>
+
+          <ModalBody>
+            {isAgentSession ? (
+              <VStack spacing={3} align="stretch">
+                <Box
+                  w="full"
+                  p={3}
+                  bg="bauhaus.yellow"
+                  border="2px solid"
+                  borderColor="bauhaus.black"
+                >
+                  <HStack spacing={2}>
+                    <WarningTwoIcon color="bauhaus.black" />
+                    <Text color="bauhaus.black" fontSize="sm" fontWeight="700">
+                      Unlock with master password to access
+                    </Text>
+                  </HStack>
+                </Box>
+                <Text color="text.secondary" fontSize="sm" fontWeight="500">
+                  API key changes are only available when unlocked with your master password.
+                </Text>
+              </VStack>
+            ) : (
+              <VStack spacing={4} align="stretch">
+                <Text fontSize="sm" color="text.secondary">
+                  Update your API key and wallet address.
+                </Text>
+
+                <FormControl isInvalid={!!apiKeyErrors.apiKey}>
+                  <FormLabel
+                    fontSize="xs"
+                    fontWeight="700"
+                    color="text.primary"
+                    textTransform="uppercase"
+                  >
+                    Bankr API Key
+                  </FormLabel>
+                  <InputGroup>
+                    <Input
+                      type={showApiKey ? "text" : "password"}
+                      placeholder="Enter your API key"
+                      value={apiKey}
+                      onChange={(e) => {
+                        setApiKey(e.target.value);
+                        setApiKeyErrors({});
+                      }}
+                      pr="3rem"
+                      bg="white"
+                      border="3px solid"
+                      borderColor={apiKeyErrors.apiKey ? "bauhaus.red" : "bauhaus.black"}
+                      borderRadius="0"
+                      _focus={{
+                        borderColor: apiKeyErrors.apiKey ? "bauhaus.red" : "bauhaus.blue",
+                        boxShadow: "none",
+                      }}
+                    />
+                    <InputRightElement>
+                      <IconButton
+                        aria-label={showApiKey ? "Hide" : "Show"}
+                        icon={showApiKey ? <ViewOffIcon /> : <ViewIcon />}
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        color="text.secondary"
+                        tabIndex={-1}
+                      />
+                    </InputRightElement>
+                  </InputGroup>
+                  <FormErrorMessage color="bauhaus.red" fontWeight="700">
+                    {apiKeyErrors.apiKey}
+                  </FormErrorMessage>
+                </FormControl>
+
+                <FormControl isInvalid={!!apiKeyErrors.walletAddress}>
+                  <FormLabel
+                    fontSize="xs"
+                    fontWeight="700"
+                    color="text.primary"
+                    textTransform="uppercase"
+                  >
+                    Wallet Address
+                  </FormLabel>
+                  <Input
+                    placeholder="0x... or ENS name"
+                    value={walletAddress}
+                    onChange={(e) => {
+                      setWalletAddress(e.target.value);
+                      setApiKeyErrors({});
+                    }}
+                    bg="white"
+                    border="3px solid"
+                    borderColor={apiKeyErrors.walletAddress ? "bauhaus.red" : "bauhaus.black"}
+                    borderRadius="0"
+                    _focus={{
+                      borderColor: apiKeyErrors.walletAddress ? "bauhaus.red" : "bauhaus.blue",
+                      boxShadow: "none",
+                    }}
+                  />
+                  <FormErrorMessage color="bauhaus.red" fontWeight="700">
+                    {apiKeyErrors.walletAddress}
+                  </FormErrorMessage>
+                </FormControl>
+
+                {needsPassword && (
+                  <>
+                    <FormControl isInvalid={!!apiKeyErrors.password}>
+                      <FormLabel
+                        fontSize="xs"
+                        fontWeight="700"
+                        color="text.primary"
+                        textTransform="uppercase"
+                      >
+                        Master Password
+                      </FormLabel>
+                      <InputGroup>
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Enter your password"
+                          value={password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            setApiKeyErrors({});
+                          }}
+                          pr="3rem"
+                          bg="white"
+                          border="3px solid"
+                          borderColor={apiKeyErrors.password ? "bauhaus.red" : "bauhaus.black"}
+                          borderRadius="0"
+                          _focus={{
+                            borderColor: apiKeyErrors.password ? "bauhaus.red" : "bauhaus.blue",
+                            boxShadow: "none",
+                          }}
+                        />
+                        <InputRightElement>
+                          <IconButton
+                            aria-label={showPassword ? "Hide" : "Show"}
+                            icon={showPassword ? <ViewOffIcon /> : <ViewIcon />}
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setShowPassword(!showPassword)}
+                            color="text.secondary"
+                            tabIndex={-1}
+                          />
+                        </InputRightElement>
+                      </InputGroup>
+                      <FormErrorMessage color="bauhaus.red" fontWeight="700">
+                        {apiKeyErrors.password}
+                      </FormErrorMessage>
+                    </FormControl>
+
+                    <Alert
+                      status="warning"
+                      bg="bauhaus.yellow"
+                      border="2px solid"
+                      borderColor="bauhaus.black"
+                      borderRadius="0"
+                      fontSize="sm"
+                    >
+                      <AlertIcon color="bauhaus.black" />
+                      <Text color="bauhaus.black" fontWeight="600">
+                        Enter your password to save changes. Session expired.
+                      </Text>
+                    </Alert>
+                  </>
+                )}
+              </VStack>
+            )}
+          </ModalBody>
+
+          <ModalFooter gap={2}>
+            <Button variant="secondary" size="sm" onClick={() => setView("settings")}>
+              Cancel
+            </Button>
+            {!isAgentSession && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSaveApiKey}
+                isLoading={isSubmittingApiKey || isResolvingAddress}
+                loadingText={isResolvingAddress ? "Resolving..." : "Saving..."}
+              >
+                Save
+              </Button>
+            )}
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    );
+  }
 
   // Confirmation view for delete
   if (view === "confirmDelete") {
@@ -318,6 +742,19 @@ function AccountSettingsModal({
                   w="full"
                 >
                   Reveal Private Key
+                </Button>
+              )}
+
+              {account.type === "bankr" && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<EditIcon />}
+                  onClick={() => setView("changeApiKey")}
+                  justifyContent="flex-start"
+                  w="full"
+                >
+                  Change API Key & Address
                 </Button>
               )}
 

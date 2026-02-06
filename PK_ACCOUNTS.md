@@ -99,13 +99,16 @@ For Private Key accounts, users can reveal their private key through a secure, p
 │  1. User clicks settings gear icon next to account in dropdown              │
 │  2. AccountSettingsModal opens                                              │
 │  3. User clicks "Reveal Private Key" button (yellow, PK accounts only)      │
-│  4. RevealPrivateKeyModal opens with password entry                         │
-│  5. User enters password → sent to background.ts                            │
-│  6. Background verifies password matches cached session password            │
-│  7. If valid: decrypt vault, return private key to modal                    │
-│  8. Modal displays key (masked by default, with show/hide toggle)           │
-│  9. User can copy key to clipboard                                          │
-│  10. On modal close: private key cleared from component state               │
+│  4. RevealPrivateKeyModal opens                                             │
+│  5. Modal checks session password type (master vs agent)                    │
+│  6. IF AGENT SESSION: Show blocked message with instructions                │
+│  7. IF MASTER SESSION: Show password entry form                             │
+│  8. User enters password → sent to background.ts                            │
+│  9. Background verifies password AND password type                          │
+│  10. If valid: decrypt vault, return private key to modal                   │
+│  11. Modal displays key (masked by default, with show/hide toggle)          │
+│  12. User can copy key to clipboard                                         │
+│  13. On modal close: private key cleared from component state               │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -113,7 +116,7 @@ For Private Key accounts, users can reveal their private key through a secure, p
 
 | Type | Direction | Payload | Response |
 | ---- | --------- | ------- | -------- |
-| `revealPrivateKey` | UI → Background | `{ accountId, password }` | `{ success, privateKey? }` or `{ success: false, error }` |
+| `revealPrivateKey` | UI → Background | `{ accountId, password }` | `{ success, privateKey? }` or `{ success: false, error, requiresMasterPassword? }` |
 
 **Security Guarantees:**
 
@@ -122,6 +125,48 @@ For Private Key accounts, users can reveal their private key through a secure, p
 3. **Memory Cleanup**: Private key is cleared from React state when modal closes
 4. **No Persistence**: Revealed key is never stored - only held in component state briefly
 5. **Vault Decryption**: If vault not cached, full decryption is performed with the password
+6. **Agent Password Blocked**: If unlocked with agent password, reveal is blocked regardless of password entry
+
+### Agent Password Restriction
+
+When the wallet is unlocked with an **agent password** (see IMPLEMENTATION.md for Agent Password details), private key reveal is **always blocked**. This is a core security feature that allows AI agents to use the wallet for transactions while protecting the underlying private keys.
+
+**Why This Restriction Exists:**
+- Agent passwords are designed for AI agents to operate wallets
+- Agents should be able to sign transactions but never export keys
+- Master password is required for sensitive operations like key reveal
+
+**UI Behavior When Unlocked with Agent Password:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  [Warning icon]  REVEAL PRIVATE KEY                              │
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  🔒 You are unlocked with an agent password.              │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  Private key reveal is only available when unlocked with        │
+│  your **master password**.                                       │
+│                                                                  │
+│  To reveal the private key:                                      │
+│  │ 1. Lock your wallet                                          │
+│  │ 2. Unlock with your master password                          │
+│  │ 3. Try revealing the key again                               │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────┐         │
+│  │                    [Close]                          │         │
+│  └────────────────────────────────────────────────────┘         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**UI Behavior When Agent Password is Enabled (Master Session):**
+
+When agent password is configured but the user is unlocked with master password, the reveal modal shows "Master Password" in the prompt to clarify which password is needed:
+
+```
+Enter your **Master** password to reveal the private key for [Account Name]
+```
 
 **UI States:**
 

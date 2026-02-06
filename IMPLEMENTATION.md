@@ -320,9 +320,10 @@ src/
 │   │   ├── AddChain.tsx     # Add new chain
 │   │   ├── EditChain.tsx    # Edit existing chain
 │   │   ├── ChangePassword.tsx # Password change flow
-│   │   └── AutoLockSettings.tsx # Auto-lock timeout configuration
+│   │   ├── AutoLockSettings.tsx # Auto-lock timeout configuration
+│   │   └── AgentPasswordSettings.tsx # Agent password set/remove (master only)
 │   ├── AccountSwitcher.tsx  # Account dropdown and selection
-│   ├── AccountSettingsModal.tsx # Account settings (rename, reveal key, remove)
+│   ├── AccountSettingsModal.tsx # Account settings (rename, reveal key, remove, change API key)
 │   ├── RevealPrivateKeyModal.tsx # Password-protected private key reveal
 │   ├── AddAccount.tsx       # Add new account screen
 │   ├── UnlockScreen.tsx     # Wallet unlock (password entry)
@@ -933,6 +934,8 @@ Both the Bankr API key and private keys are encrypted using AES-256-GCM with PBK
 
 `src/chrome/crypto.ts` and `src/chrome/vaultCrypto.ts`:
 
+### Legacy System (Pre-Vault Key)
+
 ```
 User Password
       │
@@ -948,25 +951,39 @@ Encrypt Sensitive Data (random IV)
       ▼
 Store in chrome.storage.local:
 {
-  // Bankr API key (for Bankr accounts)
-  encryptedApiKey: {
-    ciphertext: "base64...",
-    iv: "base64...",
-    salt: "base64..."
-  },
-  // Private keys vault (for PK accounts)
-  encryptedVault: {
-    ciphertext: "base64...",
-    iv: "base64...",
-    salt: "base64..."
-  },
-  // Account metadata (no sensitive data)
-  accounts: [
-    { id: "...", type: "bankr", address: "0x...", ... },
-    { id: "...", type: "privateKey", address: "0x...", ... }
-  ]
+  encryptedApiKey: { ... },    // API key encrypted with password
+  encryptedVault: { ... },      // Private keys encrypted with password
 }
 ```
+
+### Vault Key System (Current)
+
+After migration, the vault key system is used for better multi-password support:
+
+```
+Master/Agent Password
+      │
+      ▼
+PBKDF2 (600,000 iterations)
+      │
+      ▼
+Decrypt Vault Key from encryptedVaultKeyMaster or encryptedVaultKeyAgent
+      │
+      ▼
+Vault Key (32-byte AES)
+      │
+      ▼
+Decrypt Sensitive Data:
+{
+  encryptedVaultKeyMaster: { ... },  // Vault key encrypted with master password
+  encryptedVaultKeyAgent: { ... },   // Vault key encrypted with agent password (optional)
+  encryptedApiKeyVault: { ... },     // API key encrypted with vault key
+  encryptedVault: { ... },           // Private keys (still uses legacy format)
+  accounts: [...]                     // Account metadata (no sensitive data)
+}
+```
+
+**IMPORTANT**: When saving API keys after vault key migration, always use `encryptedApiKeyVault` (encrypted with vault key), NOT `encryptedApiKey` (encrypted with password). The background worker's `handleSaveApiKeyWithCachedPassword()` and `addBankrAccount` handler automatically detect which system is in use and save to the correct location.
 
 **Security Note**: Private keys are ONLY decrypted in the service worker (background.ts) and NEVER exposed to content scripts, inpage scripts, or the UI layer. See [PK_ACCOUNTS.md](./PK_ACCOUNTS.md) for detailed security architecture.
 
@@ -982,6 +999,77 @@ Wallet lock flow for secure credential management:
   - Viewing the main wallet interface
   - Confirming any pending transactions or signature requests
 - Unlock persists across popup open/close cycles (until cache expires)
+
+#### Agent Password (Optional Secondary Password)
+
+Users can optionally configure an **agent password** that allows AI agents to unlock the wallet for normal operations while protecting private key reveal:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Agent Password Architecture                          │
+│                                                                             │
+│  Vault Key System:                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Master Password → PBKDF2 → encrypts vault key → encryptedVaultKeyMaster│
+│  │  Agent Password  → PBKDF2 → encrypts vault key → encryptedVaultKeyAgent │
+│  │                                    ↓                                    │
+│  │                              Vault Key (32-byte AES)                    │
+│  │                                    ↓                                    │
+│  │                    Decrypts: API key, private key vault                 │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Access Levels:                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Master Password:                                                    │   │
+│  │    ✅ Unlock wallet                                                  │   │
+│  │    ✅ Sign transactions                                              │   │
+│  │    ✅ Sign messages                                                  │   │
+│  │    ✅ Reveal private keys                                            │   │
+│  │    ✅ Manage agent password settings                                 │   │
+│  │    ✅ Change master password                                         │   │
+│  │    ✅ Change Bankr API key & address                                 │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │  Agent Password:                                                     │   │
+│  │    ✅ Unlock wallet                                                  │   │
+│  │    ✅ Sign transactions                                              │   │
+│  │    ✅ Sign messages                                                  │   │
+│  │    ❌ Reveal private keys (blocked)                                  │   │
+│  │    ❌ Manage agent password settings (blocked)                       │   │
+│  │    ❌ Change master password (blocked)                               │   │
+│  │    ❌ Change Bankr API key & address (blocked)                       │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Storage Schema** (in `chrome.storage.local`):
+
+| Key | Description |
+| --- | ----------- |
+| `encryptedVaultKeyMaster` | Vault key encrypted with master password |
+| `encryptedVaultKeyAgent` | Vault key encrypted with agent password (optional) |
+| `encryptedApiKeyVault` | API key encrypted with vault key (current format) |
+| `encryptedApiKey` | API key encrypted with password (legacy, kept for migration) |
+| `agentPasswordEnabled` | Boolean flag for UI |
+
+**Migration**: Existing users are automatically migrated to the vault key system on first unlock. The migration:
+1. Generates a new 256-bit vault key
+2. Encrypts vault key with master password
+3. Re-encrypts API key with vault key into `encryptedApiKeyVault`
+4. Legacy `encryptedApiKey` is kept but no longer read after migration
+
+**API Key Saving**: When saving/updating API keys after wallet setup:
+- If `cachedVaultKey` exists → encrypt with vault key → save to `encryptedApiKeyVault`
+- If no vault key (legacy) → encrypt with password → save to `encryptedApiKey`
+- This is handled automatically by `handleSaveApiKeyWithCachedPassword()` and `addBankrAccount` handler
+
+**Security Invariants**:
+1. Private key reveal is **always blocked** when unlocked with agent password
+2. Agent password management requires master password
+3. Master password change requires master password (agent cannot change it)
+4. Bankr API key & address change requires master password
+5. Both passwords use the same auto-lock timeout
+6. No timing leak between password types (tries master first, then agent)
+7. Changing master password does NOT invalidate agent password
 
 #### Auto-Lock Timeout Configuration
 
@@ -1027,12 +1115,23 @@ When changing the API key while the wallet is unlocked:
 When changing the wallet password (Settings → Change Password):
 
 - **No current password required**: User is already authenticated (wallet unlocked)
-- Uses **cached password** from background service worker to decrypt API key
-- Re-encrypts API key with the new password
+- **Must be unlocked with master password**: Agent password sessions cannot change the password
 - **Session check**: Periodic check (every 30 seconds) ensures session hasn't expired
 - **Auto-redirect**: If session expires while on the form, user is redirected to unlock screen
 - **Cache cleared**: After password change, user must unlock with new password
 - Password handling stays entirely in background worker (never exposed to UI)
+
+**With Vault Key System** (current):
+1. Decrypt vault key with cached (old) password to get raw bytes
+2. Re-encrypt vault key with new password
+3. Save updated `encryptedVaultKeyMaster`
+4. API key and private keys stay encrypted with the vault key (unchanged)
+5. **Agent password remains valid** - `encryptedVaultKeyAgent` is unchanged
+
+**Legacy System** (pre-vault key migration):
+1. Decrypt API key with old password
+2. Re-encrypt API key with new password
+3. Re-encrypt private key vault with new password
 
 ### Pending Transaction Storage
 

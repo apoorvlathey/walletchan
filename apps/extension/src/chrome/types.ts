@@ -4,6 +4,13 @@
 
 export type AccountType = "bankr" | "privateKey";
 
+/**
+ * Password type for unlock sessions
+ * - master: Full access including private key reveal
+ * - agent: Normal operations only, no private key reveal
+ */
+export type PasswordType = "master" | "agent";
+
 export interface BaseAccount {
   id: string;           // UUID
   type: AccountType;

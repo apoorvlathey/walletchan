@@ -67,11 +67,10 @@ function ApiKeySetup({
         }
       });
 
-      // Load existing address
-      chrome.storage.sync.get(["address", "displayAddress"]).then((data) => {
-        if (data.displayAddress) {
-          setWalletAddress(data.displayAddress);
-        } else if (data.address) {
+      // Load existing Bankr wallet address
+      // Always use the resolved address, not displayAddress which could be a PK account's display name
+      chrome.storage.sync.get(["address"]).then((data) => {
+        if (data.address) {
           setWalletAddress(data.address);
         }
       });

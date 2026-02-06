@@ -50,6 +50,7 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
   const [sidePanelMode, setSidePanelMode] = useState(false);
   const [isInSidePanel, setIsInSidePanel] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isAgentPasswordEnabled, setIsAgentPasswordEnabled] = useState(false);
   const passwordInputRef = useRef<HTMLInputElement>(null);
   const { isOpen: isResetModalOpen, onOpen: onResetModalOpen, onClose: onResetModalClose } = useDisclosure();
 
@@ -70,6 +71,14 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
       });
     };
 
+    const checkAgentPasswordEnabled = async () => {
+      return new Promise<boolean>((resolve) => {
+        chrome.runtime.sendMessage({ type: "isAgentPasswordEnabled" }, (response) => {
+          resolve(response?.enabled || false);
+        });
+      });
+    };
+
     const init = async () => {
       const supported = await checkSidePanelSupport();
       setSidePanelSupported(supported);
@@ -81,6 +90,10 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
 
       // Detect if currently in sidepanel
       setIsInSidePanel(window.innerHeight > 620);
+
+      // Check if agent password is enabled
+      const agentEnabled = await checkAgentPasswordEnabled();
+      setIsAgentPasswordEnabled(agentEnabled);
     };
 
     init();
@@ -390,6 +403,12 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
             </Button>
           </VStack>
         </Box>
+
+        {isAgentPasswordEnabled && (
+          <Text fontSize="xs" color="text.tertiary" fontWeight="500" textAlign="center">
+            Master or Agent password accepted
+          </Text>
+        )}
       </VStack>
 
       {/* Reset Extension Modal */}

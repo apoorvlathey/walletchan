@@ -17,8 +17,8 @@ import {
   ModalFooter,
   Code,
 } from "@chakra-ui/react";
-import { ViewIcon, ViewOffIcon, WarningTwoIcon, CopyIcon, CheckIcon } from "@chakra-ui/icons";
-import type { Account } from "@/chrome/types";
+import { ViewIcon, ViewOffIcon, WarningTwoIcon, CopyIcon, CheckIcon, LockIcon } from "@chakra-ui/icons";
+import type { Account, PasswordType } from "@/chrome/types";
 
 interface RevealPrivateKeyModalProps {
   isOpen: boolean;
@@ -34,12 +34,36 @@ function RevealPrivateKeyModal({ isOpen, onClose, account }: RevealPrivateKeyMod
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [passwordType, setPasswordType] = useState<PasswordType | null>(null);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [isAgentPasswordEnabled, setIsAgentPasswordEnabled] = useState(false);
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
-  // Focus password input when modal opens
+  // Check password type and agent password status when modal opens
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => passwordInputRef.current?.focus(), 100);
+      setIsCheckingSession(true);
+
+      // Check password type
+      chrome.runtime.sendMessage(
+        { type: "getPasswordType" },
+        (response: { passwordType: PasswordType | null }) => {
+          setPasswordType(response.passwordType);
+          setIsCheckingSession(false);
+          // Only focus password input if not agent session
+          if (response.passwordType !== "agent") {
+            setTimeout(() => passwordInputRef.current?.focus(), 100);
+          }
+        }
+      );
+
+      // Check if agent password is enabled
+      chrome.runtime.sendMessage(
+        { type: "isAgentPasswordEnabled" },
+        (response: { enabled: boolean }) => {
+          setIsAgentPasswordEnabled(response.enabled);
+        }
+      );
     }
   }, [isOpen]);
 
@@ -52,6 +76,9 @@ function RevealPrivateKeyModal({ isOpen, onClose, account }: RevealPrivateKeyMod
     setError("");
     setIsLoading(false);
     setCopied(false);
+    setPasswordType(null);
+    setIsCheckingSession(true);
+    setIsAgentPasswordEnabled(false);
     onClose();
   };
 
@@ -114,7 +141,44 @@ function RevealPrivateKeyModal({ isOpen, onClose, account }: RevealPrivateKeyMod
         </ModalHeader>
 
         <ModalBody>
-          {!revealed ? (
+          {isCheckingSession ? (
+            <VStack spacing={3} align="stretch">
+              <Text color="text.secondary" fontSize="sm" fontWeight="500">
+                Checking session...
+              </Text>
+            </VStack>
+          ) : passwordType === "agent" ? (
+            /* Agent session - cannot reveal private key */
+            <VStack spacing={3} align="stretch">
+              <Box
+                w="full"
+                p={3}
+                bg="bauhaus.yellow"
+                border="2px solid"
+                borderColor="bauhaus.black"
+              >
+                <HStack spacing={2}>
+                  <LockIcon color="bauhaus.black" />
+                  <Text color="bauhaus.black" fontSize="sm" fontWeight="700">
+                    You are unlocked with an agent password.
+                  </Text>
+                </HStack>
+              </Box>
+
+              <Text color="text.secondary" fontSize="sm" fontWeight="500">
+                Private key reveal is only available when unlocked with your <Text as="span" fontWeight="700">master password</Text>.
+              </Text>
+
+              <Text color="text.secondary" fontSize="sm" fontWeight="500">
+                To reveal the private key:
+              </Text>
+              <Box pl={4} borderLeft="4px solid" borderColor="bauhaus.blue">
+                <Text color="text.secondary" fontSize="sm">1. Lock your wallet</Text>
+                <Text color="text.secondary" fontSize="sm">2. Unlock with your master password</Text>
+                <Text color="text.secondary" fontSize="sm">3. Try revealing the key again</Text>
+              </Box>
+            </VStack>
+          ) : !revealed ? (
             <VStack spacing={3} align="stretch">
               <Box
                 w="full"
@@ -129,7 +193,7 @@ function RevealPrivateKeyModal({ isOpen, onClose, account }: RevealPrivateKeyMod
               </Box>
 
               <Text color="text.secondary" fontSize="sm" fontWeight="500">
-                Enter your password to reveal the private key for{" "}
+                Enter your {isAgentPasswordEnabled && <Text as="span" fontWeight="700">Master </Text>}password to reveal the private key for{" "}
                 <Text as="span" fontWeight="700" color="text.primary">
                   {account?.displayName || truncateAddress(account?.address || "")}
                 </Text>
@@ -139,7 +203,7 @@ function RevealPrivateKeyModal({ isOpen, onClose, account }: RevealPrivateKeyMod
                 <Input
                   ref={passwordInputRef}
                   type={showPassword ? "text" : "password"}
-                  placeholder="Password"
+                  placeholder={isAgentPasswordEnabled ? "Master Password" : "Password"}
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
@@ -237,7 +301,15 @@ function RevealPrivateKeyModal({ isOpen, onClose, account }: RevealPrivateKeyMod
         </ModalBody>
 
         <ModalFooter gap={2}>
-          {!revealed ? (
+          {isCheckingSession ? (
+            <Button variant="secondary" size="sm" onClick={handleClose} w="full">
+              Cancel
+            </Button>
+          ) : passwordType === "agent" ? (
+            <Button variant="secondary" size="sm" onClick={handleClose} w="full">
+              Close
+            </Button>
+          ) : !revealed ? (
             <>
               <Button variant="secondary" size="sm" onClick={handleClose}>
                 Cancel

@@ -170,7 +170,9 @@ function ChangePassword({ onComplete, onCancel, onSessionExpired }: ChangePasswo
             placeholder="Enter new password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
             pr="3rem"
+            autoFocus
           />
           <InputRightElement>
             <IconButton
@@ -180,6 +182,7 @@ function ChangePassword({ onComplete, onCancel, onSessionExpired }: ChangePasswo
               variant="ghost"
               onClick={() => setShowNewPassword(!showNewPassword)}
               color="text.secondary"
+              tabIndex={-1}
             />
           </InputRightElement>
         </InputGroup>
@@ -197,6 +200,7 @@ function ChangePassword({ onComplete, onCancel, onSessionExpired }: ChangePasswo
           placeholder="Confirm new password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
         />
         <FormErrorMessage color="bauhaus.red" fontWeight="700">
           {errors.confirmPassword}
@@ -212,7 +216,7 @@ function ChangePassword({ onComplete, onCancel, onSessionExpired }: ChangePasswo
       >
         <HStack spacing={2}>
           <Box p={1} bg="bauhaus.black">
-            <InfoIcon color="bauhaus.blue" boxSize={4} />
+            <InfoIcon color="white" boxSize={4} />
           </Box>
           <Text color="white" fontSize="sm" fontWeight="700">
             You will need to unlock again after changing your password.

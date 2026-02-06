@@ -8,6 +8,23 @@ Browser wallet extension + landing page website in a pnpm workspace monorepo.
 
 **Supported chains**: Base (8453), Ethereum (1), Polygon (137), Unichain (130)
 
+## AI Session Workflow
+
+**At the start of each session**, before writing any code:
+
+1. **Read `IMPLEMENTATION.md`** when working on extension logic, message passing, background handlers, or crypto
+2. **Read `STYLING.md`** when working on any UI components or styling
+3. **Read `WEBSITE.md`** when working on the landing page
+
+**After making significant changes:**
+
+- **Update `IMPLEMENTATION.md`** if you modified:
+  - Message types or message flow
+  - Background handler logic
+  - Storage keys or encryption patterns
+  - New features or architectural decisions
+- Keep the documentation in sync with the code - future sessions depend on accurate docs
+
 ## Monorepo Structure
 
 ```
@@ -125,6 +142,33 @@ When working on features, refer to these docs:
 - **Per-tab chain state**: Each browser tab maintains its own selected chain
 - **Transaction persistence**: Pending transactions survive popup close (stored in chrome.storage.local)
 - **EIP-6963**: Modern wallet discovery alongside legacy window.ethereum
+
+## Development Practices
+
+### Storage/Encryption Changes
+
+When modifying how data is stored or encrypted (e.g., the vault key system):
+
+1. **Audit ALL read AND write paths** - grep for storage key names (`encryptedApiKey`, `encryptedApiKeyVault`, etc.)
+2. **Check every file** that touches the data - `background.ts` has multiple handlers, `AccountSettingsModal.tsx` can save directly
+3. **Common mistake**: updating read paths but forgetting write paths in different files/handlers
+
+### Key Storage Locations
+
+| Key | Purpose |
+| --- | ------- |
+| `encryptedApiKeyVault` | API key encrypted with vault key (current format) |
+| `encryptedApiKey` | API key encrypted with password (legacy format) |
+| `encryptedVaultKeyMaster` | Vault key encrypted with master password |
+
+**Rule**: Check `cachedVaultKey` to determine which system is active before saving API keys.
+
+### User-Reported Anomalies
+
+When a user reports something unexpected (like a wrong value appearing):
+- Don't dismiss it - trace the full data flow
+- Ask: "Where does this value come from? What code path could produce it?"
+- The anomaly is often a symptom of a deeper storage/migration issue
 
 ## Testing Extension Changes
 

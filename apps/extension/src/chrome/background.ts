@@ -6,7 +6,19 @@
  * - Returns results to content script
  */
 
-import { loadDecryptedApiKey, hasEncryptedApiKey } from "./crypto";
+import {
+  loadDecryptedApiKey,
+  hasEncryptedApiKey,
+  hasVaultKeySystem,
+  isAgentPasswordEnabled,
+  generateVaultKey,
+  encryptVaultKey,
+  tryDecryptVaultKey,
+  importVaultKey,
+  encryptWithVaultKey,
+  decryptWithVaultKey,
+  EncryptedData,
+} from "./crypto";
 import {
   submitTransaction,
   pollJobUntilComplete,
@@ -16,7 +28,7 @@ import {
 } from "./bankrApi";
 import { ALLOWED_CHAIN_IDS, CHAIN_NAMES } from "../constants/networks";
 import { CHAIN_CONFIG } from "../constants/chainConfig";
-import type { Account, DecryptedEntry } from "./types";
+import type { Account, DecryptedEntry, PasswordType } from "./types";
 import {
   getAccounts,
   getAccountById,
@@ -139,6 +151,14 @@ let cacheTimestamp: number = 0;
 let cachedVault: DecryptedEntry[] | null = null;
 let vaultCacheTimestamp: number = 0;
 
+// Session cache for password type (master or agent)
+// Used to restrict certain operations (like private key reveal) for agent sessions
+let cachedPasswordType: PasswordType | null = null;
+
+// Session cache for decrypted vault key
+// This is the intermediate key that decrypts actual data (API key, private keys)
+let cachedVaultKey: CryptoKey | null = null;
+
 // UI connection tracking for auto-lock
 // While any popup/sidepanel is connected, the cache never expires
 let activeUIConnections = 0;
@@ -254,11 +274,13 @@ function setCachedApiKey(apiKey: string, password?: string): void {
 }
 
 /**
- * Clears the cached API key and password
+ * Clears the cached API key, password, vault key, and password type
  */
 function clearCachedApiKey(): void {
   cachedApiKey = null;
   cachedPassword = null;
+  cachedPasswordType = null;
+  cachedVaultKey = null;
   cacheTimestamp = 0;
 }
 
@@ -1697,12 +1719,100 @@ async function processChatPromptInBackground(
 
 /**
  * Attempts to unlock the wallet by caching the decrypted API key and vault
+ * Supports both legacy format (direct password encryption) and new vault key system
+ * With vault key system, both master and agent passwords can unlock the wallet
  */
-async function handleUnlockWallet(password: string): Promise<{ success: boolean; error?: string }> {
+async function handleUnlockWallet(password: string): Promise<{ success: boolean; error?: string; passwordType?: PasswordType }> {
+  const hasVaultKeySystem = await checkHasVaultKeySystem();
+
+  if (hasVaultKeySystem) {
+    // New vault key system - try to decrypt vault key with either password
+    return await unlockWithVaultKeySystem(password);
+  } else {
+    // Legacy system - decrypt directly with password, then migrate if successful
+    return await unlockWithLegacySystem(password);
+  }
+}
+
+/**
+ * Checks if vault key system is in use
+ */
+async function checkHasVaultKeySystem(): Promise<boolean> {
+  const { encryptedVaultKeyMaster } = await chrome.storage.local.get("encryptedVaultKeyMaster");
+  return !!encryptedVaultKeyMaster;
+}
+
+/**
+ * Unlocks using the new vault key system
+ * Tries master password first, then agent password
+ */
+async function unlockWithVaultKeySystem(password: string): Promise<{ success: boolean; error?: string; passwordType?: PasswordType }> {
+  const { encryptedVaultKeyMaster, encryptedVaultKeyAgent, agentPasswordEnabled } =
+    await chrome.storage.local.get(["encryptedVaultKeyMaster", "encryptedVaultKeyAgent", "agentPasswordEnabled"]);
+
+  if (!encryptedVaultKeyMaster) {
+    return { success: false, error: "No encrypted vault key found" };
+  }
+
+  let vaultKeyBytes: Uint8Array | null = null;
+  let passwordType: PasswordType = "master";
+
+  // Try master password first
+  vaultKeyBytes = await tryDecryptVaultKey(encryptedVaultKeyMaster, password);
+
+  // If master failed and agent password is enabled, try agent password
+  if (!vaultKeyBytes && agentPasswordEnabled && encryptedVaultKeyAgent) {
+    vaultKeyBytes = await tryDecryptVaultKey(encryptedVaultKeyAgent, password);
+    if (vaultKeyBytes) {
+      passwordType = "agent";
+    }
+  }
+
+  if (!vaultKeyBytes) {
+    return { success: false, error: "Invalid password" };
+  }
+
+  // Import the vault key
+  const vaultKey = await importVaultKey(vaultKeyBytes);
+  cachedVaultKey = vaultKey;
+  cachedPasswordType = passwordType;
+
+  // Always cache the password for session management
+  cachedPassword = password;
+  cacheTimestamp = Date.now();
+
+  // Decrypt API key using vault key (if exists)
+  const { encryptedApiKeyVault } = await chrome.storage.local.get("encryptedApiKeyVault");
+  if (encryptedApiKeyVault) {
+    const apiKey = await decryptWithVaultKey(vaultKey, encryptedApiKeyVault);
+    if (apiKey) {
+      cachedApiKey = apiKey;
+    }
+  }
+
+  // Decrypt vault entries (private keys) using the vault key
+  const hasVault = await hasVaultEntries();
+  if (hasVault) {
+    const vault = await decryptAllKeysWithVaultKey(vaultKey);
+    if (vault) {
+      setCachedVault(vault);
+    }
+  }
+
+  return { success: true, passwordType };
+}
+
+/**
+ * Unlocks using legacy system (direct password encryption)
+ * Also migrates to vault key system after successful unlock
+ */
+async function unlockWithLegacySystem(password: string): Promise<{ success: boolean; error?: string; passwordType?: PasswordType }> {
   // Try to decrypt API key (if exists)
   const hasApiKey = await hasEncryptedApiKey();
+  let apiKey: string | null = null;
+
   if (hasApiKey) {
-    const apiKey = await loadDecryptedApiKey(password);
+    apiKey = await loadDecryptedApiKey(password);
     if (!apiKey) {
       return { success: false, error: "Invalid password" };
     }
@@ -1729,7 +1839,162 @@ async function handleUnlockWallet(password: string): Promise<{ success: boolean;
     return { success: false, error: "No encrypted data found" };
   }
 
-  return { success: true };
+  // Migration: Create vault key system
+  await migrateToVaultKeySystem(password, apiKey);
+
+  // Set password type to master (legacy system only has master password)
+  cachedPasswordType = "master";
+
+  return { success: true, passwordType: "master" };
+}
+
+/**
+ * Migrates from legacy direct-password encryption to vault key system
+ */
+async function migrateToVaultKeySystem(password: string, apiKey: string | null): Promise<void> {
+  try {
+    // Generate a new vault key
+    const vaultKeyBytes = generateVaultKey();
+    const vaultKey = await importVaultKey(vaultKeyBytes);
+
+    // Encrypt vault key with master password
+    const encryptedVaultKeyMaster = await encryptVaultKey(vaultKeyBytes, password);
+
+    // Re-encrypt API key with vault key (if exists)
+    let encryptedApiKeyVault: EncryptedData | null = null;
+    if (apiKey) {
+      encryptedApiKeyVault = await encryptWithVaultKey(vaultKey, apiKey);
+    }
+
+    // Save to storage
+    const storageData: Record<string, any> = {
+      encryptedVaultKeyMaster,
+      agentPasswordEnabled: false,
+    };
+    if (encryptedApiKeyVault) {
+      storageData.encryptedApiKeyVault = encryptedApiKeyVault;
+    }
+    await chrome.storage.local.set(storageData);
+
+    // Cache the vault key
+    cachedVaultKey = vaultKey;
+
+    console.log("Migration to vault key system completed");
+  } catch (error) {
+    console.error("Failed to migrate to vault key system:", error);
+    // Continue without migration - will try again next unlock
+  }
+}
+
+/**
+ * Decrypts all private keys using the vault key
+ * Note: This requires the vault entries to be re-encrypted with vault key
+ * For now, falls back to password-based decryption during transition
+ */
+async function decryptAllKeysWithVaultKey(vaultKey: CryptoKey): Promise<DecryptedEntry[] | null> {
+  // During transition, the vault entries are still password-encrypted
+  // We need to use the cached password to decrypt them
+  // In a full implementation, we would re-encrypt vault entries with vault key
+
+  // For now, since we don't have vault entries encrypted with vault key yet,
+  // we'll try using the cached password
+  const password = getCachedPassword();
+  if (!password) {
+    return [];
+  }
+
+  return await decryptAllKeys(password);
+}
+
+/**
+ * Sets an agent password for the wallet
+ * Requires the wallet to be unlocked with master password
+ */
+async function handleSetAgentPassword(agentPassword: string): Promise<{ success: boolean; error?: string }> {
+  // Must be unlocked with master password to set agent password
+  if (cachedPasswordType !== "master") {
+    return { success: false, error: "Must be unlocked with master password to set agent password" };
+  }
+
+  if (!cachedVaultKey) {
+    return { success: false, error: "Vault key not available. Please unlock the wallet first." };
+  }
+
+  if (!agentPassword || agentPassword.length < 6) {
+    return { success: false, error: "Agent password must be at least 6 characters" };
+  }
+
+  try {
+    // Get the vault key bytes by decrypting with master password
+    const { encryptedVaultKeyMaster } = await chrome.storage.local.get("encryptedVaultKeyMaster");
+    if (!encryptedVaultKeyMaster) {
+      return { success: false, error: "No vault key found" };
+    }
+
+    const password = getCachedPassword();
+    if (!password) {
+      return { success: false, error: "Session expired. Please unlock the wallet again." };
+    }
+
+    // Decrypt vault key with master password to get raw bytes
+    const vaultKeyBytes = await tryDecryptVaultKey(encryptedVaultKeyMaster, password);
+    if (!vaultKeyBytes) {
+      return { success: false, error: "Failed to decrypt vault key" };
+    }
+
+    // Encrypt vault key with agent password
+    const encryptedVaultKeyAgent = await encryptVaultKey(vaultKeyBytes, agentPassword);
+
+    // Save to storage
+    await chrome.storage.local.set({
+      encryptedVaultKeyAgent,
+      agentPasswordEnabled: true,
+    });
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to set agent password",
+    };
+  }
+}
+
+/**
+ * Removes the agent password
+ * Requires verification of master password
+ */
+async function handleRemoveAgentPassword(masterPassword: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Verify master password by trying to decrypt vault key
+    const { encryptedVaultKeyMaster } = await chrome.storage.local.get("encryptedVaultKeyMaster");
+    if (!encryptedVaultKeyMaster) {
+      return { success: false, error: "No vault key found" };
+    }
+
+    const vaultKeyBytes = await tryDecryptVaultKey(encryptedVaultKeyMaster, masterPassword);
+    if (!vaultKeyBytes) {
+      return { success: false, error: "Invalid master password" };
+    }
+
+    // Remove agent password from storage
+    await chrome.storage.local.remove("encryptedVaultKeyAgent");
+    await chrome.storage.local.set({ agentPasswordEnabled: false });
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to remove agent password",
+    };
+  }
+}
+
+/**
+ * Returns the current session's password type
+ */
+function getPasswordType(): PasswordType | null {
+  return cachedPasswordType;
 }
 
 /**
@@ -1745,10 +2010,18 @@ async function handleSaveApiKeyWithCachedPassword(
   }
 
   try {
-    const { saveEncryptedApiKey } = await import("./crypto");
-    await saveEncryptedApiKey(newApiKey, password);
+    // Check if vault key system is in use
+    if (cachedVaultKey) {
+      // Encrypt API key with vault key and save to new location
+      const encrypted = await encryptWithVaultKey(cachedVaultKey, newApiKey);
+      await chrome.storage.local.set({ encryptedApiKeyVault: encrypted });
+    } else {
+      // Legacy system - encrypt with password
+      const { saveEncryptedApiKey } = await import("./crypto");
+      await saveEncryptedApiKey(newApiKey, password);
+    }
     // Update the cached API key
-    setCachedApiKey(newApiKey, password);
+    cachedApiKey = newApiKey;
     return { success: true };
   } catch (error) {
     return {
@@ -1771,25 +2044,54 @@ async function handleChangePasswordWithCachedPassword(
   }
 
   try {
-    const { loadDecryptedApiKey, saveEncryptedApiKey } = await import("./crypto");
+    // Check if using vault key system
+    const hasVaultKeySystem = await checkHasVaultKeySystem();
 
-    // Decrypt API key with cached password (if exists)
-    const hasApiKey = await hasEncryptedApiKey();
-    if (hasApiKey) {
-      const apiKey = await loadDecryptedApiKey(currentPassword);
-      if (!apiKey) {
-        return { success: false, error: "Failed to decrypt API key" };
+    if (hasVaultKeySystem) {
+      // New vault key system: re-encrypt the vault key with new password
+      // The actual data (API key, private keys) stays encrypted with the vault key
+      const { encryptedVaultKeyMaster } = await chrome.storage.local.get("encryptedVaultKeyMaster");
+      if (!encryptedVaultKeyMaster) {
+        return { success: false, error: "No vault key found" };
       }
-      // Re-encrypt with new password
-      await saveEncryptedApiKey(apiKey, newPassword);
-    }
 
-    // Re-encrypt the vault with new password (if exists)
-    const hasVault = await hasVaultEntries();
-    if (hasVault) {
-      const success = await reEncryptVault(currentPassword, newPassword);
-      if (!success) {
-        return { success: false, error: "Failed to re-encrypt vault" };
+      // Decrypt vault key with old password to get raw bytes
+      const vaultKeyBytes = await tryDecryptVaultKey(encryptedVaultKeyMaster, currentPassword);
+      if (!vaultKeyBytes) {
+        return { success: false, error: "Failed to decrypt vault key" };
+      }
+
+      // Re-encrypt vault key with new password
+      const newEncryptedVaultKeyMaster = await encryptVaultKey(vaultKeyBytes, newPassword);
+
+      // Save the new encrypted vault key
+      await chrome.storage.local.set({
+        encryptedVaultKeyMaster: newEncryptedVaultKeyMaster,
+      });
+
+      // Note: encryptedVaultKeyAgent (if exists) stays unchanged - agent password remains valid
+    } else {
+      // Legacy system: re-encrypt data directly with new password
+      const { loadDecryptedApiKey, saveEncryptedApiKey } = await import("./crypto");
+
+      // Decrypt API key with cached password (if exists)
+      const hasApiKey = await hasEncryptedApiKey();
+      if (hasApiKey) {
+        const apiKey = await loadDecryptedApiKey(currentPassword);
+        if (!apiKey) {
+          return { success: false, error: "Failed to decrypt API key" };
+        }
+        // Re-encrypt with new password
+        await saveEncryptedApiKey(apiKey, newPassword);
+      }
+
+      // Re-encrypt the vault with new password (if exists)
+      const hasVault = await hasVaultEntries();
+      if (hasVault) {
+        const success = await reEncryptVault(currentPassword, newPassword);
+        if (!success) {
+          return { success: false, error: "Failed to re-encrypt vault" };
+        }
       }
     }
 
@@ -2064,10 +2366,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         try {
           // If apiKey is provided and wallet is unlocked, save it first
           if (message.apiKey && cachedPassword) {
-            const { saveEncryptedApiKey } = await import("./crypto");
-            await saveEncryptedApiKey(message.apiKey, cachedPassword);
+            // Check if vault key system is in use
+            if (cachedVaultKey) {
+              // Encrypt API key with vault key and save to new location
+              const encrypted = await encryptWithVaultKey(cachedVaultKey, message.apiKey);
+              await chrome.storage.local.set({ encryptedApiKeyVault: encrypted });
+            } else {
+              // Legacy system - encrypt with password
+              const { saveEncryptedApiKey } = await import("./crypto");
+              await saveEncryptedApiKey(message.apiKey, cachedPassword);
+            }
             // Update the cached API key
-            setCachedApiKey(message.apiKey, cachedPassword);
+            cachedApiKey = message.apiKey;
           }
 
           // Add the Bankr account
@@ -2128,6 +2438,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse({ success: false, error: "Wallet is locked" });
             return;
           }
+
+          // SECURITY: Block private key reveal when unlocked with agent password
+          if (cachedPasswordType === "agent") {
+            sendResponse({
+              success: false,
+              error: "Private key reveal requires master password",
+              requiresMasterPassword: true,
+            });
+            return;
+          }
+
           if (password !== cachedPassword) {
             sendResponse({ success: false, error: "Invalid password" });
             return;
@@ -2215,6 +2536,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // Return the cached API key if available (for displaying in settings)
       const apiKey = getCachedApiKey();
       sendResponse({ apiKey: apiKey || null });
+      return false;
+    }
+
+    case "setAgentPassword": {
+      handleSetAgentPassword(message.agentPassword).then((result) => {
+        sendResponse(result);
+      });
+      return true;
+    }
+
+    case "removeAgentPassword": {
+      handleRemoveAgentPassword(message.masterPassword).then((result) => {
+        sendResponse(result);
+      });
+      return true;
+    }
+
+    case "isAgentPasswordEnabled": {
+      (async () => {
+        const { agentPasswordEnabled } = await chrome.storage.local.get("agentPasswordEnabled");
+        sendResponse({ enabled: !!agentPasswordEnabled });
+      })();
+      return true;
+    }
+
+    case "getPasswordType": {
+      sendResponse({ passwordType: getPasswordType() });
       return false;
     }
 

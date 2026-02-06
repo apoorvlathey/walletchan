@@ -6,12 +6,9 @@ import {
   Link,
   Box,
   Button,
-  Divider,
   Badge,
   IconButton,
-  Heading,
   Spacer,
-  Code,
   Modal,
   ModalOverlay,
   ModalContent,
@@ -19,11 +16,11 @@ import {
   ModalBody,
   ModalFooter,
   useDisclosure,
+  Icon,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import {
   ArrowBackIcon,
-  WarningIcon,
   LockIcon,
   ChevronRightIcon,
   DeleteIcon,
@@ -34,10 +31,19 @@ import { clearChatHistory } from "@/chrome/chatStorage";
 import Chains from "./Chains";
 import ChangePassword from "./ChangePassword";
 import AutoLockSettings from "./AutoLockSettings";
-import ApiKeySetup from "@/pages/ApiKeySetup";
-import { hasEncryptedApiKey } from "@/chrome/crypto";
+import AgentPasswordSettings from "./AgentPasswordSettings";
 
-type SettingsTab = "main" | "apiKey" | "chains" | "changePassword" | "autoLock";
+// Robot/Agent icon for Agent Password section
+const AgentIcon = (props: any) => (
+  <Icon viewBox="0 0 24 24" {...props}>
+    <path
+      fill="currentColor"
+      d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5A2.5 2.5 0 0 0 7.5 18a2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5a2.5 2.5 0 0 0 2.5 2.5a2.5 2.5 0 0 0 2.5-2.5a2.5 2.5 0 0 0-2.5-2.5Z"
+    />
+  </Icon>
+);
+
+type SettingsTab = "main" | "chains" | "changePassword" | "autoLock" | "agentPassword";
 
 interface SettingsProps {
   close: () => void;
@@ -47,8 +53,8 @@ interface SettingsProps {
 
 function Settings({ close, showBackButton = true, onSessionExpired }: SettingsProps) {
   const [tab, setTab] = useState<SettingsTab>("main");
-  const [hasApiKey, setHasApiKey] = useState(false);
-  const [address, setAddress] = useState<string>("");
+  const [isAgentPasswordEnabled, setIsAgentPasswordEnabled] = useState(false);
+  const [passwordType, setPasswordType] = useState<"master" | "agent" | null>(null);
   const toast = useBauhausToast();
   const { isOpen: isDeleteModalOpen, onOpen: onDeleteModalOpen, onClose: onDeleteModalClose } = useDisclosure();
   const { isOpen: isChatDeleteModalOpen, onOpen: onChatDeleteModalOpen, onClose: onChatDeleteModalClose } = useDisclosure();
@@ -77,42 +83,23 @@ function Settings({ close, showBackButton = true, onSessionExpired }: SettingsPr
   };
 
   useEffect(() => {
-    checkApiKey();
-    loadAddress();
+    checkAgentPassword();
+    checkPasswordType();
   }, []);
 
-  const checkApiKey = async () => {
-    const exists = await hasEncryptedApiKey();
-    setHasApiKey(exists);
+  const checkAgentPassword = async () => {
+    const response = await new Promise<{ enabled: boolean }>((resolve) => {
+      chrome.runtime.sendMessage({ type: "isAgentPasswordEnabled" }, resolve);
+    });
+    setIsAgentPasswordEnabled(response.enabled);
   };
 
-  const loadAddress = async () => {
-    const { address: storedAddress } = (await chrome.storage.sync.get("address")) as {
-      address?: string;
-    };
-    if (storedAddress) {
-      setAddress(storedAddress);
-    }
+  const checkPasswordType = async () => {
+    const response = await new Promise<{ passwordType: "master" | "agent" | null }>((resolve) => {
+      chrome.runtime.sendMessage({ type: "getPasswordType" }, resolve);
+    });
+    setPasswordType(response.passwordType);
   };
-
-  const truncateAddress = (addr: string): string => {
-    if (!addr) return "Not set";
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-  };
-
-  if (tab === "apiKey") {
-    return (
-      <ApiKeySetup
-        onComplete={() => {
-          checkApiKey();
-          loadAddress();
-          setTab("main");
-        }}
-        onCancel={() => setTab("main")}
-        isChangingKey={hasApiKey}
-      />
-    );
-  }
 
   if (tab === "chains") {
     return <Chains close={() => setTab("main")} />;
@@ -137,6 +124,19 @@ function Settings({ close, showBackButton = true, onSessionExpired }: SettingsPr
     );
   }
 
+  if (tab === "agentPassword") {
+    return (
+      <AgentPasswordSettings
+        onComplete={() => {
+          checkAgentPassword();
+          setTab("main");
+        }}
+        onCancel={() => setTab("main")}
+        onSessionExpired={onSessionExpired || (() => setTab("main"))}
+      />
+    );
+  }
+
   return (
     <VStack spacing={4} align="stretch" flex="1">
       {/* Header */}
@@ -156,119 +156,20 @@ function Settings({ close, showBackButton = true, onSessionExpired }: SettingsPr
         <Spacer />
       </HStack>
 
-      {/* API Key & Wallet Section - Warning Style */}
+      {/* Change Password Section - only accessible with master password */}
       <Box
-        bg="bauhaus.yellow"
-        border="3px solid"
-        borderColor="bauhaus.black"
-        boxShadow="4px 4px 0px 0px #121212"
-        p={4}
-        position="relative"
-      >
-        {/* Corner decoration */}
-        <Box
-          position="absolute"
-          top="-3px"
-          right="-3px"
-          w="10px"
-          h="10px"
-          bg="bauhaus.red"
-          border="2px solid"
-          borderColor="bauhaus.black"
-        />
-
-        <HStack spacing={3} mb={3}>
-          <Box p={2} bg="bauhaus.black">
-            <WarningIcon boxSize={4} color="bauhaus.yellow" />
-          </Box>
-          <Box>
-            <Text fontWeight="700" color="bauhaus.black">
-              API Key & Wallet
-            </Text>
-            <Text fontSize="xs" color="bauhaus.black" opacity={0.8}>
-              Your API key and wallet address are linked
-            </Text>
-          </Box>
-        </HStack>
-
-        <VStack spacing={2} align="stretch" mb={3}>
-          <HStack justify="space-between">
-            <Text fontSize="sm" color="bauhaus.black" fontWeight="500">
-              API Key
-            </Text>
-            {hasApiKey ? (
-              <Badge
-                bg="bauhaus.black"
-                color="bauhaus.yellow"
-                border="2px solid"
-                borderColor="bauhaus.black"
-                fontSize="xs"
-                fontWeight="700"
-              >
-                Configured
-              </Badge>
-            ) : (
-              <Badge
-                bg="bauhaus.red"
-                color="white"
-                border="2px solid"
-                borderColor="bauhaus.black"
-                fontSize="xs"
-                fontWeight="700"
-              >
-                Not set
-              </Badge>
-            )}
-          </HStack>
-          <HStack justify="space-between">
-            <Text fontSize="sm" color="bauhaus.black" fontWeight="500">
-              Address
-            </Text>
-            <Code
-              fontSize="xs"
-              bg="bauhaus.white"
-              color="bauhaus.black"
-              border="2px solid"
-              borderColor="bauhaus.black"
-              px={2}
-              fontWeight="700"
-            >
-              {truncateAddress(address)}
-            </Code>
-          </HStack>
-        </VStack>
-
-        <Button
-          size="sm"
-          w="full"
-          bg="bauhaus.black"
-          color="bauhaus.yellow"
-          border="2px solid"
-          borderColor="bauhaus.black"
-          fontWeight="700"
-          _hover={{ bg: "bauhaus.black", opacity: 0.9 }}
-          _active={{ transform: "translate(2px, 2px)" }}
-          onClick={() => setTab("apiKey")}
-        >
-          {hasApiKey ? "Change API Key & Address" : "Configure API Key & Address"}
-        </Button>
-      </Box>
-
-      {/* Change Password Section */}
-      {hasApiKey && (
-        <Box
-          bg="bauhaus.white"
+          bg={passwordType === "agent" ? "gray.100" : "bauhaus.white"}
           border="3px solid"
-          borderColor="bauhaus.black"
-          boxShadow="4px 4px 0px 0px #121212"
+          borderColor={passwordType === "agent" ? "gray.300" : "bauhaus.black"}
+          boxShadow={passwordType === "agent" ? "none" : "4px 4px 0px 0px #121212"}
           p={4}
-          cursor="pointer"
-          onClick={() => setTab("changePassword")}
-          _hover={{
+          cursor={passwordType === "agent" ? "not-allowed" : "pointer"}
+          onClick={passwordType === "agent" ? undefined : () => setTab("changePassword")}
+          _hover={passwordType === "agent" ? {} : {
             transform: "translateY(-2px)",
             boxShadow: "6px 6px 0px 0px #121212",
           }}
-          _active={{
+          _active={passwordType === "agent" ? {} : {
             transform: "translate(2px, 2px)",
             boxShadow: "none",
           }}
@@ -282,31 +183,98 @@ function Settings({ close, showBackButton = true, onSessionExpired }: SettingsPr
             right="-3px"
             w="8px"
             h="8px"
-            bg="bauhaus.blue"
+            bg={passwordType === "agent" ? "gray.400" : "bauhaus.yellow"}
             border="2px solid"
-            borderColor="bauhaus.black"
+            borderColor={passwordType === "agent" ? "gray.300" : "bauhaus.black"}
           />
 
           <HStack justify="space-between">
             <HStack spacing={3}>
-              <Box p={2} bg="bauhaus.blue">
-                <LockIcon boxSize={4} color="white" />
+              <Box p={2} bg={passwordType === "agent" ? "gray.300" : "bauhaus.yellow"}>
+                <LockIcon boxSize={4} color={passwordType === "agent" ? "gray.400" : "bauhaus.black"} />
               </Box>
               <Box>
-                <Text fontWeight="700" color="text.primary">
+                <Text fontWeight="700" color={passwordType === "agent" ? "gray.400" : "text.primary"}>
                   Change Password
                 </Text>
-                <Text fontSize="xs" color="text.secondary" fontWeight="500">
-                  Update your encryption password
+                <Text fontSize="xs" color={passwordType === "agent" ? "text.secondary" : "text.secondary"} fontWeight="500">
+                  {passwordType === "agent"
+                    ? "Unlock with master password to access"
+                    : "Update your encryption password"}
                 </Text>
               </Box>
             </HStack>
-            <Box bg="bauhaus.black" p={1}>
-              <ChevronRightIcon color="bauhaus.white" />
-            </Box>
+            {passwordType !== "agent" && (
+              <Box bg="bauhaus.black" p={1}>
+                <ChevronRightIcon color="bauhaus.white" />
+              </Box>
+            )}
           </HStack>
         </Box>
-      )}
+
+      {/* Agent Password Section */}
+      <Box
+        bg="bauhaus.white"
+        border="3px solid"
+        borderColor="bauhaus.black"
+        boxShadow="4px 4px 0px 0px #121212"
+        p={4}
+        cursor="pointer"
+        onClick={() => setTab("agentPassword")}
+        _hover={{
+          transform: "translateY(-2px)",
+          boxShadow: "6px 6px 0px 0px #121212",
+        }}
+        _active={{
+          transform: "translate(2px, 2px)",
+          boxShadow: "none",
+        }}
+        transition="all 0.2s ease-out"
+        position="relative"
+      >
+        {/* Corner decoration */}
+        <Box
+          position="absolute"
+          top="-3px"
+          right="-3px"
+          w="8px"
+          h="8px"
+          bg={isAgentPasswordEnabled ? "bauhaus.blue" : "gray.300"}
+          border="2px solid"
+          borderColor="bauhaus.black"
+        />
+
+        <HStack justify="space-between">
+          <HStack spacing={3}>
+            <Box p={2} bg={isAgentPasswordEnabled ? "bauhaus.blue" : "gray.200"}>
+              <AgentIcon boxSize={4} color={isAgentPasswordEnabled ? "white" : "gray.600"} />
+            </Box>
+            <Box>
+              <HStack spacing={2}>
+                <Text fontWeight="700" color="text.primary">
+                  Agent Password
+                </Text>
+                <Badge
+                  bg={isAgentPasswordEnabled ? "bauhaus.blue" : "gray.200"}
+                  color={isAgentPasswordEnabled ? "white" : "gray.600"}
+                  border="2px solid"
+                  borderColor="bauhaus.black"
+                  fontSize="xs"
+                  fontWeight="700"
+                >
+                  {isAgentPasswordEnabled ? "ON" : "OFF"}
+                </Badge>
+              </HStack>
+              <Text fontSize="xs" color="text.secondary" fontWeight="500">
+                Allow AI agents to unlock wallet
+              </Text>
+            </Box>
+          </HStack>
+          <Box bg="bauhaus.black" p={1}>
+            <ChevronRightIcon color="bauhaus.white" />
+          </Box>
+        </HStack>
+      </Box>
 
       {/* Auto-Lock Settings Section */}
       <Box
@@ -335,15 +303,15 @@ function Settings({ close, showBackButton = true, onSessionExpired }: SettingsPr
           right="-3px"
           w="8px"
           h="8px"
-          bg="bauhaus.blue"
+          bg="bauhaus.yellow"
           border="2px solid"
           borderColor="bauhaus.black"
         />
 
         <HStack justify="space-between">
           <HStack spacing={3}>
-            <Box p={2} bg="bauhaus.blue">
-              <TimeIcon boxSize={4} color="white" />
+            <Box p={2} bg="bauhaus.yellow">
+              <TimeIcon boxSize={4} color="bauhaus.black" />
             </Box>
             <Box>
               <Text fontWeight="700" color="text.primary">
@@ -387,7 +355,7 @@ function Settings({ close, showBackButton = true, onSessionExpired }: SettingsPr
           right="-3px"
           w="8px"
           h="8px"
-          bg="bauhaus.yellow"
+          bg="bauhaus.black"
           border="2px solid"
           borderColor="bauhaus.black"
         />
