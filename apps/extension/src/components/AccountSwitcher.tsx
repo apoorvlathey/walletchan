@@ -169,6 +169,14 @@ function AccountSwitcher({
                   </Text>
                 )}
               </VStack>
+              <Box
+                w="8px"
+                h="8px"
+                bg={account.id === activeAccount?.id ? "bauhaus.green" : "transparent"}
+                borderRadius="full"
+                border={account.id === activeAccount?.id ? "2px solid" : "none"}
+                borderColor="bauhaus.black"
+              />
               <Tooltip label="Account Settings" hasArrow placement="top">
                 <IconButton
                   aria-label="Account Settings"
@@ -183,16 +191,6 @@ function AccountSwitcher({
                   }}
                 />
               </Tooltip>
-              {account.id === activeAccount?.id && (
-                <Box
-                  w="8px"
-                  h="8px"
-                  bg="bauhaus.green"
-                  borderRadius="full"
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                />
-              )}
             </HStack>
           </MenuItem>
         ))}
