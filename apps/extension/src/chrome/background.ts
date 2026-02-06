@@ -404,6 +404,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "addBankrAccount": {
       (async () => {
         try {
+          // SECURITY: Block API key changes when unlocked with agent password
+          if (message.apiKey && getPasswordType() === "agent") {
+            sendResponse({ success: false, error: "Adding accounts with API keys requires master password" });
+            return;
+          }
+
           // If apiKey is provided and wallet is unlocked, save it first
           if (message.apiKey && getCachedPassword()) {
             const vaultKey = getCachedVaultKey();
@@ -439,6 +445,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "addPrivateKeyAccount": {
       (async () => {
+        // SECURITY: Block adding accounts when unlocked with agent password
+        if (getPasswordType() === "agent") {
+          sendResponse({ success: false, error: "Adding accounts requires master password" });
+          return;
+        }
+
         let password = message.password || getCachedPassword();
 
         if (!password) {
@@ -467,6 +479,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "removeAccount": {
+      // SECURITY: Block account removal when unlocked with agent password
+      if (getPasswordType() === "agent") {
+        sendResponse({ success: false, error: "Account removal requires master password" });
+        return false;
+      }
       handleRemoveAccount(message.accountId).then((result) => {
         sendResponse(result);
       });
@@ -771,6 +788,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "resetExtension": {
+      // SECURITY: Block extension reset when unlocked with agent password
+      if (getPasswordType() === "agent") {
+        sendResponse({ success: false, error: "Extension reset requires master password" });
+        return false;
+      }
+
       // SECURITY: Perform full memory cleanup first (before async operations)
       performSecurityReset();
       clearCachedApiKey();

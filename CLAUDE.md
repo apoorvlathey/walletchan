@@ -16,6 +16,10 @@ Browser wallet extension + landing page website in a pnpm workspace monorepo.
 2. **Read `STYLING.md`** when working on any UI components or styling
 3. **Read `WEBSITE.md`** when working on the landing page
 
+**Before every commit** that touches extension code:
+
+4. **Read `SECURITY.md`** and verify changes against the pre-commit security checklist. This is critical for any changes to message handlers, storage, crypto, content scripts, or session management.
+
 **After making significant changes:**
 
 - **Update `IMPLEMENTATION.md`** if you modified:
@@ -23,6 +27,12 @@ Browser wallet extension + landing page website in a pnpm workspace monorepo.
   - Background handler logic
   - Storage keys or encryption patterns
   - New features or architectural decisions
+- **Update `SECURITY.md`** if you modified:
+  - Message handlers that touch secrets or account data
+  - Agent password access control (new blocked/allowed operations)
+  - Storage keys (add to the storage keys reference)
+  - Content script message filtering (new message types forwarded)
+  - Encryption parameters or crypto logic
 - Keep the documentation in sync with the code - future sessions depend on accurate docs
 
 ## Monorepo Structure
@@ -35,6 +45,7 @@ bankr-wallet/
 ├── packages/
 │   └── shared/       # Shared design tokens and assets
 ├── IMPLEMENTATION.md # Extension architecture and message flows
+├── SECURITY.md       # Security audit guide, threat model, pre-commit checklists
 ├── STYLING.md        # Bauhaus design system (colors, typography, components)
 ├── WEBSITE.md        # Website PRD and section specs
 └── DEVELOPMENT.md    # Detailed build and release instructions
@@ -136,6 +147,7 @@ When working on features, refer to these docs:
 | Doc                              | When to read                                          |
 | -------------------------------- | ----------------------------------------------------- |
 | `IMPLEMENTATION.md`              | Extension internals, message types, tx flow           |
+| `SECURITY.md`                    | Threat model, access control, pre-commit checklists   |
 | `CHAT.md`                        | Chat interface to directly chat & prompt to bankr api |
 | `STYLING.md`                     | UI components, design tokens, Bauhaus system          |
 | `WEBSITE.md`                     | Website sections, layout specs, animations            |

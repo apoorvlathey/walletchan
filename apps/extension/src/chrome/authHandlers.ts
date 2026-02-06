@@ -333,6 +333,11 @@ export async function handleRemoveAgentPassword(masterPassword: string): Promise
 export async function handleSaveApiKeyWithCachedPassword(
   newApiKey: string
 ): Promise<{ success: boolean; error?: string }> {
+  // SECURITY: Block API key changes when unlocked with agent password
+  if (getPasswordType() === "agent") {
+    return { success: false, error: "API key changes require master password" };
+  }
+
   let password = getCachedPassword();
 
   // If no cached password, try session restoration (for "Never" auto-lock mode)
@@ -380,6 +385,11 @@ export async function handleSaveApiKeyWithCachedPassword(
 export async function handleChangePasswordWithCachedPassword(
   newPassword: string
 ): Promise<{ success: boolean; error?: string }> {
+  // SECURITY: Block password changes when unlocked with agent password
+  if (getPasswordType() === "agent") {
+    return { success: false, error: "Password changes require master password" };
+  }
+
   const currentPassword = getCachedPassword();
   if (!currentPassword) {
     return { success: false, error: "Session expired. Please unlock your wallet again." };
