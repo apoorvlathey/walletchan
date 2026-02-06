@@ -24,6 +24,8 @@ import {
   ViewOffIcon,
   ArrowBackIcon,
   CheckIcon,
+  RepeatIcon,
+  CopyIcon,
 } from "@chakra-ui/icons";
 import { saveEncryptedApiKey, hasEncryptedApiKey } from "@/chrome/crypto";
 import { StaticJsonRpcProvider } from "@ethersproject/providers";
@@ -116,6 +118,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
   const [privateKey, setPrivateKey] = useState("");
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [derivedAddress, setDerivedAddress] = useState<string | null>(null);
+  const [pkCopied, setPkCopied] = useState(false);
   const [pkDisplayName, setPkDisplayName] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
   const [bankrDisplayName, setBankrDisplayName] = useState("");
@@ -1176,7 +1179,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
                     setPkMode("generate");
                     const newKey = generatePrivateKey();
                     setPrivateKey(newKey);
-                    setShowPrivateKey(true);
+                    setShowPrivateKey(false);
                   }}
                   _hover={{ opacity: 0.9 }}
                 >
@@ -1222,43 +1225,78 @@ function Onboarding({ onComplete }: OnboardingProps) {
                 </FormErrorMessage>
               </FormControl>
               ) : (
-              <VStack spacing={3} align="stretch">
+              <VStack spacing={4} align="stretch">
                 <FormControl isInvalid={!!errors.privateKey}>
                   <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
                     Generated Private Key
                   </FormLabel>
-                  <Input
-                    type={showPrivateKey ? "text" : "password"}
-                    value={privateKey}
-                    readOnly
-                    fontFamily="mono"
-                    fontSize="xs"
-                  />
+                  <InputGroup>
+                    <Input
+                      type={showPrivateKey ? "text" : "password"}
+                      value={privateKey}
+                      readOnly
+                      fontFamily="mono"
+                      fontSize="xs"
+                      pr="4.5rem"
+                    />
+                    <InputRightElement w="4.5rem">
+                      <HStack spacing={0}>
+                        <IconButton
+                          aria-label={showPrivateKey ? "Hide" : "Show"}
+                          icon={showPrivateKey ? <ViewOffIcon /> : <ViewIcon />}
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => setShowPrivateKey(!showPrivateKey)}
+                          color="text.secondary"
+                          tabIndex={-1}
+                        />
+                        <IconButton
+                          aria-label="Copy private key"
+                          icon={pkCopied ? <CheckIcon color="green.500" /> : <CopyIcon />}
+                          size="xs"
+                          variant="ghost"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(privateKey);
+                            setPkCopied(true);
+                            setTimeout(() => setPkCopied(false), 2000);
+                          }}
+                          color={pkCopied ? "green.500" : "text.secondary"}
+                          tabIndex={-1}
+                        />
+                      </HStack>
+                    </InputRightElement>
+                  </InputGroup>
                   <FormErrorMessage color="bauhaus.red" fontWeight="700">
                     {errors.privateKey}
                   </FormErrorMessage>
                 </FormControl>
-                <Box p={2} bg="bauhaus.red" border="2px solid" borderColor="bauhaus.black">
-                  <Text fontSize="xs" color="bauhaus.white" fontWeight="700">
-                    Save this key now — it cannot be recovered later!
+
+                <HStack spacing={2} align="center">
+                  <Text fontSize="xs" color="bauhaus.red" fontWeight="700" whiteSpace="nowrap">
+                    Save this key — cannot be recovered!
                   </Text>
-                </Box>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  borderColor="bauhaus.black"
-                  borderWidth="2px"
-                  borderRadius="0"
-                  fontWeight="700"
-                  textTransform="uppercase"
-                  fontSize="xs"
-                  onClick={() => {
-                    const newKey = generatePrivateKey();
-                    setPrivateKey(newKey);
-                  }}
-                >
-                  Generate Another
-                </Button>
+                  <Box flex={1} h="2px" bg="bauhaus.red" />
+                  <HStack
+                    as="button"
+                    spacing={1}
+                    onClick={() => {
+                      const newKey = generatePrivateKey();
+                      setPrivateKey(newKey);
+                      setShowPrivateKey(false);
+                      setPkCopied(false);
+                    }}
+                    cursor="pointer"
+                    opacity={0.5}
+                    _hover={{ opacity: 1 }}
+                    transition="opacity 0.15s"
+                    flexShrink={0}
+                  >
+                    <RepeatIcon boxSize="10px" color="text.secondary" />
+                    <Text fontSize="10px" color="text.secondary" fontWeight="700" textTransform="uppercase" letterSpacing="wider">
+                      Regenerate
+                    </Text>
+                  </HStack>
+                </HStack>
               </VStack>
               )}
 
@@ -1267,51 +1305,43 @@ function Onboarding({ onComplete }: OnboardingProps) {
                   mt={4}
                   p={3}
                   bg="bauhaus.yellow"
-                  border="3px solid"
+                  border="2px solid"
                   borderColor="bauhaus.black"
                   boxShadow="3px 3px 0px 0px #121212"
-                  position="relative"
                 >
-                  {/* Success indicator */}
-                  <Box
-                    position="absolute"
-                    top="-12px"
-                    right="-12px"
-                    w="24px"
-                    h="24px"
-                    bg="bauhaus.blue"
-                    border="2px solid"
-                    borderColor="bauhaus.black"
-                    borderRadius="full"
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                  >
-                    <CheckIcon boxSize="12px" color="white" />
-                  </Box>
-                  <HStack spacing={2} mb={2}>
-                    <Box w="8px" h="8px" bg="bauhaus.black" />
-                    <Text fontSize="xs" color="bauhaus.black" fontWeight="900" textTransform="uppercase" letterSpacing="wider">
-                      Derived Address
-                    </Text>
+                  <HStack spacing={2} align="center">
+                    <Box
+                      w="22px"
+                      h="22px"
+                      minW="22px"
+                      bg="bauhaus.blue"
+                      border="2px solid"
+                      borderColor="bauhaus.black"
+                      borderRadius="full"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                    >
+                      <CheckIcon boxSize="10px" color="white" />
+                    </Box>
+                    <Code
+                      fontSize="10px"
+                      bg="bauhaus.white"
+                      color="bauhaus.black"
+                      fontFamily="mono"
+                      fontWeight="700"
+                      p={1.5}
+                      border="2px solid"
+                      borderColor="bauhaus.black"
+                      overflow="hidden"
+                      textOverflow="ellipsis"
+                      whiteSpace="nowrap"
+                      title={derivedAddress}
+                      flex={1}
+                    >
+                      {derivedAddress}
+                    </Code>
                   </HStack>
-                  <Code
-                    fontSize="10px"
-                    bg="bauhaus.white"
-                    color="bauhaus.black"
-                    fontFamily="mono"
-                    p={2}
-                    border="2px solid"
-                    borderColor="bauhaus.black"
-                    display="block"
-                    fontWeight="700"
-                    overflow="hidden"
-                    textOverflow="ellipsis"
-                    whiteSpace="nowrap"
-                    title={derivedAddress}
-                  >
-                    {derivedAddress}
-                  </Code>
                 </Box>
               )}
 
@@ -1330,18 +1360,21 @@ function Onboarding({ onComplete }: OnboardingProps) {
               </FormControl>
             </Box>
 
-            <Box
+            <HStack
               w="full"
-              p={4}
+              p={3}
               bg="bauhaus.yellow"
-              border="3px solid"
+              border="2px solid"
               borderColor="bauhaus.black"
-              boxShadow="4px 4px 0px 0px #121212"
+              boxShadow="3px 3px 0px 0px #121212"
+              spacing={2}
+              align="center"
             >
-              <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
+              <Box w="8px" h="8px" minW="8px" bg="bauhaus.black" />
+              <Text fontSize="xs" color="bauhaus.black" fontWeight="700">
                 Never share your private key with anyone. It will be encrypted and stored only on this device.
               </Text>
-            </Box>
+            </HStack>
 
             <Button
               variant="primary"

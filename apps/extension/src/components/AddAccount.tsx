@@ -19,7 +19,7 @@ import {
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import SeedPhraseSetup from "@/components/SeedPhraseSetup";
-import { ViewIcon, ViewOffIcon, ArrowBackIcon, CheckIcon } from "@chakra-ui/icons";
+import { ViewIcon, ViewOffIcon, ArrowBackIcon, CheckIcon, RepeatIcon, CopyIcon } from "@chakra-ui/icons";
 import { isAddress } from "@ethersproject/address";
 import { privateKeyToAccount } from "viem/accounts";
 
@@ -132,6 +132,7 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
   const [privateKey, setPrivateKey] = useState("");
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [derivedAddress, setDerivedAddress] = useState<string | null>(null);
+  const [pkCopied, setPkCopied] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [bankrAddress, setBankrAddress] = useState("");
   const [bankrApiKey, setBankrApiKey] = useState("");
@@ -566,7 +567,7 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                   setPkMode("generate");
                   const newKey = generatePrivateKey();
                   setPrivateKey(newKey);
-                  setShowPrivateKey(true);
+                  setShowPrivateKey(false);
                 }}
                 _hover={{ opacity: 0.9 }}
               >
@@ -605,7 +606,7 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                 </FormErrorMessage>
               </FormControl>
             ) : (
-              <VStack spacing={3} align="stretch">
+              <VStack spacing={4} align="stretch">
                 <FormControl isInvalid={!!errors.privateKey}>
                   <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                     Generated Private Key
@@ -617,53 +618,66 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                       readOnly
                       fontFamily="mono"
                       fontSize="xs"
-                      pr="3rem"
+                      pr="4.5rem"
                     />
-                    <InputRightElement>
-                      <IconButton
-                        aria-label="Copy key"
-                        icon={<CheckIcon />}
-                        size="sm"
-                        variant="ghost"
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(privateKey);
-                          toast({ title: "Private key copied!", status: "success", duration: 1500 });
-                        }}
-                        color="text.secondary"
-                        tabIndex={-1}
-                      />
+                    <InputRightElement w="4.5rem">
+                      <HStack spacing={0}>
+                        <IconButton
+                          aria-label={showPrivateKey ? "Hide" : "Show"}
+                          icon={showPrivateKey ? <ViewOffIcon /> : <ViewIcon />}
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => setShowPrivateKey(!showPrivateKey)}
+                          color="text.secondary"
+                          tabIndex={-1}
+                        />
+                        <IconButton
+                          aria-label="Copy private key"
+                          icon={pkCopied ? <CheckIcon color="green.500" /> : <CopyIcon />}
+                          size="xs"
+                          variant="ghost"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(privateKey);
+                            setPkCopied(true);
+                            setTimeout(() => setPkCopied(false), 2000);
+                          }}
+                          color={pkCopied ? "green.500" : "text.secondary"}
+                          tabIndex={-1}
+                        />
+                      </HStack>
                     </InputRightElement>
                   </InputGroup>
                   <FormErrorMessage color="bauhaus.red" fontWeight="700">
                     {errors.privateKey}
                   </FormErrorMessage>
                 </FormControl>
-                <Box
-                  p={2}
-                  bg="bauhaus.red"
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                >
-                  <Text fontSize="xs" color="bauhaus.white" fontWeight="700">
-                    Save this key now — it cannot be recovered later!
+
+                <HStack spacing={2} align="center">
+                  <Text fontSize="xs" color="bauhaus.red" fontWeight="700" whiteSpace="nowrap">
+                    Save this key — cannot be recovered!
                   </Text>
-                </Box>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  borderColor="bauhaus.black"
-                  borderWidth="2px"
-                  borderRadius="0"
-                  fontWeight="700"
-                  textTransform="uppercase"
-                  fontSize="xs"
-                  onClick={() => {
-                    const newKey = generatePrivateKey();
-                    setPrivateKey(newKey);
-                  }}
-                >
-                  Generate Another
-                </Button>
+                  <Box flex={1} h="2px" bg="bauhaus.red" />
+                  <HStack
+                    as="button"
+                    spacing={1}
+                    onClick={() => {
+                      const newKey = generatePrivateKey();
+                      setPrivateKey(newKey);
+                      setShowPrivateKey(false);
+                      setPkCopied(false);
+                    }}
+                    cursor="pointer"
+                    opacity={0.5}
+                    _hover={{ opacity: 1 }}
+                    transition="opacity 0.15s"
+                    flexShrink={0}
+                  >
+                    <RepeatIcon boxSize="10px" color="text.secondary" />
+                    <Text fontSize="10px" color="text.secondary" fontWeight="700" textTransform="uppercase" letterSpacing="wider">
+                      Regenerate
+                    </Text>
+                  </HStack>
+                </HStack>
               </VStack>
             )}
 
@@ -672,51 +686,43 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                 mt={4}
                 p={3}
                 bg="bauhaus.yellow"
-                border="3px solid"
+                border="2px solid"
                 borderColor="bauhaus.black"
                 boxShadow="3px 3px 0px 0px #121212"
-                position="relative"
               >
-                {/* Success indicator */}
-                <Box
-                  position="absolute"
-                  top="-10px"
-                  right="-10px"
-                  w="20px"
-                  h="20px"
-                  bg="bauhaus.blue"
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                  borderRadius="full"
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                >
-                  <CheckIcon boxSize="10px" color="white" />
-                </Box>
-                <HStack spacing={2} mb={2}>
-                  <Box w="6px" h="6px" bg="bauhaus.black" />
-                  <Text fontSize="xs" color="bauhaus.black" fontWeight="900" textTransform="uppercase" letterSpacing="wider">
-                    Derived Address
-                  </Text>
+                <HStack spacing={2} align="center">
+                  <Box
+                    w="22px"
+                    h="22px"
+                    minW="22px"
+                    bg="bauhaus.blue"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    borderRadius="full"
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <CheckIcon boxSize="10px" color="white" />
+                  </Box>
+                  <Code
+                    fontSize="10px"
+                    bg="bauhaus.white"
+                    color="bauhaus.black"
+                    fontFamily="mono"
+                    fontWeight="700"
+                    p={1.5}
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    overflow="hidden"
+                    textOverflow="ellipsis"
+                    whiteSpace="nowrap"
+                    title={derivedAddress}
+                    flex={1}
+                  >
+                    {derivedAddress}
+                  </Code>
                 </HStack>
-                <Code
-                  fontSize="10px"
-                  bg="bauhaus.white"
-                  color="bauhaus.black"
-                  fontFamily="mono"
-                  p={2}
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                  display="block"
-                  fontWeight="700"
-                  overflow="hidden"
-                  textOverflow="ellipsis"
-                  whiteSpace="nowrap"
-                  title={derivedAddress}
-                >
-                  {derivedAddress}
-                </Code>
               </Box>
             )}
           </Box>
