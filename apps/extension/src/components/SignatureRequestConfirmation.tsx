@@ -16,6 +16,7 @@ import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon, WarningTwoIcon } from "@chakra-ui/icons";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
 import { getChainConfig } from "@/constants/chainConfig";
+import TypedDataDisplay from "@/components/TypedDataDisplay";
 
 interface SignatureRequestConfirmationProps {
   sigRequest: PendingSignatureRequest;
@@ -86,7 +87,7 @@ function getMethodDisplayName(method: string): string {
   }
 }
 
-function formatSignatureData(method: string, params: any[]): { message: string; rawData: string } {
+function formatSignatureData(method: string, params: any[]): { message: string; rawData: string; typedData?: any } {
   try {
     if (method === "personal_sign") {
       // params[0] is the message (hex or string), params[1] is the address
@@ -120,6 +121,7 @@ function formatSignatureData(method: string, params: any[]): { message: string; 
       return {
         message: typedData.message ? JSON.stringify(typedData.message, null, 2) : "",
         rawData: JSON.stringify(typedData, null, 2),
+        typedData,
       };
     }
   } catch (e) {
@@ -146,7 +148,7 @@ function SignatureRequestConfirmation({
 }: SignatureRequestConfirmationProps) {
   const toast = useBauhausToast();
   const { signature, origin, chainName, favicon } = sigRequest;
-  const { message, rawData } = formatSignatureData(signature.method, signature.params);
+  const { message, rawData, typedData } = formatSignatureData(signature.method, signature.params);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCancel = () => {
@@ -425,99 +427,82 @@ function SignatureRequestConfirmation({
           </VStack>
         </Box>
 
-        {/* Message Display */}
-        {message && (
-          <Box
-            bg="bauhaus.white"
-            p={3}
-            border="3px solid"
-            borderColor="bauhaus.black"
-            boxShadow="4px 4px 0px 0px #121212"
-          >
-            <HStack mb={2} alignItems="center">
-              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                Message
-              </Text>
-              <Spacer />
-              <CopyButton value={message} />
-            </HStack>
-            <Box
-              p={3}
-              bg="bg.muted"
-              border="2px solid"
-              borderColor="bauhaus.black"
-              maxH="120px"
-              overflowY="auto"
-              css={{
-                "&::-webkit-scrollbar": {
-                  width: "6px",
-                },
-                "&::-webkit-scrollbar-track": {
-                  background: "#E0E0E0",
-                },
-                "&::-webkit-scrollbar-thumb": {
-                  background: "#121212",
-                },
-              }}
-            >
-              <Text
-                fontSize="xs"
-                fontFamily="mono"
-                color="text.tertiary"
-                wordBreak="break-all"
-                whiteSpace="pre-wrap"
+        {/* Typed Data Display (structured + raw) */}
+        {typedData ? (
+          <TypedDataDisplay typedData={typedData} rawData={rawData} />
+        ) : (
+          <>
+            {/* Message Display (personal_sign / eth_sign) */}
+            {message && (
+              <Box
+                bg="bauhaus.white"
+                p={3}
+                border="3px solid"
+                borderColor="bauhaus.black"
+                boxShadow="4px 4px 0px 0px #121212"
               >
-                {message}
-              </Text>
-            </Box>
-          </Box>
-        )}
+                <HStack mb={2} alignItems="center">
+                  <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                    Message
+                  </Text>
+                  <Spacer />
+                  <CopyButton value={message} />
+                </HStack>
+                <Box
+                  p={3}
+                  bg="bg.muted"
+                  border="2px solid"
+                  borderColor="bauhaus.black"
+                  maxH="120px"
+                  overflowY="auto"
+                  css={{
+                    "&::-webkit-scrollbar": { width: "6px" },
+                    "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
+                    "&::-webkit-scrollbar-thumb": { background: "#121212" },
+                  }}
+                >
+                  <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
+                    {message}
+                  </Text>
+                </Box>
+              </Box>
+            )}
 
-        {/* Raw Data Display */}
-        <Box
-          bg="bauhaus.white"
-          p={3}
-          border="3px solid"
-          borderColor="bauhaus.black"
-          boxShadow="4px 4px 0px 0px #121212"
-        >
-          <HStack mb={2} alignItems="center">
-            <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
-              Raw Data
-            </Text>
-            <Spacer />
-            <CopyButton value={rawData} />
-          </HStack>
-          <Box
-            p={3}
-            bg="bg.muted"
-            border="2px solid"
-            borderColor="bauhaus.black"
-            maxH="100px"
-            overflowY="auto"
-            css={{
-              "&::-webkit-scrollbar": {
-                width: "6px",
-              },
-              "&::-webkit-scrollbar-track": {
-                background: "#E0E0E0",
-              },
-              "&::-webkit-scrollbar-thumb": {
-                background: "#121212",
-              },
-            }}
-          >
-            <Text
-              fontSize="xs"
-              fontFamily="mono"
-              color="text.tertiary"
-              wordBreak="break-all"
-              whiteSpace="pre-wrap"
+            {/* Raw Data Display */}
+            <Box
+              bg="bauhaus.white"
+              p={3}
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
             >
-              {rawData}
-            </Text>
-          </Box>
-        </Box>
+              <HStack mb={2} alignItems="center">
+                <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                  Raw Data
+                </Text>
+                <Spacer />
+                <CopyButton value={rawData} />
+              </HStack>
+              <Box
+                p={3}
+                bg="bg.muted"
+                border="2px solid"
+                borderColor="bauhaus.black"
+                maxH="100px"
+                overflowY="auto"
+                css={{
+                  "&::-webkit-scrollbar": { width: "6px" },
+                  "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
+                  "&::-webkit-scrollbar-thumb": { background: "#121212" },
+                }}
+              >
+                <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
+                  {rawData}
+                </Text>
+              </Box>
+            </Box>
+          </>
+        )}
 
         {/* Warning Box - Signatures not supported (only for Bankr accounts) */}
         {accountType === "bankr" && (
