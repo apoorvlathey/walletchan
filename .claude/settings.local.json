@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(pnpm build:*)",
-      "WebSearch",
-      "Bash(npm run build:*)"
-    ]
-  }
-}

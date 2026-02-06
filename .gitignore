@@ -42,3 +42,6 @@ source.zip
 
 # Vercel
 .vercel
+
+# Claude Code local settings (may contain API keys/tokens)
+.claude/settings.local.json
