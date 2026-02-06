@@ -164,7 +164,7 @@ let cachedVaultKey: CryptoKey | null = null;
 let activeUIConnections = 0;
 
 // Auto-lock timeout configuration
-const DEFAULT_AUTO_LOCK_TIMEOUT = 15 * 60 * 1000; // 15 minutes default
+const DEFAULT_AUTO_LOCK_TIMEOUT = 0; // Never (infinite) by default
 const AUTO_LOCK_STORAGE_KEY = "autoLockTimeout";
 let cachedAutoLockTimeout: number | null = null;
 
@@ -172,11 +172,11 @@ let cachedAutoLockTimeout: number | null = null;
 const VALID_AUTO_LOCK_TIMEOUTS = new Set([
   60000,      // 1 minute
   300000,     // 5 minutes
-  900000,     // 15 minutes (default)
+  900000,     // 15 minutes
   1800000,    // 30 minutes
   3600000,    // 1 hour
   14400000,   // 4 hours
-  0,          // Never
+  0,          // Never (default)
 ]);
 
 /**
