@@ -29,7 +29,7 @@ export function buildTransferTx(params: TransferParams): {
   data: string;
   value: string;
 } {
-  const { to, amount, contractAddress, decimals, chainId } = params;
+  const { to, amount, contractAddress, decimals } = params;
 
   if (contractAddress === "native") {
     // Native token transfer (ETH, MATIC, etc.)

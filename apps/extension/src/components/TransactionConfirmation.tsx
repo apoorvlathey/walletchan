@@ -105,6 +105,15 @@ function TransactionConfirmation({
 
   const { tx, origin, chainName, favicon } = txRequest;
 
+  // Parse origin safely — it may not be a valid URL (e.g. "BankrWallet" for internal transfers)
+  const originHostname = (() => {
+    try {
+      return new URL(origin).hostname;
+    } catch {
+      return null;
+    }
+  })();
+
   // Fetch labels for the "to" address
   useEffect(() => {
     if (!tx.to) return;
@@ -420,22 +429,26 @@ function TransactionConfirmation({
                   <Image
                     src={
                       favicon ||
-                      `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`
+                      (originHostname
+                        ? `https://www.google.com/s2/favicons?domain=${originHostname}&sz=32`
+                        : undefined)
                     }
                     alt="favicon"
                     boxSize="16px"
                     onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      const googleFallback = `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`;
-                      if (target.src !== googleFallback) {
-                        target.src = googleFallback;
+                      if (originHostname) {
+                        const target = e.target as HTMLImageElement;
+                        const googleFallback = `https://www.google.com/s2/favicons?domain=${originHostname}&sz=32`;
+                        if (target.src !== googleFallback) {
+                          target.src = googleFallback;
+                        }
                       }
                     }}
                     fallback={<Box boxSize="16px" bg="bauhaus.black" />}
                   />
                 </Box>
                 <Text fontSize="sm" fontWeight="700" color="text.primary">
-                  {new URL(origin).hostname}
+                  {originHostname || origin}
                 </Text>
               </HStack>
             </HStack>
