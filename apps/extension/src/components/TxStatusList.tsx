@@ -361,7 +361,10 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
             _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
           />
         )}
-        {tx.status === "processing" && (
+      </HStack>
+
+      {tx.status === "processing" && tx.accountType !== "bankr" && (
+        <HStack justify="flex-end" mt={1}>
           <Button
             size="xs"
             color="bauhaus.red"
@@ -375,8 +378,8 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
           >
             Cancel
           </Button>
-        )}
-      </HStack>
+        </HStack>
+      )}
 
       {/* Show error message for failed transactions */}
       {tx.status === "failed" && tx.error && (

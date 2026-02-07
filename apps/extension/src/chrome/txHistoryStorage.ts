@@ -20,6 +20,7 @@ export interface CompletedTransaction {
   txHash?: string;
   error?: string;
   jobId?: string;
+  accountType?: "bankr" | "privateKey" | "seedPhrase";
 }
 
 const TX_HISTORY_KEY = "txHistory";

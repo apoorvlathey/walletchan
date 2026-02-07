@@ -528,6 +528,7 @@ async function processTransactionInBackground(
     chainName: pending.chainName,
     chainId: pending.tx.chainId,
     createdAt: pending.timestamp,
+    accountType: "bankr",
   });
 
   try {
@@ -648,6 +649,7 @@ async function processLocalTransactionInBackground(
     chainName: pending.chainName,
     chainId: pending.tx.chainId,
     createdAt: pending.timestamp,
+    accountType: account.type as "privateKey" | "seedPhrase",
   });
 
   try {
