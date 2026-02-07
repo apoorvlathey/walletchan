@@ -41,7 +41,7 @@ function TokenTransfer({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const { resolvedAddress, resolvedName, avatar, isResolving, isValid: isRecipientValid } =
+  const { resolvedAddress, resolvedName, avatar, isResolving, isLoadingExtras, isValid: isRecipientValid } =
     useAddressResolver(recipient);
 
   const chainConfig = getChainConfig(token.chainId);
@@ -205,7 +205,7 @@ function TokenTransfer({
               Recipient
             </Text>
             {/* Resolution status - top right */}
-            {recipient && isResolving && (
+            {recipient && (isResolving || isLoadingExtras) && (
               <HStack spacing={1}>
                 <Spinner size="xs" color="bauhaus.blue" />
                 <Text fontSize="xs" color="text.tertiary" fontWeight="700">

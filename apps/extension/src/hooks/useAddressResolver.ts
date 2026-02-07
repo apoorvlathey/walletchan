@@ -10,7 +10,10 @@ interface AddressResolverResult {
   resolvedAddress: string | null;
   resolvedName: string | null;
   avatar: string | null;
+  /** True while the primary address resolution is in progress (forward-resolve for names) */
   isResolving: boolean;
+  /** True while secondary lookups (reverse name, avatar) are in progress */
+  isLoadingExtras: boolean;
   isValid: boolean;
 }
 
@@ -24,6 +27,7 @@ export function useAddressResolver(
   const [resolvedName, setResolvedName] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(false);
+  const [isLoadingExtras, setIsLoadingExtras] = useState(false);
   const latestInput = useRef(input);
 
   useEffect(() => {
@@ -35,6 +39,7 @@ export function useAddressResolver(
       setResolvedName(null);
       setAvatar(null);
       setIsResolving(false);
+      setIsLoadingExtras(false);
       return;
     }
 
@@ -47,10 +52,11 @@ export function useAddressResolver(
       setResolvedName(null);
       setAvatar(null);
       setIsResolving(false);
+      setIsLoadingExtras(false);
 
       const timer = setTimeout(async () => {
         if (latestInput.current !== input) return;
-        setIsResolving(true);
+        setIsLoadingExtras(true);
 
         try {
           const name = await resolveAddressToName(input);
@@ -66,7 +72,7 @@ export function useAddressResolver(
           // Silently fail reverse resolution
         } finally {
           if (latestInput.current === input) {
-            setIsResolving(false);
+            setIsLoadingExtras(false);
           }
         }
       }, debounceMs);
@@ -80,6 +86,7 @@ export function useAddressResolver(
       setResolvedName(null);
       setAvatar(null);
       setIsResolving(false);
+      setIsLoadingExtras(false);
 
       const timer = setTimeout(async () => {
         if (latestInput.current !== input) return;
@@ -90,8 +97,10 @@ export function useAddressResolver(
           if (latestInput.current !== input) return;
 
           setResolvedAddress(address);
+          setIsResolving(false);
 
           if (address) {
+            setIsLoadingExtras(true);
             const av = await getNameAvatar(input);
             if (latestInput.current !== input) return;
             setAvatar(av);
@@ -99,10 +108,11 @@ export function useAddressResolver(
         } catch {
           if (latestInput.current === input) {
             setResolvedAddress(null);
+            setIsResolving(false);
           }
         } finally {
           if (latestInput.current === input) {
-            setIsResolving(false);
+            setIsLoadingExtras(false);
           }
         }
       }, debounceMs);
@@ -115,9 +125,10 @@ export function useAddressResolver(
     setResolvedName(null);
     setAvatar(null);
     setIsResolving(false);
+    setIsLoadingExtras(false);
   }, [input, debounceMs]);
 
   const isValid = resolvedAddress !== null && ADDRESS_REGEX.test(resolvedAddress);
 
-  return { resolvedAddress, resolvedName, avatar, isResolving, isValid };
+  return { resolvedAddress, resolvedName, avatar, isResolving, isLoadingExtras, isValid };
 }
