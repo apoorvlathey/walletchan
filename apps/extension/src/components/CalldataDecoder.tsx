@@ -11,6 +11,8 @@ import {
 } from "@chakra-ui/react";
 import { CopyIcon, CheckIcon } from "@chakra-ui/icons";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
+import { decodeRecursive } from "@/lib/decoder";
+import type { Arg, DecodeBytesParamResult, DecodeParamTypesResult } from "@/lib/decoder/types";
 
 interface DecodedParam {
   name: string;
@@ -169,25 +171,17 @@ function CalldataDecoder({ calldata, to, chainId }: CalldataDecoderProps) {
     const decode = async () => {
       setLoading(true);
       try {
-        const response = await fetch("https://eth.sh/api/calldata/decoder-recursive", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ calldata, address: to, chainId }),
+        const result = await decodeRecursive({
+          calldata,
+          address: to,
+          chainId,
         });
 
-        if (!response.ok) {
-          setDecoded(null);
-          setTab("raw");
-          return;
-        }
-
-        const data = await response.json();
-
-        if (data && data.functionName) {
+        if (result && result.functionName) {
           setDecoded({
-            functionName: data.functionName,
-            signature: data.signature || "",
-            params: transformParams(data.params || data.args || []),
+            functionName: result.functionName,
+            signature: result.signature || "",
+            params: transformArgs(result.args),
           });
         } else {
           setDecoded(null);
@@ -339,45 +333,72 @@ function CalldataDecoder({ calldata, to, chainId }: CalldataDecoderProps) {
   );
 }
 
-// Transform API response params to our format
-function transformParams(params: any[]): DecodedParam[] {
-  if (!Array.isArray(params)) return [];
+// Transform decoder Arg[] to our DecodedParam[] format
+function transformArgs(args: Arg[]): DecodedParam[] {
+  if (!Array.isArray(args)) return [];
 
-  return params.map((p) => {
-    const param: DecodedParam = {
-      name: p.name || "",
-      type: p.type || "unknown",
-      value: p.value ?? p.decoded ?? "",
-    };
-
-    // Handle tuple/struct with components
-    if (p.components && Array.isArray(p.components)) {
-      param.children = transformParams(p.components);
-    }
-
-    // Handle array values
-    if (Array.isArray(p.value) && p.type?.includes("[]")) {
-      param.children = p.value.map((v: any, i: number) => ({
-        name: `[${i}]`,
-        type: p.type.replace("[]", ""),
-        value: v,
-      }));
-    }
-
-    // Handle nested decoded calls
-    if (p.decoded && typeof p.decoded === "object" && p.decoded.functionName) {
-      param.children = [
-        {
-          name: "call",
-          type: "function",
-          value: p.decoded.functionName,
-          children: transformParams(p.decoded.params || p.decoded.args || []),
-        },
-      ];
-    }
-
-    return param;
+  return args.map((arg) => {
+    return transformValue(arg.name, arg.type, arg.baseType, arg.value);
   });
+}
+
+function transformValue(
+  name: string,
+  type: string,
+  baseType: string,
+  value: DecodeParamTypesResult
+): DecodedParam {
+  // String value (primitives like int, address, bool, string)
+  if (typeof value === "string") {
+    return { name, type, value };
+  }
+
+  // Bytes with decoded nested calldata
+  if (value && typeof value === "object" && "decoded" in value) {
+    const bytesVal = value as DecodeBytesParamResult;
+    if (bytesVal.decoded && bytesVal.decoded.functionName) {
+      return {
+        name,
+        type,
+        value: bytesVal.decoded.functionName,
+        children: [
+          {
+            name: "call",
+            type: "function",
+            value: bytesVal.decoded.functionName,
+            children: transformArgs(bytesVal.decoded.args),
+          },
+        ],
+      };
+    }
+    // Bytes that couldn't be decoded further — show raw hex
+    return { name, type, value: String(value) };
+  }
+
+  // Tuple or Array (array of Arg-like objects)
+  if (Array.isArray(value)) {
+    return {
+      name,
+      type,
+      value: "",
+      children: value.map((item, i) => {
+        return transformValue(
+          item.name || `[${i}]`,
+          item.type,
+          item.baseType,
+          item.value
+        );
+      }),
+    };
+  }
+
+  // Null
+  if (value === null || value === undefined) {
+    return { name, type, value: "" };
+  }
+
+  // Fallback
+  return { name, type, value: String(value) };
 }
 
 export default memo(CalldataDecoder);
