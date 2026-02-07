@@ -263,71 +263,69 @@ function CalldataDecoder({ calldata, to, chainId }: CalldataDecoderProps) {
         </Box>
       </HStack>
 
-      {/* Content */}
-      <Box p={3}>
-        {tab === "decoded" ? (
-          loading ? (
-            <VStack spacing={2} align="start">
-              <Skeleton h="16px" w="120px" />
-              <Skeleton h="14px" w="200px" />
-              <Skeleton h="14px" w="180px" />
-            </VStack>
-          ) : result ? (
-            <VStack align="start" spacing={2}>
-              {/* Function name */}
-              <Code
-                px={2}
-                py={1}
-                fontSize="xs"
-                bg="bauhaus.blue"
-                color="white"
-                fontFamily="mono"
-                border="2px solid"
-                borderColor="bauhaus.black"
-                fontWeight="700"
-              >
-                {result.functionName}
-              </Code>
-
-              {/* Parameters */}
-              <Box
-                w="full"
-                maxH="250px"
-                overflowY="auto"
-                css={scrollStyles}
-              >
-                <VStack align="start" spacing={1.5} w="full">
-                  {result.args.map((arg, i) => renderParams(i, arg, chainId))}
-                </VStack>
-              </Box>
-            </VStack>
-          ) : (
-            <Text fontSize="xs" color="text.tertiary" fontWeight="600">
-              Could not decode calldata
-            </Text>
-          )
-        ) : (
-          /* Raw tab */
-          <Box
-            p={3}
-            bg="bg.muted"
-            border="2px solid"
-            borderColor="bauhaus.black"
-            maxH="100px"
-            overflowY="auto"
-            css={scrollStyles}
-          >
-            <Text
+      {/* Content — both tabs always rendered, inactive hidden to preserve state */}
+      <Box p={3} display={tab === "decoded" ? "block" : "none"}>
+        {loading ? (
+          <VStack spacing={2} align="start">
+            <Skeleton h="16px" w="120px" />
+            <Skeleton h="14px" w="200px" />
+            <Skeleton h="14px" w="180px" />
+          </VStack>
+        ) : result ? (
+          <VStack align="start" spacing={2}>
+            {/* Function name */}
+            <Code
+              px={2}
+              py={1}
               fontSize="xs"
+              bg="bauhaus.blue"
+              color="white"
               fontFamily="mono"
-              color="text.tertiary"
-              wordBreak="break-all"
-              whiteSpace="pre-wrap"
+              border="2px solid"
+              borderColor="bauhaus.black"
+              fontWeight="700"
             >
-              {calldata}
-            </Text>
-          </Box>
+              {result.functionName}
+            </Code>
+
+            {/* Parameters */}
+            <Box
+              w="full"
+              maxH="250px"
+              overflowY="auto"
+              css={scrollStyles}
+            >
+              <VStack align="start" spacing={1.5} w="full">
+                {result.args.map((arg, i) => renderParams(i, arg, chainId))}
+              </VStack>
+            </Box>
+          </VStack>
+        ) : (
+          <Text fontSize="xs" color="text.tertiary" fontWeight="600">
+            Could not decode calldata
+          </Text>
         )}
+      </Box>
+      <Box p={3} display={tab === "raw" ? "block" : "none"}>
+        <Box
+          p={3}
+          bg="bg.muted"
+          border="2px solid"
+          borderColor="bauhaus.black"
+          maxH="100px"
+          overflowY="auto"
+          css={scrollStyles}
+        >
+          <Text
+            fontSize="xs"
+            fontFamily="mono"
+            color="text.tertiary"
+            wordBreak="break-all"
+            whiteSpace="pre-wrap"
+          >
+            {calldata}
+          </Text>
+        </Box>
       </Box>
     </Box>
   );
