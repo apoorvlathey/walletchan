@@ -11,6 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { RepeatIcon, ViewIcon, ViewOffIcon } from "@chakra-ui/icons";
 import { fetchPortfolio, PortfolioToken } from "@/chrome/portfolioApi";
+import { fetchOnchainBalances } from "@/chrome/onchainBalances";
 import { getChainConfig } from "@/constants/chainConfig";
 
 interface TokenHoldingsProps {
@@ -63,8 +64,20 @@ function TokenHoldings({ address, onTokenClick, hideHeader, hideCard, onStateCha
 
       try {
         const data = await fetchPortfolio(address);
-        setTokens(data.tokens);
-        setTotalValueUsd(data.totalValueUsd);
+
+        // Fetch real on-chain balances, fall back to API values on failure
+        let finalTokens = data.tokens;
+        let finalTotal = data.totalValueUsd;
+        try {
+          const onchain = await fetchOnchainBalances(address, data.tokens);
+          finalTokens = onchain.tokens;
+          finalTotal = onchain.totalValueUsd;
+        } catch (err) {
+          console.warn("[onchain] balance fetch failed, using API values:", err);
+        }
+
+        setTokens(finalTokens);
+        setTotalValueUsd(finalTotal);
         setLastFetched(Date.now());
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load portfolio");

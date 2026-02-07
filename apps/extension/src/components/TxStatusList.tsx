@@ -142,10 +142,19 @@ function TxStatusList({ maxItems = 5, address, hideHeader, hideCard }: TxStatusL
   );
 }
 
+function getOriginHostname(origin: string): string | null {
+  try {
+    return new URL(origin).hostname;
+  } catch {
+    return null;
+  }
+}
+
 function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
   const config = getChainConfig(tx.chainId);
   const toast = useBauhausToast();
   const [cancelling, setCancelling] = useState(false);
+  const originHostname = getOriginHostname(tx.origin);
 
   const handleCancel = async () => {
     setCancelling(true);
@@ -277,24 +286,30 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
       <HStack justify="space-between">
         <HStack spacing={3} flex={1}>
           <Box
-            bg="bauhaus.white"
+            bg={tx.origin === "BankrWallet" ? "transparent" : "bauhaus.white"}
             border="2px solid"
-            borderColor="bauhaus.black"
-            p={1}
+            borderColor={tx.origin === "BankrWallet" ? "transparent" : "bauhaus.black"}
+            p={tx.origin === "BankrWallet" ? 0 : 1}
             display="flex"
             alignItems="center"
             justifyContent="center"
           >
             <Image
               src={
-                tx.favicon ||
-                `https://www.google.com/s2/favicons?domain=${new URL(tx.origin).hostname}&sz=32`
+                tx.origin === "BankrWallet"
+                  ? "/bankrwallet-icon.png"
+                  : tx.favicon ||
+                    (originHostname
+                      ? `https://www.google.com/s2/favicons?domain=${originHostname}&sz=32`
+                      : undefined)
               }
               alt="favicon"
-              boxSize="18px"
+              boxSize={tx.origin === "BankrWallet" ? "24px" : "18px"}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.src = `https://www.google.com/s2/favicons?domain=${new URL(tx.origin).hostname}&sz=32`;
+                if (originHostname) {
+                  target.src = `https://www.google.com/s2/favicons?domain=${originHostname}&sz=32`;
+                }
               }}
             />
           </Box>
@@ -306,7 +321,7 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
                 color="text.primary"
                 noOfLines={1}
               >
-                {new URL(tx.origin).hostname}
+                {originHostname || tx.origin}
               </Text>
               <Text fontSize="xs" color="text.tertiary" fontWeight="500">
                 {formatTimeAgo(tx.createdAt)}

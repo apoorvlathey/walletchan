@@ -1,4 +1,4 @@
-import { useState, useCallback, lazy, Suspense } from "react";
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from "react";
 import {
   Box,
   HStack,
@@ -28,12 +28,41 @@ interface HoldingsState {
 
 interface PortfolioTabsProps {
   address: string;
+  activityTabTrigger?: number;
   onTokenClick?: (token: PortfolioToken) => void;
 }
 
-export default function PortfolioTabs({ address, onTokenClick }: PortfolioTabsProps) {
-  const [tabIndex, setTabIndex] = useState(0);
+/** Delay before refreshing balances after on-chain tx confirmation (ms) */
+const POST_CONFIRM_REFRESH_DELAY = 3000;
+
+export default function PortfolioTabs({ address, activityTabTrigger = 0, onTokenClick }: PortfolioTabsProps) {
+  const [tabIndex, setTabIndex] = useState(activityTabTrigger > 0 ? 1 : 0);
   const [holdingsState, setHoldingsState] = useState<HoldingsState | null>(null);
+  const holdingsStateRef = useRef<HoldingsState | null>(null);
+  holdingsStateRef.current = holdingsState;
+
+  // Switch to Activity tab when activityTabTrigger increments (after tx submission)
+  useEffect(() => {
+    if (activityTabTrigger > 0) {
+      setTabIndex(1);
+    }
+  }, [activityTabTrigger]);
+
+  // Listen for tx confirmations from background and auto-refresh balances
+  useEffect(() => {
+    const handleMessage = (message: { type: string }) => {
+      if (message.type === "txHistoryUpdated") {
+        // Tx status changed (likely confirmed on-chain) — refresh after a delay
+        // so RPC nodes have time to reflect the new state
+        setTimeout(() => {
+          holdingsStateRef.current?.refresh();
+        }, POST_CONFIRM_REFRESH_DELAY);
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(handleMessage);
+    return () => chrome.runtime.onMessage.removeListener(handleMessage);
+  }, []);
 
   const handleStateChange = useCallback((state: HoldingsState) => {
     setHoldingsState(state);

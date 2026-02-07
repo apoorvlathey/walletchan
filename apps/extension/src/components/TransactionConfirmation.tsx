@@ -38,7 +38,7 @@ interface TransactionConfirmationProps {
   currentIndex: number;
   totalCount: number;
   isInSidePanel: boolean;
-  accountType?: "bankr" | "privateKey" | "impersonator";
+  accountType?: "bankr" | "privateKey" | "seedPhrase" | "impersonator";
   onBack: () => void;
   onConfirmed: () => void;
   onRejected: () => void;
@@ -142,8 +142,13 @@ function TransactionConfirmation({
     setState("submitting");
     setError("");
 
+    const messageType =
+      accountType === "privateKey" || accountType === "seedPhrase"
+        ? "confirmTransactionAsyncPK"
+        : "confirmTransactionAsync";
+
     chrome.runtime.sendMessage(
-      { type: "confirmTransactionAsync", txId: txRequest.id, password: "" },
+      { type: messageType, txId: txRequest.id, password: "" },
       (result: { success: boolean; error?: string }) => {
         if (result.success) {
           // Transaction submitted

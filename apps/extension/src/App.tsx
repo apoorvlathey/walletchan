@@ -121,6 +121,8 @@ function App() {
   const [selectedTxRequest, setSelectedTxRequest] = useState<PendingTxRequest | null>(null);
   const [pendingSignatureRequests, setPendingSignatureRequests] = useState<PendingSignatureRequest[]>([]);
   const [selectedSignatureRequest, setSelectedSignatureRequest] = useState<PendingSignatureRequest | null>(null);
+  const [activityTabTrigger, setActivityTabTrigger] = useState(0);
+
   const [copied, setCopied] = useState(false);
   const [sidePanelSupported, setSidePanelSupported] = useState(false);
   const [sidePanelMode, setSidePanelMode] = useState(false);
@@ -459,6 +461,7 @@ function App() {
       chrome.runtime.sendMessage(
         { type: "getFailedTxResult", notificationId: showErrorId },
         (result: { error: string; origin: string } | null) => {
+          if (chrome.runtime.lastError) return;
           if (result) {
             setFailedTxError({ error: result.error, origin: result.origin });
           }
@@ -588,6 +591,8 @@ function App() {
         tab.id!,
         { type: "getInfo" },
         (store: { address: string; displayAddress: string; chainName: string }) => {
+          // Ignore errors (tab might not have content script, e.g. chrome:// pages)
+          if (chrome.runtime.lastError) return;
           if (store?.chainName && store.chainName.length > 0) {
             if (store.address) setAddress(store.address);
             if (store.displayAddress) setDisplayAddress(store.displayAddress);
@@ -742,6 +747,8 @@ function App() {
         chrome.tabs.sendMessage(tab.id!, {
           type: "setChainId",
           msg: { chainName, chainId, rpcUrl: networksInfo[chainName].rpcUrl },
+        }).catch(() => {
+          // Ignore errors if content script not injected (e.g. chrome:// pages)
         });
 
         await chrome.storage.sync.set({ chainName });
@@ -820,6 +827,7 @@ function App() {
       setSelectedTxRequest(remaining[0]);
     } else {
       setSelectedTxRequest(null);
+      setActivityTabTrigger((k) => k + 1);
       setView("main");
     }
   }, [selectedTxRequest?.id]);
@@ -1849,6 +1857,7 @@ function App() {
           {address && (
             <PortfolioTabs
               address={address}
+              activityTabTrigger={activityTabTrigger}
               onTokenClick={(token) => {
                 setTransferToken(token);
                 setView("transfer");
