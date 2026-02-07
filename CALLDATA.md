@@ -46,7 +46,7 @@ type Arg = {
 
 | File | Purpose |
 |------|---------|
-| `components/CalldataDecoder.tsx` | Top-level decoder component with Raw/Decoded tabs, loading state, copy-as-JSON |
+| `components/CalldataDecoder.tsx` | Top-level decoder component with Raw/Decoded tabs, two-phase decoding, copy-as-JSON |
 | `components/renderParams.tsx` | Routes `Arg` to correct param component based on `baseType`; renders param row with name + type label |
 | `components/CopyButton.tsx` | Shared copy-to-clipboard button (extracted for reuse across param components) |
 | `lib/convertUtils.ts` | Unit conversion (Wei/ETH/Gwei/10^6/Unix Time/Bps/%/Days/Hours/Minutes), formatting, base64/JSON/SVG detection |
@@ -81,16 +81,28 @@ type Arg = {
 ### Tab Behavior
 
 - **Default tab**: Raw — shows calldata immediately without waiting for decoding
-- **Background decoding**: Decoding starts on mount. The ShapesLoader (bouncing Bauhaus shapes) appears next to "DECODED" tab text while decoding is in progress
-- **Auto-switch**: When decoding succeeds, auto-switches to the Decoded tab
+- **Two-phase decoding**: On mount, Phase 1 runs a fast local decode (no network). The ShapesLoader spinner appears only during Phase 1. Once local decode succeeds, the spinner disappears and the Decoded tab is shown instantly. Phase 2 (ABI fetch via Sourcify) runs silently in the background and updates the UI only if it finds better results (param names or a different function name).
+- **Auto-switch**: When local decoding succeeds, auto-switches to the Decoded tab
 - **Always clickable**: Both tabs are always clickable. If user clicks Decoded while loading, they see skeleton loaders. If decoding failed, they see "Could not decode calldata"
 - **Copy behavior**: On Decoded tab, copies full decoded JSON (function name + args). On Raw tab, copies raw calldata hex
+
+### Two-Phase Decoding
+
+**Phase 1 — Instant local decode** (no network):
+`CalldataDecoder` calls `decodeRecursive({ calldata })` without `address`/`chainId`, which skips ABI fetching and goes straight to selector-based local strategies. This is near-instant.
+
+**Phase 2 — Background ABI fetch** (silent):
+If Phase 1 succeeds, `decodeRecursive({ calldata, address, chainId })` runs in the background. The ABI is fetched from Sourcify. The UI only updates if the ABI result is better:
+- Different function name (ABI found a more accurate match)
+- Same function but ABI has real param names (e.g., `_to`, `amount` vs unnamed)
+
+If Phase 1 fails entirely, Phase 2 runs with a loading skeleton (same as old behavior).
 
 ### Decoding Strategies (in order)
 
 The decoder in `lib/decoder/index.ts` tries these strategies:
 
-1. **ABI from contract address** — fetches ABI via `fetchContractAbi`, decodes with it
+1. **ABI from contract address** — fetches ABI via Sourcify v2 API (`fetchContractAbi`), decodes with it
 2. **ERC-7821 Execute** — checks for `0xe9ae5c53` selector
 3. **4byte/Sourcify selector lookup** — looks up function signature by selector
 4. **Safe MultiSend** — parses packed multi-send transaction bytes
@@ -99,6 +111,18 @@ The decoder in `lib/decoder/index.ts` tries these strategies:
 7. **Universal Router commands** — maps command bytes to names
 8. **Function fragment guessing** — `@openchainxyz/abi-guesser` fragment mode
 9. **UTF-8 text** — attempts `hexToString` with printability check
+
+### ABI Fetching (Sourcify v2)
+
+`lib/decoder/fetchAbi.ts` uses the Sourcify v2 API — no API keys required, supports 180+ chains.
+
+```
+GET https://sourcify.dev/server/v2/contract/{chainId}/{address}?fields=abi,compilation.name,proxyResolution
+```
+
+- Returns parsed ABI directly (no JSON string parsing needed)
+- Proxy detection is built-in via `proxyResolution` field (supports EIP-1967, Gnosis Safe, Diamond, etc.)
+- When a proxy is detected, a second request fetches the implementation's ABI
 
 ### Recursive Decoding
 

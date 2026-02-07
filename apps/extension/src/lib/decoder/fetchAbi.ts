@@ -1,17 +1,21 @@
 import { InterfaceAbi } from "ethers";
 
-interface ContractResult {
-  ABI: string;
-  ContractName: string;
-  Implementation: string;
+const SOURCIFY_BASE = "https://sourcify.dev/server/v2/contract";
+
+interface SourcifyResponse {
+  abi?: any[];
+  compilation?: { name?: string };
+  proxyResolution?: {
+    isProxy: boolean;
+    implementations?: { address: string; name?: string }[];
+  };
 }
 
-interface ContractResponse {
-  status: string;
-  message: string;
-  result: ContractResult[];
-}
-
+/**
+ * Fetch contract ABI from Sourcify v2 API.
+ * No API key required. Supports 180+ chains.
+ * For proxies, auto-resolves to the implementation ABI.
+ */
 export async function fetchContractAbi({
   address,
   chainId,
@@ -19,44 +23,40 @@ export async function fetchContractAbi({
   address: string;
   chainId: number;
 }): Promise<{ abi: InterfaceAbi; name: string }> {
-  const res = await fetch(
-    `https://eth.sh/api/source-code?address=${address}&chainId=${chainId}`
-  );
+  const url = `${SOURCIFY_BASE}/${chainId}/${address}?fields=abi,compilation.name,proxyResolution`;
+  const res = await fetch(url);
 
   if (!res.ok) {
     throw new Error(`Failed to fetch ABI for ${address} on chain ${chainId}`);
   }
 
-  const data: ContractResponse = await res.json();
+  const data: SourcifyResponse = await res.json();
 
-  if (
-    !data.result ||
-    !Array.isArray(data.result) ||
-    data.result.length === 0
-  ) {
+  if (!data.abi || data.abi.length === 0) {
     throw new Error(`No ABI found for ${address} on chain ${chainId}`);
   }
 
-  const { ABI, ContractName, Implementation } = data.result[0];
+  const name = data.compilation?.name ?? "";
 
-  // If the contract is a proxy, fetch the implementation ABI
-  if (Implementation && Implementation.length > 0) {
-    const implRes = await fetch(
-      `https://eth.sh/api/source-code?address=${Implementation}&chainId=${chainId}`
-    );
-
-    if (implRes.ok) {
-      const implData: ContractResponse = await implRes.json();
-      if (
-        implData.result &&
-        Array.isArray(implData.result) &&
-        implData.result.length > 0
-      ) {
-        const { ABI: implAbi, ContractName: implName } = implData.result[0];
-        return { abi: JSON.parse(implAbi), name: implName };
+  // If proxy, fetch the implementation's ABI
+  if (data.proxyResolution?.isProxy && data.proxyResolution.implementations?.length) {
+    const impl = data.proxyResolution.implementations[0];
+    try {
+      const implUrl = `${SOURCIFY_BASE}/${chainId}/${impl.address}?fields=abi,compilation.name`;
+      const implRes = await fetch(implUrl);
+      if (implRes.ok) {
+        const implData: SourcifyResponse = await implRes.json();
+        if (implData.abi && implData.abi.length > 0) {
+          return {
+            abi: implData.abi,
+            name: implData.compilation?.name ?? impl.name ?? name,
+          };
+        }
       }
+    } catch {
+      // Fall through to return proxy ABI
     }
   }
 
-  return { abi: JSON.parse(ABI), name: ContractName };
+  return { abi: data.abi, name };
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import {
   Box,
   VStack,
@@ -79,10 +79,41 @@ function serializeValue(value: any): any {
   return String(value);
 }
 
+/**
+ * Check if a decode result has meaningful param names (from ABI).
+ * Selector-based decoding produces names like "" or generic "arg0".
+ */
+function hasParamNames(result: DecodeRecursiveResult): boolean {
+  if (!result) return false;
+  return result.args.some(
+    (arg) => arg.name.length > 0 && !/^arg\d+$/.test(arg.name)
+  );
+}
+
+/**
+ * Determine if the ABI-based decode is an upgrade worth showing over the local decode.
+ */
+function isAbiDecodeBetter(
+  local: DecodeRecursiveResult,
+  abi: DecodeRecursiveResult
+): boolean {
+  if (!abi) return false;
+  if (!local) return true;
+
+  // Different function name means ABI found a better match
+  if (abi.functionName !== local.functionName) return true;
+
+  // Same function but ABI has real param names
+  if (!hasParamNames(local) && hasParamNames(abi)) return true;
+
+  return false;
+}
+
 function CalldataDecoder({ calldata, to, chainId }: CalldataDecoderProps) {
   const [result, setResult] = useState<DecodeRecursiveResult>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"decoded" | "raw">("raw");
+  const localResultRef = useRef<DecodeRecursiveResult>(null);
 
   useEffect(() => {
     if (!calldata || calldata === "0x") {
@@ -90,29 +121,77 @@ function CalldataDecoder({ calldata, to, chainId }: CalldataDecoderProps) {
       return;
     }
 
+    let cancelled = false;
+
     const decode = async () => {
       setLoading(true);
-      try {
-        const decoded = await decodeRecursive({
-          calldata,
-          address: to,
-          chainId,
-        });
 
-        if (decoded && decoded.functionName) {
-          setResult(decoded);
+      // Phase 1: Instant local decode (no ABI fetch)
+      try {
+        const localDecoded = await decodeRecursive({ calldata });
+
+        if (cancelled) return;
+
+        if (localDecoded && localDecoded.functionName) {
+          localResultRef.current = localDecoded;
+          setResult(localDecoded);
           setTab("decoded");
+          setLoading(false);
+
+          // Phase 2: Background ABI fetch for better param names
+          try {
+            const abiDecoded = await decodeRecursive({
+              calldata,
+              address: to,
+              chainId,
+            });
+
+            if (cancelled) return;
+
+            if (isAbiDecodeBetter(localResultRef.current, abiDecoded)) {
+              setResult(abiDecoded);
+            }
+          } catch {
+            // ABI fetch failed — keep local result
+          }
         } else {
-          setResult(null);
+          // Local decode failed — try with ABI fetch
+          try {
+            const abiDecoded = await decodeRecursive({
+              calldata,
+              address: to,
+              chainId,
+            });
+
+            if (cancelled) return;
+
+            if (abiDecoded && abiDecoded.functionName) {
+              setResult(abiDecoded);
+              setTab("decoded");
+            } else {
+              setResult(null);
+            }
+          } catch {
+            if (!cancelled) setResult(null);
+          } finally {
+            if (!cancelled) {
+              setLoading(false);
+            }
+          }
         }
       } catch {
-        setResult(null);
-      } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setResult(null);
+          setLoading(false);
+        }
       }
     };
 
     decode();
+
+    return () => {
+      cancelled = true;
+    };
   }, [calldata, to, chainId]);
 
   const scrollStyles = {
@@ -125,6 +204,8 @@ function CalldataDecoder({ calldata, to, chainId }: CalldataDecoderProps) {
   const copyValue = tab === "decoded" && result
     ? serializeResult(result)
     : calldata;
+
+  const showSpinner = loading;
 
   return (
     <Box
@@ -153,7 +234,7 @@ function CalldataDecoder({ calldata, to, chainId }: CalldataDecoderProps) {
             >
               Decoded
             </Text>
-            {loading && <ShapesLoader size="6px" />}
+            {showSpinner && <ShapesLoader size="6px" />}
           </HStack>
         </Box>
         <Box w="2px" bg="bauhaus.black" alignSelf="stretch" />
