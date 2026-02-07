@@ -4,6 +4,7 @@ import {
   formatUnits,
   erc20Abi,
   type Address,
+  type PublicClient,
 } from "viem";
 import { DEFAULT_NETWORKS } from "@/constants/networks";
 import { PortfolioToken } from "@/chrome/portfolioApi";
@@ -12,16 +13,52 @@ import { PortfolioToken } from "@/chrome/portfolioApi";
 const MULTICALL3_ADDRESS: Address =
   "0xcA11bde05977b3631167028862bE2a173976CA11";
 
+/** Multicall3 ABI for batching native balance lookups */
+const multicall3Abi = [
+  {
+    type: "function",
+    name: "getEthBalance",
+    stateMutability: "view",
+    inputs: [{ name: "addr", type: "address" }],
+    outputs: [{ name: "balance", type: "uint256" }],
+  },
+] as const;
+
+/** Max calls per multicall batch to avoid oversized RPC requests */
+const MULTICALL_BATCH_SIZE = 100;
+
+/** RPC request timeout in ms – short enough to not block UI on rate limits */
+const RPC_TIMEOUT = 8_000;
+
 /** Map chainId → rpcUrl from DEFAULT_NETWORKS */
 const chainRpcMap: Record<number, string> = {};
 for (const net of Object.values(DEFAULT_NETWORKS)) {
   chainRpcMap[net.chainId] = net.rpcUrl;
 }
 
+/** Cached viem clients keyed by chainId to reuse connections */
+const clientCache = new Map<number, PublicClient>();
+
+function getClient(chainId: number): PublicClient | null {
+  const rpcUrl = chainRpcMap[chainId];
+  if (!rpcUrl) return null;
+
+  let client = clientCache.get(chainId);
+  if (!client) {
+    client = createPublicClient({
+      transport: http(rpcUrl, { timeout: RPC_TIMEOUT, retryCount: 0 }),
+    });
+    clientCache.set(chainId, client);
+  }
+  return client;
+}
+
 /**
- * Fetch real on-chain balances for all tokens via multicall (ERC20) and
- * getBalance (native). Returns updated tokens with fresh balance fields.
- * If a chain fails, the original API balances are preserved for those tokens.
+ * Fetch real on-chain balances for all tokens via multicall.
+ * Both native (via Multicall3.getEthBalance) and ERC20 (via balanceOf)
+ * are batched into a single multicall per chain, chunked to avoid
+ * oversized requests.
+ * If a chain/batch fails, the original API balances are preserved.
  */
 export async function fetchOnchainBalances(
   address: string,
@@ -41,72 +78,69 @@ export async function fetchOnchainBalances(
   // Fetch balances per chain in parallel
   const chainPromises = Array.from(byChain.entries()).map(
     async ([chainId, entries]) => {
-      const rpcUrl = chainRpcMap[chainId];
-      if (!rpcUrl) return; // unknown chain, keep API values
+      const client = getClient(chainId);
+      if (!client) return; // unknown chain, keep API values
 
-      const client = createPublicClient({ transport: http(rpcUrl) });
       const addr = address as Address;
 
-      const natives: typeof entries = [];
-      const erc20s: typeof entries = [];
+      // Build unified call list – native uses Multicall3.getEthBalance,
+      // ERC20 uses balanceOf, all batched into a single multicall
+      const calls: { entryIndex: number; token: PortfolioToken; contract: any }[] = [];
 
       for (const entry of entries) {
-        if (
+        const isNative =
           entry.token.contractAddress === "native" ||
-          entry.token.contractAddress ===
-            "0x0000000000000000000000000000000000000000"
-        ) {
-          natives.push(entry);
-        } else {
-          erc20s.push(entry);
-        }
-      }
+          entry.token.contractAddress === "0x0000000000000000000000000000000000000000";
 
-      // Fetch native balances
-      const nativePromises = natives.map(async (entry) => {
-        try {
-          const bal = await client.getBalance({ address: addr });
-          applyBalance(updated, entry.index, bal, entry.token);
-        } catch (err) {
-          console.warn(`[onchain] native balance fetch failed (chain ${chainId}):`, err);
-        }
-      });
-
-      // Fetch ERC20 balances via multicall
-      let erc20Promise = Promise.resolve();
-      if (erc20s.length > 0) {
-        erc20Promise = (async () => {
-          try {
-            const contracts = erc20s.map((entry) => ({
-              address: entry.token.contractAddress as Address,
-              abi: erc20Abi,
-              functionName: "balanceOf" as const,
-              args: [addr] as const,
-            }));
-
-            const results = await client.multicall({
-              contracts,
-              multicallAddress: MULTICALL3_ADDRESS,
-            });
-
-            results.forEach((result, i) => {
-              if (result.status === "success") {
-                applyBalance(
-                  updated,
-                  erc20s[i].index,
-                  result.result as bigint,
-                  erc20s[i].token
-                );
+        calls.push({
+          entryIndex: entry.index,
+          token: entry.token,
+          contract: isNative
+            ? {
+                address: MULTICALL3_ADDRESS,
+                abi: multicall3Abi,
+                functionName: "getEthBalance" as const,
+                args: [addr] as const,
               }
-              // on failure, keep API value for that token
-            });
-          } catch (err) {
-            console.warn(`[onchain] multicall failed (chain ${chainId}):`, err);
-          }
-        })();
+            : {
+                address: entry.token.contractAddress as Address,
+                abi: erc20Abi,
+                functionName: "balanceOf" as const,
+                args: [addr] as const,
+              },
+        });
       }
 
-      await Promise.all([...nativePromises, erc20Promise]);
+      if (calls.length === 0) return;
+
+      // Process in chunks to avoid oversized RPC requests
+      for (let i = 0; i < calls.length; i += MULTICALL_BATCH_SIZE) {
+        const chunk = calls.slice(i, i + MULTICALL_BATCH_SIZE);
+        try {
+          const results = await client.multicall({
+            contracts: chunk.map((c) => c.contract),
+            multicallAddress: MULTICALL3_ADDRESS,
+          });
+
+          results.forEach((result: any, j: number) => {
+            if (result.status === "success") {
+              applyBalance(
+                updated,
+                chunk[j].entryIndex,
+                result.result as bigint,
+                chunk[j].token
+              );
+            }
+            // on failure, keep API value for that token
+          });
+        } catch (err) {
+          console.warn(
+            `[onchain] multicall failed (chain ${chainId}, batch ${Math.floor(i / MULTICALL_BATCH_SIZE)}):`,
+            err
+          );
+          // Keep API values for this entire batch
+        }
+      }
     }
   );
 

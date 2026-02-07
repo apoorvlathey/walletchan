@@ -65,23 +65,23 @@ function TokenHoldings({ address, onTokenClick, hideHeader, hideCard, onStateCha
       try {
         const data = await fetchPortfolio(address);
 
-        // Fetch real on-chain balances, fall back to API values on failure
-        let finalTokens = data.tokens;
-        let finalTotal = data.totalValueUsd;
+        // Show API data immediately so user isn't stuck on skeleton loader
+        setTokens(data.tokens);
+        setTotalValueUsd(data.totalValueUsd);
+        setLoading(false);
+        setLastFetched(Date.now());
+
+        // Enhance with on-chain balances in the background.
+        // If RPCs are rate-limited or slow, user already sees API values.
         try {
           const onchain = await fetchOnchainBalances(address, data.tokens);
-          finalTokens = onchain.tokens;
-          finalTotal = onchain.totalValueUsd;
+          setTokens(onchain.tokens);
+          setTotalValueUsd(onchain.totalValueUsd);
         } catch (err) {
           console.warn("[onchain] balance fetch failed, using API values:", err);
         }
-
-        setTokens(finalTokens);
-        setTotalValueUsd(finalTotal);
-        setLastFetched(Date.now());
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load portfolio");
-      } finally {
         setLoading(false);
       }
     },
