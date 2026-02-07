@@ -23,7 +23,7 @@ The extension supports four distinct account types that can be used simultaneous
 | Feature               | Bankr API Account         | Private Key Account                 | Seed Phrase Account                  | Impersonator Account      |
 | --------------------- | ------------------------- | ----------------------------------- | ------------------------------------ | ------------------------- |
 | Transaction Execution | Via Bankr API             | Local signing + RPC broadcast       | Local signing + RPC broadcast        | ❌ Disabled (view-only)  |
-| Message Signing       | ❌ Not supported          | ✅ Full support                     | ✅ Full support                      | ❌ Disabled (view-only)  |
+| Message Signing       | ✅ Via API (`/agent/sign`) | ✅ Full support                     | ✅ Full support                      | ❌ Disabled (view-only)  |
 | Key Storage           | API key encrypted locally | Private key encrypted locally       | Mnemonic + derived keys encrypted    | No secrets stored         |
 | Setup                 | API key + wallet address  | Private key import or generate      | 12-word BIP39 import or generate     | Address only              |
 | Use Case              | AI-powered transactions   | Agent wallets, bots, standard usage | HD wallets, multiple derived accounts | Viewing portfolio/dApps   |
@@ -128,10 +128,10 @@ For detailed implementation of private key accounts, see [PK_ACCOUNTS.md](./PK_A
 ┌──────────────────────────────┐    ┌──────────────────────────────┐
 │    Extension Popup           │    │       Bankr API              │
 │    (index.html)              │    │  api.bankr.bot               │
-│    - Unlock screen           │    │  - POST /agent/prompt        │
-│    - Pending tx banner       │    │  - GET /agent/job/{id}       │
-│    - In-popup tx confirm     │    │  - POST /agent/job/{id}/cancel│
-│    - Settings management     │    │                              │
+│    - Unlock screen           │    │  - POST /agent/submit        │
+│    - Pending tx banner       │    │  - POST /agent/sign          │
+│    - In-popup tx confirm     │    │  - POST /agent/prompt (chat) │
+│    - Settings management     │    │  - GET /agent/job/{id} (chat)│
 └──────────────────────────────┘    └──────────────────────────────┘
 ```
 
@@ -260,7 +260,7 @@ src/
 │   ├── types.ts             # Account and vault type definitions
 │   ├── localSigner.ts       # Transaction and message signing with viem
 │   ├── accountStorage.ts    # Account CRUD operations (includes seed groups, PK→seed conversion)
-│   ├── bankrApi.ts          # Bankr API client
+│   ├── bankrApi.ts          # Bankr API client (submit, sign, job polling)
 │   ├── portfolioApi.ts      # Portfolio API client (fetches token holdings via website)
 │   ├── transferUtils.ts     # ERC20/native token transfer calldata builders
 │   ├── chatApi.ts           # Chat API client for Bankr agent
@@ -551,25 +551,13 @@ Each transaction maintains its own response callback - rejecting/confirming one 
 
 `src/chrome/bankrApi.ts`:
 
-- Formats transaction as JSON prompt:
-
-```json
-Submit this transaction:
-{
-  "to": "0x...",
-  "data": "0x...",
-  "value": "0",
-  "chainId": 8453
-}
-```
-
-- POST to `https://api.bankr.bot/agent/prompt`
-- Polls `GET /agent/job/{jobId}` every 2 seconds
-- Extracts transaction hash from response
+- POST to `https://api.bankr.bot/agent/submit` with transaction object and `waitForConfirmation: true`
+- Synchronous response — returns tx hash directly (no polling needed)
+- Value converted from hex to decimal string (wei)
 
 ### 8. Result Returned to Dapp
 
-- Transaction hash extracted via regex: `/0x[a-fA-F0-9]{64}/`
+- Transaction hash returned directly from `/agent/submit` response
 - Returned through the message chain back to dapp
 - Dapp receives the tx hash from `eth_sendTransaction`
 
@@ -577,12 +565,14 @@ Submit this transaction:
 
 Signature support differs by account type:
 
-| Account Type | Signature Support                        |
-| ------------ | ---------------------------------------- |
-| Bankr API    | ❌ Not supported (reject only)           |
-| Private Key  | ✅ Full support (sign locally with viem) |
+| Account Type  | Signature Support                                 |
+| ------------- | ------------------------------------------------- |
+| Bankr API     | ✅ Via `/agent/sign` API                           |
+| Private Key   | ✅ Full support (sign locally with viem)           |
+| Seed Phrase   | ✅ Full support (sign locally with viem)           |
+| Impersonator  | ❌ Disabled (view-only)                            |
 
-When dapps request signatures, the extension displays the request details. For Bankr accounts, only rejection is allowed. For Private Key accounts, users can confirm to sign the message locally.
+When dapps request signatures, the extension displays the request details. For Bankr accounts, signing is handled via the `/agent/sign` API endpoint. For Private Key and Seed Phrase accounts, signing is done locally with viem. Impersonator accounts can only reject.
 
 ### Supported Signature Methods
 
@@ -608,13 +598,13 @@ When dapps request signatures, the extension displays the request details. For B
 │  6. User action depends on account type:                                    │
 │     ┌─────────────────────────────────────────────────────────────────┐    │
 │     │  Bankr API Account:                                              │    │
-│     │    - Only REJECT button shown                                    │    │
-│     │    - Warning: "Signatures not supported"                         │    │
-│     │    - Rejection returns error to dapp                             │    │
+│     │    - SIGN and REJECT buttons shown                               │    │
+│     │    - Sign: Calls POST /agent/sign with message/typedData         │    │
+│     │    - Signature returned to dapp                                  │    │
 │     ├─────────────────────────────────────────────────────────────────┤    │
-│     │  Private Key Account:                                            │    │
-│     │    - CONFIRM and REJECT buttons shown                            │    │
-│     │    - Confirm: Signs message locally using viem                   │    │
+│     │  Private Key / Seed Phrase Account:                              │    │
+│     │    - SIGN and REJECT buttons shown                               │    │
+│     │    - Sign: Signs message locally using viem                      │    │
 │     │    - Signature returned to dapp                                  │    │
 │     └─────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -632,13 +622,13 @@ The SignatureRequestConfirmation component shows:
 
 **For Bankr API Accounts:**
 
-- Warning box: "Signatures are not supported for this account type"
-- Reject button only (red) - emphasizes that signing is not possible
+- Sign button (yellow): Signs via `/agent/sign` API
+- Reject button (white/secondary): Cancels the request
 
-**For Private Key Accounts:**
+**For Private Key / Seed Phrase Accounts:**
 
 - Sign button (yellow): Signs the message locally
-- Reject button (white/secondary): Cancels the request - matches transaction confirmation style
+- Reject button (white/secondary): Cancels the request
 
 ### Combined Navigation
 
@@ -1304,17 +1294,15 @@ When a transaction request is received, the background worker automatically open
 
 Users can cancel in-progress transactions:
 
-1. **Local Abort**: `AbortController` stops the polling loop
-2. **API Cancel**: POST to `https://api.bankr.bot/agent/job/{jobId}/cancel`
+1. **Local Abort**: `AbortController` aborts the in-flight `/agent/submit` request
 
 ## Response Handling
 
-The Bankr API returns various response formats. Success is detected by:
+The `/agent/submit` API returns a structured response:
 
-1. **Transaction hash in response**: Regex `/0x[a-fA-F0-9]{64}/`
-2. **Block explorer URL**: basescan.org, etherscan.io, polygonscan.com, etc.
-
-Error is detected by keywords: "missing required", "error", "can't", "cannot", "unable", "invalid", "not supported"
+- `status: "success"` — transaction confirmed on-chain, `transactionHash` contains the hash
+- `status: "reverted"` — transaction confirmed but reverted, treated as failure
+- `status: "pending"` — transaction submitted but not yet confirmed, treated as success
 
 ## Build Configuration
 

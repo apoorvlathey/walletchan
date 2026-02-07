@@ -8,9 +8,8 @@ import {
   hasEncryptedApiKey,
 } from "./crypto";
 import {
-  submitTransaction,
-  pollJobUntilComplete,
-  cancelJob,
+  submitTransactionDirect,
+  signMessageViaApi,
   TransactionParams,
   BankrApiError,
 } from "./bankrApi";
@@ -97,9 +96,6 @@ export const pendingSignatureResolvers = new Map<string, PendingSignatureResolve
 
 // Active transaction AbortControllers for cancellation
 export const activeAbortControllers = new Map<string, AbortController>();
-
-// Active job IDs and API keys for cancellation via Bankr API
-export const activeJobs = new Map<string, { jobId: string; apiKey: string }>();
 
 // Store failed transaction results for display when opening from notification
 export interface FailedTxResult {
@@ -401,94 +397,13 @@ export async function handleConfirmTransaction(
   activeAbortControllers.set(txId, abortController);
 
   try {
-    // Submit transaction to Bankr API
-    const { jobId } = await submitTransaction(apiKey, pending.tx, abortController.signal);
+    const result = await submitTransactionDirect(apiKey, pending.tx, abortController.signal);
 
-    // Store job ID and API key for potential cancellation
-    activeJobs.set(txId, { jobId, apiKey });
-
-    // Store jobId in history for UI-based cancel
-    await updateTxInHistory(txId, { jobId });
-
-    // Poll for completion
-    const status = await pollJobUntilComplete(apiKey, jobId, {
-      pollInterval: 2000,
-      maxDuration: 300000, // 5 minutes
-      signal: abortController.signal,
-    });
-
-    if (status.status === "completed") {
-      // Check for txHash in result
-      const txHash = status.result?.txHash;
-      if (txHash) {
-        return { success: true, txHash };
-      }
-
-      const response = status.response || "";
-
-      // Extract transaction hash from response (0x + 64 hex chars)
-      const txHashMatch = response.match(/0x[a-fA-F0-9]{64}/);
-
-      if (txHashMatch) {
-        return {
-          success: true,
-          txHash: txHashMatch[0],
-        };
-      }
-
-      // Check if response contains a transaction URL (indicates success but couldn't extract hash)
-      const hasExplorerUrl =
-        response.includes("basescan.org/tx/") ||
-        response.includes("etherscan.io/tx/") ||
-        response.includes("polygonscan.com/tx/") ||
-        response.includes("uniscan.xyz/tx/") ||
-        response.includes("unichain.org/tx/");
-
-      if (hasExplorerUrl) {
-        return {
-          success: true,
-          txHash: response,
-        };
-      }
-
-      // Check if response indicates an error
-      const isErrorResponse =
-        response.toLowerCase().includes("missing required") ||
-        response.toLowerCase().includes("error") ||
-        response.toLowerCase().includes("can't execute") ||
-        response.toLowerCase().includes("cannot") ||
-        response.toLowerCase().includes("unable to") ||
-        response.toLowerCase().includes("invalid") ||
-        response.toLowerCase().includes("not supported");
-
-      if (isErrorResponse) {
-        return {
-          success: false,
-          error: response,
-        };
-      }
-
-      // If we have status updates, it likely succeeded
-      if (status.statusUpdates && status.statusUpdates.length > 0) {
-        return {
-          success: true,
-          txHash: response || "Transaction completed"
-        };
-      }
-
-      // Fallback - assume success if status is completed
-      return {
-        success: true,
-        txHash: response || "Transaction completed",
-      };
-    } else if (status.status === "failed") {
-      return {
-        success: false,
-        error: status.result?.error || status.response || "Transaction failed",
-      };
-    } else {
-      return { success: false, error: "Unexpected job status" };
+    if (result.status === "reverted") {
+      return { success: false, error: "Transaction reverted" };
     }
+
+    return { success: true, txHash: result.transactionHash };
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       return { success: false, error: "Transaction cancelled by user" };
@@ -502,7 +417,6 @@ export async function handleConfirmTransaction(
     };
   } finally {
     activeAbortControllers.delete(txId);
-    activeJobs.delete(txId);
   }
 }
 
@@ -519,28 +433,13 @@ export function handleRejectTransaction(_txId: string): TransactionResult {
  */
 export async function handleCancelTransaction(txId: string): Promise<{ success: boolean; error?: string }> {
   const abortController = activeAbortControllers.get(txId);
-  const activeJob = activeJobs.get(txId);
 
-  if (!abortController && !activeJob) {
+  if (!abortController) {
     return { success: false, error: "No active transaction to cancel" };
   }
 
-  // Abort local polling
-  if (abortController) {
-    abortController.abort();
-    activeAbortControllers.delete(txId);
-  }
-
-  // Cancel job via Bankr API
-  if (activeJob) {
-    try {
-      await cancelJob(activeJob.apiKey, activeJob.jobId);
-    } catch (error) {
-      // Log but don't fail - local abort is enough
-      console.error("Failed to cancel job via API:", error);
-    }
-    activeJobs.delete(txId);
-  }
+  abortController.abort();
+  activeAbortControllers.delete(txId);
 
   return { success: true };
 }
@@ -632,131 +531,39 @@ async function processTransactionInBackground(
   });
 
   try {
-    // Submit transaction to Bankr API
-    const { jobId } = await submitTransaction(apiKey, pending.tx, abortController.signal);
-
-    // Store job ID and API key for potential cancellation
-    activeJobs.set(txId, { jobId, apiKey });
-
-    // Store jobId in history for UI-based cancel
-    await updateTxInHistory(txId, { jobId });
-
-    // Poll for completion
-    const status = await pollJobUntilComplete(apiKey, jobId, {
-      pollInterval: 2000,
-      maxDuration: 300000, // 5 minutes
-      signal: abortController.signal,
-    });
-
-    // Send result back to content script
+    const result = await submitTransactionDirect(apiKey, pending.tx, abortController.signal);
     const resolver = pendingResolvers.get(txId);
+    const txHash = result.transactionHash;
 
-    if (status.status === "completed") {
-      // Check for txHash in result
-      let txHash = status.result?.txHash;
-      const response = status.response || "";
-
-      if (!txHash) {
-        // Extract transaction hash from response (0x + 64 hex chars)
-        const txHashMatch = response.match(/0x[a-fA-F0-9]{64}/);
-        if (txHashMatch) {
-          txHash = txHashMatch[0];
-        }
-      }
-
-      if (txHash) {
-        // Update history to "success"
-        await updateTxInHistory(txId, {
-          status: "success",
-          txHash,
-          completedAt: Date.now(),
-        });
-
-        // Success with hash - show notification
-        const notificationId = `tx-success-${txId}`;
-        const chainConfig = CHAIN_CONFIG[pending.tx.chainId];
-        const explorerUrl = chainConfig?.explorer
-          ? `${chainConfig.explorer}/tx/${txHash}`
-          : null;
-
-        // Store explorer URL for notification click
-        if (explorerUrl) {
-          chrome.storage.local.set({ [`notification-${notificationId}`]: explorerUrl });
-        }
-
-        await showNotification(
-          notificationId,
-          "Transaction Confirmed",
-          `Transaction on ${pending.chainName} was successful. Click to view.`
-        );
-
-        if (resolver) {
-          resolver.resolve({ success: true, txHash });
-        }
-      } else {
-        // Check if response contains a transaction URL
-        const hasExplorerUrl =
-          response.includes("basescan.org/tx/") ||
-          response.includes("etherscan.io/tx/") ||
-          response.includes("polygonscan.com/tx/") ||
-          response.includes("uniscan.xyz/tx/") ||
-          response.includes("unichain.org/tx/");
-
-        if (hasExplorerUrl || (status.statusUpdates && status.statusUpdates.length > 0)) {
-          // Update history to "success"
-          await updateTxInHistory(txId, {
-            status: "success",
-            txHash: response || undefined,
-            completedAt: Date.now(),
-          });
-
-          await showNotification(
-            `tx-success-${txId}`,
-            "Transaction Completed",
-            `Transaction on ${pending.chainName} completed.`
-          );
-
-          if (resolver) {
-            resolver.resolve({ success: true, txHash: response || "Transaction completed" });
-          }
-        } else {
-          // Check if response indicates an error
-          const isErrorResponse =
-            response.toLowerCase().includes("missing required") ||
-            response.toLowerCase().includes("error") ||
-            response.toLowerCase().includes("can't execute") ||
-            response.toLowerCase().includes("cannot") ||
-            response.toLowerCase().includes("unable to") ||
-            response.toLowerCase().includes("invalid") ||
-            response.toLowerCase().includes("not supported");
-
-          if (isErrorResponse) {
-            await handleTransactionFailure(txId, pending, response, resolver);
-          } else {
-            // Assume success - update history
-            await updateTxInHistory(txId, {
-              status: "success",
-              txHash: response || undefined,
-              completedAt: Date.now(),
-            });
-
-            await showNotification(
-              `tx-success-${txId}`,
-              "Transaction Completed",
-              `Transaction on ${pending.chainName} completed.`
-            );
-
-            if (resolver) {
-              resolver.resolve({ success: true, txHash: response || "Transaction completed" });
-            }
-          }
-        }
-      }
-    } else if (status.status === "failed") {
-      const error = status.result?.error || status.response || "Transaction failed";
-      await handleTransactionFailure(txId, pending, error, resolver);
+    if (result.status === "reverted") {
+      await handleTransactionFailure(txId, pending, "Transaction reverted", resolver);
     } else {
-      await handleTransactionFailure(txId, pending, "Unexpected job status", resolver);
+      // success or pending — both mean tx was submitted
+      await updateTxInHistory(txId, {
+        status: "success",
+        txHash,
+        completedAt: Date.now(),
+      });
+
+      const notificationId = `tx-success-${txId}`;
+      const chainConfig = CHAIN_CONFIG[pending.tx.chainId];
+      const explorerUrl = chainConfig?.explorer
+        ? `${chainConfig.explorer}/tx/${txHash}`
+        : null;
+
+      if (explorerUrl) {
+        chrome.storage.local.set({ [`notification-${notificationId}`]: explorerUrl });
+      }
+
+      await showNotification(
+        notificationId,
+        "Transaction Confirmed",
+        `Transaction on ${pending.chainName} was successful. Click to view.`
+      );
+
+      if (resolver) {
+        resolver.resolve({ success: true, txHash });
+      }
     }
   } catch (error) {
     const resolver = pendingResolvers.get(txId);
@@ -773,7 +580,6 @@ async function processTransactionInBackground(
     await handleTransactionFailure(txId, pending, errorMessage, resolver);
   } finally {
     activeAbortControllers.delete(txId);
-    activeJobs.delete(txId);
     pendingResolvers.delete(txId);
   }
 }
@@ -1033,6 +839,49 @@ export async function handleConfirmSignatureRequest(
 }
 
 /**
+ * Handles signature confirmation for Bankr accounts via /agent/sign API
+ */
+export async function handleConfirmSignatureRequestBankr(
+  sigId: string,
+  password: string
+): Promise<SignatureResult> {
+  const pending = await getPendingSignatureRequestById(sigId);
+  if (!pending) {
+    return { success: false, error: "Signature request not found or expired" };
+  }
+
+  // Try to use cached API key first
+  let apiKey = getCachedApiKey();
+
+  if (!apiKey) {
+    // Decrypt API key with provided password
+    apiKey = await loadDecryptedApiKey(password);
+    if (!apiKey) {
+      return { success: false, error: "Invalid password" };
+    }
+    setCachedApiKey(apiKey, password);
+  }
+
+  try {
+    const result = await signMessageViaApi(
+      apiKey,
+      pending.signature.method,
+      pending.signature.params
+    );
+
+    // Remove from pending storage
+    await removePendingSignatureRequest(sigId);
+
+    return { success: true, signature: result.signature };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Signing failed",
+    };
+  }
+}
+
+/**
  * Adds a new private key account
  */
 export async function handleAddPrivateKeyAccount(
@@ -1134,7 +983,7 @@ export async function handleRemoveAccount(
  * This should be called when resetting the extension
  */
 export function performSecurityReset(): void {
-  // Abort all active transactions and clear their API keys from memory
+  // Abort all active transactions
   for (const [, abortController] of activeAbortControllers.entries()) {
     try {
       abortController.abort();
@@ -1143,10 +992,6 @@ export function performSecurityReset(): void {
     }
   }
   activeAbortControllers.clear();
-
-  // Clear activeJobs which contains decrypted API keys for in-flight transactions
-  // This is critical - API keys must not persist after reset
-  activeJobs.clear();
 
   // Reject all pending resolvers with reset error
   for (const [, resolver] of pendingResolvers.entries()) {
@@ -1212,80 +1057,26 @@ export async function handleInitiateTransfer(
 }
 
 /**
- * Cancels a processing transaction via the Bankr API.
- * Uses activeJobs map first (in-memory), falls back to jobId from history.
+ * Cancels a processing transaction by aborting the in-flight request.
  */
 export async function handleCancelProcessingTx(
   txId: string
 ): Promise<{ success: boolean; error?: string }> {
-  // Try in-memory active jobs first
-  const active = activeJobs.get(txId);
-  if (active) {
-    try {
-      await cancelJob(active.apiKey, active.jobId);
-    } catch {
-      // Job may have already completed
-    }
+  const controller = activeAbortControllers.get(txId);
+  if (controller) {
+    controller.abort();
+    activeAbortControllers.delete(txId);
+  }
 
-    // Abort local polling
-    const controller = activeAbortControllers.get(txId);
-    if (controller) controller.abort();
-
-    // Update history
+  // Update history regardless (may already have been marked failed by the abort handler)
+  const tx = await getTxById(txId);
+  if (tx && tx.status === "processing") {
     await updateTxInHistory(txId, {
       status: "failed",
       error: "Cancelled by user",
       completedAt: Date.now(),
     });
-
-    activeJobs.delete(txId);
-    activeAbortControllers.delete(txId);
-
-    return { success: true };
   }
-
-  // Fallback: look up jobId from tx history
-  const tx = await getTxById(txId);
-  if (!tx) {
-    return { success: false, error: "Transaction not found" };
-  }
-
-  if (tx.status !== "processing") {
-    return { success: false, error: "Transaction already completed" };
-  }
-
-  if (!tx.jobId) {
-    return { success: false, error: "No job ID available for cancellation" };
-  }
-
-  let apiKey = getCachedApiKey();
-
-  // If no cached API key, try session restoration (for "Never" auto-lock mode)
-  if (!apiKey) {
-    const autoLockTimeout = await getAutoLockTimeout();
-    if (autoLockTimeout === 0) {
-      const restored = await tryRestoreSession(handleUnlockWallet);
-      if (restored) {
-        apiKey = getCachedApiKey();
-      }
-    }
-  }
-
-  if (!apiKey) {
-    return { success: false, error: "Wallet locked - cannot cancel" };
-  }
-
-  try {
-    await cancelJob(apiKey, tx.jobId);
-  } catch {
-    // Job may have already completed
-  }
-
-  await updateTxInHistory(txId, {
-    status: "failed",
-    error: "Cancelled by user",
-    completedAt: Date.now(),
-  });
 
   return { success: true };
 }

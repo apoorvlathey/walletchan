@@ -13,7 +13,7 @@ import {
   Image,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
-import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon, WarningTwoIcon } from "@chakra-ui/icons";
+import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon } from "@chakra-ui/icons";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
 import { getChainConfig } from "@/constants/chainConfig";
 import TypedDataDisplay from "@/components/TypedDataDisplay";
@@ -23,7 +23,7 @@ interface SignatureRequestConfirmationProps {
   currentIndex: number;
   totalCount: number;
   isInSidePanel: boolean;
-  accountType?: "bankr" | "privateKey" | "impersonator";
+  accountType?: "bankr" | "privateKey" | "seedPhrase" | "impersonator";
   onBack: () => void;
   onCancelled: () => void;
   onCancelAll: () => void;
@@ -161,7 +161,7 @@ function SignatureRequestConfirmation({
   };
 
   const handleConfirm = async () => {
-    if (accountType !== "privateKey") {
+    if (accountType !== "privateKey" && accountType !== "seedPhrase" && accountType !== "bankr") {
       return;
     }
 
@@ -504,26 +504,6 @@ function SignatureRequestConfirmation({
           </>
         )}
 
-        {/* Warning Box - Signatures not supported (only for Bankr accounts) */}
-        {accountType === "bankr" && (
-          <Box
-            bg="bauhaus.yellow"
-            border="3px solid"
-            borderColor="bauhaus.black"
-            boxShadow="4px 4px 0px 0px #121212"
-            p={3}
-          >
-            <HStack spacing={2}>
-              <Box p={1} bg="bauhaus.black">
-                <WarningTwoIcon color="bauhaus.yellow" boxSize={4} />
-              </Box>
-              <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
-                Signatures are not supported in the Bankr API
-              </Text>
-            </HStack>
-          </Box>
-        )}
-
         {/* Impersonator Info Box */}
         {accountType === "impersonator" && (
           <Box
@@ -540,7 +520,7 @@ function SignatureRequestConfirmation({
         )}
 
         {/* Action Buttons */}
-        {accountType === "privateKey" ? (
+        {(accountType === "privateKey" || accountType === "seedPhrase" || accountType === "bankr") ? (
           <HStack spacing={3} mt={2}>
             <Button
               variant="secondary"

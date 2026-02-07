@@ -116,6 +116,7 @@ import {
   handleConfirmTransactionAsync,
   handleConfirmTransactionAsyncPK,
   handleConfirmSignatureRequest,
+  handleConfirmSignatureRequestBankr,
   handleAddPrivateKeyAccount,
   handleRemoveAccount,
   openPopupWindow,
@@ -850,16 +851,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "confirmSignatureRequest": {
       const tabId = message.tabId || sender.tab?.id;
-      handleConfirmSignatureRequest(message.sigId, message.password, tabId).then(
-        (result) => {
-          const resolver = pendingSignatureResolvers.get(message.sigId);
-          if (resolver) {
-            resolver.resolve(result);
-            pendingSignatureResolvers.delete(message.sigId);
-          }
-          sendResponse(result);
+      (async () => {
+        // Determine account type to route to correct handler
+        const account = tabId ? await getTabAccount(tabId) : await getActiveAccount();
+        let result: SignatureResult;
+        if (account?.type === "bankr") {
+          result = await handleConfirmSignatureRequestBankr(message.sigId, message.password);
+        } else {
+          result = await handleConfirmSignatureRequest(message.sigId, message.password, tabId);
         }
-      );
+        const resolver = pendingSignatureResolvers.get(message.sigId);
+        if (resolver) {
+          resolver.resolve(result);
+          pendingSignatureResolvers.delete(message.sigId);
+        }
+        sendResponse(result);
+      })();
       return true;
     }
 

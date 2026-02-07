@@ -1,5 +1,5 @@
 /**
- * Bankr API client for submitting transactions and polling job status
+ * Bankr API client for transaction submission, message signing, and job polling
  */
 
 const API_BASE_URL = "https://api.bankr.bot";
@@ -12,8 +12,21 @@ export interface TransactionParams {
   chainId: number;
 }
 
-export interface SubmitTransactionResponse {
-  jobId: string;
+export interface SubmitTransactionDirectResponse {
+  success: boolean;
+  transactionHash: string;
+  status: "success" | "reverted" | "pending";
+  blockNumber?: string;
+  gasUsed?: string;
+  signer?: string;
+  chainId?: number;
+}
+
+export interface SignMessageResponse {
+  success: boolean;
+  signature: string;
+  signer: string;
+  signatureType: string;
 }
 
 export interface JobStatus {
@@ -43,22 +56,35 @@ export class BankrApiError extends Error {
 }
 
 /**
- * Submits a transaction to the Bankr API
+ * Submits a transaction directly via /agent/submit (synchronous, no polling)
  */
-export async function submitTransaction(
+export async function submitTransactionDirect(
   apiKey: string,
   tx: TransactionParams,
   signal?: AbortSignal
-): Promise<SubmitTransactionResponse> {
-  const prompt = formatTransactionPrompt(tx);
+): Promise<SubmitTransactionDirectResponse> {
+  const body: Record<string, any> = {
+    transaction: {
+      to: tx.to || undefined,
+      chainId: tx.chainId,
+      value: hexToDecimalString(tx.value),
+      data: tx.data && tx.data !== "0x" ? tx.data : undefined,
+    },
+    waitForConfirmation: true,
+  };
 
-  const response = await fetch(`${API_BASE_URL}/agent/prompt`, {
+  // Remove undefined fields from transaction
+  body.transaction = Object.fromEntries(
+    Object.entries(body.transaction).filter(([_, v]) => v !== undefined)
+  );
+
+  const response = await fetch(`${API_BASE_URL}/agent/submit`, {
     method: "POST",
     headers: {
       "X-API-Key": apiKey,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify(body),
     signal,
   });
 
@@ -74,24 +100,63 @@ export async function submitTransaction(
 }
 
 /**
- * Cancels a job via the Bankr API
+ * Signs a message or typed data via /agent/sign (synchronous)
  */
-export async function cancelJob(
+export async function signMessageViaApi(
   apiKey: string,
-  jobId: string
-): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/agent/job/${jobId}/cancel`, {
+  method: string,
+  params: any[],
+  signal?: AbortSignal
+): Promise<SignMessageResponse> {
+  let body: Record<string, any>;
+
+  if (method === "personal_sign") {
+    // params[0] is hex message, params[1] is address
+    const hexMsg = params[0];
+    let message = hexMsg;
+    // Decode hex to UTF-8 string for the API
+    if (typeof hexMsg === "string" && hexMsg.startsWith("0x")) {
+      try {
+        const hex = hexMsg.slice(2);
+        const bytes = new Uint8Array(
+          hex.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || []
+        );
+        message = new TextDecoder().decode(bytes);
+      } catch {
+        message = hexMsg;
+      }
+    }
+    body = { signatureType: "personal_sign", message };
+  } else if (method === "eth_sign") {
+    // params[0] is address, params[1] is the data hash — best-effort as personal_sign
+    body = { signatureType: "personal_sign", message: params[1] };
+  } else if (method.startsWith("eth_signTypedData")) {
+    // params[0] is address, params[1] is typed data (may be stringified JSON)
+    let typedData = params[1];
+    if (typeof typedData === "string") {
+      typedData = JSON.parse(typedData);
+    }
+    body = { signatureType: "eth_signTypedData_v4", typedData };
+  } else {
+    throw new BankrApiError(`Unsupported signing method: ${method}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/agent/sign`, {
     method: "POST",
     headers: {
       "X-API-Key": apiKey,
       "Content-Type": "application/json",
     },
+    body: JSON.stringify(body),
+    signal,
   });
 
   if (!response.ok) {
     const text = await response.text();
-    throw new BankrApiError(`Failed to cancel job: ${text}`, response.status);
+    throw new BankrApiError(`Signing failed: ${text}`, response.status);
   }
+
+  return response.json();
 }
 
 /**
@@ -169,25 +234,6 @@ function hexToDecimalString(hex: string | undefined): string {
   } catch {
     return "0";
   }
-}
-
-/**
- * Formats transaction parameters into a prompt for the Bankr API
- */
-function formatTransactionPrompt(tx: TransactionParams): string {
-  const txJson = {
-    to: tx.to || undefined,
-    data: tx.data && tx.data !== "0x" ? tx.data : undefined,
-    value: hexToDecimalString(tx.value),
-    chainId: tx.chainId,
-  };
-
-  // Remove undefined fields
-  const cleanedTx = Object.fromEntries(
-    Object.entries(txJson).filter(([_, v]) => v !== undefined)
-  );
-
-  return `Submit this transaction:\n${JSON.stringify(cleanedTx, null, 2)}`;
 }
 
 function sleep(ms: number): Promise<void> {
