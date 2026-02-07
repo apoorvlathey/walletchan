@@ -198,7 +198,9 @@ function PendingTxList({ txRequests, signatureRequests, onBack, onSelectTx, onSe
                             {request.chainName}
                           </Badge>
                           <Text fontSize="xs" color="text.tertiary" fontFamily="mono" fontWeight="500">
-                            {request.tx.to.slice(0, 6)}...{request.tx.to.slice(-4)}
+                            {request.tx.to
+                              ? `${request.tx.to.slice(0, 6)}...${request.tx.to.slice(-4)}`
+                              : "Contract Deployment"}
                           </Text>
                         </HStack>
                       </Box>

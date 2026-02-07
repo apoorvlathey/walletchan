@@ -8,6 +8,7 @@ import {
   Spinner,
   Image,
   IconButton,
+  Button,
 } from "@chakra-ui/react";
 import {
   CheckCircleIcon,
@@ -15,30 +16,35 @@ import {
   ExternalLinkIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  CloseIcon,
 } from "@chakra-ui/icons";
+import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { CompletedTransaction } from "@/chrome/txHistoryStorage";
 import { getChainConfig } from "@/constants/chainConfig";
 
 interface TxStatusListProps {
   maxItems?: number;
+  address?: string; // Filter transactions by this address
+  hideHeader?: boolean;
+  hideCard?: boolean;
 }
 
-function TxStatusList({ maxItems = 5 }: TxStatusListProps) {
-  const [history, setHistory] = useState<CompletedTransaction[]>([]);
+function TxStatusList({ maxItems = 5, address, hideHeader, hideCard }: TxStatusListProps) {
+  const [allHistory, setAllHistory] = useState<CompletedTransaction[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Load and listen for updates
   useEffect(() => {
     // Initial load
     chrome.runtime.sendMessage({ type: "getTxHistory" }, (result) => {
-      setHistory(result || []);
+      setAllHistory(result || []);
     });
 
     // Listen for updates
     const handleMessage = (message: { type: string }) => {
       if (message.type === "txHistoryUpdated") {
         chrome.runtime.sendMessage({ type: "getTxHistory" }, (result) => {
-          setHistory(result || []);
+          setAllHistory(result || []);
         });
       }
     };
@@ -47,25 +53,70 @@ function TxStatusList({ maxItems = 5 }: TxStatusListProps) {
     return () => chrome.runtime.onMessage.removeListener(handleMessage);
   }, []);
 
+  // Filter history by address (case-insensitive comparison)
+  const history = address
+    ? allHistory.filter((tx) => tx.tx.from.toLowerCase() === address.toLowerCase())
+    : allHistory;
+
   const displayItems = isExpanded ? history : history.slice(0, maxItems);
   const hasMore = history.length > maxItems;
 
+  const txContent = history.length === 0 ? (
+    <Box p={4} textAlign="center">
+      <Text fontSize="sm" color="text.tertiary" fontWeight="500">
+        No recent transactions
+      </Text>
+    </Box>
+  ) : (
+    <VStack spacing={hideCard ? 3 : 3} align="stretch" p={hideCard ? 0 : 0}>
+      {displayItems.map((tx) => (
+        <TxStatusItem key={tx.id} tx={tx} />
+      ))}
+    </VStack>
+  );
+
+  if (hideCard) {
+    return (
+      <Box>
+        {!hideHeader && (
+          <HStack justify="space-between" mb={3}>
+            <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
+              Recent Transactions
+            </Text>
+            {hasMore && (
+              <IconButton
+                aria-label={isExpanded ? "Show less" : "Show more"}
+                icon={isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                size="xs"
+                variant="ghost"
+                onClick={() => setIsExpanded(!isExpanded)}
+              />
+            )}
+          </HStack>
+        )}
+        {txContent}
+      </Box>
+    );
+  }
+
   return (
     <Box pt={4}>
-      <HStack justify="space-between" mb={3}>
-        <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
-          Recent Transactions
-        </Text>
-        {hasMore && (
-          <IconButton
-            aria-label={isExpanded ? "Show less" : "Show more"}
-            icon={isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
-            size="xs"
-            variant="ghost"
-            onClick={() => setIsExpanded(!isExpanded)}
-          />
-        )}
-      </HStack>
+      {!hideHeader ? (
+        <HStack justify="space-between" mb={3}>
+          <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
+            Recent Transactions
+          </Text>
+          {hasMore && (
+            <IconButton
+              aria-label={isExpanded ? "Show less" : "Show more"}
+              icon={isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+              size="xs"
+              variant="ghost"
+              onClick={() => setIsExpanded(!isExpanded)}
+            />
+          )}
+        </HStack>
+      ) : null}
 
       {history.length === 0 ? (
         <Box
@@ -93,6 +144,29 @@ function TxStatusList({ maxItems = 5 }: TxStatusListProps) {
 
 function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
   const config = getChainConfig(tx.chainId);
+  const toast = useBauhausToast();
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleCancel = async () => {
+    setCancelling(true);
+    try {
+      const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "cancelProcessingTx", txId: tx.id },
+          resolve
+        );
+      });
+      if (result.success) {
+        toast({ title: "Transaction cancelled", status: "info", duration: 2000 });
+      } else {
+        toast({ title: result.error || "Cancel failed", status: "error", duration: 2000 });
+      }
+    } catch {
+      toast({ title: "Cancel failed", status: "error", duration: 2000 });
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const formatTimeAgo = (timestamp: number): string => {
     const diff = Date.now() - timestamp;
@@ -271,6 +345,21 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
             onClick={handleViewTx}
             _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
           />
+        )}
+        {tx.status === "processing" && (
+          <Button
+            size="xs"
+            color="bauhaus.red"
+            variant="ghost"
+            fontWeight="700"
+            onClick={handleCancel}
+            isLoading={cancelling}
+            loadingText=""
+            leftIcon={<CloseIcon boxSize="8px" />}
+            _hover={{ bg: "bauhaus.red", color: "white" }}
+          >
+            Cancel
+          </Button>
         )}
       </HStack>
 

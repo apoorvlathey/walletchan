@@ -14,7 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { ExternalLink } from "lucide-react";
-import { GITHUB_URL, COINGECKO_URL } from "../constants";
+import { GITHUB_URL, COINGECKO_URL, CHROME_STORE_URL } from "../constants";
 
 const MotionBox = motion(Box);
 
@@ -88,7 +88,8 @@ export function Hero() {
                     variant="primary"
                     size={{ base: "md", md: "lg" }}
                     as="a"
-                    href="#install"
+                    href={CHROME_STORE_URL}
+                    target="_blank"
                   >
                     Add to Chrome
                   </Button>
@@ -117,6 +118,22 @@ export function Hero() {
                   letterSpacing="wider"
                 >
                   Works on: Chrome · Brave · Arc
+                </Text>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.8 }}
+              >
+                <Text
+                  fontSize="xs"
+                  color="text.tertiary"
+                  opacity={0.7}
+                  maxW="md"
+                >
+                  *Not affiliated with Bankr. An open-source project built on
+                  top of the Bankr API.
                 </Text>
               </motion.div>
             </VStack>

@@ -1,0 +1,347 @@
+# BankrWallet Security Guide
+
+This document is the security reference for the BankrWallet Chrome extension. It defines the threat model, lists every security-sensitive code path, and provides checklists for verifying that changes do not introduce vulnerabilities.
+
+**When to read this**: Before every commit that touches extension code. Claude (or any reviewer) should verify changes against the relevant checklists below.
+
+---
+
+## Threat Model
+
+### What We Protect
+
+| Secret | Storage | In-Memory Cache |
+|--------|---------|-----------------|
+| Master password | Never stored (except encrypted session restore for "Never" auto-lock) | `cachedPassword` in `sessionCache.ts` |
+| Agent password | Never stored directly (encrypts vault key) | Not cached separately (same `cachedPassword` slot) |
+| Bankr API key | `encryptedApiKeyVault` (AES-256-GCM via vault key) | `cachedApiKey` in `sessionCache.ts` |
+| Private keys | `pkVault` entries (AES-256-GCM via PBKDF2) | `cachedVault` array in `sessionCache.ts` |
+| Vault key | `encryptedVaultKeyMaster` / `encryptedVaultKeyAgent` (PBKDF2-wrapped) | `cachedVaultKey` as CryptoKey in `sessionCache.ts` |
+
+### Trust Boundaries
+
+```
+UNTRUSTED                          TRUSTED (extension context)
+-----------                        ---------------------------
+Webpage JS (dapp)                  Background service worker
+  |                                  - sessionCache.ts (credentials)
+  v                                  - authHandlers.ts (unlock/password)
+inpage.js (runs in page context)     - txHandlers.ts (signing)
+  |                                  - crypto.ts / vaultCrypto.ts
+  v
+inject.ts (content script bridge)  Extension UI (popup/sidepanel)
+  |                                  - Same origin as background
+  v                                  - Communicates via chrome.runtime
+background.ts (message router)
+```
+
+**Key principle**: The webpage and content script are untrusted. All validation and secret handling happens in the background service worker. Private keys never leave the service worker. The UI layer receives only what it needs to display.
+
+---
+
+## Encryption Specifications
+
+| Parameter | Value |
+|-----------|-------|
+| Algorithm | AES-256-GCM (authenticated encryption) |
+| Key derivation | PBKDF2-SHA256 |
+| Iterations | 600,000 |
+| Salt | 16 bytes (random per encryption) |
+| IV | 12 bytes (random per encryption) |
+| Vault key | 256-bit random (generated once, encrypted per-password) |
+
+**Files**: `cryptoUtils.ts` (shared constants), `crypto.ts` (API key + vault key ops), `vaultCrypto.ts` (private key vault)
+
+---
+
+## Agent Password Access Control
+
+The agent password model restricts what operations are available when the wallet is unlocked with the agent (secondary) password vs. the master password.
+
+### Access Matrix
+
+| Operation | Master | Agent | Guard Location |
+|-----------|--------|-------|----------------|
+| Unlock wallet | Yes | Yes | `authHandlers.ts` - `unlockWithVaultKeySystem()` |
+| Sign/send transactions | Yes | Yes | `txHandlers.ts` |
+| Sign messages | Yes | Yes | `txHandlers.ts` |
+| Reveal private key | Yes | **BLOCKED** | `background.ts` - `revealPrivateKey` case |
+| Change API key | Yes | **BLOCKED** | `authHandlers.ts` - `handleSaveApiKeyWithCachedPassword()` |
+| Change master password | Yes | **BLOCKED** | `authHandlers.ts` - `handleChangePasswordWithCachedPassword()` |
+| Add Bankr account (with API key) | Yes | **BLOCKED** | `background.ts` - `addBankrAccount` case |
+| Add private key account | Yes | **BLOCKED** | `background.ts` - `addPrivateKeyAccount` case |
+| Add impersonator account | Yes | **BLOCKED** | `background.ts` - `addImpersonatorAccount` case |
+| Add seed phrase group | Yes | **BLOCKED** | `background.ts` - `addSeedPhraseGroup` case |
+| Derive seed account | Yes | **BLOCKED** | `background.ts` - `deriveSeedAccount` case |
+| Reveal seed phrase | Yes | **BLOCKED** | `background.ts` - `revealSeedPhrase` case |
+| Remove account | Yes | **BLOCKED** | `background.ts` - `removeAccount` case |
+| Initiate token transfer | Yes | Yes | `txHandlers.ts` - creates PendingTxRequest |
+| Reset extension | Yes | **BLOCKED** | `background.ts` - `resetExtension` case |
+| Set/remove agent password | Yes | **BLOCKED** | `authHandlers.ts` - `handleSetAgentPassword()` / `handleRemoveAgentPassword()` |
+
+### How Guards Work
+
+Every blocked operation checks `getPasswordType() === "agent"` from `sessionCache.ts` and returns an error before executing any logic. These guards are **backend-enforced** (defense-in-depth), independent of UI-level hiding/disabling.
+
+**Pattern**:
+```typescript
+// At the TOP of the handler, before any logic
+if (getPasswordType() === "agent") {
+  return { success: false, error: "This operation requires master password" };
+}
+```
+
+---
+
+## Security-Sensitive Message Handlers
+
+These are the message handlers in `background.ts` that touch secrets, modify accounts, or have destructive effects. Each must be audited when changed.
+
+### Secret-Exposing Handlers
+
+| Handler | What It Exposes | Guard |
+|---------|----------------|-------|
+| `getCachedApiKey` | Returns plaintext API key to caller | Session must be unlocked; auto-lock timeout checked |
+| `revealPrivateKey` | Returns plaintext private key | Requires password verification + blocks agent password |
+| `getCachedPassword` | Returns `hasCachedPassword` boolean (not the password itself) | None needed (boolean only) |
+
+### Secret-Modifying Handlers
+
+| Handler | What It Modifies | Guard |
+|---------|-----------------|-------|
+| `saveApiKeyWithCachedPassword` | Overwrites encrypted API key | Agent password blocked |
+| `changePasswordWithCachedPassword` | Re-encrypts vault key with new master password | Agent password blocked |
+| `addBankrAccount` | Can overwrite encrypted API key (when `message.apiKey` provided) | Agent password blocked when apiKey present |
+| `addPrivateKeyAccount` | Adds new entry to encrypted private key vault | Agent password blocked |
+
+### Account-Modifying Handlers
+
+| Handler | Effect | Guard |
+|---------|--------|-------|
+| `removeAccount` | Deletes account reference | Agent password blocked |
+| `setActiveAccount` | Changes active account + updates storage address | None (non-destructive, no secrets) |
+| `updateAccountDisplayName` | Changes display name | None (non-destructive) |
+
+### Destructive Handlers
+
+| Handler | Effect | Guard |
+|---------|--------|-------|
+| `resetExtension` | Wipes ALL extension data | Agent password blocked |
+| `lockWallet` | Clears all in-memory caches | None needed (user-initiated, non-destructive) |
+| `clearTxHistory` | Deletes transaction history | None (no secrets involved) |
+
+### Authentication Handlers
+
+| Handler | Notes |
+|---------|-------|
+| `unlockWallet` | Tries master password first, then agent. Sets `passwordType` accordingly |
+| `setAgentPassword` | Requires `getPasswordType() === "master"` |
+| `removeAgentPassword` | Requires explicit master password verification (not just cached) |
+
+---
+
+## Content Script Message Filtering
+
+### Inpage-to-Background Messages (via inject.ts)
+
+Only these message types are forwarded from webpage to background:
+
+| Message Type | Purpose |
+|-------------|---------|
+| `i_sendTransaction` | Transaction request (from, to, data, value, chainId) |
+| `i_signatureRequest` | Signature request (method, params, chainId) |
+| `i_rpcRequest` | RPC proxy call (rpcUrl, method, params) |
+| `i_switchEthereumChain` | Chain switch request (chainId) |
+
+**Source validation**: `inject.ts` checks `e.source === window` before forwarding.
+
+### Background-to-Content-Script Messages
+
+Only these types are sent to content scripts (and thus forwarded to the webpage):
+
+| Message Type | Data Sent |
+|-------------|-----------|
+| `setAddress` | address, displayAddress |
+| `setChainId` | chainId |
+| `setAccount` | address, displayName, accountId, accountType |
+
+**Rule**: Never send secrets (passwords, API keys, private keys) to content scripts. Any new background-to-content-script message type must be reviewed for data sensitivity.
+
+---
+
+## Storage Keys Reference
+
+### chrome.storage.local (encrypted secrets)
+
+| Key | Contains Secrets | Description |
+|-----|-----------------|-------------|
+| `encryptedApiKeyVault` | Yes (encrypted) | API key encrypted with vault key |
+| `encryptedApiKey` | Yes (encrypted) | Legacy API key encrypted with password |
+| `encryptedVaultKeyMaster` | Yes (encrypted) | Vault key encrypted with master password |
+| `encryptedVaultKeyAgent` | Yes (encrypted) | Vault key encrypted with agent password |
+| `pkVault` | Yes (encrypted) | Private key vault with encrypted entries |
+| `agentPasswordEnabled` | No | Boolean flag |
+| `mnemonicVault` | Yes (encrypted) | Seed phrase mnemonics encrypted with PBKDF2+AES-256-GCM |
+| `seedGroups` | No | Seed group metadata (names, counts) |
+| `accounts` | No | Account metadata (addresses, names, types) |
+| `pendingTxRequests` | No | Pending transaction queue |
+| `pendingSignatureRequests` | No | Pending signature queue |
+| `txHistory` | No | Completed transaction log |
+| `chatHistory` | No | Chat conversation history |
+
+### chrome.storage.session (session-scoped, cleared on browser close)
+
+| Key | Contains Secrets | Description |
+|-----|-----------------|-------------|
+| `encryptedSessionPassword` | Yes (encrypted) | Password for "Never" auto-lock restore |
+| `sessionId` | No | Session identifier |
+| `sessionStartedAt` | No | Session timestamp |
+| `autoLockNever` | No | Boolean flag |
+
+### chrome.storage.sync (synced, no secrets)
+
+| Key | Description |
+|-----|-------------|
+| `address` | Current wallet address |
+| `displayAddress` | Display-friendly address |
+| `activeAccountId` | Active account ID |
+| `autoLockTimeout` | Auto-lock timeout (ms) |
+| `tabAccounts` | Per-tab account overrides |
+| `sidePanelMode` / `sidePanelVerified` / `isArcBrowser` | UI settings |
+| `hidePortfolioValue` | Boolean - hide/show token USD values |
+
+---
+
+## Manifest Security Surface
+
+| Setting | Value | Security Note |
+|---------|-------|---------------|
+| `manifest_version` | 3 | MV3 enforces CSP, no `eval()`, no remote code |
+| `permissions` | `activeTab`, `storage`, `sidePanel`, `notifications`, `tabs` | No `webRequest`, no `debugger` |
+| `host_permissions` | `https://*/*`, `http://*/*` | Broad, needed for RPC proxy + content script |
+| `content_scripts.matches` | All URLs | Wallet must inject on all pages for dapp detection |
+| `externally_connectable` | Not defined | External websites cannot send messages to background |
+| `web_accessible_resources` | `inpage.js` only | Only the provider script is exposed to pages |
+| `content_security_policy` | MV3 default | No inline scripts, no `eval()`, no remote code |
+
+---
+
+## Security Invariants
+
+These must always hold true. Violations indicate a security bug.
+
+1. **Private keys and mnemonics never leave the service worker** - They are decrypted in `sessionCache.ts` / `mnemonicStorage.ts`, used for signing in `txHandlers.ts` / `localSigner.ts`, and never sent via `chrome.runtime.sendMessage` to UI or content scripts (except the `revealPrivateKey` and `revealSeedPhrase` handlers which are password-gated and agent-blocked).
+
+2. **No secrets in console logs** - Never `console.log` passwords, API keys, private keys, or vault keys. Grep for `console.log` near sensitive variables when reviewing changes.
+
+3. **Agent password blocks all account/secret modifications** - Every handler that modifies secrets or account structure checks `getPasswordType() === "agent"` and returns an error. The UI hides these options too, but backend enforcement is the true security boundary.
+
+4. **Encryption uses fresh randomness** - Every encryption operation generates a new random salt and IV. Never reuse salt/IV pairs.
+
+5. **Service worker suspend clears credentials** - The `suspend` event handler in `background.ts` calls `clearCachedApiKey()` and `clearCachedVault()`.
+
+6. **Session restore only works for "Never" auto-lock** - `tryRestoreSession()` checks `autoLockTimeout === 0` before attempting restoration.
+
+7. **Content script only forwards whitelisted message types** - `inject.ts` only bridges `i_sendTransaction`, `i_signatureRequest`, `i_rpcRequest`, `i_switchEthereumChain` from page to background.
+
+8. **No `eval()` or dynamic code execution** - MV3 CSP prevents this, but also verify no `new Function()` or similar patterns exist.
+
+---
+
+## Pre-Commit Security Checklist
+
+When reviewing or making changes to extension code, verify the following:
+
+### If you added/modified a message handler in `background.ts`:
+
+- [ ] Does the handler touch secrets (API keys, passwords, private keys, vault keys)?
+- [ ] If it modifies secrets or accounts, does it check `getPasswordType() === "agent"` and block?
+- [ ] Does the handler return secrets in the response? If so, is that necessary and is the handler guarded appropriately?
+- [ ] Could a compromised UI abuse this handler? Consider what happens if arbitrary messages are sent.
+
+### If you modified crypto, encryption, or storage:
+
+- [ ] Are new salt and IV generated for each encryption operation?
+- [ ] Is PBKDF2 iteration count still 600,000?
+- [ ] Did you update BOTH read AND write paths for any changed storage keys? (Common bug: updating reads but forgetting writes in other handlers)
+- [ ] Grep for the storage key name across all files to find every touchpoint.
+
+### If you modified content scripts or inpage scripts:
+
+- [ ] Does `inject.ts` still only forward the whitelisted message types?
+- [ ] Are any new messages being sent from background to content scripts? Do they contain sensitive data?
+- [ ] Is `e.source === window` still checked before forwarding messages?
+
+### If you modified session/cache logic:
+
+- [ ] Is auto-lock still enforced (cache expiry checked in getters)?
+- [ ] Does the `suspend` event still clear all caches?
+- [ ] Does manual lock (`lockWallet`) still clear all caches and session storage?
+- [ ] Does session restore still require `autoLockTimeout === 0`?
+
+### If you added a new message handler that uses getCachedPassword() or getCachedApiKey():
+
+- [ ] Does the handler include session restoration logic for "Never" auto-lock mode?
+- [ ] Pattern: if credentials are null, check `autoLockTimeout === 0`, then call `tryRestoreSession(handleUnlockWallet)`
+- [ ] Is the handler added to the "Handlers with Session Restoration" table in IMPLEMENTATION.md?
+- [ ] Without this, the handler will fail after service worker restarts when auto-lock is "Never"
+
+### If you added new storage keys:
+
+- [ ] Is sensitive data encrypted before storage?
+- [ ] Is the key documented in the Storage Keys Reference above?
+- [ ] Is `chrome.storage.sync` only used for non-sensitive data?
+
+### General checks:
+
+- [ ] No `console.log` of sensitive data (passwords, keys, secrets)
+- [ ] No `eval()`, `new Function()`, or dynamic code execution
+- [ ] No hardcoded secrets, API keys, or credentials
+- [ ] Build passes: `pnpm build:extension`
+
+---
+
+## Files to Audit by Category
+
+Quick reference for which files to examine based on what area of security you're reviewing.
+
+### Credential lifecycle (storage, caching, expiry)
+- `sessionCache.ts` - All in-memory credential caching and auto-lock
+- `crypto.ts` - API key encryption/decryption, vault key operations
+- `cryptoUtils.ts` - Shared crypto constants (iterations, lengths)
+- `vaultCrypto.ts` - Private key vault encryption/decryption
+
+### Access control (agent vs master password)
+- `authHandlers.ts` - Password verification, agent guards on save/change
+- `background.ts` - Agent guards on account/destructive handlers
+- `sessionCache.ts` - `getPasswordType()`, `setCachedPasswordType()`
+
+### Message passing (what crosses trust boundaries)
+- `inject.ts` - Content script bridge (message whitelist)
+- `impersonator.ts` - Inpage provider (what the webpage can call)
+- `background.ts` - Message router (what handlers exist)
+
+### Transaction security
+- `txHandlers.ts` - Transaction confirmation, signing, API key usage
+- `localSigner.ts` - Private key signing (viem)
+- `bankrApi.ts` - API key sent to Bankr backend
+- `pendingTxStorage.ts` - Pending transaction persistence
+
+### Extension permissions
+- `manifest.json` - Permissions, host permissions, CSP, externally_connectable
+
+---
+
+## Known Accepted Risks
+
+These are security characteristics that have been reviewed and accepted:
+
+1. **Session password stored in `chrome.storage.session`** with encryption key alongside ciphertext (for "Never" auto-lock mode). Provides protection against casual inspection. Acceptable because `chrome.storage.session` is only accessible to the extension's own service worker, and if that context is compromised, in-memory credentials are already exposed.
+
+2. **No rate limiting on unlock attempts**. PBKDF2 with 600k iterations provides ~100ms per attempt, making brute-force impractical without extreme resources.
+
+3. **`getCachedApiKey` returns plaintext API key** to the extension UI. This is necessary for displaying it in settings and for the UI to function. The UI is same-origin with the background worker.
+
+4. **Content script runs on all websites**. Required for wallet provider injection. The content script only bridges specific message types and does not expose any secrets.
+
+5. **RPC proxy in background (`rpcRequest` handler)** accepts any URL from content scripts. This bypasses page CSP for legitimate RPC calls. The background worker acts as a fetch proxy but does not attach credentials to these requests.

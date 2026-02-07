@@ -31,6 +31,17 @@ html:has(body.sidepanel-mode) {
   height: 100vh;
 }
 
+/* Fullscreen mode - when opened in a new tab */
+body.fullscreen-mode {
+  height: 100vh;
+  width: 100vw;
+}
+
+html:has(body.fullscreen-mode) {
+  width: 100%;
+  height: 100vh;
+}
+
 code,
 pre,
 .mono {

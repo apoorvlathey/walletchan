@@ -265,14 +265,6 @@ class ImpersonatorProvider extends EventEmitter {
           gasPrice?: string;
         };
 
-        if (!txParams.to) {
-          return logger.throwError(
-            "eth_sendTransaction requires 'to' address",
-            Logger.errors.INVALID_ARGUMENT,
-            { method, params },
-          );
-        }
-
         const txId = crypto.randomUUID();
 
         return new Promise<string>((resolve, reject) => {
@@ -286,7 +278,7 @@ class ImpersonatorProvider extends EventEmitter {
               msg: {
                 id: txId,
                 from: this.address,
-                to: txParams.to,
+                to: txParams.to || null,
                 data: txParams.data || "0x",
                 value: txParams.value || "0x0",
                 chainId: this.chainId,
@@ -346,7 +338,7 @@ const providerInfo: EIP6963ProviderInfo = {
   uuid: SESSION_UUID,
   name: "Bankr Wallet",
   icon: WALLET_ICON,
-  rdns: "bot.bankr.wallet",
+  rdns: "app.bankrwallet",
 };
 
 // Announce provider via EIP-6963

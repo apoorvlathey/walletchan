@@ -17,8 +17,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -39,8 +37,19 @@ jobs:
       - name: Create zip
         run: pnpm zip
 
+      - name: Decode signing key
+        run: echo "${{ secrets.EXTENSION_SIGNING_KEY }}" | base64 -d > bankr-wallet.pem
+
+      - name: Create CRX
+        run: npx crx3 pack apps/extension/build -o apps/extension/zip/bankr-wallet-v${{ steps.version.outputs.version }}.crx -p bankr-wallet.pem
+
+      - name: Clean up key
+        run: rm -f bankr-wallet.pem
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/extension/zip/bankr-wallet-v${{ steps.version.outputs.version }}.zip
+          files: |
+            apps/extension/zip/bankr-wallet-v${{ steps.version.outputs.version }}.zip
+            apps/extension/zip/bankr-wallet-v${{ steps.version.outputs.version }}.crx
           generate_release_notes: true

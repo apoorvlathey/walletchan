@@ -20,6 +20,7 @@ import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon }
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { getChainConfig } from "@/constants/chainConfig";
 import { reverseResolveAddress } from "@/utils/nameResolution";
+import CalldataDecoder from "@/components/CalldataDecoder";
 
 // Success animation keyframes
 const scaleIn = keyframes`
@@ -38,6 +39,7 @@ interface TransactionConfirmationProps {
   currentIndex: number;
   totalCount: number;
   isInSidePanel: boolean;
+  accountType?: "bankr" | "privateKey" | "impersonator";
   onBack: () => void;
   onConfirmed: () => void;
   onRejected: () => void;
@@ -91,6 +93,7 @@ function TransactionConfirmation({
   currentIndex,
   totalCount,
   isInSidePanel,
+  accountType,
   onBack,
   onConfirmed,
   onRejected,
@@ -106,6 +109,8 @@ function TransactionConfirmation({
 
   // Fetch labels for the "to" address
   useEffect(() => {
+    if (!tx.to) return;
+
     const fetchLabels = async () => {
       try {
         const response = await fetch(
@@ -422,7 +427,7 @@ function TransactionConfirmation({
               </Text>
               <HStack spacing={2}>
                 <Box
-                  bg="bauhaus.white"
+                  bg="bauhaus.black"
                   border="2px solid"
                   borderColor="bauhaus.black"
                   p={1}
@@ -444,7 +449,7 @@ function TransactionConfirmation({
                         target.src = googleFallback;
                       }
                     }}
-                    fallback={<Box boxSize="16px" bg="white" />}
+                    fallback={<Box boxSize="16px" bg="bauhaus.black" />}
                   />
                 </Box>
                 <Text fontSize="sm" fontWeight="700" color="text.primary">
@@ -483,48 +488,63 @@ function TransactionConfirmation({
               })()}
             </HStack>
 
-            {/* To Address */}
+            {/* To Address / Contract Deployment */}
             <Box w="full" p={3}>
               <HStack justify="space-between" mb={(toLabels.length > 0 || resolvedToName) ? 2 : 0}>
                 <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                  To
+                  {tx.to ? "To" : "Type"}
                 </Text>
-                <VStack spacing={1} align="flex-end">
-                  {resolvedToName && (
-                    <Badge
-                      fontSize="xs"
-                      bg="bauhaus.yellow"
-                      color="bauhaus.black"
+                {tx.to ? (
+                  <VStack spacing={1} align="flex-end">
+                    {resolvedToName && (
+                      <Badge
+                        fontSize="xs"
+                        bg="bauhaus.yellow"
+                        color="bauhaus.black"
+                        border="2px solid"
+                        borderColor="bauhaus.black"
+                        px={2}
+                        py={0.5}
+                        fontWeight="700"
+                        maxW="200px"
+                        isTruncated
+                      >
+                        {resolvedToName}
+                      </Badge>
+                    )}
+                    <HStack
+                      spacing={1}
+                      px={2}
+                      py={1}
+                      bg="bauhaus.white"
                       border="2px solid"
                       borderColor="bauhaus.black"
-                      px={2}
-                      py={0.5}
-                      fontWeight="700"
-                      maxW="200px"
-                      isTruncated
                     >
-                      {resolvedToName}
-                    </Badge>
-                  )}
-                  <HStack
-                    spacing={1}
-                    px={2}
-                    py={1}
-                    bg="bauhaus.white"
+                      <Text
+                        fontSize="xs"
+                        color="text.primary"
+                        fontFamily="mono"
+                        fontWeight="700"
+                      >
+                        {tx.to.slice(0, 6)}...{tx.to.slice(-4)}
+                      </Text>
+                      <CopyButton value={tx.to} />
+                    </HStack>
+                  </VStack>
+                ) : (
+                  <Badge
+                    fontSize="sm"
+                    bg="bauhaus.yellow"
+                    color="bauhaus.black"
                     border="2px solid"
                     borderColor="bauhaus.black"
+                    fontWeight="700"
+                    px={3}
+                    py={1}
                   >
-                    <Text
-                      fontSize="xs"
-                      color="text.primary"
-                      fontFamily="mono"
-                      fontWeight="700"
-                    >
-                      {tx.to.slice(0, 6)}...{tx.to.slice(-4)}
-                    </Text>
-                    <CopyButton value={tx.to} />
-                  </HStack>
-                </VStack>
+                    Contract Deployment
+                  </Badge>
+                )}
               </HStack>
               {toLabels.length > 0 && (
                 <Flex justify="flex-end">
@@ -558,8 +578,12 @@ function TransactionConfirmation({
           </VStack>
         </Box>
 
-        {/* Calldata */}
-        {tx.data && tx.data !== "0x" && (
+        {/* Calldata (Decoded + Raw) */}
+        {tx.data && tx.data !== "0x" && tx.to && (
+          <CalldataDecoder calldata={tx.data} to={tx.to} chainId={tx.chainId} />
+        )}
+        {/* Raw-only fallback for contract deployments */}
+        {tx.data && tx.data !== "0x" && !tx.to && (
           <Box
             bg="bauhaus.white"
             p={3}
@@ -569,7 +593,7 @@ function TransactionConfirmation({
           >
             <HStack mb={2} alignItems="center">
               <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                Data
+                Deploy Data
               </Text>
               <Spacer />
               <CopyButton value={tx.data} />
@@ -582,28 +606,47 @@ function TransactionConfirmation({
               maxH="100px"
               overflowY="auto"
               css={{
-                "&::-webkit-scrollbar": {
-                  width: "6px",
-                },
-                "&::-webkit-scrollbar-track": {
-                  background: "#E0E0E0",
-                },
-                "&::-webkit-scrollbar-thumb": {
-                  background: "#121212",
-                },
+                "&::-webkit-scrollbar": { width: "6px" },
+                "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
+                "&::-webkit-scrollbar-thumb": { background: "#121212" },
               }}
             >
-              <Text
-                fontSize="xs"
-                fontFamily="mono"
-                color="text.tertiary"
-                wordBreak="break-all"
-                whiteSpace="pre-wrap"
-              >
+              <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
                 {tx.data}
               </Text>
             </Box>
           </Box>
+        )}
+
+        {/* Simulate on Tenderly */}
+        {tx.to && (
+          <Button
+            size="sm"
+            variant="ghost"
+            w="full"
+            border="2px solid"
+            borderColor="bauhaus.black"
+            fontWeight="700"
+            fontSize="xs"
+            textTransform="uppercase"
+            letterSpacing="wide"
+            onClick={() => {
+              const params = new URLSearchParams({
+                from: tx.from,
+                contractAddress: tx.to!,
+                value: tx.value || "0",
+                rawFunctionInput: tx.data || "0x",
+                network: String(tx.chainId),
+              });
+              chrome.tabs.create({
+                url: `https://dashboard.tenderly.co/simulator/new?${params}`,
+              });
+            }}
+            leftIcon={<Image src="https://www.google.com/s2/favicons?sz=32&domain=tenderly.co" boxSize="14px" />}
+            _hover={{ bg: "bg.muted", transform: "translateY(-1px)" }}
+          >
+            Simulate on Tenderly
+          </Button>
         )}
 
         {/* Error Display */}
@@ -631,20 +674,37 @@ function TransactionConfirmation({
           </HStack>
         )}
 
+        {/* Impersonator Info Box */}
+        {accountType === "impersonator" && (
+          <Box
+            bg="bauhaus.yellow"
+            border="3px solid"
+            borderColor="bauhaus.black"
+            boxShadow="3px 3px 0px 0px #121212"
+            p={3}
+          >
+            <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
+              Connected via Impersonated account — signing is disabled.
+            </Text>
+          </Box>
+        )}
+
         {/* Action Buttons */}
         {state !== "submitting" && (
           <HStack pt={2} spacing={3}>
             <Button variant="secondary" flex={1} onClick={handleReject}>
               Reject
             </Button>
-            <Button
-              variant="yellow"
-              flex={1}
-              onClick={handleConfirm}
-              isDisabled={state === "error"}
-            >
-              Confirm
-            </Button>
+            {accountType !== "impersonator" && (
+              <Button
+                variant="yellow"
+                flex={1}
+                onClick={handleConfirm}
+                isDisabled={state === "error"}
+              >
+                Confirm
+              </Button>
+            )}
           </HStack>
         )}
       </VStack>

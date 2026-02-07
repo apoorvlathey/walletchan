@@ -27,7 +27,7 @@ const TIMEOUT_OPTIONS = [
   { label: "Never", value: 0 },
 ];
 
-const DEFAULT_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+const DEFAULT_TIMEOUT = 0; // Never (infinite) by default
 
 function AutoLockSettings({ onComplete, onCancel }: AutoLockSettingsProps) {
   const [timeout, setTimeout] = useState<number>(DEFAULT_TIMEOUT);

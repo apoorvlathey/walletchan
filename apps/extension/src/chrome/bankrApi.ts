@@ -6,7 +6,7 @@ const API_BASE_URL = "https://api.bankr.bot";
 
 export interface TransactionParams {
   from: string;
-  to: string;
+  to: string | null;
   data?: string;
   value?: string;
   chainId: number;
@@ -176,7 +176,7 @@ function hexToDecimalString(hex: string | undefined): string {
  */
 function formatTransactionPrompt(tx: TransactionParams): string {
   const txJson = {
-    to: tx.to,
+    to: tx.to || undefined,
     data: tx.data && tx.data !== "0x" ? tx.data : undefined,
     value: hexToDecimalString(tx.value),
     chainId: tx.chainId,

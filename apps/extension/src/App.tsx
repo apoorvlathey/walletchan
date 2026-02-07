@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import {
   useUpdateEffect,
   Flex,
@@ -20,16 +20,17 @@ import {
   Icon,
   Link,
   Spinner,
+  useDisclosure,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
-import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon, LockIcon, WarningIcon, InfoIcon } from "@chakra-ui/icons";
+import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon, LockIcon, WarningIcon, InfoIcon, ChatIcon } from "@chakra-ui/icons";
 
-// Sidepanel icon
-const SidePanelIcon = (props: any) => (
+// Fullscreen icon (two diagonal arrows pointing outward)
+const FullscreenIcon = (props: any) => (
   <Icon viewBox="0 0 24 24" {...props}>
     <path
       fill="currentColor"
-      d="M3 3h18a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm12 2v14h5V5h-5zM4 5v14h10V5H4z"
+      d="M14 3v2h3.59l-4.3 4.29 1.42 1.42L19 6.41V10h2V3h-7zM5 17.59V14H3v7h7v-2H6.41l4.3-4.29-1.42-1.42L5 17.59z"
     />
   </Icon>
 );
@@ -53,16 +54,25 @@ const Settings = lazy(() => import("@/components/Settings"));
 const TransactionConfirmation = lazy(() => import("@/components/TransactionConfirmation"));
 const SignatureRequestConfirmation = lazy(() => import("@/components/SignatureRequestConfirmation"));
 const PendingTxList = lazy(() => import("@/components/PendingTxList"));
+const ChatView = lazy(() => import("@/components/Chat/ChatView"));
+const AccountSwitcher = lazy(() => import("@/components/AccountSwitcher"));
+const AddAccount = lazy(() => import("@/components/AddAccount"));
+const RevealPrivateKeyModal = lazy(() => import("@/components/RevealPrivateKeyModal"));
+const RevealSeedPhraseModal = lazy(() => import("@/components/RevealSeedPhraseModal"));
+const AccountSettingsModal = lazy(() => import("@/components/AccountSettingsModal"));
+const TokenTransfer = lazy(() => import("@/components/TokenTransfer"));
 
 // Eager load components needed immediately
 import UnlockScreen from "@/components/UnlockScreen";
 import PendingTxBanner from "@/components/PendingTxBanner";
-import TxStatusList from "@/components/TxStatusList";
+import PortfolioTabs from "@/components/PortfolioTabs";
 import { useNetworks } from "@/contexts/NetworksContext";
 import { getChainConfig } from "@/constants/chainConfig";
 import { hasEncryptedApiKey } from "@/chrome/crypto";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
+import type { Account } from "@/chrome/types";
+import type { PortfolioToken } from "@/chrome/portfolioApi";
 
 // Combined request type for unified ordering
 export type CombinedRequest =
@@ -95,7 +105,7 @@ const LoadingFallback = () => (
   </Box>
 );
 
-type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | "signatureConfirm" | "waitingForOnboarding";
+type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | "signatureConfirm" | "waitingForOnboarding" | "chat" | "addAccount" | "transfer";
 
 function App() {
   const { networksInfo, reloadRequired, setReloadRequired } = useNetworks();
@@ -115,8 +125,24 @@ function App() {
   const [sidePanelSupported, setSidePanelSupported] = useState(false);
   const [sidePanelMode, setSidePanelMode] = useState(false);
   const [isInSidePanel, setIsInSidePanel] = useState(false);
+  const [isFullscreenTab, setIsFullscreenTab] = useState(false);
   const [failedTxError, setFailedTxError] = useState<{ error: string; origin: string } | null>(null);
   const [onboardingTabId, setOnboardingTabId] = useState<number | null>(null);
+  const [startChatWithNew, setStartChatWithNew] = useState(false);
+  const [returnToChatAfterUnlock, setReturnToChatAfterUnlock] = useState(false);
+  const [returnToConversationId, setReturnToConversationId] = useState<string | null>(null);
+  const [isWalletUnlocked, setIsWalletUnlocked] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [activeAccount, setActiveAccount] = useState<Account | null>(null);
+  const [revealAccount, setRevealAccount] = useState<Account | null>(null);
+  const [revealSeedAccount, setRevealSeedAccount] = useState<Account | null>(null);
+  const [settingsAccount, setSettingsAccount] = useState<Account | null>(null);
+  const { isOpen: isRevealKeyOpen, onOpen: onRevealKeyOpen, onClose: onRevealKeyClose } = useDisclosure();
+  const { isOpen: isRevealSeedOpen, onOpen: onRevealSeedOpen, onClose: onRevealSeedClose } = useDisclosure();
+  const { isOpen: isAccountSettingsOpen, onOpen: onAccountSettingsOpen, onClose: onAccountSettingsClose } = useDisclosure();
+  const [transferToken, setTransferToken] = useState<PortfolioToken | null>(null);
+  const keepAlivePortRef = useRef<chrome.runtime.Port | null>(null);
+  const reconnectingRef = useRef(false);
 
   const currentTab = async () => {
     const [tab] = await chrome.tabs.query({
@@ -188,6 +214,43 @@ function App() {
     return null;
   };
 
+  /**
+   * Establishes and maintains a keepalive port connection to the service worker.
+   * Automatically reconnects if the port disconnects (e.g., service worker restarts).
+   */
+  const establishKeepalivePort = useCallback(() => {
+    if (reconnectingRef.current) return;
+
+    // Disconnect existing port if any
+    if (keepAlivePortRef.current) {
+      try {
+        keepAlivePortRef.current.disconnect();
+      } catch {
+        // Ignore disconnect errors
+      }
+    }
+
+    try {
+      const port = chrome.runtime.connect({ name: "ui-keepalive" });
+      keepAlivePortRef.current = port;
+
+      port.onDisconnect.addListener(() => {
+        keepAlivePortRef.current = null;
+        // Service worker may have restarted - reconnect after a short delay
+        // Only reconnect if extension context is still valid
+        if (chrome.runtime?.id) {
+          reconnectingRef.current = true;
+          setTimeout(() => {
+            reconnectingRef.current = false;
+            establishKeepalivePort();
+          }, 100);
+        }
+      });
+    } catch {
+      keepAlivePortRef.current = null;
+    }
+  }, []);
+
   const loadPendingRequests = async () => {
     const requests = await sendMessageWithRetry<PendingTxRequest[]>({ type: "getPendingTxRequests" });
     setPendingRequests(requests || []);
@@ -201,8 +264,50 @@ function App() {
   };
 
   const checkLockState = async (): Promise<boolean> => {
-    const cached = await sendMessageWithRetry<boolean>({ type: "isApiKeyCached" });
+    const cached = await sendMessageWithRetry<boolean>({ type: "isWalletUnlocked" });
     return cached || false;
+  };
+
+  const loadAccounts = async () => {
+    const accountList = await sendMessageWithRetry<Account[]>({ type: "getAccounts" });
+    setAccounts(accountList || []);
+
+    const active = await sendMessageWithRetry<Account | null>({ type: "getActiveAccount" });
+    setActiveAccount(active);
+
+    return { accounts: accountList || [], activeAccount: active };
+  };
+
+  const handleAccountSwitch = async (account: Account) => {
+    // Set as active account
+    await sendMessageWithRetry({ type: "setActiveAccount", accountId: account.id });
+    setActiveAccount(account);
+
+    // Update address and displayAddress
+    setAddress(account.address);
+    setDisplayAddress(account.displayName || account.address);
+
+    // Update storage for backward compatibility
+    await chrome.storage.sync.set({
+      address: account.address,
+      displayAddress: account.displayName || account.address,
+    });
+
+    // Notify content script about the account change
+    const tab = await currentTab();
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, {
+        type: "setAccount",
+        msg: {
+          address: account.address,
+          displayAddress: account.displayName || account.address,
+          accountId: account.id,
+          accountType: account.type,
+        },
+      }).catch(() => {
+        // Ignore errors if content script not injected
+      });
+    }
   };
 
   // Check sidepanel support and mode on mount
@@ -242,6 +347,16 @@ function App() {
       return isWideEnough && isTall;
     };
 
+    const detectFullscreenContext = () => {
+      // Fullscreen tab has much larger width than popup (360px) or sidepanel (~400px)
+      // Also check if we're not in a popup window context
+      const isWide = window.innerWidth > 500;
+      const isTall = window.innerHeight > 700;
+      // Check if we're a top-level window (not popup)
+      const isTopLevel = window.top === window.self;
+      return isWide && isTall && isTopLevel;
+    };
+
     const initSidePanel = async () => {
       const supported = await checkSidePanelSupport();
       setSidePanelSupported(supported);
@@ -268,28 +383,41 @@ function App() {
         }
       }
 
-      // Detect if currently in sidepanel
-      const inSidePanel = detectSidePanelContext();
+      // Detect if currently in fullscreen tab first (takes priority)
+      const inFullscreen = detectFullscreenContext();
+      setIsFullscreenTab(inFullscreen);
+
+      // Detect if currently in sidepanel (only if not fullscreen)
+      const inSidePanel = !inFullscreen && detectSidePanelContext();
       setIsInSidePanel(inSidePanel);
 
       // Add/remove body class for CSS
-      if (inSidePanel) {
+      document.body.classList.remove("sidepanel-mode", "fullscreen-mode");
+      if (inFullscreen) {
+        document.body.classList.add("fullscreen-mode");
+      } else if (inSidePanel) {
         document.body.classList.add("sidepanel-mode");
-      } else {
-        document.body.classList.remove("sidepanel-mode");
       }
     };
 
     initSidePanel();
 
-    // Listen for window resize to update sidepanel detection
+    // Listen for window resize to update sidepanel/fullscreen detection
     const handleResize = () => {
-      const inSidePanel = window.innerHeight > 700;
+      const isWide = window.innerWidth > 500;
+      const isTall = window.innerHeight > 700;
+      const isTopLevel = window.top === window.self;
+      const inFullscreen = isWide && isTall && isTopLevel;
+      const inSidePanel = !inFullscreen && isTall;
+
+      setIsFullscreenTab(inFullscreen);
       setIsInSidePanel(inSidePanel);
-      if (inSidePanel) {
+
+      document.body.classList.remove("sidepanel-mode", "fullscreen-mode");
+      if (inFullscreen) {
+        document.body.classList.add("fullscreen-mode");
+      } else if (inSidePanel) {
         document.body.classList.add("sidepanel-mode");
-      } else {
-        document.body.classList.remove("sidepanel-mode");
       }
     };
 
@@ -317,48 +445,13 @@ function App() {
     }
   }, []);
 
-  const toggleSidePanelMode = async () => {
-    const newMode = !sidePanelMode;
-
-    // Update the mode setting
-    const response = await new Promise<{ success: boolean; sidePanelWorks: boolean }>((resolve) => {
-      chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: newMode }, (res) => {
-        resolve(res || { success: false, sidePanelWorks: false });
-      });
-    });
-
-    // If trying to enable sidepanel but it doesn't work, show error and keep popup mode
-    if (newMode && !response.success) {
-      toast({
-        title: "Sidepanel not supported",
-        description: "This browser doesn't support sidepanel. Using popup mode instead.",
-        status: "warning",
-        duration: 4000,
-        isClosable: true,
-      });
-      setSidePanelSupported(false);
-      setSidePanelMode(false);
-      return;
-    }
-
-    setSidePanelMode(newMode);
-
-    if (!newMode && isInSidePanel) {
-      // Switching from sidepanel to popup mode while in sidepanel
-      // Open popup window, then close sidepanel
-      chrome.runtime.sendMessage({ type: "openPopupWindow" }, () => {
-        window.close();
-      });
-    } else if (newMode && !isInSidePanel) {
-      // Switching from popup to sidepanel mode while in popup
-      // Chrome doesn't allow programmatic sidepanel open, show toast
-      toast({
-        title: "Sidepanel mode enabled",
-        description: "Close popup and click the extension icon to open in sidepanel",
-        status: "info",
-        duration: null,
-        isClosable: true,
-      });
+  const openInFullscreenTab = async () => {
+    // Open the extension in a new tab
+    const extensionUrl = chrome.runtime.getURL("index.html");
+    await chrome.tabs.create({ url: extensionUrl });
+    // Close popup if we're in popup mode
+    if (!isInSidePanel && !isFullscreenTab) {
+      window.close();
     }
   };
 
@@ -404,12 +497,35 @@ function App() {
         }
       }
 
+      // Establish keepalive connection to pause auto-lock while UI is open
+      // Use the robust reconnection mechanism
+      establishKeepalivePort();
+
       // Check lock state
       const isUnlocked = await checkLockState();
 
       // Load pending requests
       const requests = await loadPendingRequests();
       const sigRequests = await loadPendingSignatureRequests();
+
+      // Load accounts
+      const { accounts: loadedAccounts, activeAccount: loadedActive } = await loadAccounts();
+
+      // Safety net: if API key exists but no accounts, redirect to onboarding
+      // This handles edge cases like interrupted setup
+      if (loadedAccounts.length === 0) {
+        const onboardingUrl = chrome.runtime.getURL("onboarding.html");
+        const existingTabs = await chrome.tabs.query({ url: onboardingUrl });
+        if (existingTabs.length > 0 && existingTabs[0].id) {
+          await chrome.tabs.update(existingTabs[0].id, { active: true });
+          await chrome.windows.update(existingTabs[0].windowId!, { focused: true });
+        } else {
+          await chrome.tabs.create({ url: onboardingUrl });
+        }
+        setView("waitingForOnboarding");
+        setIsLoading(false);
+        return;
+      }
 
       // Load stored data
       const {
@@ -426,11 +542,16 @@ function App() {
         chainName: string | undefined;
       };
 
-      if (storedDisplayAddress) {
+      // Use active account if available, otherwise fall back to stored address
+      if (loadedActive) {
+        setAddress(loadedActive.address);
+        setDisplayAddress(loadedActive.displayName || loadedActive.address);
+      } else if (storedDisplayAddress) {
         setDisplayAddress(storedDisplayAddress);
-      }
-
-      if (storedAddress) {
+        if (storedAddress) {
+          setAddress(storedAddress);
+        }
+      } else if (storedAddress) {
         setAddress(storedAddress);
       }
 
@@ -450,6 +571,9 @@ function App() {
           }
         }
       );
+
+      // Set wallet unlock state
+      setIsWalletUnlocked(isUnlocked);
 
       // Determine initial view
       if (!isUnlocked) {
@@ -491,6 +615,7 @@ function App() {
         setPendingRequests((prev) => [...prev, message.txRequest!]);
         // Check if wallet is locked before showing the request
         const isUnlocked = await checkLockState();
+        setIsWalletUnlocked(isUnlocked);
         if (isUnlocked) {
           // Show the new tx request
           setSelectedTxRequest(message.txRequest);
@@ -505,6 +630,7 @@ function App() {
         setPendingSignatureRequests((prev) => [...prev, message.sigRequest!]);
         // Check if wallet is locked before showing the request
         const isUnlocked = await checkLockState();
+        setIsWalletUnlocked(isUnlocked);
         if (isUnlocked) {
           // Show the new signature request
           setSelectedSignatureRequest(message.sigRequest);
@@ -517,6 +643,10 @@ function App() {
       if (message.type === "onboardingComplete") {
         // Onboarding finished - reload to show unlock screen
         window.location.reload();
+      }
+      if (message.type === "accountsUpdated") {
+        // Reload accounts when they change
+        loadAccounts();
       }
     };
 
@@ -604,6 +734,20 @@ function App() {
   }, [reloadRequired, networksInfo]);
 
   const handleUnlock = useCallback(async () => {
+    // Mark wallet as unlocked
+    setIsWalletUnlocked(true);
+
+    // If we came from chat, return to chat
+    if (returnToChatAfterUnlock) {
+      setReturnToChatAfterUnlock(false);
+      // Note: returnToConversationId is kept so ChatView can load the conversation
+      setView("chat");
+      return;
+    }
+
+    // Clear conversation ID if not returning to chat
+    setReturnToConversationId(null);
+
     // Refresh pending requests after unlock
     const requests = await loadPendingRequests();
     const sigRequests = await loadPendingSignatureRequests();
@@ -619,7 +763,7 @@ function App() {
     } else {
       setView("main");
     }
-  }, []);
+  }, [returnToChatAfterUnlock]);
 
   const handleCopyAddress = async () => {
     try {
@@ -665,15 +809,15 @@ function App() {
     if (remaining.length > 0) {
       setSelectedTxRequest(remaining[0]);
     } else {
-      // Only close popup when no more pending requests (not sidepanel)
-      if (isInSidePanel) {
+      // Only close popup when no more pending requests (not sidepanel or fullscreen)
+      if (isInSidePanel || isFullscreenTab) {
         setSelectedTxRequest(null);
         setView("main");
       } else {
         window.close();
       }
     }
-  }, [selectedTxRequest?.id, isInSidePanel]);
+  }, [selectedTxRequest?.id, isInSidePanel, isFullscreenTab]);
 
   const handleRejectAll = useCallback(async () => {
     // Reject all pending transactions
@@ -694,8 +838,8 @@ function App() {
         );
       });
     }
-    // Only close popup after rejecting all (not sidepanel)
-    if (isInSidePanel) {
+    // Only close popup after rejecting all (not sidepanel or fullscreen)
+    if (isInSidePanel || isFullscreenTab) {
       setPendingRequests([]);
       setPendingSignatureRequests([]);
       setSelectedTxRequest(null);
@@ -704,7 +848,7 @@ function App() {
     } else {
       window.close();
     }
-  }, [pendingRequests, pendingSignatureRequests, isInSidePanel]);
+  }, [pendingRequests, pendingSignatureRequests, isInSidePanel, isFullscreenTab]);
 
   const handleSignatureCancelled = useCallback(async () => {
     const currentSigId = selectedSignatureRequest?.id;
@@ -721,14 +865,14 @@ function App() {
         setSelectedSignatureRequest(null);
         setSelectedTxRequest(txRequests[0]);
         setView("txConfirm");
-      } else if (isInSidePanel) {
+      } else if (isInSidePanel || isFullscreenTab) {
         setSelectedSignatureRequest(null);
         setView("main");
       } else {
         window.close();
       }
     }
-  }, [selectedSignatureRequest?.id, isInSidePanel]);
+  }, [selectedSignatureRequest?.id, isInSidePanel, isFullscreenTab]);
 
   const handleCancelAllSignatures = useCallback(async () => {
     // Cancel all pending signature requests
@@ -747,14 +891,14 @@ function App() {
       setSelectedSignatureRequest(null);
       setSelectedTxRequest(txRequests[0]);
       setView("txConfirm");
-    } else if (isInSidePanel) {
+    } else if (isInSidePanel || isFullscreenTab) {
       setPendingSignatureRequests([]);
       setSelectedSignatureRequest(null);
       setView("main");
     } else {
       window.close();
     }
-  }, [pendingSignatureRequests, isInSidePanel]);
+  }, [pendingSignatureRequests, isInSidePanel, isFullscreenTab]);
 
   const truncateAddress = (addr: string): string => {
     if (!addr) return "";
@@ -780,17 +924,37 @@ function App() {
   // Unlock screen
   if (view === "unlock") {
     return (
-      <UnlockScreen
-        onUnlock={handleUnlock}
-        pendingTxCount={pendingRequests.length}
-        pendingSignatureCount={pendingSignatureRequests.length}
-      />
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
+          <UnlockScreen
+            onUnlock={handleUnlock}
+            pendingTxCount={pendingRequests.length}
+            pendingSignatureCount={pendingSignatureRequests.length}
+          />
+        </Box>
+      </Box>
     );
   }
 
   // Waiting for onboarding to complete
   if (view === "waitingForOnboarding") {
     return (
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
       <Box
         minH="300px"
         bg="bg.base"
@@ -801,6 +965,7 @@ function App() {
         p={6}
         textAlign="center"
         position="relative"
+        flex="1"
       >
         {/* Geometric decorations */}
         <Box
@@ -889,6 +1054,8 @@ function App() {
           </HStack>
         </VStack>
       </Box>
+        </Box>
+      </Box>
     );
   }
 
@@ -896,29 +1063,157 @@ function App() {
   if (view === "settings") {
     return (
       <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
         <Container pt={4} pb={4} flex="1" display="flex" flexDirection="column">
           <Suspense fallback={<LoadingFallback />}>
             <Settings
-              close={() => {
+              close={async () => {
                 // After settings, check if now have API key
-                hasEncryptedApiKey().then((has) => {
-                  setHasApiKey(has);
-                  if (has) {
-                    checkLockState().then((unlocked) => {
-                      if (unlocked) {
+                const has = await hasEncryptedApiKey();
+                setHasApiKey(has);
+
+                if (has) {
+                  // Ensure keepalive port is connected before checking lock state
+                  // (service worker may have restarted while we were in settings)
+                  establishKeepalivePort();
+                  await new Promise((r) => setTimeout(r, 50));
+
+                  const unlocked = await checkLockState();
+
+                  if (unlocked) {
+                    setIsWalletUnlocked(true);
+                    setView("main");
+                  } else {
+                    // Check if this was unexpected (auto-lock is "Never")
+                    // If so, try to restore the session
+                    const { autoLockTimeout } = await chrome.storage.sync.get("autoLockTimeout");
+
+                    if (autoLockTimeout === 0 || autoLockTimeout === undefined) {
+                      // Auto-lock is "Never" - try session restoration
+                      const restored = await sendMessageWithRetry<boolean>({ type: "tryRestoreSession" });
+                      if (restored) {
+                        setIsWalletUnlocked(true);
                         setView("main");
-                      } else {
-                        setView("unlock");
+                        return;
                       }
-                    });
+                    }
+
+                    setIsWalletUnlocked(false);
+                    setView("unlock");
                   }
-                });
+                }
               }}
               showBackButton={hasApiKey}
-              onSessionExpired={() => setView("unlock")}
+              onSessionExpired={() => {
+                setIsWalletUnlocked(false);
+                setView("unlock");
+              }}
             />
           </Suspense>
         </Container>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Chat view
+  if (view === "chat") {
+    return (
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "600px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
+      <Suspense fallback={<LoadingFallback />}>
+        <ChatView
+          onBack={() => {
+            setStartChatWithNew(false);
+            setReturnToConversationId(null);
+            setView("main");
+          }}
+          startWithNewChat={startChatWithNew}
+          returnToConversationId={returnToConversationId}
+          isWalletUnlocked={isWalletUnlocked}
+          onUnlock={(conversationId) => {
+            setReturnToChatAfterUnlock(true);
+            setReturnToConversationId(conversationId || null);
+            setView("unlock");
+          }}
+          onWalletLocked={() => {
+            setIsWalletUnlocked(false);
+          }}
+        />
+      </Suspense>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Add Account view
+  if (view === "addAccount") {
+    return (
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
+          <Suspense fallback={<LoadingFallback />}>
+            <AddAccount
+              onBack={() => setView("main")}
+              onAccountAdded={async () => {
+                await loadAccounts();
+                setView("main");
+              }}
+            />
+          </Suspense>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Transfer view
+  if (view === "transfer" && transferToken) {
+    return (
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
+          <Suspense fallback={<LoadingFallback />}>
+            <TokenTransfer
+              token={transferToken}
+              fromAddress={address}
+              accountType={activeAccount?.type || "bankr"}
+              onBack={() => {
+                setTransferToken(null);
+                setView("main");
+              }}
+              onTransferInitiated={() => {
+                setTransferToken(null);
+                // The newPendingTxRequest listener will auto-switch to txConfirm
+              }}
+            />
+          </Suspense>
+        </Box>
       </Box>
     );
   }
@@ -926,22 +1221,33 @@ function App() {
   // Pending tx list view
   if (view === "pendingTxList") {
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <PendingTxList
-          txRequests={pendingRequests}
-          signatureRequests={pendingSignatureRequests}
-          onBack={() => setView("main")}
-          onSelectTx={(tx) => {
-            setSelectedTxRequest(tx);
-            setView("txConfirm");
-          }}
-          onSelectSignature={(sig) => {
-            setSelectedSignatureRequest(sig);
-            setView("signatureConfirm");
-          }}
-          onRejectAll={handleRejectAll}
-        />
-      </Suspense>
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
+          <Suspense fallback={<LoadingFallback />}>
+            <PendingTxList
+              txRequests={pendingRequests}
+              signatureRequests={pendingSignatureRequests}
+              onBack={() => setView("main")}
+              onSelectTx={(tx) => {
+                setSelectedTxRequest(tx);
+                setView("txConfirm");
+              }}
+              onSelectSignature={(sig) => {
+                setSelectedSignatureRequest(sig);
+                setView("signatureConfirm");
+              }}
+              onRejectAll={handleRejectAll}
+            />
+          </Suspense>
+        </Box>
+      </Box>
     );
   }
 
@@ -953,41 +1259,53 @@ function App() {
     );
     const totalCount = combinedRequests.length;
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <TransactionConfirmation
-          key={selectedTxRequest.id}
-          txRequest={selectedTxRequest}
-          currentIndex={currentIndex >= 0 ? currentIndex : 0}
-          totalCount={totalCount}
-          isInSidePanel={isInSidePanel}
-          onBack={() => {
-            if (totalCount > 1) {
-              setView("pendingTxList");
-            } else {
-              setView("main");
-            }
-          }}
-          onConfirmed={handleTxConfirmed}
-          onRejected={handleTxRejected}
-          onRejectAll={handleRejectAll}
-          onNavigate={(direction) => {
-            const currentIdx = combinedRequests.findIndex(
-              (r) => r.type === "tx" && r.request.id === selectedTxRequest.id
-            );
-            const newIdx = direction === "prev" ? currentIdx - 1 : currentIdx + 1;
-            if (newIdx >= 0 && newIdx < combinedRequests.length) {
-              const nextRequest = combinedRequests[newIdx];
-              if (nextRequest.type === "tx") {
-                setSelectedTxRequest(nextRequest.request);
-              } else {
-                setSelectedTxRequest(null);
-                setSelectedSignatureRequest(nextRequest.request);
-                setView("signatureConfirm");
-              }
-            }
-          }}
-        />
-      </Suspense>
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
+          <Suspense fallback={<LoadingFallback />}>
+            <TransactionConfirmation
+              key={selectedTxRequest.id}
+              txRequest={selectedTxRequest}
+              currentIndex={currentIndex >= 0 ? currentIndex : 0}
+              totalCount={totalCount}
+              isInSidePanel={isInSidePanel || isFullscreenTab}
+              accountType={activeAccount?.type}
+              onBack={() => {
+                if (totalCount > 1) {
+                  setView("pendingTxList");
+                } else {
+                  setView("main");
+                }
+              }}
+              onConfirmed={handleTxConfirmed}
+              onRejected={handleTxRejected}
+              onRejectAll={handleRejectAll}
+              onNavigate={(direction) => {
+                const currentIdx = combinedRequests.findIndex(
+                  (r) => r.type === "tx" && r.request.id === selectedTxRequest.id
+                );
+                const newIdx = direction === "prev" ? currentIdx - 1 : currentIdx + 1;
+                if (newIdx >= 0 && newIdx < combinedRequests.length) {
+                  const nextRequest = combinedRequests[newIdx];
+                  if (nextRequest.type === "tx") {
+                    setSelectedTxRequest(nextRequest.request);
+                  } else {
+                    setSelectedTxRequest(null);
+                    setSelectedSignatureRequest(nextRequest.request);
+                    setView("signatureConfirm");
+                  }
+                }
+              }}
+            />
+          </Suspense>
+        </Box>
+      </Box>
     );
   }
 
@@ -999,47 +1317,69 @@ function App() {
     );
     const totalCount = combinedRequests.length;
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <SignatureRequestConfirmation
-          key={selectedSignatureRequest.id}
-          sigRequest={selectedSignatureRequest}
-          currentIndex={currentIndex >= 0 ? currentIndex : 0}
-          totalCount={totalCount}
-          isInSidePanel={isInSidePanel}
-          onBack={() => {
-            setSelectedSignatureRequest(null);
-            if (totalCount > 1) {
-              setView("pendingTxList");
-            } else {
-              setView("main");
-            }
-          }}
-          onCancelled={handleSignatureCancelled}
-          onCancelAll={handleCancelAllSignatures}
-          onNavigate={(direction) => {
-            const currentIdx = combinedRequests.findIndex(
-              (r) => r.type === "sig" && r.request.id === selectedSignatureRequest.id
-            );
-            const newIdx = direction === "prev" ? currentIdx - 1 : currentIdx + 1;
-            if (newIdx >= 0 && newIdx < combinedRequests.length) {
-              const nextRequest = combinedRequests[newIdx];
-              if (nextRequest.type === "sig") {
-                setSelectedSignatureRequest(nextRequest.request);
-              } else {
+      <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+        <Box
+          maxW={isFullscreenTab ? "480px" : "100%"}
+          mx="auto"
+          w="100%"
+          h="100%"
+          display="flex"
+          flexDirection="column"
+        >
+          <Suspense fallback={<LoadingFallback />}>
+            <SignatureRequestConfirmation
+              key={selectedSignatureRequest.id}
+              sigRequest={selectedSignatureRequest}
+              currentIndex={currentIndex >= 0 ? currentIndex : 0}
+              totalCount={totalCount}
+              isInSidePanel={isInSidePanel || isFullscreenTab}
+              accountType={activeAccount?.type}
+              onBack={() => {
                 setSelectedSignatureRequest(null);
-                setSelectedTxRequest(nextRequest.request);
-                setView("txConfirm");
-              }
-            }
-          }}
-        />
-      </Suspense>
+                if (totalCount > 1) {
+                  setView("pendingTxList");
+                } else {
+                  setView("main");
+                }
+              }}
+              onCancelled={handleSignatureCancelled}
+              onCancelAll={handleCancelAllSignatures}
+              onConfirmed={handleSignatureCancelled}
+              onNavigate={(direction) => {
+                const currentIdx = combinedRequests.findIndex(
+                  (r) => r.type === "sig" && r.request.id === selectedSignatureRequest.id
+                );
+                const newIdx = direction === "prev" ? currentIdx - 1 : currentIdx + 1;
+                if (newIdx >= 0 && newIdx < combinedRequests.length) {
+                  const nextRequest = combinedRequests[newIdx];
+                  if (nextRequest.type === "sig") {
+                    setSelectedSignatureRequest(nextRequest.request);
+                  } else {
+                    setSelectedSignatureRequest(null);
+                    setSelectedTxRequest(nextRequest.request);
+                    setView("txConfirm");
+                  }
+                }
+              }}
+            />
+          </Suspense>
+        </Box>
+      </Box>
     );
   }
 
   // Main view
   return (
     <Box bg="bg.base" h="100%" display="flex" flexDirection="column">
+      {/* Fullscreen centered wrapper */}
+      <Box
+        maxW={isFullscreenTab ? "480px" : "100%"}
+        mx="auto"
+        w="100%"
+        h="100%"
+        display="flex"
+        flexDirection="column"
+      >
       {/* Header */}
       <Flex
         py={3}
@@ -1068,6 +1408,22 @@ function App() {
         </HStack>
         <Spacer />
         <HStack spacing={1}>
+          {activeAccount?.type === "bankr" && (
+            <Tooltip label="Chat History" placement="bottom">
+              <IconButton
+                aria-label="Chat History"
+                icon={<ChatIcon />}
+                variant="ghost"
+                size="sm"
+                color="bauhaus.white"
+                _hover={{ bg: "whiteAlpha.200" }}
+                onClick={() => {
+                  setStartChatWithNew(false);
+                  setView("chat");
+                }}
+              />
+            </Tooltip>
+          )}
           <Tooltip label="Lock wallet" placement="bottom">
             <IconButton
               aria-label="Lock wallet"
@@ -1083,19 +1439,16 @@ function App() {
               }}
             />
           </Tooltip>
-          {sidePanelSupported && (
-            <Tooltip
-              label={sidePanelMode ? "Switch to popup mode" : "Switch to sidepanel mode"}
-              placement="bottom"
-            >
+          {!isFullscreenTab && (
+            <Tooltip label="Open in new tab" placement="bottom">
               <IconButton
-                aria-label={sidePanelMode ? "Switch to popup mode" : "Switch to sidepanel mode"}
-                icon={<SidePanelIcon />}
+                aria-label="Open in new tab"
+                icon={<FullscreenIcon />}
                 variant="ghost"
                 size="sm"
                 color="bauhaus.white"
                 _hover={{ bg: "whiteAlpha.200" }}
-                onClick={toggleSidePanelMode}
+                onClick={openInFullscreenTab}
               />
             </Tooltip>
           )}
@@ -1159,8 +1512,8 @@ function App() {
         <Box w="6px" h="6px" bg="bauhaus.black" />
       </HStack>
 
-      <Container pt={6} pb={4} flex="1" display="flex" flexDirection="column">
-        <VStack spacing={4} align="stretch" flex="1">
+      <Container pt={6} pb={4} flex="1" display="flex" flexDirection="column" overflowY="auto">
+        <VStack spacing={4} align="stretch">
           {/* Failed Transaction Error */}
           {failedTxError && (
             <Box
@@ -1219,6 +1572,117 @@ function App() {
             }}
           />
 
+          {/* Account Switcher + Chain Selector Row */}
+          <HStack spacing={3} align="stretch">
+            {accounts.length > 0 && (
+              <Box flex={1} minW={0}>
+                <Suspense fallback={null}>
+                  <AccountSwitcher
+                    accounts={accounts}
+                    activeAccount={activeAccount}
+                    onAccountSelect={handleAccountSwitch}
+                    onAddAccount={() => setView("addAccount")}
+                    onAccountSettings={(account) => {
+                      setSettingsAccount(account);
+                      onAccountSettingsOpen();
+                    }}
+                  />
+                </Suspense>
+              </Box>
+            )}
+
+            {/* Chain Selector */}
+            <Menu isLazy lazyBehavior="unmount">
+              <MenuButton
+                as={Button}
+                variant="ghost"
+                bg="bauhaus.white"
+                border="3px solid"
+                borderColor="bauhaus.black"
+                boxShadow="4px 4px 0px 0px #121212"
+                _hover={{
+                  transform: "translateY(-2px)",
+                  boxShadow: "6px 6px 0px 0px #121212",
+                }}
+                _active={{
+                  transform: "translate(2px, 2px)",
+                  boxShadow: "none",
+                }}
+                rightIcon={<ChevronDownIcon />}
+                fontWeight="700"
+                h="full"
+                py={3}
+                px={3}
+                borderRadius="0"
+                transition="all 0.2s ease-out"
+                flexShrink={0}
+              >
+                {chainName && networksInfo ? (
+                  <HStack spacing={1.5}>
+                    <Image
+                      src={getChainConfig(networksInfo[chainName].chainId).icon}
+                      alt={chainName}
+                      boxSize="18px"
+                    />
+                    <Text fontSize="xs" fontWeight="700" noOfLines={1}>
+                      {chainName}
+                    </Text>
+                  </HStack>
+                ) : (
+                  <Text color="text.tertiary" fontSize="sm">Net</Text>
+                )}
+              </MenuButton>
+              <MenuList
+                bg="bauhaus.white"
+                border="3px solid"
+                borderColor="bauhaus.black"
+                boxShadow="4px 4px 0px 0px #121212"
+                borderRadius="0"
+                py={0}
+                minW="160px"
+              >
+                {networksInfo &&
+                  Object.keys(networksInfo).map((_chainName, i) => {
+                    const config = getChainConfig(networksInfo[_chainName].chainId);
+                    return (
+                      <MenuItem
+                        key={i}
+                        bg="bauhaus.white"
+                        _hover={{ bg: "bg.muted" }}
+                        borderBottom={i < Object.keys(networksInfo).length - 1 ? "2px solid" : "none"}
+                        borderColor="bauhaus.black"
+                        py={3}
+                        onClick={() => {
+                          if (!chainName) {
+                            setReloadRequired(true);
+                          }
+                          setChainName(_chainName);
+                        }}
+                      >
+                        <HStack spacing={2}>
+                          {config.icon && (
+                            <Box
+                              bg="bauhaus.white"
+                              border="2px solid"
+                              borderColor="bauhaus.black"
+                              p={0.5}
+                            >
+                              <Image
+                                src={config.icon}
+                                alt={_chainName}
+                                boxSize="18px"
+                              />
+                            </Box>
+                          )}
+                          <Text color="text.primary" fontWeight="700">{_chainName}</Text>
+                        </HStack>
+                      </MenuItem>
+                    );
+                  })}
+              </MenuList>
+            </Menu>
+          </HStack>
+
           {/* Address Display */}
           <Box
             bg="bauhaus.white"
@@ -1242,16 +1706,19 @@ function App() {
             />
 
             {address ? (
-              <VStack align="stretch" spacing={1}>
+              <VStack align="stretch" spacing={2}>
                 <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                  Bankr Wallet Address
+                  {activeAccount?.type === "impersonator" ? "Impersonated Address" : "Wallet Address"}
                 </Text>
-                <HStack justify="space-between">
+                {/* Two columns: address pill | explorer icons (2x2 when narrow, 1x4 when wide) */}
+                <HStack spacing={2} align="center">
+                  {/* Column 1: Address pill */}
                   <HStack
                     bg="bauhaus.black"
                     px={2}
                     py={1}
                     spacing={2}
+                    flexShrink={0}
                   >
                     <Code
                       fontSize="md"
@@ -1260,6 +1727,7 @@ function App() {
                       color="bauhaus.white"
                       p={0}
                       fontWeight="700"
+                      whiteSpace="nowrap"
                     >
                       {truncateAddress(address)}
                     </Code>
@@ -1297,31 +1765,52 @@ function App() {
                       />
                     )}
                   </HStack>
+                  {/* Column 2: Explorer icons - 2x2 grid (<390px, centered) or 1x4 row (>=390px, right-aligned) */}
                   <Box
-                    as="button"
-                    bg="#FD8464"
-                    border="2px solid"
-                    borderColor="bauhaus.black"
-                    boxShadow="2px 2px 0px 0px #121212"
-                    p={1}
-                    cursor="pointer"
-                    transition="all 0.2s ease-out"
-                    _hover={{
-                      transform: "translateY(-1px)",
-                      boxShadow: "3px 3px 0px 0px #121212",
+                    display="grid"
+                    gridTemplateColumns="repeat(2, 32px)"
+                    justifyContent="center"
+                    gap={1}
+                    flex={1}
+                    sx={{
+                      '@media (min-width: 390px)': {
+                        gridTemplateColumns: 'repeat(4, 32px)',
+                        justifyContent: 'flex-end',
+                      },
                     }}
-                    _active={{
-                      transform: "translate(2px, 2px)",
-                      boxShadow: "none",
-                    }}
-                    onClick={() => {
-                      chrome.tabs.create({
-                        url: `https://debank.com/profile/${address}`,
-                      });
-                    }}
-                    title="View on DeBank"
                   >
-                    <Image src="debank-icon.ico" boxSize="20px" />
+                    {[
+                      { name: "Octav", icon: "octav-icon.png", url: `https://pro.octav.fi/?addresses=${address}`, bg: "#FFFFFF" },
+                      { name: "DeBank", icon: "debank-icon.ico", url: `https://debank.com/profile/${address}`, bg: "#FFFFFF" },
+                      { name: "Zapper", icon: "zapper-icon.png", url: `https://zapper.xyz/account/${address}`, bg: "#FFFFFF" },
+                      { name: "Nansen", icon: "nansen-icon.png", url: `https://app.nansen.ai/address/${address}`, bg: "#FFFFFF" },
+                    ].map((site) => (
+                      <Box
+                        key={site.name}
+                        as="button"
+                        bg={site.bg}
+                        border="2px solid"
+                        borderColor="bauhaus.black"
+                        boxShadow="2px 2px 0px 0px #121212"
+                        p={1}
+                        cursor="pointer"
+                        transition="all 0.2s ease-out"
+                        _hover={{
+                          transform: "translateY(-1px)",
+                          boxShadow: "3px 3px 0px 0px #121212",
+                        }}
+                        _active={{
+                          transform: "translate(2px, 2px)",
+                          boxShadow: "none",
+                        }}
+                        onClick={() => {
+                          chrome.tabs.create({ url: site.url });
+                        }}
+                        title={`View on ${site.name}`}
+                      >
+                        <Image src={site.icon} boxSize="20px" />
+                      </Box>
+                    ))}
                   </Box>
                 </HStack>
               </VStack>
@@ -1332,102 +1821,16 @@ function App() {
             )}
           </Box>
 
-          {/* Chain Selector */}
-          <Menu matchWidth isLazy lazyBehavior="unmount">
-            <MenuButton
-              as={Button}
-              w="full"
-              variant="ghost"
-              bg="bauhaus.white"
-              border="3px solid"
-              borderColor="bauhaus.black"
-              boxShadow="4px 4px 0px 0px #121212"
-              _hover={{
-                transform: "translateY(-2px)",
-                boxShadow: "6px 6px 0px 0px #121212",
+          {/* Portfolio Tabs (Holdings + Activity) */}
+          {address && (
+            <PortfolioTabs
+              address={address}
+              onTokenClick={(token) => {
+                setTransferToken(token);
+                setView("transfer");
               }}
-              _active={{
-                transform: "translate(2px, 2px)",
-                boxShadow: "none",
-              }}
-              rightIcon={<ChevronDownIcon />}
-              textAlign="left"
-              fontWeight="700"
-              h="auto"
-              py={3}
-              borderRadius="0"
-              transition="all 0.2s ease-out"
-            >
-              {chainName && networksInfo ? (
-                <HStack spacing={2}>
-                  {getChainConfig(networksInfo[chainName].chainId).icon && (
-                    <Box
-                      bg="bauhaus.white"
-                      border="2px solid"
-                      borderColor="bauhaus.black"
-                      p={0.5}
-                    >
-                      <Image
-                        src={getChainConfig(networksInfo[chainName].chainId).icon}
-                        alt={chainName}
-                        boxSize="18px"
-                      />
-                    </Box>
-                  )}
-                  <Text color="text.primary">{chainName}</Text>
-                </HStack>
-              ) : (
-                <Text color="text.tertiary">Select Network</Text>
-              )}
-            </MenuButton>
-            <MenuList
-              bg="bauhaus.white"
-              border="3px solid"
-              borderColor="bauhaus.black"
-              boxShadow="4px 4px 0px 0px #121212"
-              borderRadius="0"
-              py={0}
-            >
-              {networksInfo &&
-                Object.keys(networksInfo).map((_chainName, i) => {
-                  const config = getChainConfig(networksInfo[_chainName].chainId);
-                  return (
-                    <MenuItem
-                      key={i}
-                      bg="bauhaus.white"
-                      _hover={{ bg: "bg.muted" }}
-                      borderBottom={i < Object.keys(networksInfo).length - 1 ? "2px solid" : "none"}
-                      borderColor="bauhaus.black"
-                      py={3}
-                      onClick={() => {
-                        if (!chainName) {
-                          setReloadRequired(true);
-                        }
-                        setChainName(_chainName);
-                      }}
-                    >
-                      <HStack spacing={2}>
-                        {config.icon && (
-                          <Box
-                            bg="bauhaus.white"
-                            border="2px solid"
-                            borderColor="bauhaus.black"
-                            p={0.5}
-                          >
-                            <Image
-                              src={config.icon}
-                              alt={_chainName}
-                              boxSize="18px"
-                            />
-                          </Box>
-                        )}
-                        <Text color="text.primary" fontWeight="700">{_chainName}</Text>
-                      </HStack>
-                    </MenuItem>
-                  );
-                })}
-            </MenuList>
-          </Menu>
+            />
+          )}
 
           {/* Reload Required Alert */}
           {reloadRequired && (
@@ -1472,44 +1875,136 @@ function App() {
             </Box>
           )}
 
-          {/* Transaction Status List */}
-          <TxStatusList maxItems={5} />
-
-          {/* Spacer to push footer to bottom */}
-          <Box flex="1" />
-
-          {/* Footer */}
-          <HStack spacing={1} justify="center" pt={2}>
-            <Text fontSize="sm" color="text.tertiary" fontWeight="500">
-              Built by
-            </Text>
-            <Link
-              display="flex"
-              alignItems="center"
-              gap={1}
-              color="bauhaus.blue"
-              fontWeight="700"
-              _hover={{ color: "bauhaus.red" }}
-              onClick={() => {
-                chrome.tabs.create({ url: "https://x.com/apoorveth" });
-              }}
-            >
-              <Box
-                as="svg"
-                viewBox="0 0 24 24"
-                w="14px"
-                h="14px"
-                fill="currentColor"
-              >
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-              </Box>
-              <Text fontSize="sm" textDecor="underline">
-                @apoorveth
-              </Text>
-            </Link>
-          </HStack>
         </VStack>
       </Container>
+
+      {/* Sticky Footer - only show for Bankr accounts */}
+      {activeAccount?.type === "bankr" && (
+        <Box
+          position="sticky"
+          bottom={0}
+          bg="bg.base"
+          borderTop="3px solid"
+          borderColor="bauhaus.black"
+          p={3}
+        >
+          <Box position="relative">
+            {/* Geometric decorations */}
+            <Box
+              position="absolute"
+              top="-8px"
+              left="10px"
+              w="12px"
+              h="12px"
+              bg="bauhaus.red"
+              borderRadius="full"
+              border="2px solid"
+              borderColor="bauhaus.black"
+              zIndex={1}
+            />
+            <Box
+              position="absolute"
+              top="-6px"
+              right="12px"
+              w="10px"
+              h="10px"
+              bg="bauhaus.blue"
+              transform="rotate(45deg)"
+              border="2px solid"
+              borderColor="bauhaus.black"
+              zIndex={1}
+            />
+            <Box
+              position="absolute"
+              bottom="-8px"
+              right="40px"
+              w={0}
+              h={0}
+              borderLeft="7px solid transparent"
+              borderRight="7px solid transparent"
+              borderBottom="12px solid"
+              borderBottomColor="bauhaus.green"
+              zIndex={1}
+            />
+
+            <Button
+              w="full"
+              bg="bauhaus.yellow"
+              color="bauhaus.black"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+              fontWeight="900"
+              textTransform="uppercase"
+              letterSpacing="wider"
+              py={6}
+              _hover={{
+                bg: "bauhaus.yellow",
+                transform: "translateY(-2px)",
+                boxShadow: "6px 6px 0px 0px #121212",
+              }}
+              _active={{
+                transform: "translate(2px, 2px)",
+                boxShadow: "none",
+              }}
+              onClick={() => {
+                setStartChatWithNew(true);
+                setView("chat");
+              }}
+              leftIcon={<ChatIcon />}
+            >
+              Chat with Bankr
+            </Button>
+          </Box>
+        </Box>
+      )}
+      </Box>
+      {/* End fullscreen centered wrapper */}
+
+      {/* Reveal Private Key Modal */}
+      <Suspense fallback={null}>
+        <RevealPrivateKeyModal
+          isOpen={isRevealKeyOpen}
+          onClose={() => {
+            onRevealKeyClose();
+            setRevealAccount(null);
+          }}
+          account={revealAccount}
+        />
+      </Suspense>
+
+      {/* Reveal Seed Phrase Modal */}
+      <Suspense fallback={null}>
+        <RevealSeedPhraseModal
+          isOpen={isRevealSeedOpen}
+          onClose={() => {
+            onRevealSeedClose();
+            setRevealSeedAccount(null);
+          }}
+          account={revealSeedAccount}
+        />
+      </Suspense>
+
+      {/* Account Settings Modal */}
+      <Suspense fallback={null}>
+        <AccountSettingsModal
+          isOpen={isAccountSettingsOpen}
+          onClose={() => {
+            onAccountSettingsClose();
+            setSettingsAccount(null);
+          }}
+          account={settingsAccount}
+          onRevealPrivateKey={(account) => {
+            setRevealAccount(account);
+            onRevealKeyOpen();
+          }}
+          onRevealSeedPhrase={(account) => {
+            setRevealSeedAccount(account);
+            onRevealSeedOpen();
+          }}
+          onAccountUpdated={loadAccounts}
+        />
+      </Suspense>
     </Box>
   );
 }

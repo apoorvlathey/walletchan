@@ -74,7 +74,7 @@ function Chain({
             <Text fontWeight="700" color="text.primary">
               {chainName}
             </Text>
-            <Text fontSize="xs" color="text.tertiary" noOfLines={1} fontWeight="500">
+            <Text fontSize="xs" color="text.tertiary" noOfLines={1} fontWeight="500" maxW="200px" title={network.rpcUrl}>
               {network.rpcUrl}
             </Text>
           </Box>

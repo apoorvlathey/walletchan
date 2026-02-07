@@ -16,16 +16,19 @@ import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon, WarningTwoIcon } from "@chakra-ui/icons";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
 import { getChainConfig } from "@/constants/chainConfig";
+import TypedDataDisplay from "@/components/TypedDataDisplay";
 
 interface SignatureRequestConfirmationProps {
   sigRequest: PendingSignatureRequest;
   currentIndex: number;
   totalCount: number;
   isInSidePanel: boolean;
+  accountType?: "bankr" | "privateKey" | "impersonator";
   onBack: () => void;
   onCancelled: () => void;
   onCancelAll: () => void;
   onNavigate: (direction: "prev" | "next") => void;
+  onConfirmed?: () => void;
 }
 
 // Copy button component
@@ -84,7 +87,7 @@ function getMethodDisplayName(method: string): string {
   }
 }
 
-function formatSignatureData(method: string, params: any[]): { message: string; rawData: string } {
+function formatSignatureData(method: string, params: any[]): { message: string; rawData: string; typedData?: any } {
   try {
     if (method === "personal_sign") {
       // params[0] is the message (hex or string), params[1] is the address
@@ -118,6 +121,7 @@ function formatSignatureData(method: string, params: any[]): { message: string; 
       return {
         message: typedData.message ? JSON.stringify(typedData.message, null, 2) : "",
         rawData: JSON.stringify(typedData, null, 2),
+        typedData,
       };
     }
   } catch (e) {
@@ -135,13 +139,17 @@ function SignatureRequestConfirmation({
   currentIndex,
   totalCount,
   isInSidePanel,
+  accountType = "bankr",
   onBack,
   onCancelled,
   onCancelAll,
   onNavigate,
+  onConfirmed,
 }: SignatureRequestConfirmationProps) {
+  const toast = useBauhausToast();
   const { signature, origin, chainName, favicon } = sigRequest;
-  const { message, rawData } = formatSignatureData(signature.method, signature.params);
+  const { message, rawData, typedData } = formatSignatureData(signature.method, signature.params);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCancel = () => {
     chrome.runtime.sendMessage(
@@ -150,6 +158,59 @@ function SignatureRequestConfirmation({
         onCancelled();
       }
     );
+  };
+
+  const handleConfirm = async () => {
+    if (accountType !== "privateKey") {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Get the current tab ID
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabId = tab?.id;
+
+      // Send confirm signature request to background
+      const result = await new Promise<{ success: boolean; signature?: string; error?: string }>((resolve) => {
+        chrome.runtime.sendMessage(
+          {
+            type: "confirmSignatureRequest",
+            sigId: sigRequest.id,
+            password: "", // Use cached password
+            tabId,
+          },
+          resolve
+        );
+      });
+
+      if (result.success) {
+        toast({
+          title: "Signed",
+          description: "Message signed successfully",
+          status: "success",
+          duration: 2000,
+        });
+        onConfirmed?.();
+      } else {
+        toast({
+          title: "Signing failed",
+          description: result.error || "Failed to sign message",
+          status: "error",
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to sign",
+        status: "error",
+        duration: 3000,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -283,7 +344,7 @@ function SignatureRequestConfirmation({
               </Text>
               <HStack spacing={2}>
                 <Box
-                  bg="bauhaus.white"
+                  bg="bauhaus.black"
                   border="2px solid"
                   borderColor="bauhaus.black"
                   p={1}
@@ -305,7 +366,7 @@ function SignatureRequestConfirmation({
                         target.src = googleFallback;
                       }
                     }}
-                    fallback={<Box boxSize="16px" bg="white" />}
+                    fallback={<Box boxSize="16px" bg="bauhaus.black" />}
                   />
                 </Box>
                 <Text fontSize="sm" fontWeight="700" color="text.primary">
@@ -366,127 +427,163 @@ function SignatureRequestConfirmation({
           </VStack>
         </Box>
 
-        {/* Message Display */}
-        {message && (
+        {/* Typed Data Display (structured + raw) */}
+        {typedData ? (
+          <TypedDataDisplay typedData={typedData} rawData={rawData} />
+        ) : (
+          <>
+            {/* Message Display (personal_sign / eth_sign) */}
+            {message && (
+              <Box
+                bg="bauhaus.white"
+                p={3}
+                border="3px solid"
+                borderColor="bauhaus.black"
+                boxShadow="4px 4px 0px 0px #121212"
+              >
+                <HStack mb={2} alignItems="center">
+                  <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                    Message
+                  </Text>
+                  <Spacer />
+                  <CopyButton value={message} />
+                </HStack>
+                <Box
+                  p={3}
+                  bg="bg.muted"
+                  border="2px solid"
+                  borderColor="bauhaus.black"
+                  maxH="120px"
+                  overflowY="auto"
+                  css={{
+                    "&::-webkit-scrollbar": { width: "6px" },
+                    "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
+                    "&::-webkit-scrollbar-thumb": { background: "#121212" },
+                  }}
+                >
+                  <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
+                    {message}
+                  </Text>
+                </Box>
+              </Box>
+            )}
+
+            {/* Raw Data Display */}
+            <Box
+              bg="bauhaus.white"
+              p={3}
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+            >
+              <HStack mb={2} alignItems="center">
+                <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                  Raw Data
+                </Text>
+                <Spacer />
+                <CopyButton value={rawData} />
+              </HStack>
+              <Box
+                p={3}
+                bg="bg.muted"
+                border="2px solid"
+                borderColor="bauhaus.black"
+                maxH="100px"
+                overflowY="auto"
+                css={{
+                  "&::-webkit-scrollbar": { width: "6px" },
+                  "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
+                  "&::-webkit-scrollbar-thumb": { background: "#121212" },
+                }}
+              >
+                <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
+                  {rawData}
+                </Text>
+              </Box>
+            </Box>
+          </>
+        )}
+
+        {/* Warning Box - Signatures not supported (only for Bankr accounts) */}
+        {accountType === "bankr" && (
           <Box
-            bg="bauhaus.white"
-            p={3}
+            bg="bauhaus.yellow"
             border="3px solid"
             borderColor="bauhaus.black"
             boxShadow="4px 4px 0px 0px #121212"
+            p={3}
           >
-            <HStack mb={2} alignItems="center">
-              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                Message
+            <HStack spacing={2}>
+              <Box p={1} bg="bauhaus.black">
+                <WarningTwoIcon color="bauhaus.yellow" boxSize={4} />
+              </Box>
+              <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
+                Signatures are not supported in the Bankr API
               </Text>
-              <Spacer />
-              <CopyButton value={message} />
             </HStack>
-            <Box
-              p={3}
-              bg="bg.muted"
-              border="2px solid"
-              borderColor="bauhaus.black"
-              maxH="120px"
-              overflowY="auto"
-              css={{
-                "&::-webkit-scrollbar": {
-                  width: "6px",
-                },
-                "&::-webkit-scrollbar-track": {
-                  background: "#E0E0E0",
-                },
-                "&::-webkit-scrollbar-thumb": {
-                  background: "#121212",
-                },
-              }}
-            >
-              <Text
-                fontSize="xs"
-                fontFamily="mono"
-                color="text.tertiary"
-                wordBreak="break-all"
-                whiteSpace="pre-wrap"
-              >
-                {message}
-              </Text>
-            </Box>
           </Box>
         )}
 
-        {/* Raw Data Display */}
-        <Box
-          bg="bauhaus.white"
-          p={3}
-          border="3px solid"
-          borderColor="bauhaus.black"
-          boxShadow="4px 4px 0px 0px #121212"
-        >
-          <HStack mb={2} alignItems="center">
-            <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
-              Raw Data
-            </Text>
-            <Spacer />
-            <CopyButton value={rawData} />
-          </HStack>
+        {/* Impersonator Info Box */}
+        {accountType === "impersonator" && (
           <Box
-            p={3}
-            bg="bg.muted"
-            border="2px solid"
+            bg="bauhaus.yellow"
+            border="3px solid"
             borderColor="bauhaus.black"
-            maxH="100px"
-            overflowY="auto"
-            css={{
-              "&::-webkit-scrollbar": {
-                width: "6px",
-              },
-              "&::-webkit-scrollbar-track": {
-                background: "#E0E0E0",
-              },
-              "&::-webkit-scrollbar-thumb": {
-                background: "#121212",
-              },
-            }}
+            boxShadow="3px 3px 0px 0px #121212"
+            p={3}
           >
-            <Text
-              fontSize="xs"
-              fontFamily="mono"
-              color="text.tertiary"
-              wordBreak="break-all"
-              whiteSpace="pre-wrap"
-            >
-              {rawData}
+            <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
+              Connected via Impersonated account — signing is disabled.
             </Text>
           </Box>
-        </Box>
+        )}
 
-        {/* Warning Box - Signatures not supported */}
-        <Box
-          bg="bauhaus.yellow"
-          border="3px solid"
-          borderColor="bauhaus.black"
-          boxShadow="4px 4px 0px 0px #121212"
-          p={3}
-        >
-          <HStack spacing={2}>
-            <Box p={1} bg="bauhaus.black">
-              <WarningTwoIcon color="bauhaus.yellow" boxSize={4} />
-            </Box>
-            <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
-              Signatures are not supported in the Bankr API
-            </Text>
+        {/* Action Buttons */}
+        {accountType === "privateKey" ? (
+          <HStack spacing={3} mt={2}>
+            <Button
+              variant="secondary"
+              flex={1}
+              onClick={handleCancel}
+              isDisabled={isSubmitting}
+            >
+              Reject
+            </Button>
+            <Button
+              flex={1}
+              onClick={handleConfirm}
+              isLoading={isSubmitting}
+              loadingText="Signing..."
+              bg="bauhaus.yellow"
+              color="bauhaus.black"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+              fontWeight="700"
+              _hover={{
+                bg: "bauhaus.yellow",
+                transform: "translateY(-2px)",
+                boxShadow: "6px 6px 0px 0px #121212",
+              }}
+              _active={{
+                transform: "translate(2px, 2px)",
+                boxShadow: "none",
+              }}
+            >
+              Sign
+            </Button>
           </HStack>
-        </Box>
-
-        {/* Reject Button */}
-        <Button
-          variant="danger"
-          w="full"
-          onClick={handleCancel}
-          mt={2}
-        >
-          Reject
-        </Button>
+        ) : (
+          <Button
+            variant="danger"
+            w="full"
+            onClick={handleCancel}
+            mt={2}
+          >
+            Reject
+          </Button>
+        )}
       </VStack>
     </Box>
   );

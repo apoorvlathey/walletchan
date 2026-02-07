@@ -7,18 +7,16 @@ import {
   Text,
   VStack,
   Button,
-  Image,
   Flex,
   OrderedList,
   ListItem,
-  Code,
   Icon,
   Grid,
 } from "@chakra-ui/react";
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
-import { Download, ExternalLink } from "lucide-react";
-import { GITHUB_RELEASES_URL, BANKR_API_URL } from "../constants";
+import { Chrome, ExternalLink } from "lucide-react";
+import { CHROME_STORE_URL, BANKR_API_URL } from "../constants";
 
 const MotionBox = motion(Box);
 
@@ -100,31 +98,24 @@ function Step({
 const steps = [
   {
     number: 1,
-    title: "Download",
-    description: "Get the latest release zip file from GitHub.",
+    title: "Install",
+    description: "Add BankrWallet to Chrome from the Chrome Web Store.",
     color: "red" as const,
     shape: "circle" as const,
   },
   {
     number: 2,
-    title: "Load Extension",
-    description: "Enable Developer mode and load the unpacked extension.",
+    title: "Get API Key",
+    description: "Visit bankr.bot/api to get your Bankr API key.",
     color: "blue" as const,
     shape: "square" as const,
   },
   {
     number: 3,
-    title: "Get API Key",
-    description: "Visit bankr.bot/api to get your Bankr API key.",
-    color: "yellow" as const,
-    shape: "triangle" as const,
-  },
-  {
-    number: 4,
     title: "Start Using",
     description: "Enter your API key, create a password, and you're ready!",
-    color: "red" as const,
-    shape: "square" as const,
+    color: "yellow" as const,
+    shape: "triangle" as const,
   },
 ];
 
@@ -282,114 +273,47 @@ export function InstallGuide() {
               gap={6}
               w="full"
             >
-              {/* Step 1: Download */}
+              {/* Step 1: Install from Chrome Web Store */}
               <InstallStepCard
                 stepNumber={1}
-                title="Download the Extension"
+                title="Install from Chrome Web Store"
                 color="red"
                 delay={0}
               >
                 <OrderedList spacing={2} fontWeight="medium" pl={2}>
                   <ListItem>
-                    Go to the{" "}
-                    <Button
-                      as="a"
-                      href={GITHUB_RELEASES_URL}
-                      target="_blank"
-                      variant="ghost"
-                      size="sm"
-                      px={2}
-                      py={1}
-                      h="auto"
-                      color="bauhaus.blue"
-                      textDecoration="underline"
-                      fontWeight="bold"
-                      _hover={{ color: "bauhaus.red" }}
-                    >
-                      latest release
-                      <Icon as={ExternalLink} ml={1} w={3} h={3} />
-                    </Button>{" "}
-                    on GitHub
-                  </ListItem>
-                  <ListItem>
-                    Download the{" "}
-                    <Code bg="bauhaus.muted" px={2} py={0.5} fontWeight="bold">
-                      bankr-wallet-vX.Y.Z.zip
-                    </Code>{" "}
-                    file from the release assets
-                  </ListItem>
-                  <ListItem>
-                    Extract the zip file to a folder on your computer
-                  </ListItem>
-                </OrderedList>
-                <Button
-                  as="a"
-                  href={GITHUB_RELEASES_URL}
-                  target="_blank"
-                  variant="primary"
-                  size="md"
-                  mt={2}
-                  leftIcon={<Download size={18} />}
-                >
-                  Download Latest Release
-                </Button>
-              </InstallStepCard>
-
-              {/* Step 2: Load Extension */}
-              <InstallStepCard
-                stepNumber={2}
-                title="Load in Chrome / Brave / Arc"
-                color="blue"
-                delay={0.1}
-              >
-                <OrderedList spacing={2} fontWeight="medium" pl={2}>
-                  <ListItem>
-                    Open your browser and navigate to:{" "}
-                    <Code bg="bauhaus.muted" px={2} py={0.5} fontWeight="bold">
-                      chrome://extensions
-                    </Code>
-                  </ListItem>
-                  <ListItem>
-                    Enable{" "}
-                    <Text as="span" fontWeight="black">
-                      Developer mode
-                    </Text>{" "}
-                    (toggle in the top-right corner)
+                    Click the button below to open the Chrome Web Store
                   </ListItem>
                   <ListItem>
                     Click{" "}
                     <Text as="span" fontWeight="black">
-                      Load unpacked
-                    </Text>
+                      Add to Chrome
+                    </Text>{" "}
+                    to install the extension
                   </ListItem>
                   <ListItem>
-                    Select the extracted folder containing the extension files
+                    Works on Chrome, Brave, Arc, and other Chromium browsers
                   </ListItem>
                 </OrderedList>
-
-                {/* Developer mode screenshot */}
-                <Box
-                  mt={4}
-                  border="3px solid"
-                  borderColor="bauhaus.black"
-                  boxShadow="4px 4px 0px 0px #121212"
-                  overflow="hidden"
-                  maxW="500px"
+                <Button
+                  as="a"
+                  href={CHROME_STORE_URL}
+                  target="_blank"
+                  variant="primary"
+                  size="md"
+                  mt={2}
+                  leftIcon={<Chrome size={18} />}
                 >
-                  <Image
-                    src="/screenshots/developer-mode.png"
-                    alt="Chrome Developer Mode toggle"
-                    w="full"
-                  />
-                </Box>
+                  Add to Chrome
+                </Button>
               </InstallStepCard>
 
-              {/* Step 3: Get API Key */}
+              {/* Step 2: Get API Key */}
               <InstallStepCard
-                stepNumber={3}
+                stepNumber={2}
                 title="Get Your Bankr API Key"
-                color="yellow"
-                delay={0.2}
+                color="blue"
+                delay={0.1}
               >
                 <OrderedList spacing={2} fontWeight="medium" pl={2}>
                   <ListItem>
@@ -428,12 +352,12 @@ export function InstallGuide() {
                 </Button>
               </InstallStepCard>
 
-              {/* Step 4: Setup */}
+              {/* Step 3: Setup */}
               <InstallStepCard
-                stepNumber={4}
+                stepNumber={3}
                 title="Complete Setup"
-                color="red"
-                delay={0.3}
+                color="yellow"
+                delay={0.2}
               >
                 <OrderedList spacing={2} fontWeight="medium" pl={2}>
                   <ListItem>
