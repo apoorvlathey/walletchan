@@ -16,7 +16,7 @@ import {
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { keyframes } from "@emotion/react";
-import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon } from "@chakra-ui/icons";
+import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon, ExternalLinkIcon } from "@chakra-ui/icons";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { getChainConfig } from "@/constants/chainConfig";
 import CalldataDecoder from "@/components/CalldataDecoder";
@@ -620,6 +620,7 @@ function TransactionConfirmation({
               });
             }}
             leftIcon={<Image src="https://www.google.com/s2/favicons?sz=32&domain=tenderly.co" boxSize="14px" />}
+            rightIcon={<ExternalLinkIcon boxSize={3} />}
             _hover={{ bg: "bg.muted", transform: "translateY(-1px)" }}
           >
             Simulate on Tenderly

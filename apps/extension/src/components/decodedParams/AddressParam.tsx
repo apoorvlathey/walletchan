@@ -51,7 +51,6 @@ export function AddressParam({ value, chainId }: AddressParamProps) {
         <Button
           size="xs"
           h="18px"
-          minW="18px"
           px={1}
           fontSize="9px"
           fontWeight="700"
@@ -60,12 +59,13 @@ export function AddressParam({ value, chainId }: AddressParamProps) {
           border="1px solid"
           borderColor="gray.300"
           borderRadius={0}
+          boxShadow="none"
           onClick={() => setShowAddress(!showAddress)}
-          _hover={{ borderColor: "bauhaus.black" }}
-          _active={{ transform: "translate(1px, 1px)" }}
+          _hover={{ borderColor: "bauhaus.black", boxShadow: "none" }}
+          _active={{ transform: "translate(1px, 1px)", boxShadow: "none" }}
           title={showAddress ? "Show name" : "Show address"}
         >
-          {showAddress ? "N" : "A"}
+          {showAddress ? "name" : "address"}
         </Button>
       )}
 

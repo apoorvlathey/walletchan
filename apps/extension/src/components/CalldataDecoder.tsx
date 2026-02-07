@@ -289,12 +289,7 @@ function CalldataDecoder({ calldata, to, chainId }: CalldataDecoderProps) {
             </Code>
 
             {/* Parameters */}
-            <Box
-              w="full"
-              maxH="250px"
-              overflowY="auto"
-              css={scrollStyles}
-            >
+            <Box w="full">
               <VStack align="start" spacing={1.5} w="full">
                 {result.args.map((arg, i) => renderParams(i, arg, chainId))}
               </VStack>

@@ -70,7 +70,7 @@ export function renderParams(index: number, arg: Arg, chainId: number): JSX.Elem
 
   return (
     <Box key={index} w="full">
-      <HStack spacing={1} align="start" w="full" flexWrap="wrap">
+      <HStack spacing={1} align="center" w="full" flexWrap="wrap">
         {/* Param name */}
         <Text
           fontSize="10px"

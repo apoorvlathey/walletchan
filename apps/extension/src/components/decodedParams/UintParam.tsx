@@ -23,6 +23,11 @@ export function UintParam({ value }: UintParamProps) {
   const converted = convertTo(value, selectedOption);
   const isWei = selectedOption === "Wei";
 
+  // Check if formatting would change the display
+  const wouldFormatChange = isWei
+    ? formatWithCommas(value) !== value || formatCompact(value) !== value
+    : formatWithCommas(converted) !== converted;
+
   // Format display: raw number or comma-separated + compact
   let display = converted;
   if (formatted && isWei) {
@@ -46,8 +51,8 @@ export function UintParam({ value }: UintParamProps) {
 
   return (
     <HStack spacing={1} flexWrap="wrap" align="center">
-      {/* Format toggle - left of value */}
-      <Button
+      {/* Format toggle - only shown when formatting would change the display */}
+      {wouldFormatChange && <Button
         size="xs"
         h="18px"
         px={1.5}
@@ -59,12 +64,13 @@ export function UintParam({ value }: UintParamProps) {
         border="1px solid"
         borderColor={formatted ? "bauhaus.black" : "gray.300"}
         borderRadius={0}
+        boxShadow="none"
         onClick={() => setFormatted(!formatted)}
-        _hover={{ borderColor: "bauhaus.black" }}
-        _active={{ transform: "translate(1px, 1px)" }}
+        _hover={{ borderColor: "bauhaus.black", boxShadow: "none" }}
+        _active={{ transform: "translate(1px, 1px)", boxShadow: "none" }}
       >
         format
-      </Button>
+      </Button>}
 
       {/* Value display */}
       <Tooltip label={value} fontSize="xs" openDelay={400}>
@@ -94,9 +100,10 @@ export function UintParam({ value }: UintParamProps) {
           border="1px solid"
           borderColor={dropdownOpen ? "bauhaus.black" : "gray.300"}
           borderRadius={0}
+          boxShadow="none"
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          _hover={{ borderColor: "bauhaus.black" }}
-          _active={{ transform: "translate(1px, 1px)" }}
+          _hover={{ borderColor: "bauhaus.black", boxShadow: "none" }}
+          _active={{ transform: "translate(1px, 1px)", boxShadow: "none" }}
           rightIcon={<ChevronDownIcon boxSize={3} />}
         >
           {selectedOption}
@@ -111,7 +118,7 @@ export function UintParam({ value }: UintParamProps) {
             bg="bauhaus.white"
             border="1.5px solid"
             borderColor="bauhaus.black"
-            boxShadow="2px 2px 0px 0px #121212"
+            boxShadow="none"
             zIndex={10}
             spacing={0}
             align="stretch"

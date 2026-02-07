@@ -60,9 +60,10 @@ export function IntParam({ value }: IntParamProps) {
           border="1px solid"
           borderColor={dropdownOpen ? "bauhaus.black" : "gray.300"}
           borderRadius={0}
+          boxShadow="none"
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          _hover={{ borderColor: "bauhaus.black" }}
-          _active={{ transform: "translate(1px, 1px)" }}
+          _hover={{ borderColor: "bauhaus.black", boxShadow: "none" }}
+          _active={{ transform: "translate(1px, 1px)", boxShadow: "none" }}
           rightIcon={<ChevronDownIcon boxSize={3} />}
         >
           {selectedOption}
@@ -77,7 +78,7 @@ export function IntParam({ value }: IntParamProps) {
             bg="bauhaus.white"
             border="1.5px solid"
             borderColor="bauhaus.black"
-            boxShadow="2px 2px 0px 0px #121212"
+            boxShadow="none"
             zIndex={10}
             spacing={0}
             align="stretch"
