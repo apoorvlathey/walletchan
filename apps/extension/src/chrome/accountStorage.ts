@@ -362,6 +362,44 @@ export async function removeSeedGroup(seedGroupId: string): Promise<void> {
 }
 
 /**
+ * Finds an account by address (case-insensitive)
+ */
+export async function findAccountByAddress(address: string): Promise<Account | null> {
+  const accounts = await getAccounts();
+  return accounts.find((a) => a.address.toLowerCase() === address.toLowerCase()) || null;
+}
+
+/**
+ * Converts a private key account to a seed phrase account in-place.
+ * Preserves the same account ID, display name, and vault entry.
+ */
+export async function convertToSeedPhraseAccount(
+  accountId: string,
+  seedGroupId: string,
+  derivationIndex: number
+): Promise<SeedPhraseAccount | null> {
+  const accounts = await getAccounts();
+  const index = accounts.findIndex((a) => a.id === accountId);
+  if (index === -1) return null;
+
+  const existing = accounts[index];
+  const converted: SeedPhraseAccount = {
+    id: existing.id,
+    type: "seedPhrase",
+    address: existing.address,
+    displayName: existing.displayName,
+    createdAt: existing.createdAt,
+    seedGroupId,
+    derivationIndex,
+  };
+
+  accounts[index] = converted;
+  await saveAccounts(accounts);
+  await setActiveAccountId(converted.id);
+  return converted;
+}
+
+/**
  * Gets the first account (useful for migration from old single-account storage)
  */
 export async function getFirstAccount(): Promise<Account | null> {

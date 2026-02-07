@@ -27,7 +27,10 @@ import {
   renameSeedGroup,
   updateSeedGroupCount,
   updateAccountDisplayName,
+  findAccountByAddress,
+  convertToSeedPhraseAccount,
 } from "./accountStorage";
+import type { SeedPhraseAccount } from "./types";
 import {
   decryptAllKeys,
   addKeyToVault,
@@ -533,12 +536,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const privateKey = deriveSeedPrivateKey(mnemonic, 0);
           const address = deriveAddress(privateKey);
 
-          // Add account metadata first (to get the UUID)
-          const account = await addSeedPhraseAccount(address, group.id, 0, message.accountDisplayName || undefined);
-          await updateSeedGroupCount(group.id, 1);
+          // Check if address already exists (PK → seed phrase conversion)
+          const existingAccount = await findAccountByAddress(address);
+          let account: SeedPhraseAccount;
 
-          // Store derived PK in vault using account UUID (matches vault lookup)
-          await addKeyToVault(account.id, privateKey, password);
+          if (existingAccount) {
+            if (existingAccount.type === "privateKey") {
+              // Convert PK account to seed phrase in-place (preserves ID, display name, vault entry)
+              const converted = await convertToSeedPhraseAccount(existingAccount.id, group.id, 0);
+              if (!converted) throw new Error("Failed to convert account");
+              account = converted;
+              // Skip addKeyToVault — vault already has the key under this account ID
+            } else {
+              throw new Error("An account with this address already exists");
+            }
+          } else {
+            account = await addSeedPhraseAccount(address, group.id, 0, message.accountDisplayName || undefined);
+            // Store derived PK in vault using account UUID (matches vault lookup)
+            await addKeyToVault(account.id, privateKey, password);
+          }
+
+          await updateSeedGroupCount(group.id, 1);
 
           // Update cached vault
           const vault = await decryptAllKeys(password);
@@ -604,12 +622,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const privateKey = deriveSeedPrivateKey(mnemonic, nextIndex);
           const address = deriveAddress(privateKey);
 
-          // Add account first (to get UUID)
-          const account = await addSeedPhraseAccount(address, seedGroupId, nextIndex, message.displayName || undefined);
-          await updateSeedGroupCount(seedGroupId, groupAccounts.length + 1);
+          // Check if address already exists (PK → seed phrase conversion)
+          const existingAccount = await findAccountByAddress(address);
+          let account: SeedPhraseAccount;
 
-          // Store in vault using account UUID (matches vault lookup)
-          await addKeyToVault(account.id, privateKey, password);
+          if (existingAccount) {
+            if (existingAccount.type === "privateKey") {
+              // Convert PK account to seed phrase in-place (preserves ID, display name, vault entry)
+              const converted = await convertToSeedPhraseAccount(existingAccount.id, seedGroupId, nextIndex);
+              if (!converted) throw new Error("Failed to convert account");
+              account = converted;
+              // Skip addKeyToVault — vault already has the key under this account ID
+            } else {
+              throw new Error("An account with this address already exists");
+            }
+          } else {
+            account = await addSeedPhraseAccount(address, seedGroupId, nextIndex, message.displayName || undefined);
+            // Store in vault using account UUID (matches vault lookup)
+            await addKeyToVault(account.id, privateKey, password);
+          }
+
+          await updateSeedGroupCount(seedGroupId, groupAccounts.length + 1);
 
           // Update cached vault
           const vault = await decryptAllKeys(password);
