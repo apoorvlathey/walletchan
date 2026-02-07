@@ -488,6 +488,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
+    case "generateMnemonic": {
+      const mnemonic = generateNewMnemonic();
+      sendResponse({ success: true, mnemonic });
+      return false;
+    }
+
     case "addSeedPhraseGroup": {
       // SECURITY: Block when unlocked with agent password
       if (getPasswordType() === "agent") {

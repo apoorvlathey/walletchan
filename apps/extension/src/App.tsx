@@ -511,6 +511,22 @@ function App() {
       // Load accounts
       const { accounts: loadedAccounts, activeAccount: loadedActive } = await loadAccounts();
 
+      // Safety net: if API key exists but no accounts, redirect to onboarding
+      // This handles edge cases like interrupted setup
+      if (loadedAccounts.length === 0) {
+        const onboardingUrl = chrome.runtime.getURL("onboarding.html");
+        const existingTabs = await chrome.tabs.query({ url: onboardingUrl });
+        if (existingTabs.length > 0 && existingTabs[0].id) {
+          await chrome.tabs.update(existingTabs[0].id, { active: true });
+          await chrome.windows.update(existingTabs[0].windowId!, { focused: true });
+        } else {
+          await chrome.tabs.create({ url: onboardingUrl });
+        }
+        setView("waitingForOnboarding");
+        setIsLoading(false);
+        return;
+      }
+
       // Load stored data
       const {
         displayAddress: storedDisplayAddress,

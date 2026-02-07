@@ -31,9 +31,21 @@ The extension supports four distinct account types that can be used simultaneous
 
 - **BIP39**: 12-word mnemonics (128-bit entropy) using `@scure/bip39`
 - **BIP44**: Derivation path `m/44'/60'/0'/0/{index}` using `@scure/bip32`
-- **Seed Groups**: Each mnemonic creates a "group" that can derive multiple accounts
+- **Seed Groups**: Each mnemonic creates a "group" that can derive multiple accounts. Groups have user-editable names (default "Seed #N").
 - **Storage**: Mnemonics encrypted separately in `mnemonicVault` (PBKDF2+AES-256-GCM). Derived private keys stored in regular `pkVault` keyed by account UUID
-- **Files**: `seedPhraseUtils.ts` (BIP39/44), `mnemonicStorage.ts` (encrypted CRUD), `SeedPhraseSetup.tsx` (UI)
+- **Byte conversion**: Uses native `bytesToHex()` from `cryptoUtils.ts` instead of Node.js `Buffer` (not available in browser service worker)
+- **Files**: `seedPhraseUtils.ts` (BIP39/44), `mnemonicStorage.ts` (encrypted CRUD), `SeedPhraseSetup.tsx` (UI), `RevealSeedPhraseModal.tsx` (reveal with password)
+- **Display**: Account dropdown shows seed group name + derivation index (e.g., "Seed #1 · #0"). Account settings shows derivation index in type label.
+
+#### PK → Seed Phrase Account Conversion
+
+When importing a seed phrase whose derived address matches an existing private key account, the extension converts the PK account to a seed phrase account **in-place** rather than creating a duplicate or throwing an error:
+
+1. Derive private key + address at index N as usual
+2. Check if the address already exists in accounts via `findAccountByAddress()`
+3. If it matches a `privateKey` account → call `convertToSeedPhraseAccount()` to update type, add seedGroupId/derivationIndex, preserve same account ID, display name, and vault entry. Skip `addKeyToVault` (key already in vault under same ID).
+4. If it matches any other type (bankr/impersonator/seedPhrase) → error "An account with this address already exists"
+5. This applies to both `addSeedPhraseGroup` (index 0) and `deriveSeedAccount` (index N) handlers
 
 ### Account Selection
 
@@ -239,14 +251,14 @@ src/
 │   ├── txHandlers.ts        # Transaction/signature handlers, notifications
 │   ├── chatHandlers.ts      # Bankr AI chat prompt handling
 │   ├── sidepanelManager.ts  # Side panel detection and mode management
-│   ├── cryptoUtils.ts       # Shared crypto utilities (PBKDF2, base64, constants)
+│   ├── cryptoUtils.ts       # Shared crypto utilities (PBKDF2, base64, bytesToHex, constants)
 │   ├── crypto.ts            # AES-256-GCM encryption for API key and vault
 │   ├── vaultCrypto.ts       # Vault encryption/decryption for private keys
 │   ├── seedPhraseUtils.ts   # BIP39 mnemonic + BIP44 key derivation
 │   ├── mnemonicStorage.ts   # Encrypted mnemonic storage (PBKDF2+AES-256-GCM)
 │   ├── types.ts             # Account and vault type definitions
 │   ├── localSigner.ts       # Transaction and message signing with viem
-│   ├── accountStorage.ts    # Account CRUD operations (includes seed groups)
+│   ├── accountStorage.ts    # Account CRUD operations (includes seed groups, PK→seed conversion)
 │   ├── bankrApi.ts          # Bankr API client
 │   ├── portfolioApi.ts      # Portfolio API client (fetches token holdings via website)
 │   ├── transferUtils.ts     # ERC20/native token transfer calldata builders
@@ -278,9 +290,10 @@ src/
 │   │   ├── ChangePassword.tsx # Password change flow
 │   │   ├── AutoLockSettings.tsx # Auto-lock timeout configuration
 │   │   └── AgentPasswordSettings.tsx # Agent password set/remove (master only)
-│   ├── AccountSwitcher.tsx  # Account dropdown and selection
-│   ├── AccountSettingsModal.tsx # Account settings (rename, reveal key, remove, change API key)
+│   ├── AccountSwitcher.tsx  # Account dropdown with seed group labels (e.g., "Seed #1 · #0")
+│   ├── AccountSettingsModal.tsx # Account settings (rename, reveal key/seed, remove, change API key)
 │   ├── RevealPrivateKeyModal.tsx # Password-protected private key reveal
+│   ├── RevealSeedPhraseModal.tsx # Password-protected seed phrase reveal (master only)
 │   ├── AddAccount.tsx       # Add new account screen
 │   ├── UnlockScreen.tsx     # Wallet unlock (password entry)
 │   ├── PendingTxBanner.tsx  # Banner showing pending tx/signature count
@@ -292,7 +305,12 @@ src/
 │   ├── TokenTransfer.tsx    # Token transfer form (recipient, amount, send)
 │   ├── SeedPhraseSetup.tsx  # Seed phrase generate/import flow (12-word grid)
 │   ├── CalldataDecoder.tsx  # Decoded/Raw tab for transaction calldata (eth.sh API)
-│   └── TypedDataDisplay.tsx # Structured typed data display for EIP-712 signatures
+│   ├── TypedDataDisplay.tsx # Structured typed data display for EIP-712 signatures
+│   └── shared/
+│       ├── AccountTypeIcons.tsx # SVG icons per account type (Robot, Key, Seed, Eye)
+│       └── PrivateKeyInput.tsx  # Reusable PK import/generate input with address derivation
+├── utils/
+│   └── privateKeyUtils.ts   # generatePrivateKey(), validateAndDeriveAddress()
 ├── hooks/
 │   └── useChat.ts           # Chat state management hook
 ├── onboarding.tsx           # React entry point for onboarding page
@@ -332,8 +350,8 @@ The onboarding flow varies based on account type selection:
 
 **Step 1: Account Type Selection**
 
-- Choose: Bankr Wallet, Private Key, or both
-- Checkbox: "Set up both account types"
+- Choose: Bankr Wallet, Private Key, Seed Phrase, or Impersonator
+- Can select multiple account types to set up
 
 **Step 2a: Bankr Setup** (if Bankr or both selected)
 
@@ -342,12 +360,22 @@ The onboarding flow varies based on account type selection:
 - Display name (optional) - allows custom naming like "My Bankr Wallet"
 - Links to bankr.bot for API key and terminal
 
-**Step 2b: Private Key Setup** (if PK or both selected)
+**Step 2b: Private Key Setup** (if PK selected)
 
-- Private key input with show/hide toggle
+- Uses shared `PrivateKeyInput` component (import existing or generate new)
 - Auto-derives and displays address
 - Display name (optional) - allows custom naming like "My Trading Wallet"
 - Security warning about local storage
+
+**Step 2c: Seed Phrase Setup** (if Seed Phrase selected)
+
+- Uses `SeedPhraseSetup` component (import existing or generate new 12-word mnemonic)
+- Display name (optional) for the first derived account
+
+**Step 2d: Impersonator Setup** (if Impersonator selected)
+
+- Address input (view-only, no secrets stored)
+- Display name (optional)
 
 **Step 3: Create Password**
 
@@ -994,6 +1022,8 @@ Users can optionally configure an **agent password** that allows AI agents to un
 │  │    ✅ Sign transactions                                              │   │
 │  │    ✅ Sign messages                                                  │   │
 │  │    ✅ Reveal private keys                                            │   │
+│  │    ✅ Reveal seed phrases                                            │   │
+│  │    ✅ Add seed phrase / derive accounts                              │   │
 │  │    ✅ Manage agent password settings                                 │   │
 │  │    ✅ Change master password                                         │   │
 │  │    ✅ Change Bankr API key & address                                 │   │
@@ -1003,6 +1033,8 @@ Users can optionally configure an **agent password** that allows AI agents to un
 │  │    ✅ Sign transactions                                              │   │
 │  │    ✅ Sign messages                                                  │   │
 │  │    ❌ Reveal private keys (blocked)                                  │   │
+│  │    ❌ Reveal seed phrases (blocked)                                  │   │
+│  │    ❌ Add seed phrase / derive accounts (blocked)                    │   │
 │  │    ❌ Manage agent password settings (blocked)                       │   │
 │  │    ❌ Change master password (blocked)                               │   │
 │  │    ❌ Change Bankr API key & address (blocked)                       │   │
@@ -1033,12 +1065,14 @@ Users can optionally configure an **agent password** that allows AI agents to un
 
 **Security Invariants**:
 1. Private key reveal is **always blocked** when unlocked with agent password
-2. Agent password management requires master password
-3. Master password change requires master password (agent cannot change it)
-4. Bankr API key & address change requires master password
-5. Both passwords use the same auto-lock timeout
-6. No timing leak between password types (tries master first, then agent)
-7. Changing master password does NOT invalidate agent password
+2. Seed phrase reveal is **always blocked** when unlocked with agent password
+3. Adding seed phrases / deriving accounts is **blocked** with agent password
+4. Agent password management requires master password
+5. Master password change requires master password (agent cannot change it)
+6. Bankr API key & address change requires master password
+7. Both passwords use the same auto-lock timeout
+8. No timing leak between password types (tries master first, then agent)
+9. Changing master password does NOT invalidate agent password
 
 #### Auto-Lock Timeout Configuration
 
@@ -1389,10 +1423,11 @@ Build command: `pnpm build`
 | `revealPrivateKey`                 | Reveal private key (requires password verification)     |
 | `updateAccountDisplayName`         | Update account display name                             |
 | `addImpersonatorAccount`           | Add view-only impersonator account (address only)       |
-| `addSeedPhraseGroup`              | Generate/import mnemonic, create seed group, derive first account |
-| `deriveSeedAccount`               | Derive next account from existing seed group             |
-| `revealSeedPhrase`                | Reveal mnemonic (requires master password)               |
+| `addSeedPhraseGroup`              | Generate/import mnemonic, create seed group, derive first account (handles PK collision) |
+| `deriveSeedAccount`               | Derive next account from existing seed group (handles PK collision) |
+| `revealSeedPhrase`                | Reveal mnemonic (requires master password verification)  |
 | `getSeedGroups`                   | Get all seed group metadata                              |
+| `renameSeedGroup`                 | Rename a seed group (broadcasts accountsUpdated)         |
 | `initiateTransfer`                 | Create pending tx for extension-initiated token transfer |
 
 ### Background → Views (chrome.runtime broadcast)

@@ -21,9 +21,11 @@ type Mode = "choose" | "generate" | "import";
 interface SeedPhraseSetupProps {
   onBack: () => void;
   onComplete: () => void;
+  /** When provided, collect mnemonic without saving (for onboarding flow where wallet isn't unlocked yet) */
+  onCollect?: (mnemonic: string, groupName?: string, accountDisplayName?: string) => void;
 }
 
-function SeedPhraseSetup({ onBack, onComplete }: SeedPhraseSetupProps) {
+function SeedPhraseSetup({ onBack, onComplete, onCollect }: SeedPhraseSetupProps) {
   const toast = useBauhausToast();
 
   const [mode, setMode] = useState<Mode>("choose");
@@ -49,33 +51,52 @@ function SeedPhraseSetup({ onBack, onComplete }: SeedPhraseSetupProps) {
     setError(null);
 
     try {
-      const response = await new Promise<{
-        success: boolean;
-        error?: string;
-        mnemonic?: string;
-        account?: any;
-        group?: any;
-      }>((resolve) => {
-        chrome.runtime.sendMessage(
-          {
-            type: "addSeedPhraseGroup",
-            name: displayName.trim() || undefined,
-            accountDisplayName: accountDisplayName.trim() || undefined,
-            // No mnemonic = generate new one
-          },
-          resolve
-        );
-      });
+      if (onCollect) {
+        // collectOnly mode: generate mnemonic without saving (wallet not unlocked yet)
+        const response = await new Promise<{
+          success: boolean;
+          error?: string;
+          mnemonic?: string;
+        }>((resolve) => {
+          chrome.runtime.sendMessage({ type: "generateMnemonic" }, resolve);
+        });
 
-      if (!response.success) {
-        setError(response.error || "Failed to generate seed phrase");
+        if (!response.success || !response.mnemonic) {
+          setError(response.error || "Failed to generate seed phrase");
+          setIsSubmitting(false);
+          return;
+        }
+
+        setGeneratedMnemonic(response.mnemonic);
         setIsSubmitting(false);
-        return;
-      }
+      } else {
+        // Normal mode: generate and save via addSeedPhraseGroup
+        const response = await new Promise<{
+          success: boolean;
+          error?: string;
+          mnemonic?: string;
+          account?: any;
+          group?: any;
+        }>((resolve) => {
+          chrome.runtime.sendMessage(
+            {
+              type: "addSeedPhraseGroup",
+              name: displayName.trim() || undefined,
+              accountDisplayName: accountDisplayName.trim() || undefined,
+            },
+            resolve
+          );
+        });
 
-      // Show the generated mnemonic for the user to save
-      setGeneratedMnemonic(response.mnemonic!);
-      setIsSubmitting(false);
+        if (!response.success) {
+          setError(response.error || "Failed to generate seed phrase");
+          setIsSubmitting(false);
+          return;
+        }
+
+        setGeneratedMnemonic(response.mnemonic!);
+        setIsSubmitting(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate seed phrase");
       setIsSubmitting(false);
@@ -96,37 +117,48 @@ function SeedPhraseSetup({ onBack, onComplete }: SeedPhraseSetupProps) {
     }
 
     try {
-      const response = await new Promise<{
-        success: boolean;
-        error?: string;
-        account?: any;
-        group?: any;
-      }>((resolve) => {
-        chrome.runtime.sendMessage(
-          {
-            type: "addSeedPhraseGroup",
-            mnemonic: trimmed,
-            name: displayName.trim() || undefined,
-            accountDisplayName: accountDisplayName.trim() || undefined,
-          },
-          resolve
+      if (onCollect) {
+        // collectOnly mode: validate locally, don't save yet
+        onCollect(
+          trimmed,
+          displayName.trim() || undefined,
+          accountDisplayName.trim() || undefined
         );
-      });
-
-      if (!response.success) {
-        setError(response.error || "Failed to import seed phrase");
         setIsSubmitting(false);
-        return;
+      } else {
+        // Normal mode: save via addSeedPhraseGroup
+        const response = await new Promise<{
+          success: boolean;
+          error?: string;
+          account?: any;
+          group?: any;
+        }>((resolve) => {
+          chrome.runtime.sendMessage(
+            {
+              type: "addSeedPhraseGroup",
+              mnemonic: trimmed,
+              name: displayName.trim() || undefined,
+              accountDisplayName: accountDisplayName.trim() || undefined,
+            },
+            resolve
+          );
+        });
+
+        if (!response.success) {
+          setError(response.error || "Failed to import seed phrase");
+          setIsSubmitting(false);
+          return;
+        }
+
+        toast({
+          title: "Seed phrase imported",
+          description: "First account has been derived",
+          status: "success",
+          duration: 2000,
+        });
+
+        onComplete();
       }
-
-      toast({
-        title: "Seed phrase imported",
-        description: "First account has been derived",
-        status: "success",
-        duration: 2000,
-      });
-
-      onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to import seed phrase");
       setIsSubmitting(false);
@@ -225,13 +257,22 @@ function SeedPhraseSetup({ onBack, onComplete }: SeedPhraseSetupProps) {
             w="full"
             onClick={() => {
               setConfirmed(true);
-              toast({
-                title: "Account added",
-                description: "Seed phrase account has been created",
-                status: "success",
-                duration: 2000,
-              });
-              onComplete();
+              if (onCollect) {
+                // collectOnly mode: pass mnemonic back without saving
+                onCollect(
+                  generatedMnemonic,
+                  displayName.trim() || undefined,
+                  accountDisplayName.trim() || undefined
+                );
+              } else {
+                toast({
+                  title: "Account added",
+                  description: "Seed phrase account has been created",
+                  status: "success",
+                  duration: 2000,
+                });
+                onComplete();
+              }
             }}
           >
             I've Saved My Seed Phrase

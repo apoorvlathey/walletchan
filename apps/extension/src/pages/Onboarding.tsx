@@ -114,6 +114,9 @@ function Onboarding({ onComplete }: OnboardingProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
+  const [collectedMnemonic, setCollectedMnemonic] = useState("");
+  const [seedGroupName, setSeedGroupName] = useState("");
+  const [seedAccountDisplayName, setSeedAccountDisplayName] = useState("");
   const [errors, setErrors] = useState<{
     apiKey?: string;
     privateKey?: string;
@@ -236,8 +239,8 @@ function Onboarding({ onComplete }: OnboardingProps) {
         } else if (accountTypeChoice === "privateKey") {
           setStep("privateKey");
         } else if (accountTypeChoice === "seedPhrase") {
-          // Seed phrase needs password first (to unlock wallet before addSeedPhraseGroup)
-          setStep("password");
+          // Collect seed phrase first, then password
+          setStep("seedPhrase");
         } else {
           // "both" - start with bankr setup
           setStep("bankrSetup");
@@ -262,11 +265,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
         break;
       case "password":
         if (validatePassword()) {
-          if (accountTypeChoice === "seedPhrase") {
-            await handleCreateWalletForSeed();
-          } else {
-            await handleSubmit();
-          }
+          await handleSubmit();
         }
         break;
     }
@@ -289,7 +288,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
         break;
       case "password":
         if (accountTypeChoice === "seedPhrase") {
-          setStep("accountType");
+          setStep("seedPhrase");
         } else if (accountTypeChoice === "privateKey") {
           setStep("privateKey");
         } else if (accountTypeChoice === "both") {
@@ -299,80 +298,8 @@ function Onboarding({ onComplete }: OnboardingProps) {
         }
         break;
       case "seedPhrase":
-        // Going back from seed phrase step means aborting after wallet was already created
-        // This is a rare case - just go back to account type selection
         setStep("accountType");
         break;
-    }
-  };
-
-  /**
-   * For seed phrase flow: create wallet (save placeholder API key + unlock) then show SeedPhraseSetup
-   */
-  const handleCreateWalletForSeed = async () => {
-    setIsSubmitting(true);
-    try {
-      // Save placeholder to establish the password
-      await saveEncryptedApiKey("pk-only-mode", password);
-
-      // Unlock wallet to cache credentials (needed by addSeedPhraseGroup)
-      await chrome.runtime.sendMessage({ type: "unlockWallet", password });
-
-      // Transition to seed phrase setup
-      setStep("seedPhrase");
-    } catch (error) {
-      setErrors({
-        password:
-          error instanceof Error
-            ? error.message
-            : "Failed to set up wallet",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  /**
-   * Called when SeedPhraseSetup completes (generate or import)
-   */
-  const handleSeedPhraseComplete = async () => {
-    try {
-      // Get the first account that was just created to use as default
-      const accounts = await new Promise<any[]>((resolve) => {
-        chrome.runtime.sendMessage({ type: "getAccounts" }, resolve);
-      });
-
-      const seedAccount = accounts?.find((a: any) => a.type === "seedPhrase");
-      const defaultAddress = seedAccount?.address || accounts?.[0]?.address;
-      const defaultDisplayName = seedAccount?.displayName || defaultAddress;
-
-      if (defaultAddress) {
-        await chrome.storage.sync.set({
-          address: defaultAddress,
-          displayAddress: defaultDisplayName,
-          chainName: "Base",
-        });
-      }
-
-      // Enable sidepanel mode by default for non-Arc browsers
-      const { isArcBrowser: storedIsArc } = await chrome.storage.sync.get(["isArcBrowser"]);
-      if (!storedIsArc) {
-        try {
-          const response = await chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: true });
-          if (response?.success) {
-            console.log("Sidepanel mode enabled by default");
-          }
-        } catch {
-          // Ignore errors - popup mode is fine as fallback
-        }
-      }
-
-      setStep("success");
-      chrome.runtime.sendMessage({ type: "onboardingComplete" });
-    } catch {
-      // If anything fails getting accounts, still show success
-      setStep("success");
-      chrome.runtime.sendMessage({ type: "onboardingComplete" });
     }
   };
 
@@ -382,6 +309,47 @@ function Onboarding({ onComplete }: OnboardingProps) {
     try {
       let finalAddress: string;
       let finalDisplayAddress: string;
+
+      // Handle Seed Phrase account setup
+      if (accountTypeChoice === "seedPhrase") {
+        // Save placeholder to establish the password
+        await saveEncryptedApiKey("pk-only-mode", password);
+
+        // Unlock wallet to cache credentials
+        await chrome.runtime.sendMessage({ type: "unlockWallet", password });
+
+        // Create seed phrase group + derive first account (atomic with wallet creation)
+        const seedResponse = await new Promise<{
+          success: boolean;
+          error?: string;
+          account?: any;
+          group?: any;
+        }>((resolve) => {
+          chrome.runtime.sendMessage(
+            {
+              type: "addSeedPhraseGroup",
+              mnemonic: collectedMnemonic,
+              name: seedGroupName || undefined,
+              accountDisplayName: seedAccountDisplayName || undefined,
+            },
+            resolve
+          );
+        });
+
+        if (!seedResponse.success) {
+          setErrors({ password: seedResponse.error || "Failed to create seed phrase account" });
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Get account address for storage
+        const accounts = await new Promise<any[]>((resolve) => {
+          chrome.runtime.sendMessage({ type: "getAccounts" }, resolve);
+        });
+        const seedAccount = accounts?.find((a: any) => a.type === "seedPhrase");
+        finalAddress = seedAccount?.address || accounts?.[0]?.address;
+        finalDisplayAddress = seedAccount?.displayName || finalAddress;
+      }
 
       // Handle Private Key account setup
       if (accountTypeChoice === "privateKey" || accountTypeChoice === "both") {
@@ -526,12 +494,12 @@ function Onboarding({ onComplete }: OnboardingProps) {
         return 1;
       case "privateKey":
         return accountTypeChoice === "both" ? 2 : 1;
+      case "seedPhrase":
+        return 1;
       case "password":
-        if (accountTypeChoice === "seedPhrase") return 1;
+        if (accountTypeChoice === "seedPhrase") return 2;
         if (accountTypeChoice === "privateKey") return 2;
         if (accountTypeChoice === "both") return 3;
-        return 2;
-      case "seedPhrase":
         return 2;
       default:
         return 0;
@@ -539,7 +507,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   const getTotalSteps = (): number => {
-    if (accountTypeChoice === "seedPhrase") return 3; // accountType, password, seedPhrase
+    if (accountTypeChoice === "seedPhrase") return 3; // accountType, seedPhrase, password
     if (accountTypeChoice === "privateKey") return 3; // accountType, privateKey, password
     if (accountTypeChoice === "both") return 4; // accountType, bankrSetup, privateKey, password
     return 3; // accountType, bankrSetup, password
@@ -840,8 +808,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
     );
   }
 
-  // Seed Phrase Step - renders the existing SeedPhraseSetup component
-  // Wrapped with centering + maxW to match the onboarding full-screen layout
+  // Seed Phrase Step - collect mnemonic before password
   if (step === "seedPhrase") {
     return (
       <Box
@@ -855,7 +822,13 @@ function Onboarding({ onComplete }: OnboardingProps) {
         <Box w="full" maxW="400px">
           <SeedPhraseSetup
             onBack={() => setStep("accountType")}
-            onComplete={handleSeedPhraseComplete}
+            onComplete={() => {}}
+            onCollect={(mnemonic, groupName, accountDisplayName) => {
+              setCollectedMnemonic(mnemonic);
+              setSeedGroupName(groupName || "");
+              setSeedAccountDisplayName(accountDisplayName || "");
+              setStep("password");
+            }}
           />
         </Box>
       </Box>
@@ -1404,7 +1377,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
               isLoading={isSubmitting}
               loadingText="Setting up..."
             >
-              {accountTypeChoice === "seedPhrase" ? "Continue" : "Complete Setup"}
+              Complete Setup
             </Button>
           </VStack>
         )}
