@@ -10,9 +10,12 @@ import {
   IconButton,
   InputGroup,
   InputRightElement,
+  Spinner,
 } from "@chakra-ui/react";
-import { ArrowBackIcon } from "@chakra-ui/icons";
+import { ArrowBackIcon, CopyIcon, CheckIcon, ExternalLinkIcon } from "@chakra-ui/icons";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
+import { useAddressResolver } from "@/hooks/useAddressResolver";
+import { isResolvableName } from "@/lib/ensUtils";
 import { PortfolioToken } from "@/chrome/portfolioApi";
 import { buildTransferTx } from "@/chrome/transferUtils";
 import { getChainConfig } from "@/constants/chainConfig";
@@ -23,10 +26,6 @@ interface TokenTransferProps {
   accountType: "bankr" | "privateKey" | "seedPhrase" | "impersonator";
   onBack: () => void;
   onTransferInitiated: () => void;
-}
-
-function isValidAddress(addr: string): boolean {
-  return /^0x[a-fA-F0-9]{40}$/.test(addr);
 }
 
 function TokenTransfer({
@@ -40,6 +39,10 @@ function TokenTransfer({
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const { resolvedAddress, resolvedName, avatar, isResolving, isValid: isRecipientValid } =
+    useAddressResolver(recipient);
 
   const chainConfig = getChainConfig(token.chainId);
 
@@ -55,7 +58,7 @@ function TokenTransfer({
     return num <= balance;
   };
 
-  const canSubmit = isValidAddress(recipient) && isAmountValid() && !isSubmitting;
+  const canSubmit = isRecipientValid && !isResolving && isAmountValid() && !isSubmitting;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -73,7 +76,7 @@ function TokenTransfer({
 
     try {
       const txParts = buildTransferTx({
-        to: recipient,
+        to: resolvedAddress!,
         amount,
         contractAddress: token.contractAddress,
         decimals: token.decimals,
@@ -197,25 +200,103 @@ function TokenTransfer({
 
         {/* Recipient input */}
         <Box>
-          <Text fontSize="sm" fontWeight="700" color="text.secondary" textTransform="uppercase" mb={1}>
-            Recipient
-          </Text>
+          <HStack justify="space-between" align="center" mb={1}>
+            <Text fontSize="sm" fontWeight="700" color="text.secondary" textTransform="uppercase">
+              Recipient
+            </Text>
+            {/* Resolution status - top right */}
+            {recipient && isResolving && (
+              <HStack spacing={1}>
+                <Spinner size="xs" color="bauhaus.blue" />
+                <Text fontSize="xs" color="text.tertiary" fontWeight="700">
+                  Resolving...
+                </Text>
+              </HStack>
+            )}
+            {recipient && !isResolving && isRecipientValid && isResolvableName(recipient) && resolvedAddress && (
+              <HStack spacing={0.5}>
+                {avatar && (
+                  <Image
+                    src={avatar}
+                    alt="avatar"
+                    boxSize="14px"
+                    borderRadius="full"
+                    border="1px solid"
+                    borderColor="bauhaus.black"
+                  />
+                )}
+                <Text fontSize="xs" color="text.tertiary" fontFamily="mono" fontWeight="700">
+                  {resolvedAddress.slice(0, 6)}...{resolvedAddress.slice(-4)}
+                </Text>
+                <IconButton
+                  aria-label="Copy address"
+                  icon={copied ? <CheckIcon boxSize="10px" /> : <CopyIcon boxSize="10px" />}
+                  size="xs"
+                  variant="ghost"
+                  minW="18px"
+                  h="18px"
+                  color={copied ? "bauhaus.yellow" : "text.tertiary"}
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(resolvedAddress);
+                    setCopied(true);
+                    toast({ title: "Copied!", status: "success", duration: 1500 });
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
+                />
+                {chainConfig.explorer && (
+                  <IconButton
+                    aria-label="View on explorer"
+                    icon={<ExternalLinkIcon boxSize="10px" />}
+                    size="xs"
+                    variant="ghost"
+                    minW="18px"
+                    h="18px"
+                    color="text.tertiary"
+                    onClick={() => window.open(`${chainConfig.explorer}/address/${resolvedAddress}`, "_blank")}
+                    _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
+                  />
+                )}
+              </HStack>
+            )}
+            {recipient && !isResolving && isRecipientValid && !isResolvableName(recipient) && resolvedName && (
+              <HStack spacing={0.5}>
+                {avatar && (
+                  <Image
+                    src={avatar}
+                    alt="avatar"
+                    boxSize="14px"
+                    borderRadius="full"
+                    border="1px solid"
+                    borderColor="bauhaus.black"
+                  />
+                )}
+                <Text fontSize="xs" color="text.tertiary" fontWeight="700">
+                  {resolvedName}
+                </Text>
+              </HStack>
+            )}
+          </HStack>
           <Input
-            placeholder="0x..."
+            placeholder="0x..., ENS, or Basename"
             value={recipient}
             onChange={(e) => setRecipient(e.target.value.trim())}
             fontFamily="mono"
             fontSize="sm"
             border="3px solid"
-            borderColor={recipient && !isValidAddress(recipient) ? "bauhaus.red" : "bauhaus.black"}
+            borderColor={
+              recipient && !isResolving && !isRecipientValid
+                ? "bauhaus.red"
+                : "bauhaus.black"
+            }
             borderRadius="0"
             bg="bauhaus.white"
             _hover={{ borderColor: "bauhaus.blue" }}
             _focus={{ borderColor: "bauhaus.blue", boxShadow: "none" }}
           />
-          {recipient && !isValidAddress(recipient) && (
+          {recipient && !isResolving && !isRecipientValid && (
             <Text fontSize="xs" color="bauhaus.red" fontWeight="700" mt={1}>
-              Invalid address
+              Invalid address or ENS name
             </Text>
           )}
         </Box>

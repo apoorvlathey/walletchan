@@ -161,6 +161,7 @@ When working on features, refer to these docs:
 - **Per-tab chain state**: Each browser tab maintains its own selected chain
 - **Transaction persistence**: Pending transactions survive popup close (stored in chrome.storage.local)
 - **EIP-6963**: Modern wallet discovery alongside legacy window.ethereum
+- **Address display standard**: Whenever a `0x` address is shown in the UI, always include a **copy button** (CopyIcon/CheckIcon toggle) and a **view on explorer** link (ExternalLinkIcon, opens `${chainConfig.explorer}/address/${addr}`). See `TypedDataDisplay.tsx` `AddressValue` component for the reference pattern.
 
 ## Code Quality Guidelines
 
