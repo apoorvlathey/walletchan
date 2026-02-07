@@ -149,13 +149,6 @@ function TokenHoldings({ address, onTokenClick, hideHeader, hideCard, onStateCha
   const tokenList = (
     <VStack
       spacing={0}
-      maxH={hideCard ? undefined : "200px"}
-      overflowY="auto"
-      css={{
-        "&::-webkit-scrollbar": { width: "6px" },
-        "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
-        "&::-webkit-scrollbar-thumb": { background: "#121212" },
-      }}
     >
       {loading && tokens.length === 0 ? (
         // Loading skeletons

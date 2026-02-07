@@ -201,16 +201,7 @@ export default function PortfolioTabs({ address, activityTabTrigger = 0, onToken
             </Suspense>
           </TabPanel>
           <TabPanel p={0}>
-            <Box
-              maxH="300px"
-              overflowY="auto"
-              p={2}
-              css={{
-                "&::-webkit-scrollbar": { width: "6px" },
-                "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
-                "&::-webkit-scrollbar-thumb": { background: "#121212" },
-              }}
-            >
+            <Box p={2}>
               <TxStatusList maxItems={10} address={address} hideHeader hideCard />
             </Box>
           </TabPanel>
