@@ -1,5 +1,6 @@
 // Chain brand colors and icons configuration
 export interface ChainConfig {
+  name: string;
   bg: string;
   border: string;
   text: string;
@@ -9,7 +10,7 @@ export interface ChainConfig {
 
 export const CHAIN_CONFIG: Record<number, ChainConfig> = {
   1: {
-    // Ethereum - Blue/Gray
+    name: "Ethereum",
     bg: "rgba(98, 126, 234, 0.15)",
     border: "rgba(98, 126, 234, 0.4)",
     text: "#627EEA",
@@ -17,7 +18,7 @@ export const CHAIN_CONFIG: Record<number, ChainConfig> = {
     explorer: "https://etherscan.io",
   },
   137: {
-    // Polygon - Purple
+    name: "Polygon",
     bg: "rgba(130, 71, 229, 0.15)",
     border: "rgba(130, 71, 229, 0.4)",
     text: "#8247E5",
@@ -25,7 +26,7 @@ export const CHAIN_CONFIG: Record<number, ChainConfig> = {
     explorer: "https://polygonscan.com",
   },
   8453: {
-    // Base - Blue
+    name: "Base",
     bg: "rgba(0, 82, 255, 0.15)",
     border: "rgba(0, 82, 255, 0.4)",
     text: "#0052FF",
@@ -33,7 +34,7 @@ export const CHAIN_CONFIG: Record<number, ChainConfig> = {
     explorer: "https://basescan.org",
   },
   130: {
-    // Unichain - Pink
+    name: "Unichain",
     bg: "rgba(255, 0, 122, 0.15)",
     border: "rgba(255, 0, 122, 0.4)",
     text: "#FF007A",
@@ -44,6 +45,7 @@ export const CHAIN_CONFIG: Record<number, ChainConfig> = {
 
 // Default config for unknown chains
 export const DEFAULT_CHAIN_CONFIG: ChainConfig = {
+  name: "Unknown",
   bg: "rgba(255, 255, 255, 0.1)",
   border: "rgba(255, 255, 255, 0.2)",
   text: "#FAFAFA",

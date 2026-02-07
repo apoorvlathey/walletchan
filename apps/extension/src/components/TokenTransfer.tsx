@@ -185,7 +185,12 @@ function TokenTransfer({
               </Text>
             </VStack>
             {chainConfig.icon && (
-              <Image src={chainConfig.icon} alt={chainConfig.name} boxSize="20px" />
+              <HStack spacing={1}>
+                <Image src={chainConfig.icon} alt={chainConfig.name} boxSize="20px" />
+                <Text fontSize="xs" fontWeight="700" color="text.secondary">
+                  {chainConfig.name}
+                </Text>
+              </HStack>
             )}
           </HStack>
         </Box>
