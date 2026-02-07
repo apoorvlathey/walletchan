@@ -133,6 +133,8 @@ interface OctavAsset {
   balance: string;
   price: string;
   value: string;
+  contract?: string;
+  decimal?: string;
   imgSmall?: string;
   imgLarge?: string;
 }
@@ -193,9 +195,12 @@ function collectAssets(
       tokenMap.set(key, {
         symbol: asset.symbol || "???",
         name: asset.name || asset.symbol || "Unknown",
-        contractAddress: "native",
+        contractAddress:
+          !asset.contract || asset.contract === "0x0000000000000000000000000000000000000000"
+            ? "native"
+            : asset.contract,
         chainId,
-        decimals: 18,
+        decimals: asset.decimal ? parseInt(asset.decimal, 10) : 18,
         balance: asset.balance || "0",
         balanceFormatted: formatBalance(balance),
         priceUsd,
