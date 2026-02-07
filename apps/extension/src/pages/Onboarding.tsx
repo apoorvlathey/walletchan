@@ -14,7 +14,6 @@ import {
   IconButton,
   Image,
   Link,
-  Checkbox,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import {
@@ -33,7 +32,7 @@ import PrivateKeyInput from "@/components/shared/PrivateKeyInput";
 import SeedPhraseSetup from "@/components/SeedPhraseSetup";
 
 type OnboardingStep = "welcome" | "accountType" | "bankrSetup" | "privateKey" | "seedPhrase" | "password" | "success";
-type AccountTypeChoice = "bankr" | "privateKey" | "seedPhrase" | "both";
+type AccountTypeChoice = "bankr" | "privateKey" | "seedPhrase";
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -239,20 +238,12 @@ function Onboarding({ onComplete }: OnboardingProps) {
         } else if (accountTypeChoice === "privateKey") {
           setStep("privateKey");
         } else if (accountTypeChoice === "seedPhrase") {
-          // Collect seed phrase first, then password
           setStep("seedPhrase");
-        } else {
-          // "both" - start with bankr setup
-          setStep("bankrSetup");
         }
         break;
       case "bankrSetup":
         if (await validateBankrSetup()) {
-          if (accountTypeChoice === "both") {
-            setStep("privateKey");
-          } else {
-            setStep("password");
-          }
+          setStep("password");
         }
         break;
       case "privateKey":
@@ -280,18 +271,12 @@ function Onboarding({ onComplete }: OnboardingProps) {
         setStep("accountType");
         break;
       case "privateKey":
-        if (accountTypeChoice === "both") {
-          setStep("bankrSetup");
-        } else {
-          setStep("accountType");
-        }
+        setStep("accountType");
         break;
       case "password":
         if (accountTypeChoice === "seedPhrase") {
           setStep("seedPhrase");
         } else if (accountTypeChoice === "privateKey") {
-          setStep("privateKey");
-        } else if (accountTypeChoice === "both") {
           setStep("privateKey");
         } else {
           setStep("bankrSetup");
@@ -352,7 +337,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
       }
 
       // Handle Private Key account setup
-      if (accountTypeChoice === "privateKey" || accountTypeChoice === "both") {
+      if (accountTypeChoice === "privateKey") {
         const pkResult = validateAndDeriveAddress(privateKey);
         if (!pkResult.valid || !pkResult.address || !pkResult.normalizedKey) {
           setErrors({ privateKey: pkResult.error || "Invalid private key" });
@@ -367,17 +352,9 @@ function Onboarding({ onComplete }: OnboardingProps) {
         // Use the normalized key from validation (already has 0x prefix)
         const normalizedKey = pkResult.normalizedKey;
 
-        // For PK accounts, we need to save the private key encrypted
-        // First, we need to create a "dummy" encrypted API key to establish the password
-        // Or we can just save the API key if "both" is selected
-        if (accountTypeChoice === "both") {
-          // Save encrypted API key
-          await saveEncryptedApiKey(apiKey.trim(), password);
-        } else {
-          // For PK-only, we still need to encrypt something to establish password
-          // Save a placeholder that will be checked
-          await saveEncryptedApiKey("pk-only-mode", password);
-        }
+        // For PK-only, we still need to encrypt something to establish password
+        // Save a placeholder that will be checked
+        await saveEncryptedApiKey("pk-only-mode", password);
 
         // Unlock wallet to cache credentials
         await chrome.runtime.sendMessage({ type: "unlockWallet", password });
@@ -402,7 +379,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
       }
 
       // Handle Bankr account setup
-      if (accountTypeChoice === "bankr" || accountTypeChoice === "both") {
+      if (accountTypeChoice === "bankr") {
         // Resolve address (in case it's ENS)
         const resolvedAddress = await resolveAddress(walletAddress.trim());
         if (!resolvedAddress) {
@@ -411,16 +388,13 @@ function Onboarding({ onComplete }: OnboardingProps) {
           return;
         }
 
-        // If bankr only, save encrypted API key
-        if (accountTypeChoice === "bankr") {
-          await saveEncryptedApiKey(apiKey.trim(), password);
+        // Save encrypted API key
+        await saveEncryptedApiKey(apiKey.trim(), password);
 
-          // Unlock wallet to cache credentials
-          await chrome.runtime.sendMessage({ type: "unlockWallet", password });
-        }
+        // Unlock wallet to cache credentials
+        await chrome.runtime.sendMessage({ type: "unlockWallet", password });
 
         // Add the Bankr account
-        // Use explicit display name if provided, otherwise use ENS name if different from resolved address
         const bankrAccountDisplayName = bankrDisplayName.trim()
           || (walletAddress.trim() !== resolvedAddress ? walletAddress.trim() : undefined);
         const bankrResponse = await new Promise<{ success: boolean; error?: string }>((resolve) => {
@@ -440,13 +414,8 @@ function Onboarding({ onComplete }: OnboardingProps) {
           return;
         }
 
-        // Only use Bankr address as the final address if it's the only account type
-        // When "both" is selected, PK account is added first and becomes active,
-        // so we should keep the PK address as finalAddress
-        if (accountTypeChoice === "bankr") {
-          finalAddress = resolvedAddress;
-          finalDisplayAddress = bankrDisplayName.trim() || walletAddress.trim();
-        }
+        finalAddress = resolvedAddress;
+        finalDisplayAddress = bankrDisplayName.trim() || walletAddress.trim();
       }
 
       // Save wallet address and default network (use first account's address)
@@ -493,13 +462,10 @@ function Onboarding({ onComplete }: OnboardingProps) {
       case "bankrSetup":
         return 1;
       case "privateKey":
-        return accountTypeChoice === "both" ? 2 : 1;
+        return 1;
       case "seedPhrase":
         return 1;
       case "password":
-        if (accountTypeChoice === "seedPhrase") return 2;
-        if (accountTypeChoice === "privateKey") return 2;
-        if (accountTypeChoice === "both") return 3;
         return 2;
       default:
         return 0;
@@ -507,10 +473,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   const getTotalSteps = (): number => {
-    if (accountTypeChoice === "seedPhrase") return 3; // accountType, seedPhrase, password
-    if (accountTypeChoice === "privateKey") return 3; // accountType, privateKey, password
-    if (accountTypeChoice === "both") return 4; // accountType, bankrSetup, privateKey, password
-    return 3; // accountType, bankrSetup, password
+    return 3; // accountType, setup, password
   };
 
   // Show loading while checking if already set up
@@ -886,7 +849,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
 
         {/* Account Type Selection Step */}
         {step === "accountType" && (
-          <VStack spacing={6} w="full">
+          <VStack spacing={5} w="full">
             <VStack spacing={2} textAlign="center">
               <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wide">
                 Choose Account Type
@@ -896,21 +859,25 @@ function Onboarding({ onComplete }: OnboardingProps) {
               </Text>
             </VStack>
 
-            <VStack spacing={3} w="full">
-              {/* Bankr API Option (on top, default) */}
+            <HStack spacing={3} w="full" align="stretch">
+              {/* Left column - Bankr Wallet */}
               <Box
                 as="button"
-                w="full"
+                flex={1}
                 p={4}
-                bg={accountTypeChoice === "bankr" || accountTypeChoice === "both" ? "bg.muted" : "bauhaus.white"}
+                bg={accountTypeChoice === "bankr" ? "bg.muted" : "bauhaus.white"}
                 border="3px solid"
                 borderColor={accountTypeChoice === "bankr" ? "bauhaus.blue" : "bauhaus.black"}
                 boxShadow="4px 4px 0px 0px #121212"
                 textAlign="left"
-                onClick={() => setAccountTypeChoice(accountTypeChoice === "both" ? "both" : "bankr")}
+                onClick={() => setAccountTypeChoice("bankr")}
                 _hover={{ bg: "bg.muted" }}
+                display="flex"
+                flexDirection="column"
+                alignItems="center"
+                justifyContent="center"
               >
-                <HStack spacing={3}>
+                <VStack spacing={2}>
                   <Box
                     bg="bauhaus.blue"
                     border="2px solid"
@@ -919,112 +886,106 @@ function Onboarding({ onComplete }: OnboardingProps) {
                   >
                     <RobotIcon boxSize="20px" color="white" />
                   </Box>
-                  <VStack align="start" spacing={0} flex={1}>
-                    <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase">
+                  <VStack spacing={0}>
+                    <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase" textAlign="center">
                       Bankr Wallet
                     </Text>
-                    <Text fontSize="xs" color="text.secondary" fontWeight="500">
-                      Use Bankr API to execute transactions. AI-powered, no seed phrases.
+                    <Text fontSize="xs" color="text.secondary" fontWeight="500" textAlign="center">
+                      AI-powered, no seed phrases.
                     </Text>
                   </VStack>
                   {accountTypeChoice === "bankr" && (
                     <Box w="12px" h="12px" bg="bauhaus.blue" border="2px solid" borderColor="bauhaus.black" borderRadius="full" />
                   )}
-                </HStack>
+                </VStack>
               </Box>
 
-              {/* Private Key Option */}
-              <Box
-                as="button"
-                w="full"
-                p={4}
-                bg={accountTypeChoice === "privateKey" || accountTypeChoice === "both" ? "bg.muted" : "bauhaus.white"}
-                border="3px solid"
-                borderColor={accountTypeChoice === "privateKey" ? "bauhaus.yellow" : "bauhaus.black"}
-                boxShadow="4px 4px 0px 0px #121212"
-                textAlign="left"
-                onClick={() => setAccountTypeChoice(accountTypeChoice === "both" ? "both" : "privateKey")}
-                _hover={{ bg: "bg.muted" }}
-              >
-                <HStack spacing={3}>
-                  <Box
-                    bg="bauhaus.yellow"
-                    border="2px solid"
-                    borderColor="bauhaus.black"
-                    p={2}
-                  >
-                    <KeyIcon boxSize="20px" color="bauhaus.black" />
-                  </Box>
-                  <VStack align="start" spacing={0} flex={1}>
-                    <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase">
-                      Private Key
-                    </Text>
-                    <Text fontSize="xs" color="text.secondary" fontWeight="500">
-                      Import your private key to sign transactions locally. Full control, no API needed.
-                    </Text>
-                  </VStack>
-                  {accountTypeChoice === "privateKey" && (
-                    <Box w="12px" h="12px" bg="bauhaus.yellow" border="2px solid" borderColor="bauhaus.black" />
-                  )}
-                </HStack>
-              </Box>
-
-              {/* Seed Phrase Option */}
-              <Box
-                as="button"
-                w="full"
-                p={4}
-                bg={accountTypeChoice === "seedPhrase" ? "bg.muted" : "bauhaus.white"}
-                border="3px solid"
-                borderColor={accountTypeChoice === "seedPhrase" ? "bauhaus.red" : "bauhaus.black"}
-                boxShadow="4px 4px 0px 0px #121212"
-                textAlign="left"
-                onClick={() => setAccountTypeChoice("seedPhrase")}
-                _hover={{ bg: "bg.muted" }}
-              >
-                <HStack spacing={3}>
-                  <Box
-                    bg="bauhaus.red"
-                    border="2px solid"
-                    borderColor="bauhaus.black"
-                    p={2}
-                  >
-                    <SeedIcon boxSize="20px" color="white" />
-                  </Box>
-                  <VStack align="start" spacing={0} flex={1}>
-                    <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase">
-                      Seed Phrase
-                    </Text>
-                    <Text fontSize="xs" color="text.secondary" fontWeight="500">
-                      Generate or import a 12-word mnemonic (BIP39). Derive multiple accounts.
-                    </Text>
-                  </VStack>
-                  {accountTypeChoice === "seedPhrase" && (
-                    <Box w="12px" h="12px" bg="bauhaus.red" border="2px solid" borderColor="bauhaus.black" transform="rotate(45deg)" />
-                  )}
-                </HStack>
-              </Box>
-            </VStack>
-
-            {/* Both option checkbox - only shown when bankr or privateKey is selected */}
-            {accountTypeChoice !== "seedPhrase" && (
-              <Checkbox
-                isChecked={accountTypeChoice === "both"}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setAccountTypeChoice("both");
-                  } else {
-                    setAccountTypeChoice("privateKey");
-                  }
-                }}
-                colorScheme="yellow"
-                borderColor="bauhaus.black"
-              >
-                <Text fontSize="sm" color="text.secondary" fontWeight="700">
-                  Set up both account types
+              {/* "or" separator */}
+              <VStack justify="center" spacing={0} flexShrink={0}>
+                <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="lowercase">
+                  or
                 </Text>
-              </Checkbox>
-            )}
+              </VStack>
+
+              {/* Right column - Private Key & Seed Phrase stacked */}
+              <VStack flex={1} spacing={3}>
+                {/* Private Key Option */}
+                <Box
+                  as="button"
+                  w="full"
+                  p={3}
+                  bg={accountTypeChoice === "privateKey" ? "bg.muted" : "bauhaus.white"}
+                  border="3px solid"
+                  borderColor={accountTypeChoice === "privateKey" ? "bauhaus.yellow" : "bauhaus.black"}
+                  boxShadow="4px 4px 0px 0px #121212"
+                  textAlign="left"
+                  onClick={() => setAccountTypeChoice("privateKey")}
+                  _hover={{ bg: "bg.muted" }}
+                >
+                  <HStack spacing={2}>
+                    <Box
+                      bg="bauhaus.yellow"
+                      border="2px solid"
+                      borderColor="bauhaus.black"
+                      p={1.5}
+                    >
+                      <KeyIcon boxSize="16px" color="bauhaus.black" />
+                    </Box>
+                    <VStack align="start" spacing={0} flex={1}>
+                      <Text fontSize="xs" fontWeight="900" color="text.primary" textTransform="uppercase">
+                        Private Key
+                      </Text>
+                      <Text fontSize="2xs" color="text.secondary" fontWeight="500">
+                        Import key, sign locally.
+                      </Text>
+                    </VStack>
+                    {accountTypeChoice === "privateKey" && (
+                      <Box w="10px" h="10px" bg="bauhaus.yellow" border="2px solid" borderColor="bauhaus.black" />
+                    )}
+                  </HStack>
+                </Box>
+
+                {/* Seed Phrase Option */}
+                <Box
+                  as="button"
+                  w="full"
+                  p={3}
+                  bg={accountTypeChoice === "seedPhrase" ? "bg.muted" : "bauhaus.white"}
+                  border="3px solid"
+                  borderColor={accountTypeChoice === "seedPhrase" ? "bauhaus.red" : "bauhaus.black"}
+                  boxShadow="4px 4px 0px 0px #121212"
+                  textAlign="left"
+                  onClick={() => setAccountTypeChoice("seedPhrase")}
+                  _hover={{ bg: "bg.muted" }}
+                >
+                  <HStack spacing={2}>
+                    <Box
+                      bg="bauhaus.red"
+                      border="2px solid"
+                      borderColor="bauhaus.black"
+                      p={1.5}
+                    >
+                      <SeedIcon boxSize="16px" color="white" />
+                    </Box>
+                    <VStack align="start" spacing={0} flex={1}>
+                      <Text fontSize="xs" fontWeight="900" color="text.primary" textTransform="uppercase">
+                        Seed Phrase
+                      </Text>
+                      <Text fontSize="2xs" color="text.secondary" fontWeight="500">
+                        BIP39 mnemonic, multi-account.
+                      </Text>
+                    </VStack>
+                    {accountTypeChoice === "seedPhrase" && (
+                      <Box w="10px" h="10px" bg="bauhaus.red" border="2px solid" borderColor="bauhaus.black" transform="rotate(45deg)" />
+                    )}
+                  </HStack>
+                </Box>
+              </VStack>
+            </HStack>
+
+            <Text fontSize="xs" color="text.secondary" fontWeight="500" textAlign="center">
+              You can add other account types later from the extension settings.
+            </Text>
 
             <Button variant="primary" w="full" onClick={handleContinue}>
               Continue
