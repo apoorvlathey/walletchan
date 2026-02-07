@@ -752,7 +752,7 @@ function AccountSettingsModal({
                   borderRadius={account.type === "privateKey" || account.type === "seedPhrase" ? "none" : "full"}
                 />
                 <Text fontSize="xs" color="text.tertiary" fontWeight="600" textTransform="uppercase">
-                  {account.type === "privateKey" ? "Private Key Account" : account.type === "seedPhrase" ? "Seed Phrase Account" : account.type === "impersonator" ? "View-Only Account" : "Bankr Account"}
+                  {account.type === "privateKey" ? "Private Key Account" : account.type === "seedPhrase" ? `Seed Phrase Account · #${account.derivationIndex}` : account.type === "impersonator" ? "View-Only Account" : "Bankr Account"}
                 </Text>
               </HStack>
             </Box>
