@@ -14,6 +14,7 @@ This document describes the core architecture and transaction handling implement
 - [SECURITY.md](./SECURITY.md) - Security audit guide, threat model, and pre-commit checklists
 - [PK_ACCOUNTS.md](./PK_ACCOUNTS.md) - Private key accounts implementation (security, signing, storage)
 - [CHAT.md](./CHAT.md) - Chat feature implementation (AI conversations with Bankr agent)
+- [CALLDATA.md](./CALLDATA.md) - Calldata decoder UI (rich param components, type routing, unit conversion)
 
 ## Account Types
 
