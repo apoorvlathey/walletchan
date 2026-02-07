@@ -418,23 +418,25 @@ function TransactionConfirmation({
               </Text>
               <HStack spacing={2}>
                 <Box
-                  bg="bauhaus.black"
+                  bg={origin === "BankrWallet" ? "transparent" : "bauhaus.black"}
                   border="2px solid"
-                  borderColor="bauhaus.black"
-                  p={1}
+                  borderColor={origin === "BankrWallet" ? "transparent" : "bauhaus.black"}
+                  p={origin === "BankrWallet" ? 0 : 1}
                   display="flex"
                   alignItems="center"
                   justifyContent="center"
                 >
                   <Image
                     src={
-                      favicon ||
-                      (originHostname
-                        ? `https://www.google.com/s2/favicons?domain=${originHostname}&sz=32`
-                        : undefined)
+                      origin === "BankrWallet"
+                        ? "/bankrwallet-icon.png"
+                        : favicon ||
+                          (originHostname
+                            ? `https://www.google.com/s2/favicons?domain=${originHostname}&sz=32`
+                            : undefined)
                     }
                     alt="favicon"
-                    boxSize="16px"
+                    boxSize={origin === "BankrWallet" ? "24px" : "16px"}
                     onError={(e) => {
                       if (originHostname) {
                         const target = e.target as HTMLImageElement;
