@@ -178,7 +178,7 @@ function TokenTransfer({
             </Box>
             <VStack align="start" spacing={0} flex={1}>
               <Text fontSize="sm" fontWeight="700" color="text.primary">
-                {token.symbol}
+                {token.symbol.toUpperCase()}
               </Text>
               <Text fontSize="xs" color="text.tertiary">
                 Balance: {token.balanceFormatted}

@@ -232,7 +232,7 @@ function TokenHoldings({ address, onTokenClick, hideHeader, hideCard, onStateCha
 
             {/* Token info */}
             <VStack align="start" spacing={0} flex={1} minW={0}>
-              <Text fontSize="xs" fontWeight="700" color="text.primary" noOfLines={1}>
+              <Text fontSize="xs" fontWeight="700" color="text.primary" noOfLines={1} textTransform="uppercase">
                 {token.symbol}
               </Text>
               <Text fontSize="10px" color="text.tertiary" fontWeight="500" noOfLines={1}>
