@@ -41,6 +41,7 @@ export default function PortfolioTabs({ address, onTokenClick }: PortfolioTabsPr
 
   const formatUsd = (value: number): string => {
     if (holdingsState?.hideValue) return "****";
+    if (value === 0) return "$0.00";
     if (value < 0.01) return "<$0.01";
     return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };

@@ -99,6 +99,7 @@ function TokenHoldings({ address, onTokenClick, hideHeader, hideCard, onStateCha
 
   const formatUsd = (value: number): string => {
     if (hideValue) return "****";
+    if (value === 0) return "$0.00";
     if (value < 0.01) return "<$0.01";
     return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };

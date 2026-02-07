@@ -268,12 +268,36 @@ function App() {
     return cached || false;
   };
 
-  const loadAccounts = async () => {
+  const loadAccounts = async (syncAddress = false) => {
     const accountList = await sendMessageWithRetry<Account[]>({ type: "getAccounts" });
     setAccounts(accountList || []);
 
     const active = await sendMessageWithRetry<Account | null>({ type: "getActiveAccount" });
     setActiveAccount(active);
+
+    // Sync address/displayAddress to match active account
+    if (syncAddress && active) {
+      setAddress(active.address);
+      setDisplayAddress(active.displayName || active.address);
+      await chrome.storage.sync.set({
+        address: active.address,
+        displayAddress: active.displayName || active.address,
+      });
+
+      // Notify content script about the account change
+      const tab = await currentTab();
+      if (tab?.id) {
+        chrome.tabs.sendMessage(tab.id, {
+          type: "setAccount",
+          msg: {
+            address: active.address,
+            displayAddress: active.displayName || active.address,
+            accountId: active.id,
+            accountType: active.type,
+          },
+        }).catch(() => {});
+      }
+    }
 
     return { accounts: accountList || [], activeAccount: active };
   };
@@ -645,8 +669,8 @@ function App() {
         window.location.reload();
       }
       if (message.type === "accountsUpdated") {
-        // Reload accounts when they change
-        loadAccounts();
+        // Reload accounts and sync address when they change
+        loadAccounts(true);
       }
     };
 
@@ -1176,7 +1200,7 @@ function App() {
             <AddAccount
               onBack={() => setView("main")}
               onAccountAdded={async () => {
-                await loadAccounts();
+                await loadAccounts(true);
                 setView("main");
               }}
             />
