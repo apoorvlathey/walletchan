@@ -1,24 +1,25 @@
 import { Box, HStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 
-const bounce = keyframes`
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
-`;
-
 interface ShapesLoaderProps {
   size?: string;
 }
 
 export function ShapesLoader({ size = "10px" }: ShapesLoaderProps) {
   const sizeNum = parseInt(size);
+  const bounceDistance = Math.round(sizeNum * 0.67);
+
+  const bounce = keyframes`
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-${bounceDistance}px);
+    }
+  `;
 
   return (
-    <HStack spacing={3} justify="center">
+    <HStack spacing={1} justify="center">
       {/* Circle - Red */}
       <Box
         animation={`${bounce} 0.6s ease-in-out infinite`}

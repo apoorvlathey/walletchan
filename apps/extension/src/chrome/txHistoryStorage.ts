@@ -20,6 +20,19 @@ export interface CompletedTransaction {
   txHash?: string;
   error?: string;
   jobId?: string;
+  accountType?: "bankr" | "privateKey" | "seedPhrase";
+  functionName?: string;
+  gasData?: GasData;
+}
+
+export interface GasData {
+  gasUsed: string;           // decimal string
+  gasLimit: string;          // decimal string
+  effectiveGasPrice: string; // decimal string (wei)
+  // OP Stack L2 only
+  l1Fee?: string;            // decimal string (wei)
+  l1GasUsed?: string;        // decimal string
+  l1GasPrice?: string;       // decimal string (wei)
 }
 
 const TX_HISTORY_KEY = "txHistory";

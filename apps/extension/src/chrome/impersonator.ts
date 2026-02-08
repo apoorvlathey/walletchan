@@ -137,7 +137,12 @@ class ImpersonatorProvider extends EventEmitter {
 
     switch (method) {
       // modified methods
-      case "eth_requestAccounts":
+      case "eth_requestAccounts": {
+        const accounts = [this.address];
+        // EIP-1193: Emit "connect" event when dapp connects
+        this.emit("connect", { chainId: hexValue(this.chainId) });
+        return accounts;
+      }
       case "eth_accounts":
         return [this.address];
 

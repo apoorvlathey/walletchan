@@ -121,6 +121,8 @@ function App() {
   const [selectedTxRequest, setSelectedTxRequest] = useState<PendingTxRequest | null>(null);
   const [pendingSignatureRequests, setPendingSignatureRequests] = useState<PendingSignatureRequest[]>([]);
   const [selectedSignatureRequest, setSelectedSignatureRequest] = useState<PendingSignatureRequest | null>(null);
+  const [activityTabTrigger, setActivityTabTrigger] = useState(0);
+
   const [copied, setCopied] = useState(false);
   const [sidePanelSupported, setSidePanelSupported] = useState(false);
   const [sidePanelMode, setSidePanelMode] = useState(false);
@@ -268,12 +270,36 @@ function App() {
     return cached || false;
   };
 
-  const loadAccounts = async () => {
+  const loadAccounts = async (syncAddress = false) => {
     const accountList = await sendMessageWithRetry<Account[]>({ type: "getAccounts" });
     setAccounts(accountList || []);
 
     const active = await sendMessageWithRetry<Account | null>({ type: "getActiveAccount" });
     setActiveAccount(active);
+
+    // Sync address/displayAddress to match active account
+    if (syncAddress && active) {
+      setAddress(active.address);
+      setDisplayAddress(active.displayName || active.address);
+      await chrome.storage.sync.set({
+        address: active.address,
+        displayAddress: active.displayName || active.address,
+      });
+
+      // Notify content script about the account change
+      const tab = await currentTab();
+      if (tab?.id) {
+        chrome.tabs.sendMessage(tab.id, {
+          type: "setAccount",
+          msg: {
+            address: active.address,
+            displayAddress: active.displayName || active.address,
+            accountId: active.id,
+            accountType: active.type,
+          },
+        }).catch(() => {});
+      }
+    }
 
     return { accounts: accountList || [], activeAccount: active };
   };
@@ -435,6 +461,7 @@ function App() {
       chrome.runtime.sendMessage(
         { type: "getFailedTxResult", notificationId: showErrorId },
         (result: { error: string; origin: string } | null) => {
+          if (chrome.runtime.lastError) return;
           if (result) {
             setFailedTxError({ error: result.error, origin: result.origin });
           }
@@ -564,6 +591,8 @@ function App() {
         tab.id!,
         { type: "getInfo" },
         (store: { address: string; displayAddress: string; chainName: string }) => {
+          // Ignore errors (tab might not have content script, e.g. chrome:// pages)
+          if (chrome.runtime.lastError) return;
           if (store?.chainName && store.chainName.length > 0) {
             if (store.address) setAddress(store.address);
             if (store.displayAddress) setDisplayAddress(store.displayAddress);
@@ -645,8 +674,8 @@ function App() {
         window.location.reload();
       }
       if (message.type === "accountsUpdated") {
-        // Reload accounts when they change
-        loadAccounts();
+        // Reload accounts and sync address when they change
+        loadAccounts(true);
       }
     };
 
@@ -718,6 +747,8 @@ function App() {
         chrome.tabs.sendMessage(tab.id!, {
           type: "setChainId",
           msg: { chainName, chainId, rpcUrl: networksInfo[chainName].rpcUrl },
+        }).catch(() => {
+          // Ignore errors if content script not injected (e.g. chrome:// pages)
         });
 
         await chrome.storage.sync.set({ chainName });
@@ -796,6 +827,7 @@ function App() {
       setSelectedTxRequest(remaining[0]);
     } else {
       setSelectedTxRequest(null);
+      setActivityTabTrigger((k) => k + 1);
       setView("main");
     }
   }, [selectedTxRequest?.id]);
@@ -1176,7 +1208,7 @@ function App() {
             <AddAccount
               onBack={() => setView("main")}
               onAccountAdded={async () => {
-                await loadAccounts();
+                await loadAccounts(true);
                 setView("main");
               }}
             />
@@ -1825,6 +1857,7 @@ function App() {
           {address && (
             <PortfolioTabs
               address={address}
+              activityTabTrigger={activityTabTrigger}
               onTokenClick={(token) => {
                 setTransferToken(token);
                 setView("transfer");

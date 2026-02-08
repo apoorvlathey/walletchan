@@ -11,6 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { RepeatIcon, ViewIcon, ViewOffIcon } from "@chakra-ui/icons";
 import { fetchPortfolio, PortfolioToken } from "@/chrome/portfolioApi";
+import { fetchOnchainBalances } from "@/chrome/onchainBalances";
 import { getChainConfig } from "@/constants/chainConfig";
 
 interface TokenHoldingsProps {
@@ -63,12 +64,24 @@ function TokenHoldings({ address, onTokenClick, hideHeader, hideCard, onStateCha
 
       try {
         const data = await fetchPortfolio(address);
+
+        // Show API data immediately so user isn't stuck on skeleton loader
         setTokens(data.tokens);
         setTotalValueUsd(data.totalValueUsd);
+        setLoading(false);
         setLastFetched(Date.now());
+
+        // Enhance with on-chain balances in the background.
+        // If RPCs are rate-limited or slow, user already sees API values.
+        try {
+          const onchain = await fetchOnchainBalances(address, data.tokens);
+          setTokens(onchain.tokens);
+          setTotalValueUsd(onchain.totalValueUsd);
+        } catch (err) {
+          console.warn("[onchain] balance fetch failed, using API values:", err);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load portfolio");
-      } finally {
         setLoading(false);
       }
     },
@@ -99,6 +112,7 @@ function TokenHoldings({ address, onTokenClick, hideHeader, hideCard, onStateCha
 
   const formatUsd = (value: number): string => {
     if (hideValue) return "****";
+    if (value === 0) return "$0.00";
     if (value < 0.01) return "<$0.01";
     return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
@@ -135,13 +149,6 @@ function TokenHoldings({ address, onTokenClick, hideHeader, hideCard, onStateCha
   const tokenList = (
     <VStack
       spacing={0}
-      maxH={hideCard ? undefined : "200px"}
-      overflowY="auto"
-      css={{
-        "&::-webkit-scrollbar": { width: "6px" },
-        "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
-        "&::-webkit-scrollbar-thumb": { background: "#121212" },
-      }}
     >
       {loading && tokens.length === 0 ? (
         // Loading skeletons
@@ -231,7 +238,7 @@ function TokenHoldings({ address, onTokenClick, hideHeader, hideCard, onStateCha
 
             {/* Token info */}
             <VStack align="start" spacing={0} flex={1} minW={0}>
-              <Text fontSize="xs" fontWeight="700" color="text.primary" noOfLines={1}>
+              <Text fontSize="xs" fontWeight="700" color="text.primary" noOfLines={1} textTransform="uppercase">
                 {token.symbol}
               </Text>
               <Text fontSize="10px" color="text.tertiary" fontWeight="500" noOfLines={1}>

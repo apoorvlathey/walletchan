@@ -16,7 +16,7 @@ import {
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { keyframes } from "@emotion/react";
-import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon } from "@chakra-ui/icons";
+import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon, ExternalLinkIcon } from "@chakra-ui/icons";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { getChainConfig } from "@/constants/chainConfig";
 import { reverseResolveAddress } from "@/utils/nameResolution";
@@ -39,7 +39,7 @@ interface TransactionConfirmationProps {
   currentIndex: number;
   totalCount: number;
   isInSidePanel: boolean;
-  accountType?: "bankr" | "privateKey" | "impersonator";
+  accountType?: "bankr" | "privateKey" | "seedPhrase" | "impersonator";
   onBack: () => void;
   onConfirmed: () => void;
   onRejected: () => void;
@@ -104,8 +104,18 @@ function TransactionConfirmation({
   const [error, setError] = useState<string>("");
   const [toLabels, setToLabels] = useState<string[]>([]);
   const [resolvedToName, setResolvedToName] = useState<string | null>(null);
+  const [decodedFunctionName, setDecodedFunctionName] = useState<string | undefined>();
 
   const { tx, origin, chainName, favicon } = txRequest;
+
+  // Parse origin safely — it may not be a valid URL (e.g. "BankrWallet" for internal transfers)
+  const originHostname = (() => {
+    try {
+      return new URL(origin).hostname;
+    } catch {
+      return null;
+    }
+  })();
 
   // Fetch labels for the "to" address
   useEffect(() => {
@@ -151,8 +161,18 @@ function TransactionConfirmation({
     setState("submitting");
     setError("");
 
+    const messageType =
+      accountType === "privateKey" || accountType === "seedPhrase"
+        ? "confirmTransactionAsyncPK"
+        : "confirmTransactionAsync";
+
+    // Determine function name: use decoded name, or "Contract Deployment" for deploys
+    const functionName = !tx.to
+      ? "Contract Deployment"
+      : decodedFunctionName || undefined;
+
     chrome.runtime.sendMessage(
-      { type: "confirmTransactionAsync", txId: txRequest.id, password: "" },
+      { type: messageType, txId: txRequest.id, password: "", functionName },
       (result: { success: boolean; error?: string }) => {
         if (result.success) {
           // Transaction submitted
@@ -427,33 +447,39 @@ function TransactionConfirmation({
               </Text>
               <HStack spacing={2}>
                 <Box
-                  bg="bauhaus.black"
+                  bg={origin === "BankrWallet" ? "transparent" : "bauhaus.black"}
                   border="2px solid"
-                  borderColor="bauhaus.black"
-                  p={1}
+                  borderColor={origin === "BankrWallet" ? "transparent" : "bauhaus.black"}
+                  p={origin === "BankrWallet" ? 0 : 1}
                   display="flex"
                   alignItems="center"
                   justifyContent="center"
                 >
                   <Image
                     src={
-                      favicon ||
-                      `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`
+                      origin === "BankrWallet"
+                        ? "/bankrwallet-icon.png"
+                        : favicon ||
+                          (originHostname
+                            ? `https://www.google.com/s2/favicons?domain=${originHostname}&sz=32`
+                            : undefined)
                     }
                     alt="favicon"
-                    boxSize="16px"
+                    boxSize={origin === "BankrWallet" ? "24px" : "16px"}
                     onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      const googleFallback = `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`;
-                      if (target.src !== googleFallback) {
-                        target.src = googleFallback;
+                      if (originHostname) {
+                        const target = e.target as HTMLImageElement;
+                        const googleFallback = `https://www.google.com/s2/favicons?domain=${originHostname}&sz=32`;
+                        if (target.src !== googleFallback) {
+                          target.src = googleFallback;
+                        }
                       }
                     }}
                     fallback={<Box boxSize="16px" bg="bauhaus.black" />}
                   />
                 </Box>
                 <Text fontSize="sm" fontWeight="700" color="text.primary">
-                  {new URL(origin).hostname}
+                  {originHostname || origin}
                 </Text>
               </HStack>
             </HStack>
@@ -580,7 +606,7 @@ function TransactionConfirmation({
 
         {/* Calldata (Decoded + Raw) */}
         {tx.data && tx.data !== "0x" && tx.to && (
-          <CalldataDecoder calldata={tx.data} to={tx.to} chainId={tx.chainId} />
+          <CalldataDecoder calldata={tx.data} to={tx.to} chainId={tx.chainId} onFunctionName={setDecodedFunctionName} />
         )}
         {/* Raw-only fallback for contract deployments */}
         {tx.data && tx.data !== "0x" && !tx.to && (
@@ -619,35 +645,34 @@ function TransactionConfirmation({
         )}
 
         {/* Simulate on Tenderly */}
-        {tx.to && (
-          <Button
-            size="sm"
-            variant="ghost"
-            w="full"
-            border="2px solid"
-            borderColor="bauhaus.black"
-            fontWeight="700"
-            fontSize="xs"
-            textTransform="uppercase"
-            letterSpacing="wide"
-            onClick={() => {
-              const params = new URLSearchParams({
-                from: tx.from,
-                contractAddress: tx.to!,
-                value: tx.value || "0",
-                rawFunctionInput: tx.data || "0x",
-                network: String(tx.chainId),
-              });
-              chrome.tabs.create({
-                url: `https://dashboard.tenderly.co/simulator/new?${params}`,
-              });
-            }}
-            leftIcon={<Image src="https://www.google.com/s2/favicons?sz=32&domain=tenderly.co" boxSize="14px" />}
-            _hover={{ bg: "bg.muted", transform: "translateY(-1px)" }}
-          >
-            Simulate on Tenderly
-          </Button>
-        )}
+        <Button
+          size="sm"
+          variant="ghost"
+          w="full"
+          border="2px solid"
+          borderColor="bauhaus.black"
+          fontWeight="700"
+          fontSize="xs"
+          textTransform="uppercase"
+          letterSpacing="wide"
+          onClick={() => {
+            const params = new URLSearchParams({
+              from: tx.from,
+              value: tx.value || "0",
+              rawFunctionInput: tx.data || "0x",
+              network: String(tx.chainId),
+              ...(tx.to ? { contractAddress: tx.to } : {}),
+            });
+            chrome.tabs.create({
+              url: `https://dashboard.tenderly.co/simulator/new?${params}`,
+            });
+          }}
+          leftIcon={<Image src="https://www.google.com/s2/favicons?sz=32&domain=tenderly.co" boxSize="14px" />}
+          rightIcon={<ExternalLinkIcon boxSize={3} />}
+          _hover={{ bg: "bg.muted", transform: "translateY(-1px)" }}
+        >
+          Simulate on Tenderly
+        </Button>
 
         {/* Error Display */}
         {error && state === "error" && (
