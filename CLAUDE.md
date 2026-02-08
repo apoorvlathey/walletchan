@@ -12,22 +12,22 @@ Browser wallet extension + landing page website in a pnpm workspace monorepo.
 
 **At the start of each session**, before writing any code:
 
-1. **Read `IMPLEMENTATION.md`** when working on extension logic, message passing, background handlers, or crypto
-2. **Read `STYLING.md`** when working on any UI components or styling
-3. **Read `WEBSITE.md`** when working on the landing page
+1. **Read `_docs/IMPLEMENTATION.md`** when working on extension logic, message passing, background handlers, or crypto
+2. **Read `_docs/STYLING.md`** when working on any UI components or styling
+3. **Read `_docs/WEBSITE.md`** when working on the landing page
 
 **Before every commit** that touches extension code:
 
-4. **Read `SECURITY.md`** and verify changes against the pre-commit security checklist. This is critical for any changes to message handlers, storage, crypto, content scripts, or session management.
+4. **Read `_docs/SECURITY.md`** and verify changes against the pre-commit security checklist. This is critical for any changes to message handlers, storage, crypto, content scripts, or session management.
 
 **After making significant changes:**
 
-- **Update `IMPLEMENTATION.md`** if you modified:
+- **Update `_docs/IMPLEMENTATION.md`** if you modified:
   - Message types or message flow
   - Background handler logic
   - Storage keys or encryption patterns
   - New features or architectural decisions
-- **Update `SECURITY.md`** if you modified:
+- **Update `_docs/SECURITY.md`** if you modified:
   - Message handlers that touch secrets or account data
   - Agent password access control (new blocked/allowed operations)
   - Storage keys (add to the storage keys reference)
@@ -44,12 +44,13 @@ bankr-wallet/
 │   └── website/      # Landing page (Next.js + Chakra UI)
 ├── packages/
 │   └── shared/       # Shared design tokens and assets
-├── IMPLEMENTATION.md # Extension architecture and message flows
-├── SECURITY.md       # Security audit guide, threat model, pre-commit checklists
-├── STYLING.md        # Bauhaus design system (colors, typography, components)
-├── WEBSITE.md        # Website PRD and section specs
-├── DEVELOPMENT.md    # Build and dev environment setup
-└── PUBLISHING.md     # Release workflow, CWS upload, auto-update system
+├── _docs/             # LLM-facing documentation
+│   ├── IMPLEMENTATION.md  # Extension architecture and message flows
+│   ├── SECURITY.md        # Security audit guide, threat model, pre-commit checklists
+│   ├── STYLING.md         # Bauhaus design system (colors, typography, components)
+│   ├── WEBSITE.md         # Website PRD and section specs
+│   ├── DEVELOPMENT.md     # Build and dev environment setup
+│   └── PUBLISHING.md      # Release workflow, CWS upload, auto-update system
 ```
 
 ## Tech Stack
@@ -59,7 +60,7 @@ bankr-wallet/
 | Extension | React 18                | Chakra UI  | Vite       |
 | Website   | Next.js 14 (App Router) | Chakra UI  | Next.js    |
 
-**Design System**: Bauhaus - geometric, primary colors (Red #D02020, Blue #1040C0, Yellow #F0C020), hard shadows, thick borders. See `STYLING.md`.
+**Design System**: Bauhaus - geometric, primary colors (Red #D02020, Blue #1040C0, Yellow #F0C020), hard shadows, thick borders. See `_docs/STYLING.md`.
 
 ## Commands
 
@@ -100,7 +101,7 @@ The extension has 5 build targets (see `apps/extension/vite.config.*.ts`):
 
 **Message flow**: Dapp → inpage.js → inject.js → background.js → Bankr API
 
-For detailed architecture, message types, and flows, see `IMPLEMENTATION.md`.
+For detailed architecture, message types, and flows, see `_docs/IMPLEMENTATION.md`.
 
 ## Key Extension Files
 
@@ -147,15 +148,15 @@ When working on features, refer to these docs:
 
 | Doc                              | When to read                                          |
 | -------------------------------- | ----------------------------------------------------- |
-| `IMPLEMENTATION.md`              | Extension internals, message types, tx flow           |
-| `SECURITY.md`                    | Threat model, access control, pre-commit checklists   |
-| `CHAT.md`                        | Chat interface to directly chat & prompt to bankr api |
-| `STYLING.md`                     | UI components, design tokens, Bauhaus system          |
-| `WEBSITE.md`                     | Website sections, layout specs, animations            |
-| `APPS.md`                        | Apps page data source, fetch script, adding chains     |
-| `CALLDATA.md`                    | Calldata decoder UI, param components, type routing   |
-| `DEVELOPMENT.md`                 | Build process, dev environment setup                  |
-| `PUBLISHING.md`                  | Release workflow, CWS upload, auto-update, signing    |
+| `_docs/IMPLEMENTATION.md`        | Extension internals, message types, tx flow           |
+| `_docs/SECURITY.md`             | Threat model, access control, pre-commit checklists   |
+| `_docs/CHAT.md`                 | Chat interface to directly chat & prompt to bankr api |
+| `_docs/STYLING.md`              | UI components, design tokens, Bauhaus system          |
+| `_docs/WEBSITE.md`              | Website sections, layout specs, animations            |
+| `_docs/APPS.md`                 | Apps page data source, fetch script, adding chains     |
+| `_docs/CALLDATA.md`             | Calldata decoder UI, param components, type routing   |
+| `_docs/DEVELOPMENT.md`          | Build process, dev environment setup                  |
+| `_docs/PUBLISHING.md`           | Release workflow, CWS upload, auto-update, signing    |
 | `openclaw-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling     |
 
 ## Important Patterns
@@ -189,7 +190,7 @@ When working on features, refer to these docs:
 - Place new message handlers in the appropriate `*Handlers.ts` file, not in `background.ts`.
 - Add the message routing case to the switch in `background.ts` (just a 1-3 line delegation).
 - If a feature doesn't fit existing modules, create a new focused module rather than growing an existing one.
-- Update `IMPLEMENTATION.md` and this file's Key Extension Files section if you add new modules.
+- Update `_docs/IMPLEMENTATION.md` and this file's Key Extension Files section if you add new modules.
 
 ### When Adding New Handlers That Need Credentials
 
@@ -217,7 +218,7 @@ if (!password) {
 }
 ```
 
-See `IMPLEMENTATION.md` → "Handlers with Session Restoration" for the full list of handlers that implement this pattern.
+See `_docs/IMPLEMENTATION.md` → "Handlers with Session Restoration" for the full list of handlers that implement this pattern.
 
 ## Development Practices
 

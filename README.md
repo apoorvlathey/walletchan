@@ -61,7 +61,7 @@
 
 ## Development
 
-This repository is a monorepo containing the browser extension and [website](apps/website/). See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development instructions.
+This repository is a monorepo containing the browser extension and [website](apps/website/). See [DEVELOPMENT.md](_docs/DEVELOPMENT.md) for detailed development instructions.
 
 ### Prerequisites
 
@@ -82,7 +82,7 @@ pnpm build:extension
 
 ## Architecture
 
-For detailed implementation documentation, see [IMPLEMENTATION.md](IMPLEMENTATION.md).
+For detailed implementation documentation, see [IMPLEMENTATION.md](_docs/IMPLEMENTATION.md).
 
 ## Security
 
