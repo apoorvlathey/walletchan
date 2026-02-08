@@ -257,20 +257,30 @@ window.addEventListener("message", async (e) => {
     }
 
     case "i_sendTransaction": {
-      const { id, from, to, data, value, chainId } = e.data.msg as {
+      const { id, from, to, data, value, chainId, gas, gasPrice, maxFeePerGas, maxPriorityFeePerGas } = e.data.msg as {
         id: string;
         from: string;
         to: string | null;
         data: string;
         value: string;
         chainId: number;
+        gas?: string;
+        gasPrice?: string;
+        maxFeePerGas?: string;
+        maxPriorityFeePerGas?: string;
       };
 
       // Forward to background worker
       chrome.runtime.sendMessage(
         {
           type: "sendTransaction",
-          tx: { from, to, data, value, chainId },
+          tx: {
+            from, to, data, value, chainId,
+            ...(gas ? { gas } : {}),
+            ...(gasPrice ? { gasPrice } : {}),
+            ...(maxFeePerGas ? { maxFeePerGas } : {}),
+            ...(maxPriorityFeePerGas ? { maxPriorityFeePerGas } : {}),
+          },
           origin: window.location.origin,
           favicon: getFaviconUrl(),
         },

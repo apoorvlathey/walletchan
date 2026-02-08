@@ -514,7 +514,7 @@ const OP_STACK_CHAIN_IDS = new Set([8453, 130]);
  * Resolve RPC URL for a chain ID.
  * Checks user-configured networks first, falls back to defaults.
  */
-async function getRpcUrl(chainId: number): Promise<string | undefined> {
+export async function getRpcUrl(chainId: number): Promise<string | undefined> {
   const { networksInfo } = await chrome.storage.sync.get("networksInfo");
   if (networksInfo) {
     for (const name of Object.keys(networksInfo)) {
@@ -741,6 +741,13 @@ async function handleTransactionFailure(
   }
 }
 
+/** Gas overrides from user-edited gas params */
+export interface GasOverrides {
+  gasLimit: string;
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+}
+
 /**
  * Processes a local (PK) transaction in background
  */
@@ -749,7 +756,8 @@ async function processLocalTransactionInBackground(
   pending: PendingTxRequest,
   account: Account,
   privateKey: `0x${string}`,
-  functionName?: string
+  functionName?: string,
+  gasOverrides?: GasOverrides
 ): Promise<void> {
   // Create AbortController for this transaction
   const abortController = new AbortController();
@@ -789,8 +797,20 @@ async function processLocalTransactionInBackground(
       }
     }
 
+    // Merge gas overrides if provided
+    // When overrides are set, remove legacy gasPrice to avoid conflict with EIP-1559 params
+    const txForSigning = gasOverrides
+      ? {
+          ...pending.tx,
+          gas: gasOverrides.gasLimit,
+          maxFeePerGas: gasOverrides.maxFeePerGas,
+          maxPriorityFeePerGas: gasOverrides.maxPriorityFeePerGas,
+          gasPrice: undefined,
+        }
+      : pending.tx;
+
     // Sign and broadcast the transaction
-    const result = await signAndBroadcastTransaction(privateKey, pending.tx, rpcUrl);
+    const result = await signAndBroadcastTransaction(privateKey, txForSigning, rpcUrl);
     const txHash = result.txHash;
 
     // Send result back to content script
@@ -846,7 +866,8 @@ export async function handleConfirmTransactionAsyncPK(
   txId: string,
   password: string,
   tabId?: number,
-  functionName?: string
+  functionName?: string,
+  gasOverrides?: GasOverrides
 ): Promise<{ success: boolean; error?: string }> {
   const pending = await getPendingTxRequestById(txId);
   if (!pending) {
@@ -894,7 +915,7 @@ export async function handleConfirmTransactionAsyncPK(
   await removePendingTxRequest(txId);
 
   // Start background processing
-  processLocalTransactionInBackground(txId, pending, account, privateKey, functionName);
+  processLocalTransactionInBackground(txId, pending, account, privateKey, functionName, gasOverrides);
 
   return { success: true };
 }

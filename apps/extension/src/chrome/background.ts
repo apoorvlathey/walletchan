@@ -126,6 +126,9 @@ import {
   SignatureResult,
 } from "./txHandlers";
 
+// Gas estimation
+import { estimateGas } from "./gasEstimation";
+
 // Chat handlers
 import { handleSubmitChatPrompt } from "./chatHandlers";
 
@@ -870,9 +873,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
+    case "estimateGas": {
+      estimateGas(message.tx, message.accountAddress).then(sendResponse);
+      return true;
+    }
+
     case "confirmTransactionAsyncPK": {
       const tabId = message.tabId || sender.tab?.id;
-      handleConfirmTransactionAsyncPK(message.txId, message.password, tabId, message.functionName).then(
+      handleConfirmTransactionAsyncPK(message.txId, message.password, tabId, message.functionName, message.gasOverrides).then(
         (result) => {
           sendResponse(result);
         }

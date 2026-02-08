@@ -260,6 +260,7 @@ src/
 │   ├── types.ts             # Account and vault type definitions
 │   ├── localSigner.ts       # Transaction and message signing with viem
 │   ├── accountStorage.ts    # Account CRUD operations (includes seed groups, PK→seed conversion)
+│   ├── gasEstimation.ts     # Pre-confirmation gas estimation (RPC fees, CoinGecko USD price)
 │   ├── bankrApi.ts          # Bankr API client (submit, sign, job polling)
 │   ├── portfolioApi.ts      # Portfolio API client (fetches token holdings via website)
 │   ├── onchainBalances.ts   # On-chain balance verification via Multicall3 batching
@@ -302,6 +303,7 @@ src/
 │   ├── PendingTxList.tsx    # List of pending transactions and signature requests
 │   ├── TxStatusList.tsx     # Recent transaction history display (clickable → TxDetailModal)
 │   ├── TxDetailModal.tsx    # Transaction detail modal (gas fees, function name, addresses)
+│   ├── GasEstimateDisplay.tsx # Collapsible gas fee display with editable params (PK/Seed)
 │   ├── TransactionConfirmation.tsx # In-popup tx confirmation with success animation
 │   ├── SignatureRequestConfirmation.tsx # Signature request display (confirm for PK, reject for Bankr)
 │   ├── TokenHoldings.tsx    # Portfolio token list with USD values
@@ -319,7 +321,8 @@ src/
 │   └── useEnsIdentities.ts  # ENS/Basename identity resolution + caching hook
 ├── lib/
 │   ├── ensUtils.ts          # ENS/Basename resolution (name, avatar, forward/reverse)
-│   └── ensIdentityCache.ts  # ENS identity cache (chrome.storage.local, 6-hour TTL)
+│   ├── ensIdentityCache.ts  # ENS identity cache (chrome.storage.local, 6-hour TTL)
+│   └── gasFormatUtils.ts    # Gas formatting utilities (formatEth, formatGwei, formatNumber)
 ├── onboarding.tsx           # React entry point for onboarding page
 └── App.tsx                  # Main popup application
 
@@ -476,12 +479,16 @@ await provider.request({
       to: "0x...", // null for contract deployment
       data: "0x...",
       value: "0x0",
+      // Optional gas params (forwarded through full pipeline if present):
+      // gas, gasPrice, maxFeePerGas, maxPriorityFeePerGas
     },
   ],
 });
 ```
 
 **Contract Deployment**: When the `to` field is `null` (not address zero), the transaction is treated as a contract deployment. This is supported across both Bankr API and Private Key accounts. The confirmation UI shows a "Contract Deployment" badge instead of a recipient address.
+
+**Gas Parameters**: Dapp-provided gas fields (`gas`, `gasPrice`, `maxFeePerGas`, `maxPriorityFeePerGas`) are forwarded through the full pipeline (impersonator → inject → background → pending storage). These are used as defaults in gas estimation and sent to the Bankr API or local signer.
 
 ### 3. Impersonator Validates & Forwards
 
@@ -490,6 +497,7 @@ await provider.request({
 - Validates chain ID is in allowed list (1, 137, 8453, 130)
 - Creates unique transaction ID
 - Allows `to` to be null for contract deployment transactions
+- Forwards dapp-provided gas parameters (`gas`, `gasPrice`, `maxFeePerGas`, `maxPriorityFeePerGas`) if present
 - Posts message to content script
 - Returns Promise that resolves when tx completes
 
@@ -498,7 +506,7 @@ await provider.request({
 `src/chrome/inject.ts`:
 
 - Receives `i_sendTransaction` message
-- Forwards to background via `chrome.runtime.sendMessage`
+- Forwards all tx fields to background via `chrome.runtime.sendMessage`, including gas params
 - Sends result back to inpage via `postMessage`
 
 ### 5. Background Stores Pending Transaction & Opens Popup
@@ -527,6 +535,7 @@ The extension automatically opens a popup window when a transaction request is r
 - If wallet locked (API key not cached): shows unlock screen first
 - Shows pending transaction banner if requests exist
 - Displays: origin (with favicon), network, to address (with labels), value, data
+- **Gas estimation** fetched on mount via `estimateGas` message to background (see Gas Estimation below)
 - User clicks Confirm or Reject
 - Closing popup does NOT cancel transaction (persisted)
 
@@ -560,12 +569,52 @@ Each transaction maintains its own response callback - rejecting/confirming one 
 - POST to `https://api.bankr.bot/agent/submit` with transaction object and `waitForConfirmation: true`
 - Synchronous response — returns tx hash directly (no polling needed)
 - Value converted from hex to decimal string (wei)
+- Forwards dapp-provided gas params (`gas`, `gasPrice`, `maxFeePerGas`, `maxPriorityFeePerGas`) to the API if present
 
 ### 8. Result Returned to Dapp
 
 - Transaction hash returned directly from `/agent/submit` response
 - Returned through the message chain back to dapp
 - Dapp receives the tx hash from `eth_sendTransaction`
+
+### Gas Estimation
+
+`src/chrome/gasEstimation.ts` + `src/components/GasEstimateDisplay.tsx`:
+
+Pre-confirmation gas estimation shown on the transaction confirmation screen. Fetches gas limit, EIP-1559 fees, sender balance, and native token USD price.
+
+**Background estimation (`gasEstimation.ts`):**
+- Uses viem `createPublicClient` with cached clients (keyed by chainId), reuses `getRpcUrl()` from `txHandlers.ts`
+- Parallel RPC calls: `estimateGas` (gas limit + 20% buffer), `estimateFeesPerGas` (EIP-1559 fees), `getBalance` (sender balance)
+- CoinGecko price fetch with 60s in-memory cache for USD display
+- If dapp provided gas params (`gas`, `maxFeePerGas`, `maxPriorityFeePerGas`, `gasPrice`), uses them as defaults instead of RPC estimates
+- Returns `GasEstimate` with `dappProvidedGas` flag
+
+**UI component (`GasEstimateDisplay.tsx`):**
+- Collapsible box showing estimated gas fee in ETH + USD (collapsed) with detailed breakdown (expanded)
+- **PK/Seed accounts**: Gas Limit, Max Priority Fee, Max Fee are editable inputs. Overrides sent back via `onGasOverrides` callback
+- **Bankr accounts**: All read-only with "Gas managed by Bankr API" note
+- **Impersonator accounts**: All read-only
+- When dapp provided gas params, shows "Gas params suggested by dapp" indicator
+
+**Warnings:**
+| Condition | Display |
+|---|---|
+| `eth_estimateGas` reverts | Red banner: "TX MAY REVERT: {reason}" |
+| gas cost + tx value > balance | Yellow banner: "INSUFFICIENT BALANCE FOR GAS" |
+| RPC unreachable | Muted text: "Gas estimate unavailable" (non-blocking) |
+| CoinGecko fails | ETH amount shown, no USD |
+| Invalid user gas input | Red border on field, overrides nullified |
+
+**Gas overrides flow (PK/Seed accounts only):**
+```
+GasEstimateDisplay → onGasOverrides(overrides) → TransactionConfirmation state
+  → confirmTransactionAsyncPK message includes gasOverrides
+  → txHandlers.ts merges into tx (clears legacy gasPrice to avoid EIP-1559 conflict)
+  → signAndBroadcastTransaction(privateKey, txWithGas, rpcUrl)
+```
+
+**Shared utilities (`lib/gasFormatUtils.ts`):** `formatEth()`, `formatGwei()`, `formatNumber()` — extracted from `TxDetailModal.tsx` for reuse.
 
 ## Signature Request Handling
 
@@ -1495,7 +1544,7 @@ Build command: `pnpm build`
 
 | Type               | Description              |
 | ------------------ | ------------------------ |
-| `sendTransaction`  | Submit transaction       |
+| `sendTransaction`  | Submit transaction (includes gas params if dapp provided) |
 | `signatureRequest` | Submit signature request |
 | `rpcRequest`       | Proxy RPC call           |
 
@@ -1510,7 +1559,8 @@ Build command: `pnpm build`
 | `lockWallet`                       | Lock wallet (clear cached credentials)                  |
 | `confirmTransaction`               | User approved tx (sync, waits)                          |
 | `confirmTransactionAsync`          | User approved tx (async, Bankr API). Optional `functionName` field |
-| `confirmTransactionAsyncPK`        | User approved tx (async, PK/seed local sign). Optional `functionName` field |
+| `confirmTransactionAsyncPK`        | User approved tx (async, PK/seed local sign). Optional `functionName` and `gasOverrides` fields |
+| `estimateGas`                      | Estimate gas for pending tx (returns `GasEstimate` with fees, balance, USD price) |
 | `rejectTransaction`                | User rejected tx                                        |
 | `getPendingSignatureRequests`      | Get all pending signature requests                      |
 | `rejectSignatureRequest`           | User rejected signature request                         |

@@ -32,6 +32,7 @@ import { DEFAULT_NETWORKS } from "@/constants/networks";
 import { AddressParam } from "@/components/decodedParams/AddressParam";
 import { CopyButton } from "@/components/CopyButton";
 import CalldataDecoder from "@/components/CalldataDecoder";
+import { formatEth, formatGwei, formatNumber } from "@/lib/gasFormatUtils";
 
 interface TxDetailModalProps {
   isOpen: boolean;
@@ -49,25 +50,6 @@ function formatValue(value: string | undefined): string {
   const wei = BigInt(value);
   const eth = Number(wei) / 1e18;
   return `${eth.toFixed(6)} ETH`;
-}
-
-function formatEth(wei: string): string {
-  const eth = Number(BigInt(wei)) / 1e18;
-  if (eth === 0) return "0 ETH";
-  // Show enough precision for small gas fees
-  const formatted = eth.toFixed(18).replace(/0+$/, "").replace(/\.$/, "");
-  return `${formatted} ETH`;
-}
-
-function formatGwei(wei: string): string {
-  const gwei = Number(BigInt(wei)) / 1e9;
-  if (gwei === 0) return "0 Gwei";
-  const formatted = gwei.toFixed(9).replace(/0+$/, "").replace(/\.$/, "");
-  return `${formatted} Gwei`;
-}
-
-function formatNumber(value: string): string {
-  return Number(value).toLocaleString();
 }
 
 function GasRow({ label, value }: { label: string; value: string }) {

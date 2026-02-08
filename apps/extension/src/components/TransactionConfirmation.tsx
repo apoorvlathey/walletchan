@@ -18,8 +18,10 @@ import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { keyframes } from "@emotion/react";
 import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon, ExternalLinkIcon } from "@chakra-ui/icons";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
+import { GasOverrides } from "@/chrome/txHandlers";
 import { getChainConfig } from "@/constants/chainConfig";
 import CalldataDecoder from "@/components/CalldataDecoder";
+import GasEstimateDisplay from "@/components/GasEstimateDisplay";
 
 // Success animation keyframes
 const scaleIn = keyframes`
@@ -103,6 +105,7 @@ function TransactionConfirmation({
   const [error, setError] = useState<string>("");
   const [toLabels, setToLabels] = useState<string[]>([]);
   const [decodedFunctionName, setDecodedFunctionName] = useState<string | undefined>();
+  const [gasOverrides, setGasOverrides] = useState<GasOverrides | null>(null);
 
   const { tx, origin, chainName, favicon } = txRequest;
 
@@ -154,7 +157,7 @@ function TransactionConfirmation({
       : decodedFunctionName || undefined;
 
     chrome.runtime.sendMessage(
-      { type: messageType, txId: txRequest.id, password: "", functionName },
+      { type: messageType, txId: txRequest.id, password: "", functionName, ...(gasOverrides ? { gasOverrides } : {}) },
       (result: { success: boolean; error?: string }) => {
         if (result.success) {
           // Transaction submitted
@@ -567,6 +570,13 @@ function TransactionConfirmation({
             </HStack>
           </VStack>
         </Box>
+
+        {/* Gas Estimate */}
+        <GasEstimateDisplay
+          txRequest={txRequest}
+          accountType={accountType}
+          onGasOverrides={setGasOverrides}
+        />
 
         {/* Calldata (Decoded + Raw) */}
         {tx.data && tx.data !== "0x" && tx.to && (

@@ -268,6 +268,8 @@ class ImpersonatorProvider extends EventEmitter {
           value?: string;
           gas?: string;
           gasPrice?: string;
+          maxFeePerGas?: string;
+          maxPriorityFeePerGas?: string;
         };
 
         const txId = crypto.randomUUID();
@@ -287,6 +289,10 @@ class ImpersonatorProvider extends EventEmitter {
                 data: txParams.data || "0x",
                 value: txParams.value || "0x0",
                 chainId: this.chainId,
+                ...(txParams.gas ? { gas: txParams.gas } : {}),
+                ...(txParams.gasPrice ? { gasPrice: txParams.gasPrice } : {}),
+                ...(txParams.maxFeePerGas ? { maxFeePerGas: txParams.maxFeePerGas } : {}),
+                ...(txParams.maxPriorityFeePerGas ? { maxPriorityFeePerGas: txParams.maxPriorityFeePerGas } : {}),
               },
             },
             "*",
