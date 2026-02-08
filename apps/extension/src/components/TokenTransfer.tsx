@@ -278,7 +278,7 @@ function TokenTransfer({
             )}
           </HStack>
           <Input
-            placeholder="0x..., ENS, or Basename"
+            placeholder="0x..., ENS, Basename, or .wei"
             value={recipient}
             onChange={(e) => setRecipient(e.target.value.trim())}
             fontFamily="mono"
@@ -296,7 +296,7 @@ function TokenTransfer({
           />
           {recipient && !isResolving && !isRecipientValid && (
             <Text fontSize="xs" color="bauhaus.red" fontWeight="700" mt={1}>
-              Invalid address or ENS name
+              Invalid address or name
             </Text>
           )}
         </Box>

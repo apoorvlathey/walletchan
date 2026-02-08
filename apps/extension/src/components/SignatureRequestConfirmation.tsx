@@ -13,10 +13,12 @@ import {
   Image,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
-import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon } from "@chakra-ui/icons";
+import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon } from "@chakra-ui/icons";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
 import { getChainConfig } from "@/constants/chainConfig";
 import TypedDataDisplay from "@/components/TypedDataDisplay";
+import { FromAccountDisplay } from "@/components/FromAccountDisplay";
+import { CopyButton } from "@/components/CopyButton";
 
 interface SignatureRequestConfirmationProps {
   sigRequest: PendingSignatureRequest;
@@ -31,44 +33,11 @@ interface SignatureRequestConfirmationProps {
   onConfirmed?: () => void;
 }
 
-// Copy button component
-function CopyButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  const toast = useBauhausToast();
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      toast({
-        title: "Copied!",
-        status: "success",
-        duration: 1500,
-        isClosable: true,
-      });
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      toast({
-        title: "Failed to copy",
-        status: "error",
-        duration: 2000,
-        isClosable: true,
-      });
-    }
-  };
-
-  return (
-    <IconButton
-      aria-label="Copy"
-      icon={copied ? <CheckIcon /> : <CopyIcon />}
-      size="xs"
-      variant="ghost"
-      color={copied ? "bauhaus.yellow" : "text.secondary"}
-      onClick={handleCopy}
-      _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
-    />
-  );
-}
+const scrollStyles = {
+  "&::-webkit-scrollbar": { width: "6px" },
+  "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
+  "&::-webkit-scrollbar-thumb": { background: "#121212" },
+};
 
 function getMethodDisplayName(method: string): string {
   switch (method) {
@@ -85,6 +54,13 @@ function getMethodDisplayName(method: string): string {
     default:
       return method;
   }
+}
+
+function getSignerAddress(method: string, params: any[]): string | null {
+  if (method === "personal_sign" && params[1]) return params[1];
+  if (method === "eth_sign" && params[0]) return params[0];
+  if (method.startsWith("eth_signTypedData") && params[0]) return params[0];
+  return null;
 }
 
 function formatSignatureData(method: string, params: any[]): { message: string; rawData: string; typedData?: any } {
@@ -134,6 +110,109 @@ function formatSignatureData(method: string, params: any[]): { message: string; 
   };
 }
 
+/** Tabbed Message / Raw display for personal_sign and eth_sign */
+function MessageDataDisplay({ message, rawData }: { message: string; rawData: string }) {
+  const [tab, setTab] = useState<"message" | "raw">("message");
+
+  const copyValue = tab === "message" ? message : rawData;
+
+  return (
+    <Box
+      bg="bauhaus.white"
+      border="2px solid"
+      borderColor="bauhaus.black"
+      boxShadow="4px 4px 0px 0px #121212"
+    >
+      {/* Tab header */}
+      <HStack p={0} borderBottom="2px solid" borderColor="bauhaus.black" spacing={0}>
+        <Box
+          flex={1}
+          py={2}
+          px={3}
+          cursor="pointer"
+          bg={tab === "message" ? "bauhaus.black" : "transparent"}
+          onClick={() => setTab("message")}
+        >
+          <Text
+            fontSize="xs"
+            fontWeight="800"
+            textTransform="uppercase"
+            letterSpacing="wide"
+            textAlign="center"
+            color={tab === "message" ? "bauhaus.white" : "text.secondary"}
+          >
+            Message
+          </Text>
+        </Box>
+        <Box w="2px" bg="bauhaus.black" alignSelf="stretch" />
+        <Box
+          flex={1}
+          py={2}
+          px={3}
+          cursor="pointer"
+          bg={tab === "raw" ? "bauhaus.black" : "transparent"}
+          onClick={() => setTab("raw")}
+        >
+          <Text
+            fontSize="xs"
+            fontWeight="800"
+            textTransform="uppercase"
+            letterSpacing="wide"
+            textAlign="center"
+            color={tab === "raw" ? "bauhaus.white" : "text.secondary"}
+          >
+            Raw
+          </Text>
+        </Box>
+        <Spacer />
+        <Box pr={1}>
+          <CopyButton value={copyValue} />
+        </Box>
+      </HStack>
+
+      {/* Message tab */}
+      <Box p={3} display={tab === "message" ? "block" : "none"}>
+        {message ? (
+          <Box
+            p={3}
+            bg="#EEF2FF"
+            border="2px solid"
+            borderColor="bauhaus.black"
+            maxH="200px"
+            overflowY="auto"
+            css={scrollStyles}
+          >
+            <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
+              {message}
+            </Text>
+          </Box>
+        ) : (
+          <Text fontSize="xs" color="text.tertiary" fontWeight="600">
+            No message data
+          </Text>
+        )}
+      </Box>
+
+      {/* Raw tab */}
+      <Box p={3} display={tab === "raw" ? "block" : "none"}>
+        <Box
+          p={3}
+          bg="#EEF2FF"
+          border="2px solid"
+          borderColor="bauhaus.black"
+          maxH="200px"
+          overflowY="auto"
+          css={scrollStyles}
+        >
+          <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
+            {rawData}
+          </Text>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
 function SignatureRequestConfirmation({
   sigRequest,
   currentIndex,
@@ -149,6 +228,7 @@ function SignatureRequestConfirmation({
   const toast = useBauhausToast();
   const { signature, origin, chainName, favicon } = sigRequest;
   const { message, rawData, typedData } = formatSignatureData(signature.method, signature.params);
+  const signerAddress = getSignerAddress(signature.method, signature.params);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCancel = () => {
@@ -319,35 +399,35 @@ function SignatureRequestConfirmation({
         {/* Request Info Card */}
         <Box
           bg="bauhaus.white"
-          border="3px solid"
+          border="2px solid"
           borderColor="bauhaus.black"
-          boxShadow="4px 4px 0px 0px #121212"
+          boxShadow="3px 3px 0px 0px #121212"
           position="relative"
         >
           {/* Corner decoration */}
           <Box
             position="absolute"
-            top="-3px"
-            right="-3px"
-            w="10px"
-            h="10px"
+            top="-2px"
+            right="-2px"
+            w="8px"
+            h="8px"
             bg="bauhaus.blue"
-            border="2px solid"
+            border="1.5px solid"
             borderColor="bauhaus.black"
           />
 
-          <VStack spacing={0} divider={<Box h="2px" bg="bauhaus.black" w="full" />}>
+          <VStack spacing={0} divider={<Box h="1px" bg="gray.300" w="full" />}>
             {/* Origin */}
-            <HStack w="full" p={3} justify="space-between">
-              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+            <HStack w="full" py={2} px={3} justify="space-between">
+              <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                 Origin
               </Text>
-              <HStack spacing={2}>
+              <HStack spacing={1.5}>
                 <Box
                   bg="bauhaus.black"
-                  border="2px solid"
+                  border="1.5px solid"
                   borderColor="bauhaus.black"
-                  p={1}
+                  p={0.5}
                   display="flex"
                   alignItems="center"
                   justifyContent="center"
@@ -358,7 +438,7 @@ function SignatureRequestConfirmation({
                       `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`
                     }
                     alt="favicon"
-                    boxSize="16px"
+                    boxSize="14px"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       const googleFallback = `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`;
@@ -366,38 +446,48 @@ function SignatureRequestConfirmation({
                         target.src = googleFallback;
                       }
                     }}
-                    fallback={<Box boxSize="16px" bg="bauhaus.black" />}
+                    fallback={<Box boxSize="14px" bg="bauhaus.black" />}
                   />
                 </Box>
-                <Text fontSize="sm" fontWeight="700" color="text.primary">
+                <Text fontSize="xs" fontWeight="700" color="text.primary">
                   {new URL(origin).hostname}
                 </Text>
               </HStack>
             </HStack>
 
+            {/* From */}
+            {signerAddress && (
+              <HStack w="full" py={2} px={3} justify="space-between">
+                <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                  From
+                </Text>
+                <FromAccountDisplay address={signerAddress} />
+              </HStack>
+            )}
+
             {/* Network */}
-            <HStack w="full" p={3} justify="space-between">
-              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+            <HStack w="full" py={2} px={3} justify="space-between">
+              <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                 Network
               </Text>
               {(() => {
                 const config = getChainConfig(signature.chainId);
                 return (
                   <Badge
-                    fontSize="sm"
+                    fontSize="xs"
                     bg={config.bg}
                     color={config.text}
-                    border="2px solid"
+                    border="1.5px solid"
                     borderColor="bauhaus.black"
                     fontWeight="700"
-                    px={3}
-                    py={1}
+                    px={2}
+                    py={0.5}
                     display="flex"
                     alignItems="center"
-                    gap={1.5}
+                    gap={1}
                   >
                     {config.icon && (
-                      <Image src={config.icon} alt={chainName} boxSize="14px" />
+                      <Image src={config.icon} alt={chainName} boxSize="12px" />
                     )}
                     {chainName}
                   </Badge>
@@ -406,18 +496,18 @@ function SignatureRequestConfirmation({
             </HStack>
 
             {/* Method */}
-            <HStack w="full" p={3} justify="space-between">
-              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+            <HStack w="full" py={2} px={3} justify="space-between">
+              <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                 Method
               </Text>
               <Code
-                px={2}
-                py={1}
+                px={1.5}
+                py={0.5}
                 fontSize="xs"
                 bg="bauhaus.white"
                 color="text.primary"
                 fontFamily="mono"
-                border="2px solid"
+                border="1.5px solid"
                 borderColor="bauhaus.black"
                 fontWeight="700"
               >
@@ -431,77 +521,7 @@ function SignatureRequestConfirmation({
         {typedData ? (
           <TypedDataDisplay typedData={typedData} rawData={rawData} />
         ) : (
-          <>
-            {/* Message Display (personal_sign / eth_sign) */}
-            {message && (
-              <Box
-                bg="bauhaus.white"
-                p={3}
-                border="3px solid"
-                borderColor="bauhaus.black"
-                boxShadow="4px 4px 0px 0px #121212"
-              >
-                <HStack mb={2} alignItems="center">
-                  <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                    Message
-                  </Text>
-                  <Spacer />
-                  <CopyButton value={message} />
-                </HStack>
-                <Box
-                  p={3}
-                  bg="bg.muted"
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                  maxH="120px"
-                  overflowY="auto"
-                  css={{
-                    "&::-webkit-scrollbar": { width: "6px" },
-                    "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
-                    "&::-webkit-scrollbar-thumb": { background: "#121212" },
-                  }}
-                >
-                  <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
-                    {message}
-                  </Text>
-                </Box>
-              </Box>
-            )}
-
-            {/* Raw Data Display */}
-            <Box
-              bg="bauhaus.white"
-              p={3}
-              border="3px solid"
-              borderColor="bauhaus.black"
-              boxShadow="4px 4px 0px 0px #121212"
-            >
-              <HStack mb={2} alignItems="center">
-                <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                  Raw Data
-                </Text>
-                <Spacer />
-                <CopyButton value={rawData} />
-              </HStack>
-              <Box
-                p={3}
-                bg="bg.muted"
-                border="2px solid"
-                borderColor="bauhaus.black"
-                maxH="100px"
-                overflowY="auto"
-                css={{
-                  "&::-webkit-scrollbar": { width: "6px" },
-                  "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
-                  "&::-webkit-scrollbar-thumb": { background: "#121212" },
-                }}
-              >
-                <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
-                  {rawData}
-                </Text>
-              </Box>
-            </Box>
-          </>
+          <MessageDataDisplay message={message} rawData={rawData} />
         )}
 
         {/* Impersonator Info Box */}

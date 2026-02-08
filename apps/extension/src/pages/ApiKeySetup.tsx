@@ -20,7 +20,7 @@ import {
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { ViewIcon, ViewOffIcon, ArrowBackIcon } from "@chakra-ui/icons";
 import { saveEncryptedApiKey } from "@/chrome/crypto";
-import { StaticJsonRpcProvider } from "@ethersproject/providers";
+import { resolveNameToAddress, isResolvableName } from "@/lib/ensUtils";
 import { isAddress } from "@ethersproject/address";
 
 interface ApiKeySetupProps {
@@ -85,14 +85,10 @@ function ApiKeySetup({
     if (isAddress(input)) {
       return input;
     }
-
-    try {
-      const mainnetProvider = new StaticJsonRpcProvider("https://rpc.ankr.com/eth");
-      const resolved = await mainnetProvider.resolveName(input);
-      return resolved;
-    } catch (err) {
-      return null;
+    if (isResolvableName(input)) {
+      return await resolveNameToAddress(input);
     }
+    return null;
   };
 
   const validate = async (): Promise<boolean> => {
@@ -110,7 +106,7 @@ function ApiKeySetup({
       setIsResolvingAddress(false);
 
       if (!resolved) {
-        newErrors.walletAddress = "Invalid address or ENS name";
+        newErrors.walletAddress = "Invalid address or name";
       }
     }
 
@@ -140,10 +136,10 @@ function ApiKeySetup({
     setIsSubmitting(true);
 
     try {
-      // Resolve address (in case it's ENS)
+      // Resolve address (in case it's ENS/Basename/WNS)
       const resolvedAddress = await resolveAddress(walletAddress.trim());
       if (!resolvedAddress) {
-        setErrors({ walletAddress: "Invalid address or ENS name" });
+        setErrors({ walletAddress: "Invalid address or name" });
         setIsSubmitting(false);
         return;
       }
@@ -260,7 +256,7 @@ function ApiKeySetup({
       <FormControl isInvalid={!!errors.walletAddress}>
         <FormLabel color="text.secondary">Wallet Address</FormLabel>
         <Input
-          placeholder="0x... or ENS name"
+          placeholder="0x... or name (e.g., vitalik.eth, name.wei)"
           value={walletAddress}
           onChange={(e) => setWalletAddress(e.target.value)}
           bg="bg.subtle"

@@ -395,6 +395,7 @@ function TxStatusItem({ tx, onClick }: { tx: CompletedTransaction; onClick: () =
         )}
       </HStack>
 
+      {/* Cancel button temporarily disabled
       {tx.status === "processing" && tx.accountType !== "bankr" && (
         <HStack justify="flex-end" mt={1}>
           <Button
@@ -412,6 +413,7 @@ function TxStatusItem({ tx, onClick }: { tx: CompletedTransaction; onClick: () =
           </Button>
         </HStack>
       )}
+      */}
 
       {/* Show error message for failed transactions */}
       {tx.status === "failed" && tx.error && (

@@ -12,6 +12,7 @@ import {
 import { RepeatIcon, ViewIcon, ViewOffIcon } from "@chakra-ui/icons";
 import { fetchPortfolio, PortfolioToken } from "@/chrome/portfolioApi";
 import { fetchOnchainBalances } from "@/chrome/onchainBalances";
+import { recordSnapshot } from "@/chrome/portfolioSnapshotStorage";
 import { getChainConfig } from "@/constants/chainConfig";
 
 interface TokenHoldingsProps {
@@ -77,8 +78,12 @@ function TokenHoldings({ address, onTokenClick, hideHeader, hideCard, onStateCha
           const onchain = await fetchOnchainBalances(address, data.tokens);
           setTokens(onchain.tokens);
           setTotalValueUsd(onchain.totalValueUsd);
+          // Record snapshot with on-chain enhanced value
+          recordSnapshot(address, onchain.totalValueUsd).catch(() => {});
         } catch (err) {
           console.warn("[onchain] balance fetch failed, using API values:", err);
+          // Record snapshot with API-only value
+          recordSnapshot(address, data.totalValueUsd).catch(() => {});
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load portfolio");

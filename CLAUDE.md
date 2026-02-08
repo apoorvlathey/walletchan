@@ -151,6 +151,7 @@ When working on features, refer to these docs:
 | `CHAT.md`                        | Chat interface to directly chat & prompt to bankr api |
 | `STYLING.md`                     | UI components, design tokens, Bauhaus system          |
 | `WEBSITE.md`                     | Website sections, layout specs, animations            |
+| `APPS.md`                        | Apps page data source, fetch script, adding chains     |
 | `CALLDATA.md`                    | Calldata decoder UI, param components, type routing   |
 | `DEVELOPMENT.md`                 | Build process, release workflow                       |
 | `openclaw-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling     |

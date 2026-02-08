@@ -7,8 +7,9 @@ import {
   Code,
   IconButton,
   Spacer,
+  Collapse,
 } from "@chakra-ui/react";
-import { CopyIcon, CheckIcon, ExternalLinkIcon } from "@chakra-ui/icons";
+import { CopyIcon, CheckIcon, ExternalLinkIcon, ChevronDownIcon } from "@chakra-ui/icons";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { getChainConfig } from "@/constants/chainConfig";
 
@@ -204,9 +205,11 @@ const scrollStyles = {
 
 function TypedDataDisplay({ typedData, rawData }: TypedDataDisplayProps) {
   const [tab, setTab] = useState<"structured" | "raw">("structured");
+  const [typesOpen, setTypesOpen] = useState(false);
   const domain = typedData?.domain;
   const message = typedData?.message;
   const primaryType = typedData?.primaryType;
+  const types = typedData?.types;
   const chainId = domain?.chainId ? Number(domain.chainId) : undefined;
 
   return (
@@ -338,6 +341,64 @@ function TypedDataDisplay({ typedData, rawData }: TypedDataDisplayProps) {
                   <MessageField key={key} name={key} value={val} chainId={chainId} />
                 ))}
               </VStack>
+            )}
+
+            {/* Types section (collapsible) */}
+            {types && Object.keys(types).length > 0 && (
+              <Box w="full">
+                <HStack
+                  spacing={1}
+                  cursor="pointer"
+                  onClick={() => setTypesOpen(!typesOpen)}
+                  _hover={{ opacity: 0.8 }}
+                >
+                  <Code
+                    px={2}
+                    py={0.5}
+                    fontSize="10px"
+                    bg="bauhaus.yellow"
+                    color="bauhaus.black"
+                    fontWeight="800"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    textTransform="uppercase"
+                  >
+                    Types
+                  </Code>
+                  <ChevronDownIcon
+                    boxSize="14px"
+                    color="text.secondary"
+                    transform={typesOpen ? "rotate(180deg)" : "rotate(0deg)"}
+                    transition="transform 0.2s ease-out"
+                  />
+                  <Text fontSize="10px" color="text.tertiary" fontWeight="600">
+                    {Object.keys(types).length} type{Object.keys(types).length !== 1 ? "s" : ""}
+                  </Text>
+                </HStack>
+                <Collapse in={typesOpen} animateOpacity>
+                  <VStack align="start" spacing={1.5} mt={2} pl={1}>
+                    {Object.entries(types).map(([typeName, typeFields]) => (
+                      <VStack key={typeName} align="start" spacing={0.5} w="full">
+                        <Text fontSize="xs" color="text.primary" fontWeight="700">
+                          {typeName}
+                        </Text>
+                        <VStack align="start" spacing={0} pl={3} borderLeft="2px solid" borderColor="bauhaus.black">
+                          {Array.isArray(typeFields) && typeFields.map((field: any, i: number) => (
+                            <HStack key={i} spacing={1}>
+                              <Text fontSize="10px" fontFamily="mono" color="bauhaus.blue" fontWeight="600">
+                                {field.type}
+                              </Text>
+                              <Text fontSize="10px" fontFamily="mono" color="text.secondary" fontWeight="600">
+                                {field.name}
+                              </Text>
+                            </HStack>
+                          ))}
+                        </VStack>
+                      </VStack>
+                    ))}
+                  </VStack>
+                </Collapse>
+              </Box>
             )}
           </VStack>
         ) : (

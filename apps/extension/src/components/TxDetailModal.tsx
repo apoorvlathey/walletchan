@@ -33,6 +33,7 @@ import { AddressParam } from "@/components/decodedParams/AddressParam";
 import { CopyButton } from "@/components/CopyButton";
 import CalldataDecoder from "@/components/CalldataDecoder";
 import { formatEth, formatGwei, formatNumber } from "@/lib/gasFormatUtils";
+import { FromAccountDisplay } from "@/components/FromAccountDisplay";
 
 interface TxDetailModalProps {
   isOpen: boolean;
@@ -288,36 +289,44 @@ function TxDetailModal({ isOpen, onClose, tx }: TxDetailModalProps) {
               </Box>
             )}
 
-            {/* To address / Contract Deployment */}
-            <Box>
-              <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase" mb={1}>
-                {isContractDeploy ? "Type" : "To"}
-              </Text>
-              {isContractDeploy ? (
-                <Badge
-                  fontSize="xs"
-                  bg="bauhaus.yellow"
-                  color="bauhaus.black"
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                  fontWeight="700"
-                  px={2}
-                  py={0.5}
-                >
-                  Contract Deployment
-                </Badge>
-              ) : (
-                <AddressParam value={tx.tx.to!} chainId={tx.chainId} />
-              )}
-            </Box>
+            {/* From → To row */}
+            <HStack spacing={2} align="start">
+              {/* From (our wallet) */}
+              <VStack align="start" spacing={0} flex={1} minW={0}>
+                <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase" mb={1}>
+                  From
+                </Text>
+                <FromAccountDisplay address={tx.tx.from} />
+              </VStack>
 
-            {/* From address */}
-            <Box>
-              <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase" mb={1}>
-                From
+              {/* Arrow */}
+              <Text fontSize="md" fontWeight="800" color="text.tertiary" pt={5}>
+                →
               </Text>
-              <AddressParam value={tx.tx.from} chainId={tx.chainId} />
-            </Box>
+
+              {/* To */}
+              <VStack align="start" spacing={0} flex={1} minW={0}>
+                <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase" mb={1}>
+                  {isContractDeploy ? "Type" : "To"}
+                </Text>
+                {isContractDeploy ? (
+                  <Badge
+                    fontSize="2xs"
+                    bg="bauhaus.yellow"
+                    color="bauhaus.black"
+                    border="2px solid"
+                    borderColor="bauhaus.black"
+                    fontWeight="700"
+                    px={1.5}
+                    py={0.5}
+                  >
+                    Contract Deploy
+                  </Badge>
+                ) : (
+                  <AddressParam value={tx.tx.to!} chainId={tx.chainId} />
+                )}
+              </VStack>
+            </HStack>
 
             {/* Value */}
             <Box>
