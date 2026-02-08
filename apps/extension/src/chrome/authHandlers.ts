@@ -19,6 +19,7 @@ import {
   reEncryptVault,
   hasVaultEntries,
 } from "./vaultCrypto";
+import { reEncryptMnemonicVault, hasMnemonics } from "./mnemonicStorage";
 import type { PasswordType } from "./types";
 import {
   setCachedApiKey,
@@ -444,6 +445,24 @@ export async function handleChangePasswordWithCachedPassword(
       await chrome.storage.local.set({
         encryptedVaultKeyMaster: newEncryptedVaultKeyMaster,
       });
+
+      // Re-encrypt private key vault entries (encrypted with password, not vault key)
+      const hasVault = await hasVaultEntries();
+      if (hasVault) {
+        const success = await reEncryptVault(currentPassword, newPassword);
+        if (!success) {
+          return { success: false, error: "Failed to re-encrypt private key vault" };
+        }
+      }
+
+      // Re-encrypt mnemonic vault entries (encrypted with password, not vault key)
+      const hasMnemonicEntries = await hasMnemonics();
+      if (hasMnemonicEntries) {
+        const success = await reEncryptMnemonicVault(currentPassword, newPassword);
+        if (!success) {
+          return { success: false, error: "Failed to re-encrypt mnemonic vault" };
+        }
+      }
 
       // Note: encryptedVaultKeyAgent (if exists) stays unchanged - agent password remains valid
     } else {

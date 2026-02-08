@@ -430,6 +430,13 @@ function Onboarding({ onComplete }: OnboardingProps) {
         }
       }
 
+      // Clear sensitive state from memory before showing success
+      setApiKey("");
+      setPrivateKey("");
+      setPassword("");
+      setConfirmPassword("");
+      setCollectedMnemonic("");
+
       // Show success step
       setStep("success");
 

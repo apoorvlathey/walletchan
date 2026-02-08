@@ -35,7 +35,7 @@ The extension supports four distinct account types that can be used simultaneous
 - **Seed Groups**: Each mnemonic creates a "group" that can derive multiple accounts. Groups have user-editable names (default "Seed #N").
 - **Storage**: Mnemonics encrypted separately in `mnemonicVault` (PBKDF2+AES-256-GCM). Derived private keys stored in regular `pkVault` keyed by account UUID
 - **Byte conversion**: Uses native `bytesToHex()` from `cryptoUtils.ts` instead of Node.js `Buffer` (not available in browser service worker)
-- **Files**: `seedPhraseUtils.ts` (BIP39/44), `mnemonicStorage.ts` (encrypted CRUD), `SeedPhraseSetup.tsx` (UI), `RevealSeedPhraseModal.tsx` (reveal with password)
+- **Files**: `seedPhraseUtils.ts` (BIP39/44), `mnemonicStorage.ts` (encrypted CRUD + `reEncryptMnemonicVault` for password changes), `SeedPhraseSetup.tsx` (UI), `RevealSeedPhraseModal.tsx` (reveal with password)
 - **Display**: Account dropdown shows seed group name + derivation index (e.g., "Seed #1 · #0"). Account settings shows derivation index in type label.
 
 #### PK → Seed Phrase Account Conversion
@@ -509,6 +509,7 @@ await provider.request({
 - Receives `i_sendTransaction` message
 - Forwards all tx fields to background via `chrome.runtime.sendMessage`, including gas params
 - Sends result back to inpage via `postMessage`
+- **Security**: Only forwards whitelisted message types from background to the webpage (`setAddress`, `setChainId`, `setAccount`). All other background broadcasts are not forwarded, preventing dapps from eavesdropping on wallet events.
 
 ### 5. Background Stores Pending Transaction & Opens Popup
 
@@ -1452,8 +1453,12 @@ When changing the wallet password (Settings → Change Password):
 1. Decrypt vault key with cached (old) password to get raw bytes
 2. Re-encrypt vault key with new password
 3. Save updated `encryptedVaultKeyMaster`
-4. API key and private keys stay encrypted with the vault key (unchanged)
-5. **Agent password remains valid** - `encryptedVaultKeyAgent` is unchanged
+4. API key stays encrypted with the vault key (unchanged)
+5. Re-encrypt `pkVault` entries with new password (via `reEncryptVault()`)
+6. Re-encrypt `mnemonicVault` entries with new password (via `reEncryptMnemonicVault()`)
+7. **Agent password remains valid** - `encryptedVaultKeyAgent` is unchanged
+
+**Note**: `pkVault` and `mnemonicVault` entries are encrypted directly with the user's password (via PBKDF2), not with the vault key. Both must be re-encrypted when the password changes, or the private keys and seed phrases become inaccessible.
 
 **Legacy System** (pre-vault key migration):
 1. Decrypt API key with old password
@@ -1559,6 +1564,8 @@ Build command: `pnpm build`
 
 ### Content Script → Inpage (postMessage)
 
+**SECURITY**: `inject.ts` only forwards whitelisted message types to the webpage. Background broadcast messages like `newPendingTxRequest`, `accountsUpdated`, `txHistoryUpdated` are NOT forwarded, preventing malicious dapps from eavesdropping on wallet activity.
+
 | Type                       | Description                                          |
 | -------------------------- | ---------------------------------------------------- |
 | `sendTransactionResult`    | Transaction result                                   |
@@ -1566,7 +1573,8 @@ Build command: `pnpm build`
 | `rpcResponse`              | RPC call response                                    |
 | `switchEthereumChain`      | Chain switch success (chainId, rpcUrl)               |
 | `switchEthereumChainError` | Chain switch error (unsupported chain)               |
-| `setAddress`               | Account changed (address, displayAddress)            |
+| `setAddress`               | Account changed (forwarded from background)          |
+| `setChainId`               | Chain changed (forwarded from background)            |
 | `accountsChanged`          | Emitted when address changes (for dApp notification) |
 
 ### Content Script → Background (chrome.runtime)
@@ -1596,7 +1604,7 @@ Build command: `pnpm build`
 | `cancelTransaction`                | User cancelled in-progress tx                           |
 | `clearApiKeyCache`                 | Clear cached API key                                    |
 | `getCachedPassword`                | Check if password is cached                             |
-| `getCachedApiKey`                  | Get decrypted API key (if cached)                       |
+| `getCachedApiKey`                  | Get decrypted API key (if cached). **Sender-verified**: extension pages only |
 | `saveApiKeyWithCachedPassword`     | Save new API key using cached password                  |
 | `changePasswordWithCachedPassword` | Change password using cached password                   |
 | `isSidePanelSupported`             | Check if browser supports sidepanel                     |
@@ -1615,12 +1623,13 @@ Build command: `pnpm build`
 | `getTabAccount`                    | Get account for specific tab                            |
 | `setTabAccount`                    | Set account for specific tab                            |
 | `confirmSignatureRequest`          | Sign message (PK accounts only)                         |
-| `revealPrivateKey`                 | Reveal private key (requires password verification)     |
+| `revealPrivateKey`                 | Reveal private key (requires password verification). **Sender-verified** |
 | `updateAccountDisplayName`         | Update account display name                             |
 | `addImpersonatorAccount`           | Add view-only impersonator account (address only)       |
+| `generateMnemonic`                | Generate fresh BIP39 mnemonic (no storage). **Sender-verified**  |
 | `addSeedPhraseGroup`              | Generate/import mnemonic, create seed group, derive first account (handles PK collision) |
 | `deriveSeedAccount`               | Derive next account from existing seed group (handles PK collision) |
-| `revealSeedPhrase`                | Reveal mnemonic (requires master password verification)  |
+| `revealSeedPhrase`                | Reveal mnemonic (requires master password verification). **Sender-verified** |
 | `getSeedGroups`                   | Get all seed group metadata                              |
 | `renameSeedGroup`                 | Rename a seed group (broadcasts accountsUpdated)         |
 | `initiateTransfer`                 | Create pending tx for extension-initiated token transfer |

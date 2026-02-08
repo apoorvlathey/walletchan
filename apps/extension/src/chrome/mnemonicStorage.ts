@@ -153,6 +153,42 @@ export async function removeMnemonic(seedGroupId: string): Promise<void> {
 }
 
 /**
+ * Re-encrypts all mnemonic vault entries with a new password
+ * Used when changing the wallet password
+ */
+export async function reEncryptMnemonicVault(
+  oldPassword: string,
+  newPassword: string
+): Promise<boolean> {
+  const vault = await loadMnemonicVault();
+  if (!vault || vault.entries.length === 0) {
+    return true; // Nothing to re-encrypt
+  }
+
+  try {
+    const newEntries: MnemonicVaultEntry[] = [];
+    for (const entry of vault.entries) {
+      // Decrypt with old password
+      const mnemonic = await decryptMnemonic(entry.keystore, oldPassword);
+      // Re-encrypt with new password
+      const newKeystore = await encryptMnemonic(mnemonic, newPassword);
+      newEntries.push({
+        id: entry.id,
+        keystore: newKeystore,
+      });
+    }
+
+    // Save the re-encrypted vault
+    vault.entries = newEntries;
+    await saveMnemonicVault(vault);
+    return true;
+  } catch {
+    // Failed to decrypt (wrong old password)
+    return false;
+  }
+}
+
+/**
  * Check if any mnemonics exist in the vault
  */
 export async function hasMnemonics(): Promise<boolean> {

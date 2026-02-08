@@ -172,6 +172,17 @@ async function handleRpcRequest(
   return data.result;
 }
 
+// ─── Security Helpers ────────────────────────────────────────────────────────
+
+/**
+ * Checks whether the message sender is an extension page (popup, sidepanel, onboarding)
+ * as opposed to a content script running on a web page.
+ * Content scripts have sender.url set to the web page URL, not the extension URL.
+ */
+function isExtensionPage(sender: chrome.runtime.MessageSender): boolean {
+  return !!sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`);
+}
+
 // ─── Chrome Event Listeners ──────────────────────────────────────────────────
 
 // Listen for storage changes to update cached timeout and broadcast address changes
@@ -493,6 +504,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "generateMnemonic": {
+      // SECURITY: Only extension pages can generate mnemonics
+      if (!isExtensionPage(sender)) {
+        sendResponse({ success: false, error: "Unauthorized" });
+        return false;
+      }
       const mnemonic = generateNewMnemonic();
       sendResponse({ success: true, mnemonic });
       return false;
@@ -668,6 +684,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "revealSeedPhrase": {
+      // SECURITY: Only extension pages can reveal seed phrases
+      if (!isExtensionPage(sender)) {
+        sendResponse({ success: false, error: "Unauthorized" });
+        return true;
+      }
       (async () => {
         try {
           const { seedGroupId, password } = message;
@@ -794,6 +815,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "revealPrivateKey": {
+      // SECURITY: Only extension pages can reveal private keys
+      if (!isExtensionPage(sender)) {
+        sendResponse({ success: false, error: "Unauthorized" });
+        return true;
+      }
       (async () => {
         try {
           const { accountId, password } = message;
@@ -955,6 +981,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "getCachedApiKey": {
+      // SECURITY: Only extension pages can access the API key
+      if (!isExtensionPage(sender)) {
+        sendResponse({ apiKey: null });
+        return true;
+      }
       (async () => {
         let apiKey = getCachedApiKey();
         if (!apiKey) {
@@ -1152,22 +1183,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           await Promise.all([
             chrome.storage.local.remove([
               "encryptedApiKey",
+              "encryptedApiKeyVault",
+              "encryptedVaultKeyMaster",
+              "encryptedVaultKeyAgent",
+              "agentPasswordEnabled",
               "txHistory",
               "pendingTxRequests",
               "pendingSignatureRequests",
               "chatHistory",
               "pkVault",
+              "mnemonicVault",
+              "seedGroups",
               "accounts",
+              "portfolioSnapshots",
+              "ensIdentityCache",
               ...notificationKeys,
             ]),
             chrome.storage.sync.remove([
               "address",
               "displayAddress",
+              "networksInfo",
+              "chainName",
+              "autoLockTimeout",
+              "isArcBrowser",
+              "hidePortfolioValue",
               "sidePanelVerified",
               "sidePanelMode",
               "activeAccountId",
               "tabAccounts",
             ]),
+            clearSessionStorage(),
           ]);
 
           await chrome.action.setBadgeText({ text: "" });

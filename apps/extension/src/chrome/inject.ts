@@ -141,12 +141,18 @@ chrome.runtime.onMessage.addListener((msgObj, sender, sendResponse) => {
             msg: { address },
           }, "*");
         }
+
+        // Forward to inpage script for provider state update
+        window.postMessage(msgObj, "*");
         break;
       }
       case "setChainId": {
         const chainName = msgObj.msg.chainName as string;
 
         store.chainName = chainName;
+
+        // Forward to inpage script for provider chain update
+        window.postMessage(msgObj, "*");
         break;
       }
       case "setAccount": {
@@ -173,10 +179,11 @@ chrome.runtime.onMessage.addListener((msgObj, sender, sendResponse) => {
 
         break;
       }
+      // All other message types (e.g., newPendingTxRequest, accountsUpdated,
+      // txHistoryUpdated) are NOT forwarded to the webpage to prevent
+      // malicious dapps from eavesdropping on wallet activity
     }
   }
-
-  window.postMessage(msgObj, "*");
 });
 
 // Receive messages from injected impersonator.ts code

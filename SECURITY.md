@@ -110,7 +110,7 @@ These are the message handlers in `background.ts` that touch secrets, modify acc
 | Handler | What It Modifies | Guard |
 |---------|-----------------|-------|
 | `saveApiKeyWithCachedPassword` | Overwrites encrypted API key | Agent password blocked |
-| `changePasswordWithCachedPassword` | Re-encrypts vault key with new master password | Agent password blocked |
+| `changePasswordWithCachedPassword` | Re-encrypts vault key, pkVault entries, and mnemonicVault entries with new master password | Agent password blocked |
 | `addBankrAccount` | Can overwrite encrypted API key (when `message.apiKey` provided) | Agent password blocked when apiKey present |
 | `addPrivateKeyAccount` | Adds new entry to encrypted private key vault | Agent password blocked |
 
@@ -166,6 +166,21 @@ Only these types are sent to content scripts (and thus forwarded to the webpage)
 | `setAccount` | address, displayName, accountId, accountType |
 
 **Rule**: Never send secrets (passwords, API keys, private keys) to content scripts. Any new background-to-content-script message type must be reviewed for data sensitivity.
+
+**Whitelist enforcement**: `inject.ts` only forwards `setAddress`, `setChainId`, and `setAccount` messages to the webpage via `window.postMessage`. All other message types from background broadcasts (e.g., `newPendingTxRequest`, `accountsUpdated`, `txHistoryUpdated`) are **not** forwarded. This prevents malicious dapps from eavesdropping on wallet activity across other tabs.
+
+### Sender Verification for Secret-Returning Handlers
+
+Handlers that return secrets or generate sensitive material verify that the sender is an extension page (popup, sidepanel, onboarding) and not a content script running on a web page:
+
+| Handler | Check |
+|---------|-------|
+| `getCachedApiKey` | `isExtensionPage(sender)` |
+| `revealPrivateKey` | `isExtensionPage(sender)` |
+| `revealSeedPhrase` | `isExtensionPage(sender)` |
+| `generateMnemonic` | `isExtensionPage(sender)` |
+
+The `isExtensionPage()` helper verifies `sender.url` starts with `chrome-extension://<extension-id>/`. Content scripts have `sender.url` set to the web page URL, so they will fail this check.
 
 ---
 
@@ -242,9 +257,13 @@ These must always hold true. Violations indicate a security bug.
 
 6. **Session restore only works for "Never" auto-lock** - `tryRestoreSession()` checks `autoLockTimeout === 0` before attempting restoration.
 
-7. **Content script only forwards whitelisted message types** - `inject.ts` only bridges `i_sendTransaction`, `i_signatureRequest`, `i_rpcRequest`, `i_switchEthereumChain` from page to background.
+7. **Content script only forwards whitelisted message types** - `inject.ts` only bridges `i_sendTransaction`, `i_signatureRequest`, `i_rpcRequest`, `i_switchEthereumChain` from page to background. In the reverse direction, only `setAddress`, `setChainId`, and `setAccount` are forwarded from background to the webpage.
 
 8. **No `eval()` or dynamic code execution** - MV3 CSP prevents this, but also verify no `new Function()` or similar patterns exist.
+
+9. **Secret-returning handlers verify sender origin** - Handlers like `getCachedApiKey`, `revealPrivateKey`, `revealSeedPhrase`, and `generateMnemonic` check `isExtensionPage(sender)` to ensure the request comes from an extension page, not a content script on a web page.
+
+10. **Password change re-encrypts all password-derived vaults** - `handleChangePasswordWithCachedPassword` re-encrypts the vault key wrapper, `pkVault` entries, and `mnemonicVault` entries with the new password. Without this, private keys and seed phrases become inaccessible after a password change.
 
 ---
 
@@ -256,8 +275,8 @@ When reviewing or making changes to extension code, verify the following:
 
 - [ ] Does the handler touch secrets (API keys, passwords, private keys, vault keys)?
 - [ ] If it modifies secrets or accounts, does it check `getPasswordType() === "agent"` and block?
-- [ ] Does the handler return secrets in the response? If so, is that necessary and is the handler guarded appropriately?
-- [ ] Could a compromised UI abuse this handler? Consider what happens if arbitrary messages are sent.
+- [ ] Does the handler return secrets in the response? If so, is `isExtensionPage(sender)` checked to prevent content scripts from requesting secrets?
+- [ ] Could a compromised content script abuse this handler? Consider what happens if arbitrary messages are sent from a web page context.
 
 ### If you modified crypto, encryption, or storage:
 
