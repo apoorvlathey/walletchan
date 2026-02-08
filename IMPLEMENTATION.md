@@ -262,6 +262,7 @@ src/
 │   ├── accountStorage.ts    # Account CRUD operations (includes seed groups, PK→seed conversion)
 │   ├── bankrApi.ts          # Bankr API client (submit, sign, job polling)
 │   ├── portfolioApi.ts      # Portfolio API client (fetches token holdings via website)
+│   ├── onchainBalances.ts   # On-chain balance verification via Multicall3 batching
 │   ├── transferUtils.ts     # ERC20/native token transfer calldata builders
 │   ├── chatApi.ts           # Chat API client for Bankr agent
 │   ├── chatStorage.ts       # Persistent storage for chat conversations
@@ -299,7 +300,8 @@ src/
 │   ├── UnlockScreen.tsx     # Wallet unlock (password entry)
 │   ├── PendingTxBanner.tsx  # Banner showing pending tx/signature count
 │   ├── PendingTxList.tsx    # List of pending transactions and signature requests
-│   ├── TxStatusList.tsx     # Recent transaction history display
+│   ├── TxStatusList.tsx     # Recent transaction history display (clickable → TxDetailModal)
+│   ├── TxDetailModal.tsx    # Transaction detail modal (gas fees, function name, addresses)
 │   ├── TransactionConfirmation.tsx # In-popup tx confirmation with success animation
 │   ├── SignatureRequestConfirmation.tsx # Signature request display (confirm for PK, reject for Bankr)
 │   ├── TokenHoldings.tsx    # Portfolio token list with USD values
@@ -724,6 +726,46 @@ Completed transactions (confirmed or failed) are stored persistently and display
 
 **See**: `src/chrome/txHistoryStorage.ts` for `CompletedTransaction` interface and `TxStatus` type. Each entry tracks the transaction params, origin, chain, status (processing/success/failed), timestamps, and result (txHash or error).
 
+Additional fields populated after transaction submission:
+
+- `accountType` — `"bankr" | "privateKey" | "seedPhrase"` — which account type submitted the tx
+- `functionName` — Human-readable function name extracted from decoded calldata (see Function Name Resolution below)
+- `gasData` — Gas fee breakdown fetched asynchronously after tx confirms (see Gas Data Fetching below)
+
+#### GasData Interface
+
+```typescript
+interface GasData {
+  gasUsed: string;           // decimal string
+  gasLimit: string;          // decimal string
+  effectiveGasPrice: string; // decimal string (wei)
+  // OP Stack L2 only (Base 8453, Unichain 130)
+  l1Fee?: string;            // decimal string (wei)
+  l1GasUsed?: string;        // decimal string
+  l1GasPrice?: string;       // decimal string (wei)
+}
+```
+
+#### Function Name Resolution
+
+Function names are resolved via a two-phase approach:
+
+**Phase 1 (UI-driven)**: `TransactionConfirmation` decodes calldata locally via `CalldataDecoder`. If decoded, the `functionName` is passed in the confirmation message to background.
+
+**Phase 2 (Background fallback)**: If the UI didn't provide a function name, `lookupFunctionName()` runs after tx submission and queries:
+1. Sourcify 4byte API (`https://api.4byte.sourcify.dev/signature-database/v1/lookup`)
+2. 4byte.directory (`https://www.4byte.directory/api/v1/signatures/`) as fallback
+
+The resolved name is stored in tx history via `updateTxInHistory()`.
+
+#### Gas Data Fetching
+
+Gas data is not available at confirmation time (tx hasn't been mined). It's fetched asynchronously:
+
+1. **After tx success**: `fetchAndStoreGasData()` in `txHandlers.ts` runs fire-and-forget, calling `eth_getTransactionByHash` (gasLimit) and `eth_getTransactionReceipt` (gasUsed, effectiveGasPrice). For OP Stack L2s (Base 8453, Unichain 130), L1 fee fields (`l1Fee`, `l1GasUsed`, `l1GasPrice`) are extracted from the receipt.
+2. **On-demand in TxDetailModal**: For older transactions missing `gasData`, the modal fetches directly via RPC when opened.
+3. **Graceful degradation**: Errors are silently ignored (non-critical data).
+
 ### Storage Functions
 
 | Function                           | Description                               |
@@ -748,15 +790,27 @@ Completed transactions (confirmed or failed) are stored persistently and display
 - **Empty state**: "No recent transactions" message
 - **Account filtering**: Only shows transactions from the currently selected account (filtered by `tx.from` address)
 
-Each transaction shows:
+Each transaction card shows:
 
-- Origin favicon and hostname
+- Origin favicon and hostname (or function name if available)
 - Chain badge with icon
 - Status badge:
   - **Processing**: Blue badge with spinner
   - **Confirmed**: Green badge with checkmark, explorer link
   - **Failed**: Red badge with warning icon, error message
 - Relative timestamp ("Just now", "5m ago", "2h ago")
+
+**Clickable detail**: Clicking a completed transaction card opens `TxDetailModal`, which shows:
+
+- Status badge, chain info, and explorer link
+- Function name (if decoded)
+- From/To addresses with `AddressParam` (ENS resolution, labels, copy + explorer links)
+- Value in ETH
+- Gas fee breakdown: total fee, gas price (Gwei), gas limit & usage with percentage
+- **OP Stack L2 breakdown** (Base, Unichain): separate L2 fees, L1 fees, L1 gas price, L1 gas used
+- Calldata decoder (reuses `CalldataDecoder` component)
+- Contract deployment detection
+- Error display for failed transactions
 
 ### Real-time Updates
 
@@ -789,6 +843,16 @@ Token holdings are fetched via a website API route that wraps the Octav API:
 - **Website route**: `apps/website/app/api/portfolio/route.ts` (GET `/api/portfolio?address=0x...`)
 - **Extension client**: `portfolioApi.ts` fetches from `https://bankrwallet.app/api/portfolio`
 - **Response format**: Provider-agnostic `PortfolioResponse` with `tokens[]` and `totalValueUsd`
+
+### On-Chain Balance Verification
+
+API portfolio data is shown immediately, while on-chain balances are verified in the background via `onchainBalances.ts`:
+
+- **Multicall3** (`0xcA11bde05977b3631167028862bE2a173976CA11`, same address on all chains) batches native `getEthBalance` and ERC20 `balanceOf` calls into a single multicall per chain
+- Calls are chunked into batches of 100 to avoid oversized RPC requests
+- Parallel execution across all chains with 8s timeout and no retries
+- Cached viem clients per chainId for performance
+- Falls back to API values on any error (per-token or per-batch)
 
 ### TokenHoldings Component
 
@@ -1292,9 +1356,11 @@ When a transaction request is received, the background worker automatically open
 
 ## Cancellation
 
-Users can cancel in-progress transactions:
+Users can cancel in-progress transactions (PK/Seed Phrase accounts only):
 
-1. **Local Abort**: `AbortController` aborts the in-flight `/agent/submit` request
+1. **Local Abort**: `AbortController` aborts the in-flight RPC broadcast
+
+**Bankr API accounts** cannot be cancelled — `/agent/submit` is synchronous (tx is already broadcast on-chain by the time the response returns). The cancel button is hidden in the UI for Bankr account transactions.
 
 ## Response Handling
 
@@ -1383,7 +1449,8 @@ Build command: `pnpm build`
 | `unlockWallet`                     | Unlock wallet with password                             |
 | `lockWallet`                       | Lock wallet (clear cached credentials)                  |
 | `confirmTransaction`               | User approved tx (sync, waits)                          |
-| `confirmTransactionAsync`          | User approved tx (async, returns immediately)           |
+| `confirmTransactionAsync`          | User approved tx (async, Bankr API). Optional `functionName` field |
+| `confirmTransactionAsyncPK`        | User approved tx (async, PK/seed local sign). Optional `functionName` field |
 | `rejectTransaction`                | User rejected tx                                        |
 | `getPendingSignatureRequests`      | Get all pending signature requests                      |
 | `rejectSignatureRequest`           | User rejected signature request                         |

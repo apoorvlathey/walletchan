@@ -143,6 +143,14 @@ default (string, etc.)        → StringParam
 
 Note: `bytes` values that pass viem's `isAddress()` check are rendered as `AddressParam` instead of `BytesParam`.
 
+## Portal Rendering (UintParam / IntParam)
+
+The unit conversion dropdown menus in `UintParam` and `IntParam` are rendered via Chakra `<Portal>` to prevent clipping by parent overflow containers (modals, scrollable areas):
+
+- Dropdown menu uses `position="fixed"` with coordinates computed via `getBoundingClientRect()` on button click
+- Auto-closes on outside click (`mousedown` listener) or scroll (position would be stale)
+- This pattern ensures dropdowns remain visible even inside `TxDetailModal` or other constrained containers
+
 ## Styling Conventions
 
 All param components follow the extension's Bauhaus design system:
