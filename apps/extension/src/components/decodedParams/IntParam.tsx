@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { HStack, Text, Button, Tooltip, Box, VStack } from "@chakra-ui/react";
+import { HStack, Text, Button, Tooltip, Box, VStack, Portal } from "@chakra-ui/react";
 import { ChevronDownIcon } from "@chakra-ui/icons";
 import { CopyButton } from "@/components/CopyButton";
 import {
@@ -15,20 +15,43 @@ interface IntParamProps {
 export function IntParam({ value }: IntParamProps) {
   const [selectedOption, setSelectedOption] = useState<ETHSelectedOption>("Wei");
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
 
   const converted = convertTo(value, selectedOption);
+
+  // Compute dropdown position when opening
+  useEffect(() => {
+    if (dropdownOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 2, left: rect.left });
+    }
+  }, [dropdownOpen]);
 
   // Close dropdown on outside click
   useEffect(() => {
     if (!dropdownOpen) return;
     const handleClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        (!containerRef.current || !containerRef.current.contains(target)) &&
+        (!menuRef.current || !menuRef.current.contains(target))
+      ) {
         setDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
+  }, [dropdownOpen]);
+
+  // Close dropdown on scroll (position would be stale)
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handleScroll = () => setDropdownOpen(false);
+    document.addEventListener("scroll", handleScroll, true);
+    return () => document.removeEventListener("scroll", handleScroll, true);
   }, [dropdownOpen]);
 
   return (
@@ -47,8 +70,9 @@ export function IntParam({ value }: IntParamProps) {
       </Tooltip>
 
       {/* Custom unit dropdown */}
-      <Box position="relative" ref={dropdownRef}>
+      <Box position="relative" ref={containerRef}>
         <Button
+          ref={buttonRef}
           size="xs"
           h="18px"
           px={1.5}
@@ -70,41 +94,43 @@ export function IntParam({ value }: IntParamProps) {
         </Button>
 
         {dropdownOpen && (
-          <VStack
-            position="absolute"
-            top="100%"
-            left={0}
-            mt="2px"
-            bg="bauhaus.white"
-            border="1.5px solid"
-            borderColor="bauhaus.black"
-            boxShadow="none"
-            zIndex={10}
-            spacing={0}
-            align="stretch"
-            minW="90px"
-          >
-            {ethFormatOptions.map((opt) => (
-              <Box
-                key={opt}
-                px={2}
-                py={1}
-                fontSize="9px"
-                fontWeight="700"
-                textTransform="uppercase"
-                cursor="pointer"
-                bg={opt === selectedOption ? "bauhaus.black" : "transparent"}
-                color={opt === selectedOption ? "bauhaus.white" : "text.primary"}
-                _hover={{ bg: opt === selectedOption ? "bauhaus.black" : "bg.muted" }}
-                onClick={() => {
-                  setSelectedOption(opt);
-                  setDropdownOpen(false);
-                }}
-              >
-                {opt}
-              </Box>
-            ))}
-          </VStack>
+          <Portal>
+            <VStack
+              ref={menuRef}
+              position="fixed"
+              top={`${menuPos.top}px`}
+              left={`${menuPos.left}px`}
+              bg="bauhaus.white"
+              border="1.5px solid"
+              borderColor="bauhaus.black"
+              boxShadow="none"
+              zIndex={1800}
+              spacing={0}
+              align="stretch"
+              minW="90px"
+            >
+              {ethFormatOptions.map((opt) => (
+                <Box
+                  key={opt}
+                  px={2}
+                  py={1}
+                  fontSize="9px"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                  cursor="pointer"
+                  bg={opt === selectedOption ? "bauhaus.black" : "transparent"}
+                  color={opt === selectedOption ? "bauhaus.white" : "text.primary"}
+                  _hover={{ bg: opt === selectedOption ? "bauhaus.black" : "bg.muted" }}
+                  onClick={() => {
+                    setSelectedOption(opt);
+                    setDropdownOpen(false);
+                  }}
+                >
+                  {opt}
+                </Box>
+              ))}
+            </VStack>
+          </Portal>
         )}
       </Box>
 
