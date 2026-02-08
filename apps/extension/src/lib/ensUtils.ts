@@ -10,6 +10,8 @@ import {
 import { mainnet, base } from "viem/chains";
 import { normalize } from "viem/ens";
 import { L2ResolverAbi } from "./L2ResolverAbi";
+import { DEFAULT_NETWORKS } from "@/constants/networks";
+import type { NetworksInfo } from "@/types";
 
 // ============================================================================
 // Constants
@@ -19,18 +21,51 @@ const BASENAME_L2_RESOLVER_ADDRESS =
   "0xC6d566A56A1aFf6508b41f6c90ff131615583BCD" as const;
 
 // ============================================================================
-// Public Clients (singletons)
+// Public Clients (use user-configured RPCs from storage)
 // ============================================================================
 
-const mainnetClient = createPublicClient({
-  chain: mainnet,
-  transport: http("https://eth.llamarpc.com"),
-});
+async function getUserRpcUrl(chainId: number): Promise<string> {
+  try {
+    const { networksInfo } = (await chrome.storage.sync.get("networksInfo")) as {
+      networksInfo: NetworksInfo | undefined;
+    };
+    if (networksInfo) {
+      for (const name of Object.keys(networksInfo)) {
+        if (networksInfo[name].chainId === chainId) {
+          return networksInfo[name].rpcUrl;
+        }
+      }
+    }
+  } catch {
+    // Fall through to defaults (e.g. if chrome.storage is unavailable)
+  }
+  // Fallback to defaults
+  for (const name of Object.keys(DEFAULT_NETWORKS)) {
+    if (DEFAULT_NETWORKS[name].chainId === chainId) {
+      return DEFAULT_NETWORKS[name].rpcUrl;
+    }
+  }
+  // Hardcoded last resort
+  return chainId === base.id
+    ? "https://mainnet.base.org"
+    : "https://eth.llamarpc.com";
+}
 
-const baseClient = createPublicClient({
-  chain: base,
-  transport: http("https://mainnet.base.org"),
-});
+async function getMainnetClient() {
+  const rpcUrl = await getUserRpcUrl(mainnet.id);
+  return createPublicClient({
+    chain: mainnet,
+    transport: http(rpcUrl),
+  });
+}
+
+async function getBaseClient() {
+  const rpcUrl = await getUserRpcUrl(base.id);
+  return createPublicClient({
+    chain: base,
+    transport: http(rpcUrl),
+  });
+}
 
 // ============================================================================
 // Helpers
@@ -75,7 +110,8 @@ export const resolveNameToAddress = async (
   name: string
 ): Promise<Address | null> => {
   try {
-    const address = await mainnetClient.getEnsAddress({
+    const client = await getMainnetClient();
+    const address = await client.getEnsAddress({
       name: normalize(name),
     });
     return address;
@@ -91,8 +127,9 @@ export const resolveNameToAddress = async (
 
 const getBasename = async (address: Address): Promise<string | null> => {
   try {
+    const client = await getBaseClient();
     const addressReverseNode = convertReverseNodeToBytes(address, base.id);
-    const basename = await baseClient.readContract({
+    const basename = await client.readContract({
       abi: L2ResolverAbi,
       address: BASENAME_L2_RESOLVER_ADDRESS,
       functionName: "name",
@@ -110,7 +147,8 @@ const getBasename = async (address: Address): Promise<string | null> => {
 
 const getEnsName = async (address: string): Promise<string | null> => {
   try {
-    const name = await mainnetClient.getEnsName({
+    const client = await getMainnetClient();
+    const name = await client.getEnsName({
       address: address as Hex,
     });
     return name;
@@ -140,7 +178,8 @@ export const resolveAddressToName = async (
 
 const getEnsAvatar = async (ensName: string): Promise<string | null> => {
   try {
-    const avatar = await mainnetClient.getEnsAvatar({
+    const client = await getMainnetClient();
+    const avatar = await client.getEnsAvatar({
       name: normalize(ensName),
     });
     return avatar;
@@ -153,7 +192,8 @@ const getBasenameAvatar = async (
   basename: string
 ): Promise<string | null> => {
   try {
-    const avatar = await baseClient.readContract({
+    const client = await getBaseClient();
+    const avatar = await client.readContract({
       abi: L2ResolverAbi,
       address: BASENAME_L2_RESOLVER_ADDRESS,
       functionName: "text",
@@ -178,4 +218,42 @@ export const getNameAvatar = async (
     return await getEnsAvatar(name);
   }
   return await getEnsAvatar(name);
+};
+
+// ============================================================================
+// Combined Identity Resolution (ENS preferred over Basename)
+// ============================================================================
+
+/**
+ * Resolves name + avatar for an address with explicit ENS-first priority.
+ * - Resolves ENS and Basename names in parallel for speed
+ * - If ENS name exists, uses ENS name + ENS avatar
+ * - Falls back to Basename name + Basename avatar only when no ENS name
+ */
+export const resolveEnsIdentity = async (
+  address: string
+): Promise<{ name: string | null; avatar: string | null }> => {
+  try {
+    const [ensName, basename] = await Promise.all([
+      getEnsName(address),
+      getBasename(address as Address),
+    ]);
+
+    // ENS takes priority
+    if (ensName) {
+      const avatar = await getEnsAvatar(ensName);
+      return { name: ensName, avatar };
+    }
+
+    // Fall back to Basename
+    if (basename) {
+      const avatar = await getBasenameAvatar(basename);
+      return { name: basename, avatar };
+    }
+
+    return { name: null, avatar: null };
+  } catch (error) {
+    console.error("Error resolving ENS identity for", address, error);
+    return { name: null, avatar: null };
+  }
 };

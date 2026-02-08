@@ -21,11 +21,12 @@ import {
   Alert,
   AlertIcon,
 } from "@chakra-ui/react";
-import { SettingsIcon, DeleteIcon, ViewIcon, WarningTwoIcon, EditIcon, ViewOffIcon, ArrowBackIcon } from "@chakra-ui/icons";
+import { SettingsIcon, DeleteIcon, ViewIcon, WarningTwoIcon, EditIcon, ViewOffIcon, ArrowBackIcon, RepeatIcon } from "@chakra-ui/icons";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import type { Account, PasswordType, SeedGroup } from "@/chrome/types";
 import { StaticJsonRpcProvider } from "@ethersproject/providers";
 import { isAddress } from "@ethersproject/address";
+import { resolveAndCacheIdentity } from "@/lib/ensIdentityCache";
 
 interface AccountSettingsModalProps {
   isOpen: boolean;
@@ -51,6 +52,9 @@ function AccountSettingsModal({
   const [displayName, setDisplayName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // ENS refresh state
+  const [isRefreshingEns, setIsRefreshingEns] = useState(false);
 
   // Seed group rename states
   const [seedGroupName, setSeedGroupName] = useState("");
@@ -144,6 +148,7 @@ function AccountSettingsModal({
     setSeedGroupName("");
     setOriginalSeedGroupName("");
     setIsSavingSeedGroup(false);
+    setIsRefreshingEns(false);
     onClose();
   };
 
@@ -361,6 +366,38 @@ function AccountSettingsModal({
         }
       }
     );
+  };
+
+  const handleRefreshEns = async () => {
+    if (!account) return;
+    setIsRefreshingEns(true);
+    try {
+      const result = await resolveAndCacheIdentity(account.address);
+      if (result.name) {
+        toast({
+          title: "ENS data refreshed",
+          description: result.name,
+          status: "success",
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: "No ENS name found",
+          description: "This address has no ENS or Basename",
+          status: "info",
+          duration: 3000,
+        });
+      }
+      onAccountUpdated();
+    } catch {
+      toast({
+        title: "Failed to refresh ENS data",
+        status: "error",
+        duration: 3000,
+      });
+    } finally {
+      setIsRefreshingEns(false);
+    }
   };
 
   const handleRevealKey = () => {
@@ -870,6 +907,19 @@ function AccountSettingsModal({
                   Reveal Seed Phrase
                 </Button>
               )}
+
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<RepeatIcon />}
+                onClick={handleRefreshEns}
+                isLoading={isRefreshingEns}
+                loadingText="Resolving..."
+                justifyContent="flex-start"
+                w="full"
+              >
+                Refresh ENS Data
+              </Button>
 
               {account.type === "bankr" && (
                 <Button

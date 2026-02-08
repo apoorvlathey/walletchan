@@ -292,8 +292,8 @@ src/
 │   │   ├── ChangePassword.tsx # Password change flow
 │   │   ├── AutoLockSettings.tsx # Auto-lock timeout configuration
 │   │   └── AgentPasswordSettings.tsx # Agent password set/remove (master only)
-│   ├── AccountSwitcher.tsx  # Account dropdown with seed group labels (e.g., "Seed #1 · #0")
-│   ├── AccountSettingsModal.tsx # Account settings (rename, reveal key/seed, remove, change API key)
+│   ├── AccountSwitcher.tsx  # Account dropdown with ENS avatars/names, seed group labels
+│   ├── AccountSettingsModal.tsx # Account settings (rename, reveal key/seed, remove, change API key, refresh ENS)
 │   ├── RevealPrivateKeyModal.tsx # Password-protected private key reveal
 │   ├── RevealSeedPhraseModal.tsx # Password-protected seed phrase reveal (master only)
 │   ├── AddAccount.tsx       # Add new account screen
@@ -315,7 +315,11 @@ src/
 ├── utils/
 │   └── privateKeyUtils.ts   # generatePrivateKey(), validateAndDeriveAddress()
 ├── hooks/
-│   └── useChat.ts           # Chat state management hook
+│   ├── useChat.ts           # Chat state management hook
+│   └── useEnsIdentities.ts  # ENS/Basename identity resolution + caching hook
+├── lib/
+│   ├── ensUtils.ts          # ENS/Basename resolution (name, avatar, forward/reverse)
+│   └── ensIdentityCache.ts  # ENS identity cache (chrome.storage.local, 6-hour TTL)
 ├── onboarding.tsx           # React entry point for onboarding page
 └── App.tsx                  # Main popup application
 
@@ -900,6 +904,62 @@ Transaction confirmation includes a "Simulate on Tenderly" button:
 - Opens `https://dashboard.tenderly.co/simulator/new` with pre-filled tx params
 - No API key needed (URL-based simulation)
 - Skipped for contract deployments (no `to` address)
+
+## ENS/Basename Identity Resolution
+
+Accounts in the dropdown automatically resolve ENS names, Basenames, and avatars. Results are cached in `chrome.storage.local` for 6 hours.
+
+### Resolution Priority
+
+ENS (Ethereum mainnet) always takes precedence over Basename (Base L2):
+
+1. **Name**: ENS name > Basename > truncated address
+2. **Avatar**: ENS avatar (when ENS name exists) > Basename avatar (when only Basename exists) > BankrAvatar (Bankr accounts) > BlockieAvatar (fallback)
+
+Both names are resolved in parallel for speed via `resolveEnsIdentity()` in `ensUtils.ts`. If ENS name exists, ENS avatar is fetched; Basename avatar is only fetched when no ENS name is found.
+
+### Display Priority in AccountSwitcher
+
+| Condition | Primary Name | Secondary | Tag |
+|-----------|-------------|-----------|-----|
+| User-set displayName + ENS name | displayName | truncated address | ENS name (gray tag) + account type |
+| User-set displayName, no ENS | displayName | truncated address | account type only |
+| No displayName, ENS name exists | ENS name | truncated address | account type only |
+| No displayName, no ENS | truncated address | (none) | account type only |
+
+### Architecture
+
+```
+AccountSwitcher.tsx
+  └── useEnsIdentities(addresses)         # React hook
+        └── ensIdentityCache.ts           # Cache read/write (chrome.storage.local)
+              └── ensUtils.ts             # resolveEnsIdentity() — RPC calls
+                    ├── getEnsName()      # mainnet reverse resolution
+                    ├── getBasename()     # Base L2 reverse resolution
+                    ├── getEnsAvatar()    # mainnet avatar lookup
+                    └── getBasenameAvatar() # Base L2 avatar lookup
+```
+
+### Cache
+
+- **Storage key**: `ensIdentityCache` in `chrome.storage.local`
+- **TTL**: 6 hours per entry
+- **Schema**: `Record<lowercaseAddress, { name, avatar, resolvedAt }>`
+- **Manual refresh**: "Refresh ENS Data" button in Account Settings forces re-resolution (ignores cache)
+
+### RPC Configuration
+
+`ensUtils.ts` reads user-configured RPCs from `chrome.storage.sync` (`networksInfo`), falling back to `DEFAULT_NETWORKS` defaults. This ensures ENS resolution uses the same RPC endpoints configured in Settings → Chains.
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/ensUtils.ts` | ENS/Basename name + avatar resolution, `resolveEnsIdentity()` |
+| `src/lib/ensIdentityCache.ts` | Cache read/write, `resolveAndCacheIdentity()` |
+| `src/hooks/useEnsIdentities.ts` | React hook: loads cache, resolves stale entries, exposes `refreshAddress()` |
+| `src/components/AccountSwitcher.tsx` | Integrates hook, renders ENS avatars/names/tags |
+| `src/components/AccountSettingsModal.tsx` | "Refresh ENS Data" button |
 
 ## RPC Proxy (CSP Bypass)
 
