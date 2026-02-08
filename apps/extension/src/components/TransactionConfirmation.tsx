@@ -20,6 +20,7 @@ import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon, 
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { GasOverrides } from "@/chrome/txHandlers";
 import { getChainConfig } from "@/constants/chainConfig";
+import { resolveAddressToName } from "@/lib/ensUtils";
 import CalldataDecoder from "@/components/CalldataDecoder";
 import GasEstimateDisplay from "@/components/GasEstimateDisplay";
 import { FromAccountDisplay } from "@/components/FromAccountDisplay";
@@ -105,6 +106,7 @@ function TransactionConfirmation({
   const [state, setState] = useState<ConfirmationState>("ready");
   const [error, setError] = useState<string>("");
   const [toLabels, setToLabels] = useState<string[]>([]);
+  const [resolvedToName, setResolvedToName] = useState<string | null>(null);
   const [decodedFunctionName, setDecodedFunctionName] = useState<string | undefined>();
   const [gasOverrides, setGasOverrides] = useState<GasOverrides | null>(null);
 
@@ -142,6 +144,14 @@ function TransactionConfirmation({
 
     fetchLabels();
   }, [tx.to, tx.chainId]);
+
+  // Reverse resolve the "to" address to get ENS/Basename/WNS name
+  useEffect(() => {
+    if (!tx.to) return;
+    resolveAddressToName(tx.to).then((name) => {
+      if (name) setResolvedToName(name);
+    }).catch(() => {});
+  }, [tx.to]);
 
   const handleConfirm = async () => {
     setState("submitting");
@@ -510,29 +520,47 @@ function TransactionConfirmation({
 
             {/* To Address / Contract Deployment */}
             <Box w="full" py={2} px={3}>
-              <HStack justify="space-between" mb={toLabels.length > 0 ? 1 : 0}>
+              <HStack justify="space-between" mb={(toLabels.length > 0 || resolvedToName) ? 1 : 0}>
                 <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                   {tx.to ? "To" : "Type"}
                 </Text>
                 {tx.to ? (
-                  <HStack
-                    spacing={0.5}
-                    px={1.5}
-                    py={0.5}
-                    bg="bauhaus.white"
-                    border="1.5px solid"
-                    borderColor="bauhaus.black"
-                  >
-                    <Text
-                      fontSize="xs"
-                      color="text.primary"
-                      fontFamily="mono"
-                      fontWeight="700"
+                  <VStack spacing={1} align="flex-end">
+                    {resolvedToName && (
+                      <Badge
+                        fontSize="2xs"
+                        bg="bauhaus.yellow"
+                        color="bauhaus.black"
+                        border="1.5px solid"
+                        borderColor="bauhaus.black"
+                        px={1.5}
+                        py={0}
+                        fontWeight="700"
+                        maxW="200px"
+                        isTruncated
+                      >
+                        {resolvedToName}
+                      </Badge>
+                    )}
+                    <HStack
+                      spacing={0.5}
+                      px={1.5}
+                      py={0.5}
+                      bg="bauhaus.white"
+                      border="1.5px solid"
+                      borderColor="bauhaus.black"
                     >
-                      {tx.to.slice(0, 6)}...{tx.to.slice(-4)}
-                    </Text>
-                    <CopyButton value={tx.to} />
-                  </HStack>
+                      <Text
+                        fontSize="xs"
+                        color="text.primary"
+                        fontFamily="mono"
+                        fontWeight="700"
+                      >
+                        {tx.to.slice(0, 6)}...{tx.to.slice(-4)}
+                      </Text>
+                      <CopyButton value={tx.to} />
+                    </HStack>
+                  </VStack>
                 ) : (
                   <Badge
                     fontSize="xs"

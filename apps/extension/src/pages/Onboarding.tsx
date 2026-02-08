@@ -23,9 +23,8 @@ import {
   CheckIcon,
 } from "@chakra-ui/icons";
 import { saveEncryptedApiKey, hasEncryptedApiKey } from "@/chrome/crypto";
-import { StaticJsonRpcProvider } from "@ethersproject/providers";
+import { resolveNameToAddress, isResolvableName } from "@/lib/ensUtils";
 import { isAddress } from "@ethersproject/address";
-import { DEFAULT_NETWORKS } from "@/constants/networks";
 import { validateAndDeriveAddress } from "@/utils/privateKeyUtils";
 import { RobotIcon, KeyIcon, SeedIcon } from "@/components/shared/AccountTypeIcons";
 import PrivateKeyInput from "@/components/shared/PrivateKeyInput";
@@ -159,17 +158,10 @@ function Onboarding({ onComplete }: OnboardingProps) {
     if (isAddress(input)) {
       return input;
     }
-
-    try {
-      // Use the configured Ethereum RPC URL for ENS resolution
-      const mainnetProvider = new StaticJsonRpcProvider(
-        DEFAULT_NETWORKS.Ethereum.rpcUrl,
-      );
-      const resolved = await mainnetProvider.resolveName(input);
-      return resolved;
-    } catch {
-      return null;
+    if (isResolvableName(input)) {
+      return await resolveNameToAddress(input);
     }
+    return null;
   };
 
   // Derive address when private key changes
@@ -222,7 +214,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
       setIsResolvingAddress(false);
 
       if (!resolved) {
-        newErrors.walletAddress = "Invalid address or ENS name";
+        newErrors.walletAddress = "Invalid address or name";
       }
     }
 
@@ -380,10 +372,10 @@ function Onboarding({ onComplete }: OnboardingProps) {
 
       // Handle Bankr account setup
       if (accountTypeChoice === "bankr") {
-        // Resolve address (in case it's ENS)
+        // Resolve address (in case it's ENS/Basename/WNS)
         const resolvedAddress = await resolveAddress(walletAddress.trim());
         if (!resolvedAddress) {
-          setErrors({ walletAddress: "Invalid address or ENS name" });
+          setErrors({ walletAddress: "Invalid address or name" });
           setIsSubmitting(false);
           return;
         }
@@ -1069,7 +1061,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
                     Wallet Address
                   </FormLabel>
                   <Input
-                    placeholder="0x... or ENS name (e.g., vitalik.eth)"
+                    placeholder="0x... or name (e.g., vitalik.eth, name.wei)"
                     value={walletAddress}
                     onChange={(e) => {
                       setWalletAddress(e.target.value);

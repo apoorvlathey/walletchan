@@ -24,7 +24,7 @@ import {
 import { SettingsIcon, DeleteIcon, ViewIcon, WarningTwoIcon, EditIcon, ViewOffIcon, ArrowBackIcon, RepeatIcon } from "@chakra-ui/icons";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import type { Account, PasswordType, SeedGroup } from "@/chrome/types";
-import { StaticJsonRpcProvider } from "@ethersproject/providers";
+import { resolveNameToAddress, isResolvableName } from "@/lib/ensUtils";
 import { isAddress } from "@ethersproject/address";
 import { resolveAndCacheIdentity } from "@/lib/ensIdentityCache";
 
@@ -157,13 +157,10 @@ function AccountSettingsModal({
     if (isAddress(input)) {
       return input;
     }
-    try {
-      const mainnetProvider = new StaticJsonRpcProvider("https://rpc.ankr.com/eth");
-      const resolved = await mainnetProvider.resolveName(input);
-      return resolved;
-    } catch {
-      return null;
+    if (isResolvableName(input)) {
+      return await resolveNameToAddress(input);
     }
+    return null;
   };
 
   const needsPassword = !hasCachedPassword;
@@ -183,7 +180,7 @@ function AccountSettingsModal({
       setIsResolvingAddress(false);
 
       if (!resolved) {
-        newErrors.walletAddress = "Invalid address or ENS name";
+        newErrors.walletAddress = "Invalid address or name";
       }
     }
 
@@ -204,7 +201,7 @@ function AccountSettingsModal({
     try {
       const resolvedAddress = await resolveAddress(walletAddress.trim());
       if (!resolvedAddress) {
-        setApiKeyErrors({ walletAddress: "Invalid address or ENS name" });
+        setApiKeyErrors({ walletAddress: "Invalid address or name" });
         setIsSubmittingApiKey(false);
         return;
       }
@@ -555,7 +552,7 @@ function AccountSettingsModal({
                     Wallet Address
                   </FormLabel>
                   <Input
-                    placeholder="0x... or ENS name"
+                    placeholder="0x... or name (e.g., vitalik.eth, name.wei)"
                     value={walletAddress}
                     onChange={(e) => {
                       setWalletAddress(e.target.value);

@@ -12,6 +12,7 @@ import { normalize } from "viem/ens";
 import { L2ResolverAbi } from "./L2ResolverAbi";
 import { DEFAULT_NETWORKS } from "@/constants/networks";
 import type { NetworksInfo } from "@/types";
+import wei from "@/utils/wei";
 
 // ============================================================================
 // Constants
@@ -110,6 +111,13 @@ export const resolveNameToAddress = async (
   name: string
 ): Promise<Address | null> => {
   try {
+    // Handle .wei names via WNS
+    if (wei.isWei(name)) {
+      const address = await wei.resolve(name);
+      return address as Address | null;
+    }
+
+    // ENS handles .eth, .base.eth, and other names
     const client = await getMainnetClient();
     const address = await client.getEnsAddress({
       name: normalize(name),
@@ -157,15 +165,25 @@ const getEnsName = async (address: string): Promise<string | null> => {
   }
 };
 
+const getWeiName = async (address: string): Promise<string | null> => {
+  try {
+    return await wei.reverseResolve(address);
+  } catch {
+    return null;
+  }
+};
+
 export const resolveAddressToName = async (
   address: string
 ): Promise<string | null> => {
   try {
-    const [ensName, basename] = await Promise.all([
+    const [ensName, basename, weiName] = await Promise.all([
       getEnsName(address),
       getBasename(address as Address),
+      getWeiName(address),
     ]);
-    return ensName || basename || null;
+    // Priority: ENS > Basename > WNS
+    return ensName || basename || weiName || null;
   } catch (error) {
     console.error("Error resolving address to name:", error);
     return null;
@@ -221,22 +239,25 @@ export const getNameAvatar = async (
 };
 
 // ============================================================================
-// Combined Identity Resolution (ENS preferred over Basename)
+// Combined Identity Resolution (ENS > Basename > WNS)
 // ============================================================================
 
 /**
- * Resolves name + avatar for an address with explicit ENS-first priority.
- * - Resolves ENS and Basename names in parallel for speed
+ * Resolves name + avatar for an address with explicit priority:
+ * ENS > Basename > WNS (Wei Name Service)
+ * - Resolves all name services in parallel for speed
  * - If ENS name exists, uses ENS name + ENS avatar
- * - Falls back to Basename name + Basename avatar only when no ENS name
+ * - Falls back to Basename name + Basename avatar
+ * - Falls back to WNS name (no avatar support for .wei names)
  */
 export const resolveEnsIdentity = async (
   address: string
 ): Promise<{ name: string | null; avatar: string | null }> => {
   try {
-    const [ensName, basename] = await Promise.all([
+    const [ensName, basename, weiName] = await Promise.all([
       getEnsName(address),
       getBasename(address as Address),
+      getWeiName(address),
     ]);
 
     // ENS takes priority
@@ -251,9 +272,14 @@ export const resolveEnsIdentity = async (
       return { name: basename, avatar };
     }
 
+    // Fall back to WNS (no avatar support)
+    if (weiName) {
+      return { name: weiName, avatar: null };
+    }
+
     return { name: null, avatar: null };
   } catch (error) {
-    console.error("Error resolving ENS identity for", address, error);
+    console.error("Error resolving identity for", address, error);
     return { name: null, avatar: null };
   }
 };
