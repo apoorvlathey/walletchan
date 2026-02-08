@@ -97,6 +97,12 @@ export const pendingSignatureResolvers = new Map<string, PendingSignatureResolve
 // Active transaction AbortControllers for cancellation
 export const activeAbortControllers = new Map<string, AbortController>();
 
+// Prevent double-execution: tracks txIds currently being processed
+const processingTxIds = new Set<string>();
+
+// Transaction expiry: reject confirmations for requests older than 30 minutes
+const TX_EXPIRY_MS = 30 * 60 * 1000;
+
 // Store failed transaction results for display when opening from notification
 export interface FailedTxResult {
   txId: string;
@@ -375,8 +381,9 @@ export async function handleConfirmTransaction(
   password: string
 ): Promise<TransactionResult> {
   const pending = await getPendingTxRequestById(txId);
-  if (!pending) {
-    return { success: false, error: "Transaction not found or expired" };
+  if (!pending || Date.now() - pending.timestamp > TX_EXPIRY_MS) {
+    if (pending) await removePendingTxRequest(txId);
+    return { success: false, error: "Transaction request expired" };
   }
 
   // Try to use cached API key first
@@ -580,10 +587,18 @@ export async function handleConfirmTransactionAsync(
   password: string,
   functionName?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const pending = await getPendingTxRequestById(txId);
-  if (!pending) {
-    return { success: false, error: "Transaction not found or expired" };
+  // Prevent double-execution
+  if (processingTxIds.has(txId)) {
+    return { success: false, error: "Transaction already being processed" };
   }
+
+  const pending = await getPendingTxRequestById(txId);
+  if (!pending || Date.now() - pending.timestamp > TX_EXPIRY_MS) {
+    if (pending) await removePendingTxRequest(txId);
+    return { success: false, error: "Transaction request expired" };
+  }
+
+  processingTxIds.add(txId);
 
   // Try to use cached API key first
   let apiKey = getCachedApiKey();
@@ -592,6 +607,7 @@ export async function handleConfirmTransactionAsync(
     // Decrypt API key with provided password
     apiKey = await loadDecryptedApiKey(password);
     if (!apiKey) {
+      processingTxIds.delete(txId);
       return { success: false, error: "Invalid password" };
     }
     // Cache the API key and password for future transactions
@@ -601,7 +617,7 @@ export async function handleConfirmTransactionAsync(
   // Remove from pending storage immediately
   await removePendingTxRequest(txId);
 
-  // Start background processing
+  // Start background processing (cleanup of processingTxIds happens in finally block)
   processTransactionInBackground(txId, pending, apiKey, functionName);
 
   return { success: true };
@@ -697,6 +713,7 @@ async function processTransactionInBackground(
   } finally {
     activeAbortControllers.delete(txId);
     pendingResolvers.delete(txId);
+    processingTxIds.delete(txId);
   }
 }
 
@@ -856,6 +873,7 @@ async function processLocalTransactionInBackground(
   } finally {
     activeAbortControllers.delete(txId);
     pendingResolvers.delete(txId);
+    processingTxIds.delete(txId);
   }
 }
 
@@ -869,18 +887,28 @@ export async function handleConfirmTransactionAsyncPK(
   functionName?: string,
   gasOverrides?: GasOverrides
 ): Promise<{ success: boolean; error?: string }> {
-  const pending = await getPendingTxRequestById(txId);
-  if (!pending) {
-    return { success: false, error: "Transaction not found or expired" };
+  // Prevent double-execution
+  if (processingTxIds.has(txId)) {
+    return { success: false, error: "Transaction already being processed" };
   }
+
+  const pending = await getPendingTxRequestById(txId);
+  if (!pending || Date.now() - pending.timestamp > TX_EXPIRY_MS) {
+    if (pending) await removePendingTxRequest(txId);
+    return { success: false, error: "Transaction request expired" };
+  }
+
+  processingTxIds.add(txId);
 
   // Get the account for this tab
   const account = tabId ? await getTabAccount(tabId) : await getActiveAccount();
   if (!account) {
+    processingTxIds.delete(txId);
     return { success: false, error: "No account found" };
   }
 
   if (account.type !== "privateKey" && account.type !== "seedPhrase") {
+    processingTxIds.delete(txId);
     return { success: false, error: "Account does not support local signing" };
   }
 
@@ -891,6 +919,7 @@ export async function handleConfirmTransactionAsyncPK(
     // Need to decrypt the vault
     const vault = await decryptAllKeys(password);
     if (!vault) {
+      processingTxIds.delete(txId);
       return { success: false, error: "Invalid password" };
     }
     setCachedVault(vault);
@@ -907,6 +936,7 @@ export async function handleConfirmTransactionAsyncPK(
     // Get the private key from the now-cached vault
     privateKey = getPrivateKeyFromCache(account.id);
     if (!privateKey) {
+      processingTxIds.delete(txId);
       return { success: false, error: "Private key not found for account" };
     }
   }
@@ -914,7 +944,7 @@ export async function handleConfirmTransactionAsyncPK(
   // Remove from pending storage immediately
   await removePendingTxRequest(txId);
 
-  // Start background processing
+  // Start background processing (cleanup of processingTxIds happens in finally block)
   processLocalTransactionInBackground(txId, pending, account, privateKey, functionName, gasOverrides);
 
   return { success: true };
@@ -1168,6 +1198,9 @@ export function performSecurityReset(): void {
 
   // Clear failed transaction results
   failedTxResults.clear();
+
+  // Clear processing locks
+  processingTxIds.clear();
 }
 
 /**

@@ -17,9 +17,10 @@ import {
 import {
   decryptAllKeys,
   reEncryptVault,
+  computeReEncryptedVault,
   hasVaultEntries,
 } from "./vaultCrypto";
-import { reEncryptMnemonicVault, hasMnemonics } from "./mnemonicStorage";
+import { reEncryptMnemonicVault, computeReEncryptedMnemonicVault, hasMnemonics } from "./mnemonicStorage";
 import type { PasswordType } from "./types";
 import {
   setCachedApiKey,
@@ -438,31 +439,38 @@ export async function handleChangePasswordWithCachedPassword(
         return { success: false, error: "Failed to decrypt vault key" };
       }
 
-      // Re-encrypt vault key with new password
+      // Step 1: Compute ALL new encrypted values in memory (no storage writes yet)
       const newEncryptedVaultKeyMaster = await encryptVaultKey(vaultKeyBytes, newPassword);
 
-      // Save the new encrypted vault key
-      await chrome.storage.local.set({
-        encryptedVaultKeyMaster: newEncryptedVaultKeyMaster,
-      });
-
-      // Re-encrypt private key vault entries (encrypted with password, not vault key)
       const hasVault = await hasVaultEntries();
+      let newPkVault = null;
       if (hasVault) {
-        const success = await reEncryptVault(currentPassword, newPassword);
-        if (!success) {
+        newPkVault = await computeReEncryptedVault(currentPassword, newPassword);
+        if (!newPkVault) {
           return { success: false, error: "Failed to re-encrypt private key vault" };
         }
       }
 
-      // Re-encrypt mnemonic vault entries (encrypted with password, not vault key)
       const hasMnemonicEntries = await hasMnemonics();
+      let newMnemonicVault = null;
       if (hasMnemonicEntries) {
-        const success = await reEncryptMnemonicVault(currentPassword, newPassword);
-        if (!success) {
+        newMnemonicVault = await computeReEncryptedMnemonicVault(currentPassword, newPassword);
+        if (!newMnemonicVault) {
           return { success: false, error: "Failed to re-encrypt mnemonic vault" };
         }
       }
+
+      // Step 2: Single atomic storage write with all re-encrypted data
+      const storageUpdate: Record<string, unknown> = {
+        encryptedVaultKeyMaster: newEncryptedVaultKeyMaster,
+      };
+      if (newPkVault) {
+        storageUpdate.pkVault = newPkVault;
+      }
+      if (newMnemonicVault) {
+        storageUpdate.mnemonicVault = newMnemonicVault;
+      }
+      await chrome.storage.local.set(storageUpdate);
 
       // Note: encryptedVaultKeyAgent (if exists) stays unchanged - agent password remains valid
     } else {

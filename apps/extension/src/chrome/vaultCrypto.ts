@@ -244,6 +244,33 @@ export async function reEncryptVault(
 }
 
 /**
+ * Computes re-encrypted vault data in memory without writing to storage.
+ * Returns the new vault object, or null on failure.
+ * Used by atomic password change to prepare all data before a single write.
+ */
+export async function computeReEncryptedVault(
+  oldPassword: string,
+  newPassword: string
+): Promise<Vault | null> {
+  const vault = await loadVault();
+  if (!vault || vault.entries.length === 0) {
+    return null;
+  }
+
+  try {
+    const newEntries: VaultEntry[] = [];
+    for (const entry of vault.entries) {
+      const privateKey = await decryptPrivateKey(entry.keystore as EncryptedKeystore, oldPassword);
+      const newKeystore = await encryptPrivateKey(privateKey, newPassword);
+      newEntries.push({ id: entry.id, keystore: newKeystore });
+    }
+    return { ...vault, entries: newEntries };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Clears the entire vault
  */
 export async function clearVault(): Promise<void> {

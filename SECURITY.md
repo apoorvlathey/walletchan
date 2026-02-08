@@ -110,7 +110,7 @@ These are the message handlers in `background.ts` that touch secrets, modify acc
 | Handler | What It Modifies | Guard |
 |---------|-----------------|-------|
 | `saveApiKeyWithCachedPassword` | Overwrites encrypted API key | Agent password blocked |
-| `changePasswordWithCachedPassword` | Re-encrypts vault key, pkVault entries, and mnemonicVault entries with new master password | Agent password blocked |
+| `changePasswordWithCachedPassword` | Atomically re-encrypts vault key, pkVault entries, and mnemonicVault entries with new master password (single storage write) | Agent password blocked |
 | `addBankrAccount` | Can overwrite encrypted API key (when `message.apiKey` provided) | Agent password blocked when apiKey present |
 | `addPrivateKeyAccount` | Adds new entry to encrypted private key vault | Agent password blocked |
 
@@ -233,7 +233,7 @@ The `isExtensionPage()` helper verifies `sender.url` starts with `chrome-extensi
 |---------|-------|---------------|
 | `manifest_version` | 3 | MV3 enforces CSP, no `eval()`, no remote code |
 | `permissions` | `activeTab`, `storage`, `sidePanel`, `notifications`, `tabs` | No `webRequest`, no `debugger` |
-| `host_permissions` | `https://*/*`, `http://*/*` | Broad, needed for RPC proxy + content script |
+| `host_permissions` | `https://*/*`, `http://*/*` | Broad, needed for RPC proxy (protocol-validated, 15s timeout) + content script |
 | `content_scripts.matches` | All URLs | Wallet must inject on all pages for dapp detection |
 | `externally_connectable` | Not defined | External websites cannot send messages to background |
 | `web_accessible_resources` | `inpage.js` only | Only the provider script is exposed to pages |
@@ -263,7 +263,15 @@ These must always hold true. Violations indicate a security bug.
 
 9. **Secret-returning handlers verify sender origin** - Handlers like `getCachedApiKey`, `revealPrivateKey`, `revealSeedPhrase`, and `generateMnemonic` check `isExtensionPage(sender)` to ensure the request comes from an extension page, not a content script on a web page.
 
-10. **Password change re-encrypts all password-derived vaults** - `handleChangePasswordWithCachedPassword` re-encrypts the vault key wrapper, `pkVault` entries, and `mnemonicVault` entries with the new password. Without this, private keys and seed phrases become inaccessible after a password change.
+10. **Password change re-encrypts all password-derived vaults atomically** - `handleChangePasswordWithCachedPassword` computes all new encrypted values in memory first (`encryptedVaultKeyMaster`, `pkVault`, `mnemonicVault`), then writes them in a single `chrome.storage.local.set()` call. This prevents partial-write corruption where the vault key is updated but private key/mnemonic vaults remain encrypted with the old password.
+
+11. **Transaction confirmation checks expiry** - `handleConfirmTransaction`, `handleConfirmTransactionAsync`, and `handleConfirmTransactionAsyncPK` reject requests older than 30 minutes (`TX_EXPIRY_MS`), preventing stale transaction confirmation.
+
+12. **Transaction double-execution prevention** - A `processingTxIds` Set in `txHandlers.ts` prevents the same transaction from being submitted twice if two confirm messages arrive concurrently.
+
+13. **RPC proxy validates URL protocol** - `handleRpcRequest` only accepts `http:` and `https:` protocols, preventing SSRF via `file://`, `ftp://`, or other schemes. A 15-second timeout prevents resource exhaustion from slow servers.
+
+14. **Input length validation on user-facing strings** - Display names and group names are capped at 100 characters to prevent storage bloat from malformed inputs. Unknown message types are logged with `console.warn` for debuggability.
 
 ---
 
@@ -363,4 +371,4 @@ These are security characteristics that have been reviewed and accepted:
 
 4. **Content script runs on all websites**. Required for wallet provider injection. The content script only bridges specific message types and does not expose any secrets.
 
-5. **RPC proxy in background (`rpcRequest` handler)** accepts any URL from content scripts. This bypasses page CSP for legitimate RPC calls. The background worker acts as a fetch proxy but does not attach credentials to these requests.
+5. **RPC proxy in background (`rpcRequest` handler)** accepts URLs from content scripts with protocol validation (HTTP/HTTPS only) and a 15-second timeout. This bypasses page CSP for legitimate RPC calls. The background worker acts as a fetch proxy but does not attach credentials to these requests.

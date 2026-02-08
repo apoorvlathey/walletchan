@@ -146,6 +146,17 @@ async function handleRpcRequest(
   method: string,
   params: any[]
 ): Promise<any> {
+  // Validate URL protocol to prevent SSRF
+  try {
+    const url = new URL(rpcUrl);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      throw new Error("Only HTTP(S) RPC URLs allowed");
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message === "Only HTTP(S) RPC URLs allowed") throw e;
+    throw new Error("Invalid RPC URL");
+  }
+
   const response = await fetch(rpcUrl, {
     method: "POST",
     headers: {
@@ -157,6 +168,7 @@ async function handleRpcRequest(
       method,
       params,
     }),
+    signal: AbortSignal.timeout(15000),
   });
 
   if (!response.ok) {
@@ -743,7 +755,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "renameSeedGroup": {
-      const newName = (message.name || "").trim();
+      const newName = (typeof message.name === "string" ? message.name : "").trim().slice(0, 100);
       if (!message.seedGroupId || !newName) {
         sendResponse({ success: false, error: "Missing seedGroupId or name" });
         return true;
@@ -758,7 +770,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "updateAccountDisplayName": {
-      updateAccountDisplayName(message.accountId, message.displayName || "").then(() => {
+      const displayName = typeof message.displayName === "string" ? message.displayName.slice(0, 100) : "";
+      updateAccountDisplayName(message.accountId, displayName).then(() => {
         chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
         sendResponse({ success: true });
       }).catch((error) => {
@@ -1289,6 +1302,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(conversation);
       });
       return true;
+    }
+
+    default: {
+      if (message.type && typeof message.type === "string") {
+        console.warn(`[BankrWallet] Unknown message type: ${message.type}`);
+      }
+      break;
     }
   }
 

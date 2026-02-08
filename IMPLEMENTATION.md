@@ -1062,7 +1062,7 @@ Inpage                    Content Script              Background
    │◄──────────────────────────┤                          │
 ```
 
-The background worker is not subject to page CSP, so it can call any RPC endpoint.
+The background worker is not subject to page CSP, so it can call any RPC endpoint. Security: the handler validates URL protocol (HTTP/HTTPS only, preventing SSRF via `file://` etc.) and enforces a 15-second timeout to prevent resource exhaustion.
 
 ## Chain Switching
 
@@ -1449,14 +1449,16 @@ When changing the wallet password (Settings → Change Password):
 - **Cache cleared**: After password change, user must unlock with new password
 - Password handling stays entirely in background worker (never exposed to UI)
 
-**With Vault Key System** (current):
+**With Vault Key System** (current) — atomic write pattern:
 1. Decrypt vault key with cached (old) password to get raw bytes
-2. Re-encrypt vault key with new password
-3. Save updated `encryptedVaultKeyMaster`
-4. API key stays encrypted with the vault key (unchanged)
-5. Re-encrypt `pkVault` entries with new password (via `reEncryptVault()`)
-6. Re-encrypt `mnemonicVault` entries with new password (via `reEncryptMnemonicVault()`)
+2. Compute re-encrypted vault key with new password (in memory)
+3. Compute re-encrypted `pkVault` entries with new password via `computeReEncryptedVault()` (in memory)
+4. Compute re-encrypted `mnemonicVault` entries with new password via `computeReEncryptedMnemonicVault()` (in memory)
+5. **Single atomic `chrome.storage.local.set()`** writes all re-encrypted data at once
+6. API key stays encrypted with the vault key (unchanged)
 7. **Agent password remains valid** - `encryptedVaultKeyAgent` is unchanged
+
+**Why atomic**: If any re-encryption step fails (OOM, crypto error), no storage writes happen. Without atomicity, the vault key could be updated to the new password while `pkVault`/`mnemonicVault` remain encrypted with the old password, making private keys permanently inaccessible.
 
 **Note**: `pkVault` and `mnemonicVault` entries are encrypted directly with the user's password (via PBKDF2), not with the vault key. Both must be re-encrypted when the password changes, or the private keys and seed phrases become inaccessible.
 
@@ -1472,7 +1474,9 @@ Transactions are stored persistently in `chrome.storage.local`:
 - Closing popup does NOT reject/cancel pending transactions
 - Pending requests survive popup close, browser restart
 - Extension badge shows count of pending requests
-- Transactions auto-expire after 30 minutes
+- Transactions auto-expire after 30 minutes (periodic cleanup + enforced at confirmation time)
+- Confirmation handlers reject expired requests even if periodic cleanup hasn't run
+- A `processingTxIds` Set prevents the same transaction from being confirmed twice concurrently
 - User can review and confirm/reject at any time
 
 #### Pending Requests List
@@ -1583,7 +1587,7 @@ Build command: `pnpm build`
 | ------------------ | ------------------------ |
 | `sendTransaction`  | Submit transaction (includes gas params if dapp provided) |
 | `signatureRequest` | Submit signature request |
-| `rpcRequest`       | Proxy RPC call           |
+| `rpcRequest`       | Proxy RPC call (protocol-validated, 15s timeout) |
 
 ### Popup → Background (chrome.runtime)
 

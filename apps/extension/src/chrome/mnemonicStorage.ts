@@ -189,6 +189,33 @@ export async function reEncryptMnemonicVault(
 }
 
 /**
+ * Computes re-encrypted mnemonic vault data in memory without writing to storage.
+ * Returns the new vault object, or null on failure.
+ * Used by atomic password change to prepare all data before a single write.
+ */
+export async function computeReEncryptedMnemonicVault(
+  oldPassword: string,
+  newPassword: string
+): Promise<MnemonicVault | null> {
+  const vault = await loadMnemonicVault();
+  if (!vault || vault.entries.length === 0) {
+    return null;
+  }
+
+  try {
+    const newEntries: MnemonicVaultEntry[] = [];
+    for (const entry of vault.entries) {
+      const mnemonic = await decryptMnemonic(entry.keystore, oldPassword);
+      const newKeystore = await encryptMnemonic(mnemonic, newPassword);
+      newEntries.push({ id: entry.id, keystore: newKeystore });
+    }
+    return { ...vault, entries: newEntries };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Check if any mnemonics exist in the vault
  */
 export async function hasMnemonics(): Promise<boolean> {
