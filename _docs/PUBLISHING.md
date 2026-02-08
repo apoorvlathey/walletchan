@@ -17,7 +17,7 @@ BankrWallet is distributed through two independent channels with separate extens
 
 Chrome extension IDs are derived from cryptographic keys. CWS assigns its own key (Google holds the private key), while self-hosted CRX files are signed with `bankr-wallet.pem`. These are fundamentally different keys, so the IDs differ. This is expected and cannot be changed.
 
-CWS **strips** the `key` and `update_url` fields from manifest.json on upload, so their presence doesn't cause conflicts.
+CWS **rejects** uploads containing `key` or `update_url` fields. The `pnpm zip` command automatically strips these from the build output before zipping (via `scripts/strip-cws-keys.sh`). The source `manifest.json` keeps both fields for self-hosted distribution.
 
 ## Release Process
 
