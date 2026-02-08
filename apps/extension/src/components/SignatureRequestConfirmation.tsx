@@ -17,6 +17,7 @@ import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon }
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
 import { getChainConfig } from "@/constants/chainConfig";
 import TypedDataDisplay from "@/components/TypedDataDisplay";
+import { FromAccountDisplay } from "@/components/FromAccountDisplay";
 
 interface SignatureRequestConfirmationProps {
   sigRequest: PendingSignatureRequest;
@@ -87,6 +88,13 @@ function getMethodDisplayName(method: string): string {
   }
 }
 
+function getSignerAddress(method: string, params: any[]): string | null {
+  if (method === "personal_sign" && params[1]) return params[1];
+  if (method === "eth_sign" && params[0]) return params[0];
+  if (method.startsWith("eth_signTypedData") && params[0]) return params[0];
+  return null;
+}
+
 function formatSignatureData(method: string, params: any[]): { message: string; rawData: string; typedData?: any } {
   try {
     if (method === "personal_sign") {
@@ -149,6 +157,7 @@ function SignatureRequestConfirmation({
   const toast = useBauhausToast();
   const { signature, origin, chainName, favicon } = sigRequest;
   const { message, rawData, typedData } = formatSignatureData(signature.method, signature.params);
+  const signerAddress = getSignerAddress(signature.method, signature.params);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCancel = () => {
@@ -319,35 +328,35 @@ function SignatureRequestConfirmation({
         {/* Request Info Card */}
         <Box
           bg="bauhaus.white"
-          border="3px solid"
+          border="2px solid"
           borderColor="bauhaus.black"
-          boxShadow="4px 4px 0px 0px #121212"
+          boxShadow="3px 3px 0px 0px #121212"
           position="relative"
         >
           {/* Corner decoration */}
           <Box
             position="absolute"
-            top="-3px"
-            right="-3px"
-            w="10px"
-            h="10px"
+            top="-2px"
+            right="-2px"
+            w="8px"
+            h="8px"
             bg="bauhaus.blue"
-            border="2px solid"
+            border="1.5px solid"
             borderColor="bauhaus.black"
           />
 
-          <VStack spacing={0} divider={<Box h="2px" bg="bauhaus.black" w="full" />}>
+          <VStack spacing={0} divider={<Box h="1px" bg="gray.300" w="full" />}>
             {/* Origin */}
-            <HStack w="full" p={3} justify="space-between">
-              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+            <HStack w="full" py={2} px={3} justify="space-between">
+              <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                 Origin
               </Text>
-              <HStack spacing={2}>
+              <HStack spacing={1.5}>
                 <Box
                   bg="bauhaus.black"
-                  border="2px solid"
+                  border="1.5px solid"
                   borderColor="bauhaus.black"
-                  p={1}
+                  p={0.5}
                   display="flex"
                   alignItems="center"
                   justifyContent="center"
@@ -358,7 +367,7 @@ function SignatureRequestConfirmation({
                       `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`
                     }
                     alt="favicon"
-                    boxSize="16px"
+                    boxSize="14px"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       const googleFallback = `https://www.google.com/s2/favicons?domain=${new URL(origin).hostname}&sz=32`;
@@ -366,38 +375,48 @@ function SignatureRequestConfirmation({
                         target.src = googleFallback;
                       }
                     }}
-                    fallback={<Box boxSize="16px" bg="bauhaus.black" />}
+                    fallback={<Box boxSize="14px" bg="bauhaus.black" />}
                   />
                 </Box>
-                <Text fontSize="sm" fontWeight="700" color="text.primary">
+                <Text fontSize="xs" fontWeight="700" color="text.primary">
                   {new URL(origin).hostname}
                 </Text>
               </HStack>
             </HStack>
 
+            {/* From */}
+            {signerAddress && (
+              <HStack w="full" py={2} px={3} justify="space-between">
+                <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                  From
+                </Text>
+                <FromAccountDisplay address={signerAddress} />
+              </HStack>
+            )}
+
             {/* Network */}
-            <HStack w="full" p={3} justify="space-between">
-              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+            <HStack w="full" py={2} px={3} justify="space-between">
+              <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                 Network
               </Text>
               {(() => {
                 const config = getChainConfig(signature.chainId);
                 return (
                   <Badge
-                    fontSize="sm"
+                    fontSize="xs"
                     bg={config.bg}
                     color={config.text}
-                    border="2px solid"
+                    border="1.5px solid"
                     borderColor="bauhaus.black"
                     fontWeight="700"
-                    px={3}
-                    py={1}
+                    px={2}
+                    py={0.5}
                     display="flex"
                     alignItems="center"
-                    gap={1.5}
+                    gap={1}
                   >
                     {config.icon && (
-                      <Image src={config.icon} alt={chainName} boxSize="14px" />
+                      <Image src={config.icon} alt={chainName} boxSize="12px" />
                     )}
                     {chainName}
                   </Badge>
@@ -406,18 +425,18 @@ function SignatureRequestConfirmation({
             </HStack>
 
             {/* Method */}
-            <HStack w="full" p={3} justify="space-between">
-              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+            <HStack w="full" py={2} px={3} justify="space-between">
+              <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                 Method
               </Text>
               <Code
-                px={2}
-                py={1}
+                px={1.5}
+                py={0.5}
                 fontSize="xs"
                 bg="bauhaus.white"
                 color="text.primary"
                 fontFamily="mono"
-                border="2px solid"
+                border="1.5px solid"
                 borderColor="bauhaus.black"
                 fontWeight="700"
               >

@@ -22,6 +22,7 @@ import { GasOverrides } from "@/chrome/txHandlers";
 import { getChainConfig } from "@/constants/chainConfig";
 import CalldataDecoder from "@/components/CalldataDecoder";
 import GasEstimateDisplay from "@/components/GasEstimateDisplay";
+import { FromAccountDisplay } from "@/components/FromAccountDisplay";
 
 // Success animation keyframes
 const scaleIn = keyframes`
@@ -406,36 +407,36 @@ function TransactionConfirmation({
         {/* Transaction Info Card */}
         <Box
           bg="bauhaus.white"
-          border="3px solid"
+          border="2px solid"
           borderColor="bauhaus.black"
-          boxShadow="4px 4px 0px 0px #121212"
+          boxShadow="3px 3px 0px 0px #121212"
           position="relative"
         >
           {/* Corner decoration */}
           <Box
             position="absolute"
-            top="-3px"
-            right="-3px"
-            w="10px"
-            h="10px"
+            top="-2px"
+            right="-2px"
+            w="8px"
+            h="8px"
             bg="bauhaus.red"
-            border="2px solid"
+            border="1.5px solid"
             borderColor="bauhaus.black"
             borderRadius="full"
           />
 
-          <VStack spacing={0} divider={<Box h="2px" bg="bauhaus.black" w="full" />}>
+          <VStack spacing={0} divider={<Box h="1px" bg="gray.300" w="full" />}>
             {/* Origin */}
-            <HStack w="full" p={3} justify="space-between">
-              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+            <HStack w="full" py={2} px={3} justify="space-between">
+              <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                 Origin
               </Text>
-              <HStack spacing={2}>
+              <HStack spacing={1.5}>
                 <Box
                   bg={origin === "BankrWallet" ? "transparent" : "bauhaus.black"}
-                  border="2px solid"
-                  borderColor={origin === "BankrWallet" ? "transparent" : "bauhaus.black"}
-                  p={origin === "BankrWallet" ? 0 : 1}
+                  border={origin === "BankrWallet" ? "none" : "1.5px solid"}
+                  borderColor="bauhaus.black"
+                  p={origin === "BankrWallet" ? 0 : 0.5}
                   display="flex"
                   alignItems="center"
                   justifyContent="center"
@@ -450,7 +451,7 @@ function TransactionConfirmation({
                             : undefined)
                     }
                     alt="favicon"
-                    boxSize={origin === "BankrWallet" ? "24px" : "16px"}
+                    boxSize={origin === "BankrWallet" ? "20px" : "14px"}
                     onError={(e) => {
                       if (originHostname) {
                         const target = e.target as HTMLImageElement;
@@ -460,38 +461,46 @@ function TransactionConfirmation({
                         }
                       }
                     }}
-                    fallback={<Box boxSize="16px" bg="bauhaus.black" />}
+                    fallback={<Box boxSize="14px" bg="bauhaus.black" />}
                   />
                 </Box>
-                <Text fontSize="sm" fontWeight="700" color="text.primary">
+                <Text fontSize="xs" fontWeight="700" color="text.primary">
                   {originHostname || origin}
                 </Text>
               </HStack>
             </HStack>
 
+            {/* From */}
+            <HStack w="full" py={2} px={3} justify="space-between">
+              <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                From
+              </Text>
+              <FromAccountDisplay address={tx.from} />
+            </HStack>
+
             {/* Network */}
-            <HStack w="full" p={3} justify="space-between">
-              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+            <HStack w="full" py={2} px={3} justify="space-between">
+              <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                 Network
               </Text>
               {(() => {
                 const config = getChainConfig(tx.chainId);
                 return (
                   <Badge
-                    fontSize="sm"
+                    fontSize="xs"
                     bg={config.bg}
                     color={config.text}
-                    border="2px solid"
+                    border="1.5px solid"
                     borderColor="bauhaus.black"
                     fontWeight="700"
-                    px={3}
-                    py={1}
+                    px={2}
+                    py={0.5}
                     display="flex"
                     alignItems="center"
-                    gap={1.5}
+                    gap={1}
                   >
                     {config.icon && (
-                      <Image src={config.icon} alt={chainName} boxSize="14px" />
+                      <Image src={config.icon} alt={chainName} boxSize="12px" />
                     )}
                     {chainName}
                   </Badge>
@@ -500,18 +509,18 @@ function TransactionConfirmation({
             </HStack>
 
             {/* To Address / Contract Deployment */}
-            <Box w="full" p={3}>
-              <HStack justify="space-between" mb={toLabels.length > 0 ? 2 : 0}>
-                <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+            <Box w="full" py={2} px={3}>
+              <HStack justify="space-between" mb={toLabels.length > 0 ? 1 : 0}>
+                <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                   {tx.to ? "To" : "Type"}
                 </Text>
                 {tx.to ? (
                   <HStack
-                    spacing={1}
-                    px={2}
-                    py={1}
+                    spacing={0.5}
+                    px={1.5}
+                    py={0.5}
                     bg="bauhaus.white"
-                    border="2px solid"
+                    border="1.5px solid"
                     borderColor="bauhaus.black"
                   >
                     <Text
@@ -526,14 +535,14 @@ function TransactionConfirmation({
                   </HStack>
                 ) : (
                   <Badge
-                    fontSize="sm"
+                    fontSize="xs"
                     bg="bauhaus.yellow"
                     color="bauhaus.black"
-                    border="2px solid"
+                    border="1.5px solid"
                     borderColor="bauhaus.black"
                     fontWeight="700"
-                    px={3}
-                    py={1}
+                    px={2}
+                    py={0.5}
                   >
                     Contract Deployment
                   </Badge>
@@ -545,10 +554,10 @@ function TransactionConfirmation({
                     fontSize="2xs"
                     bg="bauhaus.blue"
                     color="white"
-                    border="2px solid"
+                    border="1.5px solid"
                     borderColor="bauhaus.black"
-                    px={2}
-                    py={0.5}
+                    px={1.5}
+                    py={0}
                     fontWeight="700"
                     maxW="200px"
                     isTruncated
@@ -560,11 +569,11 @@ function TransactionConfirmation({
             </Box>
 
             {/* Value */}
-            <HStack w="full" p={3} justify="space-between">
-              <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
+            <HStack w="full" py={2} px={3} justify="space-between">
+              <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
                 Value
               </Text>
-              <Text fontSize="sm" fontWeight="700" color="text.primary">
+              <Text fontSize="xs" fontWeight="700" color="text.primary">
                 {formatValue(tx.value)}
               </Text>
             </HStack>
