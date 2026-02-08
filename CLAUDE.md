@@ -48,7 +48,8 @@ bankr-wallet/
 ├── SECURITY.md       # Security audit guide, threat model, pre-commit checklists
 ├── STYLING.md        # Bauhaus design system (colors, typography, components)
 ├── WEBSITE.md        # Website PRD and section specs
-└── DEVELOPMENT.md    # Detailed build and release instructions
+├── DEVELOPMENT.md    # Build and dev environment setup
+└── PUBLISHING.md     # Release workflow, CWS upload, auto-update system
 ```
 
 ## Tech Stack
@@ -153,7 +154,8 @@ When working on features, refer to these docs:
 | `WEBSITE.md`                     | Website sections, layout specs, animations            |
 | `APPS.md`                        | Apps page data source, fetch script, adding chains     |
 | `CALLDATA.md`                    | Calldata decoder UI, param components, type routing   |
-| `DEVELOPMENT.md`                 | Build process, release workflow                       |
+| `DEVELOPMENT.md`                 | Build process, dev environment setup                  |
+| `PUBLISHING.md`                  | Release workflow, CWS upload, auto-update, signing    |
 | `openclaw-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling     |
 
 ## Important Patterns

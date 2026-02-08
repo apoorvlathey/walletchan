@@ -58,140 +58,14 @@ From the root directory:
 | `pnpm zip`             | Create extension zip for distribution |
 | `pnpm lint`            | Lint the extension code               |
 
-## Creating a Release
+## Releasing & Publishing
 
-Releases are automated via GitHub Actions. When you push a version tag, the workflow will:
+See [`PUBLISHING.md`](./PUBLISHING.md) for the full release workflow, Chrome Web Store upload process, and self-hosted auto-update system.
 
-1. Build the extension
-2. Create a zip file
-3. Publish a GitHub release with the zip attached
-
-### Steps to release a new version:
-
-Run one of these commands based on the type of release:
+Quick reference:
 
 ```bash
-pnpm release:patch  # 0.1.0 → 0.1.1 (bug fixes)
-pnpm release:minor  # 0.1.0 → 0.2.0 (new features)
-pnpm release:major  # 0.1.0 → 1.0.0 (breaking changes)
+pnpm release:patch  # 0.2.0 → 0.2.1 (bug fixes)
+pnpm release:minor  # 0.2.0 → 0.3.0 (new features)
+pnpm release:major  # 0.2.0 → 1.0.0 (breaking changes)
 ```
-
-This automatically:
-
-1. Bumps the version in `apps/extension/package.json`
-2. Syncs the version to `apps/extension/public/manifest.json`
-3. Creates a commit and git tag
-4. Pushes to origin with tags
-5. GitHub Actions creates the release at [Releases](https://github.com/apoorvlathey/bankr-wallet/releases)
-
-### Manual release (optional)
-
-If you need to create a release manually:
-
-```bash
-pnpm build:extension
-pnpm zip
-```
-
-Then upload `apps/extension/zip/bankr-wallet-vX.Y.Z.zip` to a new GitHub release.
-
-## Auto-Update System
-
-The extension uses Chrome's self-hosted auto-update mechanism. Users with the extension installed will automatically receive new versions without manual re-installation.
-
-### How It Works
-
-1. `manifest.json` includes an `update_url` pointing to `https://bankrwallet.app/api/extension/update.xml`
-2. Chrome checks this URL every few hours
-3. If a newer version exists, Chrome downloads and installs the signed CRX automatically
-
-### Version Flow
-
-```
-pnpm release:patch
-  → bumps version in package.json + manifest.json
-  → creates git tag v0.1.2
-  → pushes to GitHub
-
-GitHub Actions
-  → builds extension
-  → creates ZIP + signed CRX
-  → attaches both to GitHub Release
-
-Chrome (periodic check)
-  → fetches https://bankrwallet.app/api/extension/update.xml
-  → sees version 0.1.2 > installed 0.1.1
-  → downloads CRX from GitHub Release
-  → installs update automatically
-```
-
-### One-Time Setup (Required Before First Release)
-
-#### 1. Generate signing key
-
-```bash
-openssl genrsa -out bankr-wallet.pem 2048
-```
-
-#### 2. Get extension ID
-
-Calculate the extension ID from your signing key:
-
-```bash
-node -e "
-const crypto = require('crypto');
-const fs = require('fs');
-const pem = fs.readFileSync('bankr-wallet.pem', 'utf8');
-const key = crypto.createPrivateKey(pem);
-const pubKey = crypto.createPublicKey(key).export({ type: 'spki', format: 'der' });
-const hash = crypto.createHash('sha256').update(pubKey).digest();
-const id = Array.from(hash.slice(0, 16))
-  .map(b => String.fromCharCode((b >> 4) + 97) + String.fromCharCode((b & 0xf) + 97))
-  .join('');
-console.log(id);
-"
-```
-
-This outputs the 32-character extension ID derived from your signing key.
-
-#### 3. Add GitHub Secrets
-
-In the repository settings, add:
-
-- `EXTENSION_SIGNING_KEY`: Base64 encoded .pem file
-  ```bash
-  base64 -i bankr-wallet.pem | pbcopy  # macOS
-  base64 -w 0 bankr-wallet.pem         # Linux
-  ```
-
-#### 4. Add website environment variable
-
-Add to your website deployment (Vercel, etc.):
-
-```
-EXTENSION_ID=<32-char-id-from-step-2>
-```
-
-#### 5. Secure backup
-
-Store the `bankr-wallet.pem` file in a password manager. This key is the extension's identity—losing it means users won't receive updates.
-
-### Verification
-
-**Test the XML endpoint:**
-
-```bash
-curl https://bankrwallet.app/api/extension/update.xml
-```
-
-**Force update check in Chrome:**
-
-1. Go to `chrome://extensions`
-2. Enable Developer mode
-3. Click "Update" button
-
-### Security Notes
-
-- **Never commit the .pem file** to the repository
-- Both `update_url` and CRX download URL must be HTTPS
-- The API route caches GitHub responses for 5 minutes to avoid rate limits
