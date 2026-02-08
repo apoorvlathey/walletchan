@@ -515,7 +515,7 @@ async function lookupFunctionName(calldata: string): Promise<string | null> {
 }
 
 /** OP Stack L2 chain IDs (Base, Unichain) */
-const OP_STACK_CHAIN_IDS = new Set([8453, 130]);
+const OP_STACK_CHAIN_IDS = new Set([4326, 8453, 130]);
 
 /**
  * Resolve RPC URL for a chain ID.

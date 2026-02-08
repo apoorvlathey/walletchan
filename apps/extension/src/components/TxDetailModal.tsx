@@ -42,7 +42,7 @@ interface TxDetailModalProps {
 }
 
 /** OP Stack L2 chain IDs */
-const OP_STACK_CHAIN_IDS = new Set([8453, 130]);
+const OP_STACK_CHAIN_IDS = new Set([4326, 8453, 130]);
 
 function formatValue(value: string | undefined): string {
   if (!value || value === "0" || value === "0x0") {

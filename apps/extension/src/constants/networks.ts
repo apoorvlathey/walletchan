@@ -13,6 +13,10 @@ export const DEFAULT_NETWORKS: NetworksInfo = {
     chainId: 1,
     rpcUrl: "https://eth.llamarpc.com",
   },
+  MegaETH: {
+    chainId: 4326,
+    rpcUrl: "https://mainnet.megaeth.com/rpc",
+  },
   Polygon: {
     chainId: 137,
     rpcUrl: "https://polygon-rpc.com",
@@ -26,7 +30,7 @@ export const DEFAULT_NETWORKS: NetworksInfo = {
 /**
  * Chain IDs that are allowed for transaction signing
  */
-export const ALLOWED_CHAIN_IDS = new Set([1, 137, 8453, 130]);
+export const ALLOWED_CHAIN_IDS = new Set([1, 137, 4326, 8453, 130]);
 
 /**
  * Human-readable chain names by chain ID
@@ -34,6 +38,7 @@ export const ALLOWED_CHAIN_IDS = new Set([1, 137, 8453, 130]);
 export const CHAIN_NAMES: Record<number, string> = {
   1: "Ethereum",
   137: "Polygon",
+  4326: "MegaETH",
   8453: "Base",
   130: "Unichain",
 };
