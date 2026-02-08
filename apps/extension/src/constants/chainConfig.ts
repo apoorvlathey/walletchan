@@ -27,9 +27,9 @@ export const CHAIN_CONFIG: Record<number, ChainConfig> = {
   },
   4326: {
     name: "MegaETH",
-    bg: "rgba(61, 61, 61, 0.15)",
-    border: "rgba(61, 61, 61, 0.4)",
-    text: "#3D3D3D",
+    bg: "rgba(25, 25, 26, 0.15)",
+    border: "rgba(25, 25, 26, 0.4)",
+    text: "#19191A",
     icon: "/chainIcons/megaeth.svg",
     explorer: "https://mega.etherscan.io",
   },
