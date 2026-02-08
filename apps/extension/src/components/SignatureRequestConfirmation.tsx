@@ -13,11 +13,12 @@ import {
   Image,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
-import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, CheckIcon } from "@chakra-ui/icons";
+import { ArrowBackIcon, ChevronLeftIcon, ChevronRightIcon } from "@chakra-ui/icons";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
 import { getChainConfig } from "@/constants/chainConfig";
 import TypedDataDisplay from "@/components/TypedDataDisplay";
 import { FromAccountDisplay } from "@/components/FromAccountDisplay";
+import { CopyButton } from "@/components/CopyButton";
 
 interface SignatureRequestConfirmationProps {
   sigRequest: PendingSignatureRequest;
@@ -32,44 +33,11 @@ interface SignatureRequestConfirmationProps {
   onConfirmed?: () => void;
 }
 
-// Copy button component
-function CopyButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  const toast = useBauhausToast();
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      toast({
-        title: "Copied!",
-        status: "success",
-        duration: 1500,
-        isClosable: true,
-      });
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      toast({
-        title: "Failed to copy",
-        status: "error",
-        duration: 2000,
-        isClosable: true,
-      });
-    }
-  };
-
-  return (
-    <IconButton
-      aria-label="Copy"
-      icon={copied ? <CheckIcon /> : <CopyIcon />}
-      size="xs"
-      variant="ghost"
-      color={copied ? "bauhaus.yellow" : "text.secondary"}
-      onClick={handleCopy}
-      _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
-    />
-  );
-}
+const scrollStyles = {
+  "&::-webkit-scrollbar": { width: "6px" },
+  "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
+  "&::-webkit-scrollbar-thumb": { background: "#121212" },
+};
 
 function getMethodDisplayName(method: string): string {
   switch (method) {
@@ -140,6 +108,109 @@ function formatSignatureData(method: string, params: any[]): { message: string; 
     message: "",
     rawData: JSON.stringify(params, null, 2),
   };
+}
+
+/** Tabbed Message / Raw display for personal_sign and eth_sign */
+function MessageDataDisplay({ message, rawData }: { message: string; rawData: string }) {
+  const [tab, setTab] = useState<"message" | "raw">("message");
+
+  const copyValue = tab === "message" ? message : rawData;
+
+  return (
+    <Box
+      bg="bauhaus.white"
+      border="2px solid"
+      borderColor="bauhaus.black"
+      boxShadow="4px 4px 0px 0px #121212"
+    >
+      {/* Tab header */}
+      <HStack p={0} borderBottom="2px solid" borderColor="bauhaus.black" spacing={0}>
+        <Box
+          flex={1}
+          py={2}
+          px={3}
+          cursor="pointer"
+          bg={tab === "message" ? "bauhaus.black" : "transparent"}
+          onClick={() => setTab("message")}
+        >
+          <Text
+            fontSize="xs"
+            fontWeight="800"
+            textTransform="uppercase"
+            letterSpacing="wide"
+            textAlign="center"
+            color={tab === "message" ? "bauhaus.white" : "text.secondary"}
+          >
+            Message
+          </Text>
+        </Box>
+        <Box w="2px" bg="bauhaus.black" alignSelf="stretch" />
+        <Box
+          flex={1}
+          py={2}
+          px={3}
+          cursor="pointer"
+          bg={tab === "raw" ? "bauhaus.black" : "transparent"}
+          onClick={() => setTab("raw")}
+        >
+          <Text
+            fontSize="xs"
+            fontWeight="800"
+            textTransform="uppercase"
+            letterSpacing="wide"
+            textAlign="center"
+            color={tab === "raw" ? "bauhaus.white" : "text.secondary"}
+          >
+            Raw
+          </Text>
+        </Box>
+        <Spacer />
+        <Box pr={1}>
+          <CopyButton value={copyValue} />
+        </Box>
+      </HStack>
+
+      {/* Message tab */}
+      <Box p={3} display={tab === "message" ? "block" : "none"}>
+        {message ? (
+          <Box
+            p={3}
+            bg="#EEF2FF"
+            border="2px solid"
+            borderColor="bauhaus.black"
+            maxH="200px"
+            overflowY="auto"
+            css={scrollStyles}
+          >
+            <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
+              {message}
+            </Text>
+          </Box>
+        ) : (
+          <Text fontSize="xs" color="text.tertiary" fontWeight="600">
+            No message data
+          </Text>
+        )}
+      </Box>
+
+      {/* Raw tab */}
+      <Box p={3} display={tab === "raw" ? "block" : "none"}>
+        <Box
+          p={3}
+          bg="#EEF2FF"
+          border="2px solid"
+          borderColor="bauhaus.black"
+          maxH="200px"
+          overflowY="auto"
+          css={scrollStyles}
+        >
+          <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
+            {rawData}
+          </Text>
+        </Box>
+      </Box>
+    </Box>
+  );
 }
 
 function SignatureRequestConfirmation({
@@ -450,77 +521,7 @@ function SignatureRequestConfirmation({
         {typedData ? (
           <TypedDataDisplay typedData={typedData} rawData={rawData} />
         ) : (
-          <>
-            {/* Message Display (personal_sign / eth_sign) */}
-            {message && (
-              <Box
-                bg="bauhaus.white"
-                p={3}
-                border="3px solid"
-                borderColor="bauhaus.black"
-                boxShadow="4px 4px 0px 0px #121212"
-              >
-                <HStack mb={2} alignItems="center">
-                  <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                    Message
-                  </Text>
-                  <Spacer />
-                  <CopyButton value={message} />
-                </HStack>
-                <Box
-                  p={3}
-                  bg="bg.muted"
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                  maxH="120px"
-                  overflowY="auto"
-                  css={{
-                    "&::-webkit-scrollbar": { width: "6px" },
-                    "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
-                    "&::-webkit-scrollbar-thumb": { background: "#121212" },
-                  }}
-                >
-                  <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
-                    {message}
-                  </Text>
-                </Box>
-              </Box>
-            )}
-
-            {/* Raw Data Display */}
-            <Box
-              bg="bauhaus.white"
-              p={3}
-              border="3px solid"
-              borderColor="bauhaus.black"
-              boxShadow="4px 4px 0px 0px #121212"
-            >
-              <HStack mb={2} alignItems="center">
-                <Text fontSize="sm" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                  Raw Data
-                </Text>
-                <Spacer />
-                <CopyButton value={rawData} />
-              </HStack>
-              <Box
-                p={3}
-                bg="bg.muted"
-                border="2px solid"
-                borderColor="bauhaus.black"
-                maxH="100px"
-                overflowY="auto"
-                css={{
-                  "&::-webkit-scrollbar": { width: "6px" },
-                  "&::-webkit-scrollbar-track": { background: "#E0E0E0" },
-                  "&::-webkit-scrollbar-thumb": { background: "#121212" },
-                }}
-              >
-                <Text fontSize="xs" fontFamily="mono" color="text.tertiary" wordBreak="break-all" whiteSpace="pre-wrap">
-                  {rawData}
-                </Text>
-              </Box>
-            </Box>
-          </>
+          <MessageDataDisplay message={message} rawData={rawData} />
         )}
 
         {/* Impersonator Info Box */}
