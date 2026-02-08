@@ -536,7 +536,22 @@ function App() {
       const sigRequests = await loadPendingSignatureRequests();
 
       // Load accounts
-      const { accounts: loadedAccounts, activeAccount: loadedActive } = await loadAccounts();
+      let { accounts: loadedAccounts, activeAccount: loadedActive } = await loadAccounts();
+
+      // Migration fallback: if API key exists but no accounts, the user is
+      // upgrading from v0.1.1/v0.2.0 and the onInstalled migration may not
+      // have run yet (e.g. service worker was inactive). Ask background to
+      // create the account entry from legacy storage.
+      if (loadedAccounts.length === 0) {
+        const migrationResult = await sendMessageWithRetry<{ migrated: boolean }>({
+          type: "migrateFromLegacy",
+        });
+        if (migrationResult?.migrated) {
+          const result = await loadAccounts(true);
+          loadedAccounts = result.accounts;
+          loadedActive = result.activeAccount;
+        }
+      }
 
       // Safety net: if API key exists but no accounts, redirect to onboarding
       // This handles edge cases like interrupted setup

@@ -157,6 +157,7 @@ When working on features, refer to these docs:
 | `_docs/CALLDATA.md`             | Calldata decoder UI, param components, type routing   |
 | `_docs/DEVELOPMENT.md`          | Build process, dev environment setup                  |
 | `_docs/PUBLISHING.md`           | Release workflow, CWS upload, auto-update, signing    |
+| `_docs/STORAGE.md`              | Every chrome.storage key, shapes, version history     |
 | `openclaw-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling     |
 
 ## Important Patterns
@@ -224,7 +225,16 @@ See `_docs/IMPLEMENTATION.md` → "Handlers with Session Restoration" for the fu
 
 ### Storage/Encryption Changes
 
-When modifying how data is stored or encrypted (e.g., the vault key system):
+**CRITICAL**: Chrome extensions auto-update silently — users on ANY previous version will receive new code. Before adding, removing, renaming, or changing the shape of ANY `chrome.storage` key, you **MUST**:
+
+1. **Read [`_docs/STORAGE.md`](/_docs/STORAGE.md)** — full reference of every key, its shape, and which version introduced it
+2. **Read [`_docs/PUBLISHING.md`](/_docs/PUBLISHING.md)** — migration rules, how to write an idempotent migration, and the pre-release storage checklist
+3. **Write a migration** in `background.ts` (called from the `onInstalled` `"update"` handler) if old users would break without one
+4. **Update `_docs/STORAGE.md`** with any new/changed keys and their version
+
+Failure to do this **will brick the extension** for existing users (they get stuck in an onboarding loop or lose data).
+
+Additional checks when modifying storage:
 
 1. **Audit ALL read AND write paths** - grep for storage key names (`encryptedApiKey`, `encryptedApiKeyVault`, etc.)
 2. **Check every file** that touches the data - `background.ts` has multiple handlers, `AccountSettingsModal.tsx` can save directly

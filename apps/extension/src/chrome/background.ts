@@ -245,12 +245,71 @@ updateBadge();
 // Initialize auto-lock timeout cache on startup
 getAutoLockTimeout();
 
+/**
+ * Migrates legacy storage (v0.1.1/v0.2.0) to the multi-account system.
+ *
+ * Old versions stored only `address` in chrome.storage.sync and had no `accounts`
+ * array.  Without this migration the popup enters an onboarding loop because
+ * App.tsx requires at least one entry in the accounts array.
+ *
+ * Safe to call multiple times — exits early when accounts already exist.
+ */
+async function migrateFromLegacyStorage(): Promise<boolean> {
+  try {
+    // Already migrated?
+    const { accounts } = await chrome.storage.local.get("accounts");
+    if (Array.isArray(accounts) && accounts.length > 0) {
+      return false;
+    }
+
+    // Must have legacy encrypted data to be a real returning user
+    const { encryptedApiKey } = await chrome.storage.local.get("encryptedApiKey");
+    if (!encryptedApiKey) {
+      return false; // Fresh install — nothing to migrate
+    }
+
+    // Read legacy address
+    const { address, displayAddress } = await chrome.storage.sync.get([
+      "address",
+      "displayAddress",
+    ]);
+    if (!address) {
+      return false; // No address stored — cannot create account entry
+    }
+
+    // Build a BankrAccount entry matching the shape in types.ts
+    const newAccount = {
+      id: crypto.randomUUID(),
+      type: "bankr" as const,
+      address: (address as string).toLowerCase(),
+      displayName:
+        displayAddress && displayAddress !== address
+          ? (displayAddress as string)
+          : undefined,
+      createdAt: Date.now(),
+    };
+
+    // Write accounts array + set this account as active (single atomic write per store)
+    await chrome.storage.local.set({ accounts: [newAccount] });
+    await chrome.storage.sync.set({ activeAccountId: newAccount.id });
+
+    console.log("[BankrWallet] Legacy storage migration complete:", newAccount.address);
+    return true;
+  } catch (error) {
+    console.error("[BankrWallet] Legacy storage migration failed:", error);
+    return false;
+  }
+}
+
 // Handle extension install/update
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === "install") {
     // First time install - open onboarding page
     const onboardingUrl = chrome.runtime.getURL("onboarding.html");
     await chrome.tabs.create({ url: onboardingUrl });
+  } else if (details.reason === "update") {
+    // Migrate from v0.1.1/v0.2.0 legacy storage to multi-account system
+    await migrateFromLegacyStorage();
   }
 });
 
@@ -447,6 +506,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       } else {
         sendResponse({ success: false, error: "No tab ID" });
       }
+      return true;
+    }
+
+    case "migrateFromLegacy": {
+      // Only extension pages (popup / sidepanel) may trigger migration
+      if (!isExtensionPage(sender)) {
+        sendResponse({ migrated: false });
+        return false;
+      }
+      migrateFromLegacyStorage().then((migrated) => {
+        sendResponse({ migrated });
+      });
       return true;
     }
 
