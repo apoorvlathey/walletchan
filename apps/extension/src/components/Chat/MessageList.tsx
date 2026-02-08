@@ -6,13 +6,14 @@ import MessageBubble from "./MessageBubble";
 interface MessageListProps {
   messages: Message[];
   isLoading?: boolean;
+  statusUpdateText?: string | null;
   isWalletUnlocked?: boolean;
   onUnlock?: () => void;
   onRetry?: () => void;
   onResend?: (content: string) => void;
 }
 
-export function MessageList({ messages, isLoading, isWalletUnlocked, onUnlock, onRetry, onResend }: MessageListProps) {
+export function MessageList({ messages, isLoading, statusUpdateText, isWalletUnlocked, onUnlock, onRetry, onResend }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when messages change
@@ -92,6 +93,7 @@ export function MessageList({ messages, isLoading, isWalletUnlocked, onUnlock, o
           <MessageBubble
             key={message.id}
             message={message}
+            statusText={message.status === "pending" ? statusUpdateText : undefined}
             isWalletUnlocked={isWalletUnlocked}
             onUnlock={onUnlock}
             onRetry={onRetry}

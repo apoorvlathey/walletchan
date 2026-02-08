@@ -23,6 +23,7 @@ export function ChatView({ onBack, startWithNewChat = false, returnToConversatio
     currentConversation,
     messages,
     isLoading,
+    statusUpdateText,
     sendMessage,
     loadConversation,
     createNewChat,
@@ -189,6 +190,7 @@ export function ChatView({ onBack, startWithNewChat = false, returnToConversatio
         <MessageList
           messages={messages}
           isLoading={isLoading}
+          statusUpdateText={statusUpdateText}
           isWalletUnlocked={isWalletUnlocked}
           onUnlock={handleUnlock}
           onRetry={retryLastMessage}

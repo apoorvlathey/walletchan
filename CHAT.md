@@ -32,6 +32,7 @@ The chat feature allows users to converse with the Bankr AI agent directly from 
 │                                      ┌──────────────┐                     │
 │                                      │ ShapesLoader │                     │
 │                                      │ (pending)    │                     │
+│                                      │+ status text │                     │
 │                                      └──────────────┘                     │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -172,8 +173,29 @@ async function pollChatJobUntilComplete(
 3. **Submit Prompt**: POST to `/agent/prompt` with formatted prompt (max 10,000 chars)
 4. **Get Job ID**: API returns `{ jobId: string }`
 5. **Poll Status**: GET `/agent/job/{jobId}` every 2 seconds
-6. **Complete**: Job status becomes "completed" with response text
-7. **Timeout**: Max 5 minutes before auto-fail
+6. **Show Status Updates**: Display latest `statusUpdates` message in UI alongside loader
+7. **Complete**: Job status becomes "completed" with response text
+8. **Timeout**: Max 5 minutes before auto-fail
+
+### Status Updates (Live Progress)
+
+During polling, the API response includes a `statusUpdates` array that grows over time:
+
+```json
+{
+  "statusUpdates": [
+    { "message": "viewing clanker fees", "timestamp": "2026-02-07T23:39:10.846Z" },
+    { "message": "validating response accuracy", "timestamp": "2026-02-07T23:39:31.040Z" }
+  ]
+}
+```
+
+**Flow**:
+1. Background sends `chatJobUpdate` message to UI with `statusUpdates` array on each poll
+2. `useChat` hook extracts the **last element** of the array (latest status)
+3. `statusUpdateText` state is set and passed through `ChatView` → `MessageList` → `MessageBubble`
+4. `MessageBubble` displays it next to the `ShapesLoader` in the pending state
+5. Text is cleared when `chatJobComplete` is received or a new message is sent
 
 ### Conversation Context Format
 

@@ -18,6 +18,7 @@ interface UseChatReturn {
   messages: Message[];
   isLoading: boolean;
   error: string | null;
+  statusUpdateText: string | null;
   sendMessage: (content: string) => Promise<void>;
   loadConversation: (id: string) => Promise<void>;
   createNewChat: () => Promise<Conversation>;
@@ -32,6 +33,7 @@ export function useChat(): UseChatReturn {
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusUpdateText, setStatusUpdateText] = useState<string | null>(null);
   // Track if current conversation is unsaved (only in memory)
   const [isUnsavedChat, setIsUnsavedChat] = useState(false);
 
@@ -49,11 +51,14 @@ export function useChat(): UseChatReturn {
         messageId?: string;
         content?: string;
         error?: string;
+        statusUpdates?: Array<{ message: string; timestamp: string }>;
       },
       _sender: chrome.runtime.MessageSender,
       sendResponse: (response?: any) => void
     ) => {
       if (message.type === "chatJobComplete" && message.conversationId) {
+        // Clear status update text on completion
+        setStatusUpdateText(null);
         // Update the message with the response
         if (currentConversation?.id === message.conversationId && message.messageId) {
           updateMessageInConversation(message.conversationId, message.messageId, {
@@ -70,6 +75,11 @@ export function useChat(): UseChatReturn {
       }
 
       if (message.type === "chatJobUpdate" && message.conversationId) {
+        // Extract the latest status update message
+        if (message.statusUpdates && message.statusUpdates.length > 0) {
+          const latest = message.statusUpdates[message.statusUpdates.length - 1];
+          setStatusUpdateText(latest.message);
+        }
         // Refresh conversation to get latest state
         if (currentConversation?.id === message.conversationId) {
           getConversation(message.conversationId).then((conv) => {
@@ -139,6 +149,7 @@ export function useChat(): UseChatReturn {
       if (isLoading) return;
 
       setError(null);
+      setStatusUpdateText(null);
       let conv = currentConversation;
 
       // Create new conversation if none exists
@@ -371,6 +382,7 @@ export function useChat(): UseChatReturn {
     messages: currentConversation?.messages || [],
     isLoading,
     error,
+    statusUpdateText,
     sendMessage,
     loadConversation,
     createNewChat,

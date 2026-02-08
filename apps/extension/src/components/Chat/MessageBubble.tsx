@@ -45,13 +45,14 @@ function parseContentWithLinks(
 
 interface MessageBubbleProps {
   message: Message;
+  statusText?: string | null;
   isWalletUnlocked?: boolean;
   onUnlock?: () => void;
   onRetry?: () => void;
   onResend?: (content: string) => void;
 }
 
-export function MessageBubble({ message, isWalletUnlocked, onUnlock, onRetry, onResend }: MessageBubbleProps) {
+export function MessageBubble({ message, statusText, isWalletUnlocked, onUnlock, onRetry, onResend }: MessageBubbleProps) {
   const toast = useBauhausToast();
   const isUser = message.role === "user";
   const isPending = message.status === "pending";
@@ -90,7 +91,20 @@ export function MessageBubble({ message, isWalletUnlocked, onUnlock, onRetry, on
           px={3}
           py={2}
         >
-          <ShapesLoader size="10px" />
+          <HStack spacing={2}>
+            <ShapesLoader size="10px" />
+            {statusText && (
+              <Text
+                fontSize="xs"
+                fontWeight="600"
+                color="bauhaus.black"
+                opacity={0.8}
+                fontStyle="italic"
+              >
+                {statusText}
+              </Text>
+            )}
+          </HStack>
         </Box>
       </Box>
     );
