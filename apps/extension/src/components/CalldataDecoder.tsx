@@ -18,6 +18,7 @@ interface CalldataDecoderProps {
   calldata: string;
   to: string;
   chainId: number;
+  onFunctionName?: (name: string) => void;
 }
 
 /**
@@ -109,7 +110,7 @@ function isAbiDecodeBetter(
   return false;
 }
 
-function CalldataDecoder({ calldata, to, chainId }: CalldataDecoderProps) {
+function CalldataDecoder({ calldata, to, chainId, onFunctionName }: CalldataDecoderProps) {
   const [result, setResult] = useState<DecodeRecursiveResult>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"decoded" | "raw">("raw");
@@ -193,6 +194,13 @@ function CalldataDecoder({ calldata, to, chainId }: CalldataDecoderProps) {
       cancelled = true;
     };
   }, [calldata, to, chainId]);
+
+  // Notify parent of decoded function name
+  useEffect(() => {
+    if (result?.functionName && onFunctionName) {
+      onFunctionName(result.functionName);
+    }
+  }, [result?.functionName, onFunctionName]);
 
   const scrollStyles = {
     "&::-webkit-scrollbar": { width: "6px" },

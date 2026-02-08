@@ -872,7 +872,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "confirmTransactionAsyncPK": {
       const tabId = message.tabId || sender.tab?.id;
-      handleConfirmTransactionAsyncPK(message.txId, message.password, tabId).then(
+      handleConfirmTransactionAsyncPK(message.txId, message.password, tabId, message.functionName).then(
         (result) => {
           sendResponse(result);
         }
@@ -1056,7 +1056,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "confirmTransactionAsync": {
-      handleConfirmTransactionAsync(message.txId, message.password).then(
+      handleConfirmTransactionAsync(message.txId, message.password, message.functionName).then(
         (result) => {
           sendResponse(result);
         }

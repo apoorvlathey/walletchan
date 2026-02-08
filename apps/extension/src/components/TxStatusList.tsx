@@ -21,6 +21,7 @@ import {
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import { CompletedTransaction } from "@/chrome/txHistoryStorage";
 import { getChainConfig } from "@/constants/chainConfig";
+import TxDetailModal from "@/components/TxDetailModal";
 
 interface TxStatusListProps {
   maxItems?: number;
@@ -32,6 +33,7 @@ interface TxStatusListProps {
 function TxStatusList({ maxItems = 5, address, hideHeader, hideCard }: TxStatusListProps) {
   const [allHistory, setAllHistory] = useState<CompletedTransaction[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [selectedTx, setSelectedTx] = useState<CompletedTransaction | null>(null);
 
   // Load and listen for updates
   useEffect(() => {
@@ -70,9 +72,17 @@ function TxStatusList({ maxItems = 5, address, hideHeader, hideCard }: TxStatusL
   ) : (
     <VStack spacing={hideCard ? 3 : 3} align="stretch" p={hideCard ? 0 : 0}>
       {displayItems.map((tx) => (
-        <TxStatusItem key={tx.id} tx={tx} />
+        <TxStatusItem key={tx.id} tx={tx} onClick={() => setSelectedTx(tx)} />
       ))}
     </VStack>
+  );
+
+  const modal = selectedTx && (
+    <TxDetailModal
+      isOpen={!!selectedTx}
+      onClose={() => setSelectedTx(null)}
+      tx={selectedTx}
+    />
   );
 
   if (hideCard) {
@@ -95,6 +105,7 @@ function TxStatusList({ maxItems = 5, address, hideHeader, hideCard }: TxStatusL
           </HStack>
         )}
         {txContent}
+        {modal}
       </Box>
     );
   }
@@ -134,10 +145,11 @@ function TxStatusList({ maxItems = 5, address, hideHeader, hideCard }: TxStatusL
       ) : (
         <VStack spacing={3} align="stretch">
           {displayItems.map((tx) => (
-            <TxStatusItem key={tx.id} tx={tx} />
+            <TxStatusItem key={tx.id} tx={tx} onClick={() => setSelectedTx(tx)} />
           ))}
         </VStack>
       )}
+      {modal}
     </Box>
   );
 }
@@ -150,7 +162,7 @@ function getOriginHostname(origin: string): string | null {
   }
 }
 
-function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
+function TxStatusItem({ tx, onClick }: { tx: CompletedTransaction; onClick: () => void }) {
   const config = getChainConfig(tx.chainId);
   const toast = useBauhausToast();
   const [cancelling, setCancelling] = useState(false);
@@ -263,6 +275,8 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
       borderColor="bauhaus.black"
       boxShadow="4px 4px 0px 0px #121212"
       p={3}
+      cursor="pointer"
+      onClick={onClick}
       _hover={{
         transform: "translateY(-1px)",
         boxShadow: "5px 5px 0px 0px #121212",
@@ -315,15 +329,33 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
           </Box>
           <Box flex={1}>
             <HStack justify="space-between">
-              <Text
-                fontSize="sm"
-                fontWeight="700"
-                color="text.primary"
-                noOfLines={1}
-              >
-                {originHostname || tx.origin}
-              </Text>
-              <Text fontSize="xs" color="text.tertiary" fontWeight="500">
+              <HStack spacing={1.5} flex={1} minW={0}>
+                <Text
+                  fontSize="sm"
+                  fontWeight="700"
+                  color="text.primary"
+                  noOfLines={1}
+                >
+                  {originHostname || tx.origin}
+                </Text>
+                {tx.functionName && (
+                  <Badge
+                    fontSize="2xs"
+                    bg="bg.muted"
+                    color="text.secondary"
+                    border="2px solid"
+                    borderColor="gray.300"
+                    fontFamily="mono"
+                    textTransform="none"
+                    px={1.5}
+                    py={0}
+                    flexShrink={0}
+                  >
+                    {tx.functionName}
+                  </Badge>
+                )}
+              </HStack>
+              <Text fontSize="xs" color="text.tertiary" fontWeight="500" flexShrink={0}>
                 {formatTimeAgo(tx.createdAt)}
               </Text>
             </HStack>
@@ -357,7 +389,7 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
             size="sm"
             variant="ghost"
             color="text.secondary"
-            onClick={handleViewTx}
+            onClick={(e) => { e.stopPropagation(); handleViewTx(); }}
             _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
           />
         )}
@@ -370,7 +402,7 @@ function TxStatusItem({ tx }: { tx: CompletedTransaction }) {
             color="bauhaus.red"
             variant="ghost"
             fontWeight="700"
-            onClick={handleCancel}
+            onClick={(e) => { e.stopPropagation(); handleCancel(); }}
             isLoading={cancelling}
             loadingText=""
             leftIcon={<CloseIcon boxSize="8px" />}

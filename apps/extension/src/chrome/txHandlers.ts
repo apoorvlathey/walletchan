@@ -13,7 +13,7 @@ import {
   TransactionParams,
   BankrApiError,
 } from "./bankrApi";
-import { ALLOWED_CHAIN_IDS, CHAIN_NAMES } from "../constants/networks";
+import { ALLOWED_CHAIN_IDS, CHAIN_NAMES, DEFAULT_NETWORKS } from "../constants/networks";
 import { CHAIN_CONFIG } from "../constants/chainConfig";
 import type { Account } from "./types";
 import {
@@ -473,11 +473,112 @@ export async function showNotification(
 }
 
 /**
+ * Lightweight 4-byte selector lookup for function names.
+ * Used as fallback when the UI didn't provide a decoded function name.
+ */
+async function lookupFunctionName(calldata: string): Promise<string | null> {
+  if (!calldata || calldata.length < 10) return null;
+  const selector = calldata.slice(0, 10);
+
+  // Try Sourcify first
+  try {
+    const url = new URL("https://api.4byte.sourcify.dev/signature-database/v1/lookup");
+    url.searchParams.append("function", selector);
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data?.ok && data.result?.function?.[selector]?.[0]?.name) {
+      return data.result.function[selector][0].name;
+    }
+  } catch { /* ignore */ }
+
+  // Fallback to 4byte.directory
+  try {
+    const url = new URL("https://www.4byte.directory/api/v1/signatures/");
+    url.searchParams.append("hex_signature", selector);
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data?.count > 0 && data.results?.[0]?.text_signature) {
+      // Extract just the function name from "functionName(uint256,address,...)"
+      const sig = data.results[0].text_signature;
+      return sig.split("(")[0];
+    }
+  } catch { /* ignore */ }
+
+  return null;
+}
+
+/** OP Stack L2 chain IDs (Base, Unichain) */
+const OP_STACK_CHAIN_IDS = new Set([8453, 130]);
+
+/**
+ * Resolve RPC URL for a chain ID.
+ * Checks user-configured networks first, falls back to defaults.
+ */
+async function getRpcUrl(chainId: number): Promise<string | undefined> {
+  const { networksInfo } = await chrome.storage.sync.get("networksInfo");
+  if (networksInfo) {
+    for (const name of Object.keys(networksInfo)) {
+      if (networksInfo[name].chainId === chainId) {
+        return networksInfo[name].rpcUrl;
+      }
+    }
+  }
+  // Fallback to defaults
+  for (const net of Object.values(DEFAULT_NETWORKS)) {
+    if (net.chainId === chainId) return net.rpcUrl;
+  }
+  return undefined;
+}
+
+/**
+ * Fetch gas data from the transaction and receipt, then update tx history.
+ * Fetches both eth_getTransactionByHash (for gasLimit) and eth_getTransactionReceipt
+ * (for gasUsed, effectiveGasPrice, and L1 fee data on OP Stack).
+ */
+async function fetchAndStoreGasData(txId: string, txHash: string, chainId: number): Promise<void> {
+  const rpcUrl = await getRpcUrl(chainId);
+  if (!rpcUrl) return;
+
+  try {
+    const rpcCall = (method: string, params: any[]) =>
+      fetch(rpcUrl!, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      }).then((r) => r.json()).then((r) => r.result);
+
+    const [txData, receipt] = await Promise.all([
+      rpcCall("eth_getTransactionByHash", [txHash]),
+      rpcCall("eth_getTransactionReceipt", [txHash]),
+    ]);
+    if (!receipt) return;
+
+    const gasData: import("./txHistoryStorage").GasData = {
+      gasUsed: BigInt(receipt.gasUsed).toString(),
+      gasLimit: txData?.gas ? BigInt(txData.gas).toString() : BigInt(receipt.gasUsed).toString(),
+      effectiveGasPrice: BigInt(receipt.effectiveGasPrice).toString(),
+    };
+
+    // OP Stack L2s include L1 fee fields in the receipt
+    if (OP_STACK_CHAIN_IDS.has(chainId)) {
+      if (receipt.l1Fee) gasData.l1Fee = BigInt(receipt.l1Fee).toString();
+      if (receipt.l1GasUsed) gasData.l1GasUsed = BigInt(receipt.l1GasUsed).toString();
+      if (receipt.l1GasPrice) gasData.l1GasPrice = BigInt(receipt.l1GasPrice).toString();
+    }
+
+    await updateTxInHistory(txId, { gasData });
+  } catch {
+    // Non-critical — silently ignore
+  }
+}
+
+/**
  * Handles async confirmation - returns immediately and polls in background
  */
 export async function handleConfirmTransactionAsync(
   txId: string,
-  password: string
+  password: string,
+  functionName?: string
 ): Promise<{ success: boolean; error?: string }> {
   const pending = await getPendingTxRequestById(txId);
   if (!pending) {
@@ -501,7 +602,7 @@ export async function handleConfirmTransactionAsync(
   await removePendingTxRequest(txId);
 
   // Start background processing
-  processTransactionInBackground(txId, pending, apiKey);
+  processTransactionInBackground(txId, pending, apiKey, functionName);
 
   return { success: true };
 }
@@ -512,7 +613,8 @@ export async function handleConfirmTransactionAsync(
 async function processTransactionInBackground(
   txId: string,
   pending: PendingTxRequest,
-  apiKey: string
+  apiKey: string,
+  functionName?: string
 ): Promise<void> {
   // Create AbortController for this transaction
   const abortController = new AbortController();
@@ -529,7 +631,15 @@ async function processTransactionInBackground(
     chainId: pending.tx.chainId,
     createdAt: pending.timestamp,
     accountType: "bankr",
+    functionName,
   });
+
+  // If no function name provided by UI, try background lookup
+  if (!functionName && pending.tx.data && pending.tx.data !== "0x") {
+    lookupFunctionName(pending.tx.data).then((name) => {
+      if (name) updateTxInHistory(txId, { functionName: name });
+    });
+  }
 
   try {
     const result = await submitTransactionDirect(apiKey, pending.tx, abortController.signal);
@@ -545,6 +655,11 @@ async function processTransactionInBackground(
         txHash,
         completedAt: Date.now(),
       });
+
+      // Fire-and-forget gas fee fetch
+      if (txHash) {
+        fetchAndStoreGasData(txId, txHash, pending.tx.chainId);
+      }
 
       const notificationId = `tx-success-${txId}`;
       const chainConfig = CHAIN_CONFIG[pending.tx.chainId];
@@ -633,7 +748,8 @@ async function processLocalTransactionInBackground(
   txId: string,
   pending: PendingTxRequest,
   account: Account,
-  privateKey: `0x${string}`
+  privateKey: `0x${string}`,
+  functionName?: string
 ): Promise<void> {
   // Create AbortController for this transaction
   const abortController = new AbortController();
@@ -650,7 +766,15 @@ async function processLocalTransactionInBackground(
     chainId: pending.tx.chainId,
     createdAt: pending.timestamp,
     accountType: account.type as "privateKey" | "seedPhrase",
+    functionName,
   });
+
+  // If no function name provided by UI, try background lookup
+  if (!functionName && pending.tx.data && pending.tx.data !== "0x") {
+    lookupFunctionName(pending.tx.data).then((name) => {
+      if (name) updateTxInHistory(txId, { functionName: name });
+    });
+  }
 
   try {
     // Get RPC URL for the chain
@@ -678,6 +802,11 @@ async function processLocalTransactionInBackground(
       txHash,
       completedAt: Date.now(),
     });
+
+    // Fire-and-forget gas fee fetch
+    if (txHash) {
+      fetchAndStoreGasData(txId, txHash, pending.tx.chainId);
+    }
 
     // Show notification
     const notificationId = `tx-success-${txId}`;
@@ -716,7 +845,8 @@ async function processLocalTransactionInBackground(
 export async function handleConfirmTransactionAsyncPK(
   txId: string,
   password: string,
-  tabId?: number
+  tabId?: number,
+  functionName?: string
 ): Promise<{ success: boolean; error?: string }> {
   const pending = await getPendingTxRequestById(txId);
   if (!pending) {
@@ -764,7 +894,7 @@ export async function handleConfirmTransactionAsyncPK(
   await removePendingTxRequest(txId);
 
   // Start background processing
-  processLocalTransactionInBackground(txId, pending, account, privateKey);
+  processLocalTransactionInBackground(txId, pending, account, privateKey, functionName);
 
   return { success: true };
 }

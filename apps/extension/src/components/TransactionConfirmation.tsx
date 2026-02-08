@@ -102,6 +102,7 @@ function TransactionConfirmation({
   const [state, setState] = useState<ConfirmationState>("ready");
   const [error, setError] = useState<string>("");
   const [toLabels, setToLabels] = useState<string[]>([]);
+  const [decodedFunctionName, setDecodedFunctionName] = useState<string | undefined>();
 
   const { tx, origin, chainName, favicon } = txRequest;
 
@@ -147,8 +148,13 @@ function TransactionConfirmation({
         ? "confirmTransactionAsyncPK"
         : "confirmTransactionAsync";
 
+    // Determine function name: use decoded name, or "Contract Deployment" for deploys
+    const functionName = !tx.to
+      ? "Contract Deployment"
+      : decodedFunctionName || undefined;
+
     chrome.runtime.sendMessage(
-      { type: messageType, txId: txRequest.id, password: "" },
+      { type: messageType, txId: txRequest.id, password: "", functionName },
       (result: { success: boolean; error?: string }) => {
         if (result.success) {
           // Transaction submitted
@@ -564,7 +570,7 @@ function TransactionConfirmation({
 
         {/* Calldata (Decoded + Raw) */}
         {tx.data && tx.data !== "0x" && tx.to && (
-          <CalldataDecoder calldata={tx.data} to={tx.to} chainId={tx.chainId} />
+          <CalldataDecoder calldata={tx.data} to={tx.to} chainId={tx.chainId} onFunctionName={setDecodedFunctionName} />
         )}
         {/* Raw-only fallback for contract deployments */}
         {tx.data && tx.data !== "0x" && !tx.to && (
