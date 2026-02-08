@@ -1,26 +1,16 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import {
-  Box,
-  HStack,
-  Text,
-  IconButton,
-  Select,
-  Spinner,
-} from "@chakra-ui/react";
+import { useCallback } from "react";
+import { Box, HStack, VStack, Text, IconButton, Select } from "@chakra-ui/react";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import {
   ImpersonatorIframeProvider,
   ImpersonatorIframe,
 } from "@impersonator/iframe";
-
-const SUPPORTED_CHAINS: { id: number; name: string; rpc: string }[] = [
-  { id: 1, name: "Ethereum", rpc: "https://eth.llamarpc.com" },
-  { id: 8453, name: "Base", rpc: "https://base.llamarpc.com" },
-  { id: 137, name: "Polygon", rpc: "https://polygon.llamarpc.com" },
-  { id: 130, name: "Unichain", rpc: "https://mainnet.unichain.org" },
-];
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount, useWalletClient, useChainId, useSwitchChain } from "wagmi";
+import { CHAIN_RPC_URLS } from "@/app/wagmiConfig";
+import { CHAIN_NAMES } from "../data/dapps";
 
 interface IframeAppProps {
   appUrl: string;
@@ -35,96 +25,39 @@ export function IframeApp({
   supportedChains,
   onBack,
 }: IframeAppProps) {
-  const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
-  const [selectedChainId, setSelectedChainId] = useState<number>(
-    supportedChains[0] || 1
-  );
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { address, isConnected } = useAccount();
+  const { data: walletClient } = useWalletClient();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
 
-  const selectedChain = SUPPORTED_CHAINS.find((c) => c.id === selectedChainId);
+  const rpcUrl = CHAIN_RPC_URLS[chainId] ?? `https://eth.llamarpc.com`;
 
-  // Try to connect to BankrWallet on mount
-  useEffect(() => {
-    connectWallet();
-  }, []);
-
-  const connectWallet = async () => {
-    setIsConnecting(true);
-    setError(null);
-
-    try {
-      // Check for BankrWallet or any injected provider
-      const provider = (window as any).ethereum;
-      if (!provider) {
-        setError("No wallet detected. Install BankrWallet to use dApps.");
-        setIsConnecting(false);
-        return;
-      }
-
-      const accounts = await provider.request({
-        method: "eth_requestAccounts",
-      });
-
-      if (accounts && accounts.length > 0) {
-        setConnectedAddress(accounts[0]);
-      } else {
-        setError("No accounts found. Please unlock your wallet.");
-      }
-    } catch (err: any) {
-      setError(err?.message || "Failed to connect wallet");
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  // Forward transaction to BankrWallet
   const handleTransaction = useCallback(
     async (tx: any): Promise<string> => {
-      const provider = (window as any).ethereum;
-      if (!provider) throw new Error("No wallet provider");
-
-      const hash = await provider.request({
-        method: "eth_sendTransaction",
-        params: [tx],
-      });
-      return hash as string;
+      if (!walletClient) throw new Error("No wallet client");
+      return walletClient.sendTransaction(tx);
     },
-    []
+    [walletClient]
   );
 
-  // Forward message signing to BankrWallet
   const handleSignMessage = useCallback(
     async (message: string): Promise<string> => {
-      const provider = (window as any).ethereum;
-      if (!provider) throw new Error("No wallet provider");
-
-      const signature = await provider.request({
-        method: "personal_sign",
-        params: [message, connectedAddress],
-      });
-      return signature as string;
+      if (!walletClient) throw new Error("No wallet client");
+      return walletClient.signMessage({ message });
     },
-    [connectedAddress]
+    [walletClient]
   );
 
-  // Forward typed data signing to BankrWallet
   const handleSignTypedData = useCallback(
     async (typedData: any): Promise<string> => {
-      const provider = (window as any).ethereum;
-      if (!provider) throw new Error("No wallet provider");
-
-      const signature = await provider.request({
-        method: "eth_signTypedData_v4",
-        params: [connectedAddress, JSON.stringify(typedData)],
-      });
-      return signature as string;
+      if (!walletClient) throw new Error("No wallet client");
+      return walletClient.signTypedData(typedData);
     },
-    [connectedAddress]
+    [walletClient]
   );
 
-  const availableChains = SUPPORTED_CHAINS.filter((c) =>
-    supportedChains.includes(c.id)
+  const availableChains = supportedChains.filter(
+    (id) => CHAIN_RPC_URLS[id] !== undefined
   );
 
   return (
@@ -170,16 +103,14 @@ export function IframeApp({
               fontWeight="700"
               fontSize="xs"
               w="140px"
-              value={selectedChainId}
-              onChange={(e) => setSelectedChainId(Number(e.target.value))}
+              value={chainId}
+              onChange={(e) =>
+                switchChain({ chainId: Number(e.target.value) })
+              }
             >
-              {availableChains.map((chain) => (
-                <option
-                  key={chain.id}
-                  value={chain.id}
-                  style={{ color: "black" }}
-                >
-                  {chain.name}
+              {availableChains.map((id) => (
+                <option key={id} value={id} style={{ color: "black" }}>
+                  {CHAIN_NAMES[id] || `Chain ${id}`}
                 </option>
               ))}
             </Select>
@@ -199,48 +130,48 @@ export function IframeApp({
         </HStack>
 
         {/* Connection status */}
-        {connectedAddress && (
+        {address && (
           <HStack mt={1} spacing={2}>
             <Box w="6px" h="6px" bg="green.400" borderRadius="full" />
             <Text color="whiteAlpha.700" fontSize="xs" fontFamily="mono">
-              {connectedAddress.slice(0, 6)}...{connectedAddress.slice(-4)}
+              {address.slice(0, 6)}...{address.slice(-4)}
             </Text>
           </HStack>
         )}
       </Box>
 
-      {/* Error or loading state */}
-      {error && (
-        <Box bg="bauhaus.red" p={3} borderBottom="3px solid" borderColor="bauhaus.black">
-          <Text color="white" fontSize="sm" fontWeight="700">
-            {error}
+      {/* Not connected state */}
+      {!isConnected && (
+        <VStack flex={1} justify="center" spacing={6} p={8}>
+          <Text
+            fontWeight="900"
+            fontSize="lg"
+            textTransform="uppercase"
+            letterSpacing="wide"
+          >
+            Connect Wallet
           </Text>
-        </Box>
-      )}
-
-      {isConnecting && (
-        <Box p={8} textAlign="center">
-          <Spinner size="lg" color="bauhaus.blue" />
-          <Text mt={3} fontWeight="700" textTransform="uppercase">
-            Connecting wallet...
+          <Text color="gray.600" fontWeight="500" textAlign="center">
+            Connect your wallet to interact with {appName}
           </Text>
-        </Box>
+          <ConnectButton />
+        </VStack>
       )}
 
       {/* Iframe */}
-      {connectedAddress && selectedChain && (
+      {isConnected && address && (
         <Box flex={1} position="relative">
           <ImpersonatorIframeProvider
-            address={connectedAddress as `0x${string}`}
-            rpcUrl={selectedChain.rpc}
+            address={address}
+            rpcUrl={rpcUrl}
             sendTransaction={handleTransaction}
             signMessage={handleSignMessage}
             signTypedData={handleSignTypedData}
           >
             <ImpersonatorIframe
               src={appUrl}
-              address={connectedAddress as `0x${string}`}
-              rpcUrl={selectedChain.rpc}
+              address={address}
+              rpcUrl={rpcUrl}
               width="100%"
               height="100%"
             />

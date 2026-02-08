@@ -14,31 +14,47 @@ import {
   Button,
 } from "@chakra-ui/react";
 import { Search } from "lucide-react";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Navigation } from "../components/Navigation";
 import { AppCard } from "./components/AppCard";
 import { IframeApp } from "./components/IframeApp";
-import { DAPPS, ALL_CATEGORIES, CHAIN_NAMES } from "./data/dapps";
+import { DAPPS, CHAIN_NAMES } from "./data/dapps";
 import type { DappEntry } from "./data/dapps";
 
 export default function AppsPage() {
   const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedChain, setSelectedChain] = useState<number | null>(null);
   const [activeDapp, setActiveDapp] = useState<DappEntry | null>(null);
 
+  // Derive unique chain IDs from the dapps data
+  const availableChains = useMemo(() => {
+    const chainSet = new Set<number>();
+    DAPPS.forEach((dapp) => dapp.chains.forEach((c) => chainSet.add(c)));
+    // Sort by CHAIN_NAMES order (known chains first), then by ID
+    const knownOrder = Object.keys(CHAIN_NAMES).map(Number);
+    return Array.from(chainSet).sort((a, b) => {
+      const aIdx = knownOrder.indexOf(a);
+      const bIdx = knownOrder.indexOf(b);
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+      if (aIdx !== -1) return -1;
+      if (bIdx !== -1) return 1;
+      return a - b;
+    });
+  }, []);
+
   const filteredDapps = useMemo(() => {
     return DAPPS.filter((dapp) => {
+      const q = search.toLowerCase();
       const matchesSearch =
         !search ||
-        dapp.name.toLowerCase().includes(search.toLowerCase()) ||
-        dapp.description.toLowerCase().includes(search.toLowerCase());
-      const matchesCategory =
-        !selectedCategory || dapp.categories.includes(selectedCategory);
+        dapp.name.toLowerCase().includes(q) ||
+        dapp.description.toLowerCase().includes(q) ||
+        dapp.url.toLowerCase().includes(q);
       const matchesChain =
         !selectedChain || dapp.chains.includes(selectedChain);
-      return matchesSearch && matchesCategory && matchesChain;
+      return matchesSearch && matchesChain;
     });
-  }, [search, selectedCategory, selectedChain]);
+  }, [search, selectedChain]);
 
   // If a dapp is selected, show the iframe view
   if (activeDapp) {
@@ -88,6 +104,7 @@ export default function AppsPage() {
               Browse and interact with dApps directly through BankrWallet.
               Connect your wallet to get started.
             </Text>
+            <ConnectButton />
           </VStack>
 
           {/* Search */}
@@ -113,14 +130,30 @@ export default function AppsPage() {
             </InputGroup>
           </Box>
 
-          {/* Filters */}
-          <VStack spacing={3} align="stretch">
-            {/* Category chips */}
-            <HStack spacing={2} flexWrap="wrap" justify="center">
+          {/* Chain filter chips */}
+          <HStack spacing={2} flexWrap="wrap" justify="center">
+            <Button
+              size="xs"
+              bg={selectedChain === null ? "bauhaus.blue" : "white"}
+              color={selectedChain === null ? "white" : "bauhaus.black"}
+              border="2px solid"
+              borderColor="bauhaus.black"
+              borderRadius="0"
+              fontWeight="800"
+              textTransform="uppercase"
+              fontSize="10px"
+              letterSpacing="wide"
+              onClick={() => setSelectedChain(null)}
+              _hover={{ opacity: 0.8 }}
+            >
+              All Chains
+            </Button>
+            {availableChains.map((chainId) => (
               <Button
+                key={chainId}
                 size="xs"
-                bg={selectedCategory === null ? "bauhaus.black" : "white"}
-                color={selectedCategory === null ? "white" : "bauhaus.black"}
+                bg={selectedChain === chainId ? "bauhaus.blue" : "white"}
+                color={selectedChain === chainId ? "white" : "bauhaus.black"}
                 border="2px solid"
                 borderColor="bauhaus.black"
                 borderRadius="0"
@@ -128,79 +161,15 @@ export default function AppsPage() {
                 textTransform="uppercase"
                 fontSize="10px"
                 letterSpacing="wide"
-                onClick={() => setSelectedCategory(null)}
+                onClick={() =>
+                  setSelectedChain(selectedChain === chainId ? null : chainId)
+                }
                 _hover={{ opacity: 0.8 }}
               >
-                All
+                {CHAIN_NAMES[chainId] || `Chain ${chainId}`}
               </Button>
-              {ALL_CATEGORIES.map((cat) => (
-                <Button
-                  key={cat}
-                  size="xs"
-                  bg={selectedCategory === cat ? "bauhaus.black" : "white"}
-                  color={selectedCategory === cat ? "white" : "bauhaus.black"}
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                  borderRadius="0"
-                  fontWeight="800"
-                  textTransform="uppercase"
-                  fontSize="10px"
-                  letterSpacing="wide"
-                  onClick={() =>
-                    setSelectedCategory(selectedCategory === cat ? null : cat)
-                  }
-                  _hover={{ opacity: 0.8 }}
-                >
-                  {cat}
-                </Button>
-              ))}
-            </HStack>
-
-            {/* Chain chips */}
-            <HStack spacing={2} flexWrap="wrap" justify="center">
-              <Button
-                size="xs"
-                bg={selectedChain === null ? "bauhaus.blue" : "white"}
-                color={selectedChain === null ? "white" : "bauhaus.black"}
-                border="2px solid"
-                borderColor="bauhaus.black"
-                borderRadius="0"
-                fontWeight="800"
-                textTransform="uppercase"
-                fontSize="10px"
-                letterSpacing="wide"
-                onClick={() => setSelectedChain(null)}
-                _hover={{ opacity: 0.8 }}
-              >
-                All Chains
-              </Button>
-              {Object.entries(CHAIN_NAMES).map(([id, name]) => (
-                <Button
-                  key={id}
-                  size="xs"
-                  bg={selectedChain === Number(id) ? "bauhaus.blue" : "white"}
-                  color={
-                    selectedChain === Number(id) ? "white" : "bauhaus.black"
-                  }
-                  border="2px solid"
-                  borderColor="bauhaus.black"
-                  borderRadius="0"
-                  fontWeight="800"
-                  textTransform="uppercase"
-                  fontSize="10px"
-                  letterSpacing="wide"
-                  onClick={() =>
-                    setSelectedChain(
-                      selectedChain === Number(id) ? null : Number(id)
-                    )
-                  }
-                  _hover={{ opacity: 0.8 }}
-                >
-                  {name}
-                </Button>
-              ))}
-            </HStack>
-          </VStack>
+            ))}
+          </HStack>
 
           {/* Dapp Grid */}
           {filteredDapps.length > 0 ? (

@@ -112,6 +112,7 @@ export function TokenDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
+    // @ts-expect-error React 19 types conflict with monorepo React 18 types
     <TokenDataContext.Provider value={{ tokenData, isLoading }}>
       {children}
     </TokenDataContext.Provider>
