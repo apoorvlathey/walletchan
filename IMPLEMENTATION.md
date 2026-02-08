@@ -915,6 +915,32 @@ API portfolio data is shown immediately, while on-chain balances are verified in
 - Refresh button, loading skeletons, empty state
 - Click token → opens TokenTransfer view
 
+### Portfolio Snapshot Storage
+
+`portfolioSnapshotStorage.ts` silently records `totalValueUsd` snapshots per address over time in `chrome.storage.local` under the key `portfolioSnapshots`.
+
+**How it works:**
+- `recordSnapshot(address, totalValueUsd)` is called fire-and-forget from `TokenHoldings.tsx` after each portfolio load (preferring on-chain enhanced value, falling back to API-only)
+- Snapshots are deduplicated: skipped if the last snapshot for the address is <1 hour old
+- Entries older than 8 days are pruned on each write
+- Addresses are normalized to lowercase
+
+**Storage shape:**
+```typescript
+// chrome.storage.local key: "portfolioSnapshots"
+{ [address: string]: { timestamp: number; totalValueUsd: number }[] }
+```
+
+**Exports:**
+- `recordSnapshot(address, totalValueUsd)` — append snapshot (with dedup + prune)
+- `getSnapshots(address)` — read all snapshots for an address
+
+**Future expansion:**
+- **7-day holdings chart**: Use `getSnapshots()` to render a sparkline or area chart on the portfolio view showing value over the past week
+- **Per-token snapshots**: Extend the snapshot shape to include per-token breakdowns (`{ symbol, valueUsd }[]`) for individual token performance charts
+- **Snapshot on background alarm**: Register a `chrome.alarms` periodic task (e.g., every 4 hours) that fetches portfolio in the background service worker and records a snapshot, so data is captured even when the popup isn't opened
+- **Export/analytics**: Expose snapshot data for CSV export or aggregate statistics (daily high/low, % change)
+
 ### Token Transfer Flow
 
 1. User clicks a token in TokenHoldings
