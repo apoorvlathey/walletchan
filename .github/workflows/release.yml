@@ -27,9 +27,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build extension
-        run: pnpm build:extension
-
       - name: Get version
         id: version
         run: echo "version=$(node -p "require('./apps/extension/package.json').version")" >> $GITHUB_OUTPUT

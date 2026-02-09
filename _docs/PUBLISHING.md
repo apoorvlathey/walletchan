@@ -14,7 +14,9 @@ BankrWallet is distributed through two channels.
 
 ### Two Zip Variants
 
-CWS **rejects** uploads containing `key` or `update_url` fields in `manifest.json`. Use `pnpm zip:cws` to create a CWS-ready zip — it strips these fields from the build output before zipping (via `scripts/strip-cws-keys.sh`). The plain `pnpm zip` keeps all fields intact (used for GitHub Releases).
+CWS **rejects** uploads containing `key` or `update_url` fields in `manifest.json`. Use `pnpm zip:cws` to create a CWS-ready zip — it builds the extension and strips these fields from the build output before zipping (via `scripts/strip-cws-keys.sh`). The plain `pnpm zip` builds and keeps all fields intact (used for GitHub Releases).
+
+Both `zip` and `zip:cws` run `pnpm build` automatically — no need to build separately first.
 
 ## Release Process
 
@@ -40,17 +42,15 @@ This automatically (via `scripts/release.sh`):
 
 The [release workflow](/.github/workflows/release.yml) triggers on `v*` tags and:
 
-1. Builds the extension
-2. Creates `bankr-wallet-vX.Y.Z.zip`
-3. Publishes to [GitHub Releases](https://github.com/apoorvlathey/bankr-wallet/releases)
+1. Runs `pnpm zip` (which builds the extension and creates the zip)
+2. Publishes `bankr-wallet-vX.Y.Z.zip` to [GitHub Releases](https://github.com/apoorvlathey/bankr-wallet/releases)
 
 Users can download the zip from GitHub Releases and load it as an unpacked extension in developer mode.
 
 ### 3. Upload to Chrome Web Store
 
-1. Build locally and create the CWS zip:
+1. Create the CWS zip (builds automatically):
    ```bash
-   pnpm build:extension
    pnpm zip:cws
    ```
 2. Go to the [CWS Developer Dashboard](https://chrome.google.com/webstore/devconsole)
@@ -66,9 +66,8 @@ Once approved, **CWS users** receive the update.
 If you need to create a release without the automated workflow:
 
 ```bash
-pnpm build:extension
-pnpm zip        # keeps key + update_url (for GitHub Release)
-pnpm zip:cws    # strips key + update_url (for CWS upload)
+pnpm zip        # builds + zips with key + update_url (for GitHub Release)
+pnpm zip:cws    # builds + zips without key + update_url (for CWS upload)
 ```
 
 Then upload `apps/extension/zip/bankr-wallet-vX.Y.Z.zip` to a new GitHub release.
@@ -100,8 +99,7 @@ pnpm release:patch
   → pushes to GitHub
 
 GitHub Actions (.github/workflows/release.yml)
-  → builds extension
-  → creates ZIP
+  → runs pnpm zip (builds + creates ZIP)
   → attaches to GitHub Release
 ```
 
