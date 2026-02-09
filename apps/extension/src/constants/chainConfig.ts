@@ -25,6 +25,14 @@ export const CHAIN_CONFIG: Record<number, ChainConfig> = {
     icon: "/chainIcons/polygon.svg",
     explorer: "https://polygonscan.com",
   },
+  4326: {
+    name: "MegaETH",
+    bg: "rgba(25, 25, 26, 0.15)",
+    border: "rgba(25, 25, 26, 0.4)",
+    text: "#19191A",
+    icon: "/chainIcons/megaeth.svg",
+    explorer: "https://mega.etherscan.io",
+  },
   8453: {
     name: "Base",
     bg: "rgba(0, 82, 255, 0.15)",

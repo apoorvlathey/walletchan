@@ -13,7 +13,7 @@ import {
   TransactionParams,
   BankrApiError,
 } from "./bankrApi";
-import { ALLOWED_CHAIN_IDS, CHAIN_NAMES, DEFAULT_NETWORKS } from "../constants/networks";
+import { ALLOWED_CHAIN_IDS, BANKR_SUPPORTED_CHAIN_IDS, CHAIN_NAMES, DEFAULT_NETWORKS, OP_STACK_CHAIN_IDS } from "../constants/networks";
 import { CHAIN_CONFIG } from "../constants/chainConfig";
 import type { Account } from "./types";
 import {
@@ -514,9 +514,6 @@ async function lookupFunctionName(calldata: string): Promise<string | null> {
   return null;
 }
 
-/** OP Stack L2 chain IDs (Base, Unichain) */
-const OP_STACK_CHAIN_IDS = new Set([8453, 130]);
-
 /**
  * Resolve RPC URL for a chain ID.
  * Checks user-configured networks first, falls back to defaults.
@@ -596,6 +593,11 @@ export async function handleConfirmTransactionAsync(
   if (!pending || Date.now() - pending.timestamp > TX_EXPIRY_MS) {
     if (pending) await removePendingTxRequest(txId);
     return { success: false, error: "Transaction request expired" };
+  }
+
+  // Validate chain is supported for Bankr API accounts
+  if (!BANKR_SUPPORTED_CHAIN_IDS.has(pending.tx.chainId)) {
+    return { success: false, error: `Chain ${CHAIN_NAMES[pending.tx.chainId] || pending.tx.chainId} is not supported for Bankr API accounts` };
   }
 
   processingTxIds.add(txId);

@@ -25,19 +25,10 @@ interface EIP6963AnnounceProviderEvent extends CustomEvent {
 }
 
 import { WALLET_ICON } from "./walletIcon";
+import { ALLOWED_CHAIN_IDS, CHAIN_NAMES } from "@/constants/networks";
 
 // Session UUID for EIP-6963 (generated once per page load)
 const SESSION_UUID = crypto.randomUUID();
-
-// Allowed chain IDs: Ethereum, Polygon, Base, Unichain
-const ALLOWED_CHAIN_IDS = new Set([1, 137, 8453, 130]);
-
-const CHAIN_NAMES: Record<number, string> = {
-  1: "Ethereum",
-  137: "Polygon",
-  8453: "Base",
-  130: "Unichain",
-};
 
 // Pending transaction callbacks
 const pendingTxCallbacks = new Map<

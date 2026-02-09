@@ -68,6 +68,7 @@ import PendingTxBanner from "@/components/PendingTxBanner";
 import PortfolioTabs from "@/components/PortfolioTabs";
 import { useNetworks } from "@/contexts/NetworksContext";
 import { getChainConfig } from "@/constants/chainConfig";
+import { BANKR_SUPPORTED_CHAIN_IDS } from "@/constants/networks";
 import { hasEncryptedApiKey } from "@/chrome/crypto";
 import { PendingTxRequest } from "@/chrome/pendingTxStorage";
 import { PendingSignatureRequest } from "@/chrome/pendingSignatureStorage";
@@ -318,6 +319,17 @@ function App() {
       address: account.address,
       displayAddress: account.displayName || account.address,
     });
+
+    // If switching to a Bankr account, ensure current chain is supported
+    if (account.type === "bankr" && chainName && networksInfo) {
+      const currentChainId = networksInfo[chainName]?.chainId;
+      if (currentChainId && !BANKR_SUPPORTED_CHAIN_IDS.has(currentChainId)) {
+        const firstSupported = Object.keys(networksInfo).find(name =>
+          BANKR_SUPPORTED_CHAIN_IDS.has(networksInfo[name].chainId)
+        );
+        if (firstSupported) setChainName(firstSupported);
+      }
+    }
 
     // Notify content script about the account change
     const tab = await currentTab();
@@ -1689,14 +1701,21 @@ function App() {
                 minW="160px"
               >
                 {networksInfo &&
-                  Object.keys(networksInfo).map((_chainName, i) => {
+                  Object.keys(networksInfo)
+                    .filter((_chainName) => {
+                      if (activeAccount?.type === "bankr") {
+                        return BANKR_SUPPORTED_CHAIN_IDS.has(networksInfo[_chainName].chainId);
+                      }
+                      return true;
+                    })
+                    .map((_chainName, i, filteredChains) => {
                     const config = getChainConfig(networksInfo[_chainName].chainId);
                     return (
                       <MenuItem
-                        key={i}
+                        key={_chainName}
                         bg="bauhaus.white"
                         _hover={{ bg: "bg.muted" }}
-                        borderBottom={i < Object.keys(networksInfo).length - 1 ? "2px solid" : "none"}
+                        borderBottom={i < filteredChains.length - 1 ? "2px solid" : "none"}
                         borderColor="bauhaus.black"
                         py={3}
                         onClick={() => {
