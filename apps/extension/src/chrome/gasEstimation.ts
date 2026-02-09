@@ -11,6 +11,7 @@ import {
   type Address,
 } from "viem";
 import { getRpcUrl } from "./txHandlers";
+import { CHAIN_TOKEN_IDS } from "@/constants/chainRegistry";
 
 export interface GasEstimate {
   gasLimit: string;
@@ -46,14 +47,6 @@ async function getClient(chainId: number): Promise<PublicClient | null> {
   clientCache.set(chainId, client);
   return client;
 }
-
-/** CoinGecko chain → token ID mapping */
-const CHAIN_TOKEN_IDS: Record<number, string> = {
-  1: "ethereum",
-  8453: "ethereum",
-  130: "ethereum",
-  137: "matic-network",
-};
 
 /** In-memory price cache */
 let priceCache: { prices: Record<string, number>; timestamp: number } | null = null;

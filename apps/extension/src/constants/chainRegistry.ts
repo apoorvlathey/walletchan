@@ -1,0 +1,220 @@
+/**
+ * Single source of truth for all supported chains.
+ *
+ * Adding a new chain? Add ONE entry to CHAIN_REGISTRY below.
+ * All derived maps, sets, and config objects auto-populate.
+ */
+
+import { type Chain } from "viem";
+import { mainnet, polygon, base } from "viem/chains";
+import { type NetworksInfo } from "@/types";
+
+// ---------------------------------------------------------------------------
+// Core types
+// ---------------------------------------------------------------------------
+
+export interface ChainEntry {
+  chainId: number;
+  name: string;
+  rpcUrl: string;
+  explorer: string;
+  /** Icon path relative to extension public dir */
+  icon: string;
+  /** UI brand colors */
+  bg: string;
+  border: string;
+  text: string;
+  nativeCurrency: { name: string; symbol: string; decimals: number };
+  /** Whether this chain uses OP Stack (for L1 fee breakdown in gas display) */
+  isOpStack: boolean;
+  /** Whether the Bankr API supports this chain */
+  isBankrSupported: boolean;
+  /** CoinGecko token ID for native token price lookups (undefined = no price) */
+  coingeckoTokenId?: string;
+  /** Pre-built viem Chain object (for chains in viem/chains). Omit for custom chains. */
+  viemChain?: Chain;
+}
+
+/** Subset exposed by chainConfig.ts consumers */
+export interface ChainConfig {
+  name: string;
+  bg: string;
+  border: string;
+  text: string;
+  icon: string;
+  explorer: string;
+}
+
+// ---------------------------------------------------------------------------
+// Registry — THE single list. Edit here to add/remove chains.
+// ---------------------------------------------------------------------------
+
+const ETH_CURRENCY = { name: "Ether", symbol: "ETH", decimals: 18 };
+
+export const CHAIN_REGISTRY: readonly ChainEntry[] = [
+  {
+    chainId: 8453,
+    name: "Base",
+    rpcUrl: "https://mainnet.base.org",
+    explorer: "https://basescan.org",
+    icon: "/chainIcons/base.svg",
+    bg: "rgba(0, 82, 255, 0.15)",
+    border: "rgba(0, 82, 255, 0.4)",
+    text: "#0052FF",
+    nativeCurrency: ETH_CURRENCY,
+    isOpStack: true,
+    isBankrSupported: true,
+    coingeckoTokenId: "ethereum",
+    viemChain: base,
+  },
+  {
+    chainId: 1,
+    name: "Ethereum",
+    rpcUrl: "https://eth.llamarpc.com",
+    explorer: "https://etherscan.io",
+    icon: "/chainIcons/ethereum.svg",
+    bg: "rgba(98, 126, 234, 0.15)",
+    border: "rgba(98, 126, 234, 0.4)",
+    text: "#627EEA",
+    nativeCurrency: ETH_CURRENCY,
+    isOpStack: false,
+    isBankrSupported: true,
+    coingeckoTokenId: "ethereum",
+    viemChain: mainnet,
+  },
+  {
+    chainId: 4326,
+    name: "MegaETH",
+    rpcUrl: "https://mainnet.megaeth.com/rpc",
+    explorer: "https://mega.etherscan.io",
+    icon: "/chainIcons/megaeth.svg",
+    bg: "rgba(25, 25, 26, 0.15)",
+    border: "rgba(25, 25, 26, 0.4)",
+    text: "#19191A",
+    nativeCurrency: ETH_CURRENCY,
+    isOpStack: true,
+    isBankrSupported: false,
+    coingeckoTokenId: undefined,
+  },
+  {
+    chainId: 137,
+    name: "Polygon",
+    rpcUrl: "https://polygon-rpc.com",
+    explorer: "https://polygonscan.com",
+    icon: "/chainIcons/polygon.svg",
+    bg: "rgba(130, 71, 229, 0.15)",
+    border: "rgba(130, 71, 229, 0.4)",
+    text: "#8247E5",
+    nativeCurrency: { name: "POL", symbol: "POL", decimals: 18 },
+    isOpStack: false,
+    isBankrSupported: true,
+    coingeckoTokenId: "matic-network",
+    viemChain: polygon,
+  },
+  {
+    chainId: 130,
+    name: "Unichain",
+    rpcUrl: "https://mainnet.unichain.org",
+    explorer: "https://uniscan.xyz",
+    icon: "/chainIcons/unichain.svg",
+    bg: "rgba(255, 0, 122, 0.15)",
+    border: "rgba(255, 0, 122, 0.4)",
+    text: "#FF007A",
+    nativeCurrency: ETH_CURRENCY,
+    isOpStack: true,
+    isBankrSupported: true,
+    coingeckoTokenId: "ethereum",
+  },
+] as const;
+
+// ---------------------------------------------------------------------------
+// Derived: chainConfig.ts exports
+// ---------------------------------------------------------------------------
+
+export const CHAIN_CONFIG: Record<number, ChainConfig> = {};
+for (const c of CHAIN_REGISTRY) {
+  CHAIN_CONFIG[c.chainId] = {
+    name: c.name,
+    bg: c.bg,
+    border: c.border,
+    text: c.text,
+    icon: c.icon,
+    explorer: c.explorer,
+  };
+}
+
+export const DEFAULT_CHAIN_CONFIG: ChainConfig = {
+  name: "Unknown",
+  bg: "rgba(255, 255, 255, 0.1)",
+  border: "rgba(255, 255, 255, 0.2)",
+  text: "#FAFAFA",
+  icon: "",
+  explorer: "",
+};
+
+export function getChainConfig(chainId: number): ChainConfig {
+  return CHAIN_CONFIG[chainId] || DEFAULT_CHAIN_CONFIG;
+}
+
+// ---------------------------------------------------------------------------
+// Derived: networks.ts exports
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_NETWORKS: NetworksInfo = {};
+for (const c of CHAIN_REGISTRY) {
+  DEFAULT_NETWORKS[c.name] = { chainId: c.chainId, rpcUrl: c.rpcUrl };
+}
+
+export const ALLOWED_CHAIN_IDS = new Set(CHAIN_REGISTRY.map((c) => c.chainId));
+
+export const BANKR_SUPPORTED_CHAIN_IDS = new Set(
+  CHAIN_REGISTRY.filter((c) => c.isBankrSupported).map((c) => c.chainId)
+);
+
+export const OP_STACK_CHAIN_IDS = new Set(
+  CHAIN_REGISTRY.filter((c) => c.isOpStack).map((c) => c.chainId)
+);
+
+export const CHAIN_NAMES: Record<number, string> = {};
+for (const c of CHAIN_REGISTRY) {
+  CHAIN_NAMES[c.chainId] = c.name;
+}
+
+// ---------------------------------------------------------------------------
+// Derived: localSigner.ts exports (viem Chain objects + RPC URLs)
+// ---------------------------------------------------------------------------
+
+function buildViemChain(entry: ChainEntry): Chain {
+  return {
+    id: entry.chainId,
+    name: entry.name,
+    nativeCurrency: entry.nativeCurrency,
+    rpcUrls: {
+      default: { http: [entry.rpcUrl] },
+    },
+    blockExplorers: {
+      default: { name: entry.name + " Explorer", url: entry.explorer },
+    },
+  };
+}
+
+export const VIEM_CHAINS: Record<number, Chain> = {};
+for (const c of CHAIN_REGISTRY) {
+  VIEM_CHAINS[c.chainId] = c.viemChain ?? buildViemChain(c);
+}
+
+export const RPC_URLS: Record<number, string> = {};
+for (const c of CHAIN_REGISTRY) {
+  RPC_URLS[c.chainId] = c.rpcUrl;
+}
+
+// ---------------------------------------------------------------------------
+// Derived: gasEstimation.ts exports
+// ---------------------------------------------------------------------------
+
+export const CHAIN_TOKEN_IDS: Record<number, string> = {};
+for (const c of CHAIN_REGISTRY) {
+  if (c.coingeckoTokenId) {
+    CHAIN_TOKEN_IDS[c.chainId] = c.coingeckoTokenId;
+  }
+}

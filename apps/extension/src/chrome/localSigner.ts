@@ -10,52 +10,12 @@ import {
   createWalletClient,
   http,
   type WalletClient,
-  type Account,
   type Chain,
   type Transport,
   type LocalAccount,
-  parseGwei,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { mainnet, polygon, base } from "viem/chains";
-
-// Unichain definition (not in viem by default)
-const unichain: Chain = {
-  id: 130,
-  name: "Unichain",
-  nativeCurrency: {
-    decimals: 18,
-    name: "Ether",
-    symbol: "ETH",
-  },
-  rpcUrls: {
-    default: {
-      http: ["https://mainnet.unichain.org"],
-    },
-  },
-  blockExplorers: {
-    default: {
-      name: "Uniscan",
-      url: "https://uniscan.xyz",
-    },
-  },
-};
-
-// Chain configuration map
-const CHAINS: Record<number, Chain> = {
-  1: mainnet,
-  137: polygon,
-  8453: base,
-  130: unichain,
-};
-
-// RPC URLs for each chain (can be overridden)
-const RPC_URLS: Record<number, string> = {
-  1: "https://eth.llamarpc.com",
-  137: "https://polygon.llamarpc.com",
-  8453: "https://base.llamarpc.com",
-  130: "https://mainnet.unichain.org",
-};
+import { VIEM_CHAINS, RPC_URLS } from "@/constants/chainRegistry";
 
 export interface TransactionRequest {
   from: string;
@@ -82,7 +42,7 @@ function createClient(
   privateKey: `0x${string}`,
   rpcUrl?: string
 ): { client: WalletClient<Transport, Chain, LocalAccount>; account: LocalAccount } {
-  const chain = CHAINS[chainId];
+  const chain = VIEM_CHAINS[chainId];
   if (!chain) {
     throw new Error(`Unsupported chain: ${chainId}`);
   }
@@ -122,7 +82,7 @@ export async function signAndBroadcastTransaction(
     to: tx.to ? (tx.to as `0x${string}`) : undefined,
     data: tx.data as `0x${string}`,
     value: valueInWei,
-    chain: CHAINS[tx.chainId],
+    chain: VIEM_CHAINS[tx.chainId],
   };
 
   // Add gas parameters if provided
@@ -264,16 +224,3 @@ export function isValidPrivateKey(key: string): boolean {
   return /^0x[0-9a-fA-F]{64}$/.test(key);
 }
 
-/**
- * Gets the chain object by ID
- */
-export function getChain(chainId: number): Chain | undefined {
-  return CHAINS[chainId];
-}
-
-/**
- * Gets the RPC URL for a chain
- */
-export function getRpcUrl(chainId: number): string | undefined {
-  return RPC_URLS[chainId];
-}

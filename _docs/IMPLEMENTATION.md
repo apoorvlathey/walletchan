@@ -147,7 +147,7 @@ The following chains are supported for transaction signing (listed in dropdown o
 | Polygon  | 137      | https://polygon-rpc.com          | ✅        | ✅                   |          |
 | Unichain | 130      | https://mainnet.unichain.org     | ✅        | ✅                   | ✅       |
 
-These are configured in `src/constants/networks.ts` and pre-populated on first install.
+These are configured in `src/constants/chainRegistry.ts` (the single source of truth for all chain data) and pre-populated on first install.
 
 **Default Network**: Base is set as the default network for new installations.
 
@@ -155,7 +155,7 @@ These are configured in `src/constants/networks.ts` and pre-populated on first i
 
 Not all chains are supported by all account types. The Bankr API only supports the original 4 chains (Base, Ethereum, Polygon, Unichain). Newer chains like MegaETH are available for PK, Seed Phrase, and Impersonator accounts only.
 
-**Constants** (in `src/constants/networks.ts`):
+**Constants** (derived from `src/constants/chainRegistry.ts`, re-exported via `src/constants/networks.ts`):
 
 | Constant | Purpose |
 | --- | --- |
@@ -170,11 +170,7 @@ Not all chains are supported by all account types. The Bankr API only supports t
 3. **Background validation** (`txHandlers.ts`): `handleConfirmTransactionAsync` (Bankr path) rejects chains not in `BANKR_SUPPORTED_CHAIN_IDS`
 4. **Inpage validation** (`impersonator.ts`): Validates against `ALLOWED_CHAIN_IDS` (imports from constants, no longer hardcoded)
 
-**When adding a new chain:**
-- Add to `DEFAULT_NETWORKS`, `ALLOWED_CHAIN_IDS`, `CHAIN_NAMES` in `networks.ts`
-- Add to `CHAIN_CONFIG` in `chainConfig.ts` with icon
-- If supported by Bankr API: also add to `BANKR_SUPPORTED_CHAIN_IDS`
-- If OP Stack L2: also add to `OP_STACK_CHAIN_IDS`
+**When adding a new chain:** Add a single entry to `CHAIN_REGISTRY` in `src/constants/chainRegistry.ts`. All derived maps, sets, and config objects auto-populate. See [ADD_CHAIN.md](./ADD_CHAIN.md) for the full checklist.
 
 ## Provider Discovery (EIP-6963)
 
@@ -297,8 +293,9 @@ src/
 │   ├── pendingSignatureStorage.ts # Persistent storage for pending signature requests
 │   └── txHistoryStorage.ts  # Persistent storage for completed transaction history
 ├── constants/
-│   ├── networks.ts          # Default networks configuration
-│   └── chainConfig.ts       # Chain-specific styling/icons
+│   ├── chainRegistry.ts     # Single source of truth for all chain data
+│   ├── networks.ts          # Re-exports network constants from chainRegistry
+│   └── chainConfig.ts       # Re-exports chain UI config from chainRegistry
 ├── pages/
 │   ├── Onboarding.tsx       # Full-page onboarding wizard for first-time setup
 │   └── ApiKeySetup.tsx      # API key + wallet address configuration

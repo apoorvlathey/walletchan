@@ -6,7 +6,7 @@ import {
   type Address,
   type PublicClient,
 } from "viem";
-import { DEFAULT_NETWORKS } from "@/constants/networks";
+import { RPC_URLS } from "@/constants/chainRegistry";
 import { PortfolioToken } from "@/chrome/portfolioApi";
 
 /** Multicall3 is deployed at the same address on all supported chains */
@@ -30,17 +30,11 @@ const MULTICALL_BATCH_SIZE = 100;
 /** RPC request timeout in ms – short enough to not block UI on rate limits */
 const RPC_TIMEOUT = 8_000;
 
-/** Map chainId → rpcUrl from DEFAULT_NETWORKS */
-const chainRpcMap: Record<number, string> = {};
-for (const net of Object.values(DEFAULT_NETWORKS)) {
-  chainRpcMap[net.chainId] = net.rpcUrl;
-}
-
 /** Cached viem clients keyed by chainId to reuse connections */
 const clientCache = new Map<number, PublicClient>();
 
 function getClient(chainId: number): PublicClient | null {
-  const rpcUrl = chainRpcMap[chainId];
+  const rpcUrl = RPC_URLS[chainId];
   if (!rpcUrl) return null;
 
   let client = clientCache.get(chainId);
