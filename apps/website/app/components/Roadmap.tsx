@@ -124,7 +124,7 @@ const roadmapItems: RoadmapItemProps[] = [
     title: "Initial Release",
     items: [
       "Transaction execution through Bankr API",
-      "Multi-chain support (Base, ETH, Polygon, Unichain)",
+      "Multi-chain support (Base, ETH, MegaETH, Polygon, Unichain)",
       "Side panel mode",
       "Secure encrypted storage",
     ],
