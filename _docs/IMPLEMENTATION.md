@@ -137,18 +137,44 @@ For detailed implementation of private key accounts, see [PK_ACCOUNTS.md](./PK_A
 
 ## Supported Chains
 
-Only the following chains are supported for transaction signing (listed in dropdown order):
+The following chains are supported for transaction signing (listed in dropdown order):
 
-| Chain    | Chain ID | Default RPC                  |
-| -------- | -------- | ---------------------------- |
-| Base     | 8453     | https://mainnet.base.org     |
-| Ethereum | 1        | https://eth.llamarpc.com     |
-| Polygon  | 137      | https://polygon-rpc.com      |
-| Unichain | 130      | https://mainnet.unichain.org |
+| Chain    | Chain ID | Default RPC                      | Bankr API | PK/Seed/Impersonator | OP Stack |
+| -------- | -------- | -------------------------------- | --------- | -------------------- | -------- |
+| Base     | 8453     | https://mainnet.base.org         | ✅        | ✅                   | ✅       |
+| Ethereum | 1        | https://eth.llamarpc.com         | ✅        | ✅                   |          |
+| MegaETH  | 4326     | https://mainnet.megaeth.com/rpc  |           | ✅                   | ✅       |
+| Polygon  | 137      | https://polygon-rpc.com          | ✅        | ✅                   |          |
+| Unichain | 130      | https://mainnet.unichain.org     | ✅        | ✅                   | ✅       |
 
 These are configured in `src/constants/networks.ts` and pre-populated on first install.
 
 **Default Network**: Base is set as the default network for new installations.
+
+### Per-Account-Type Chain Restrictions
+
+Not all chains are supported by all account types. The Bankr API only supports the original 4 chains (Base, Ethereum, Polygon, Unichain). Newer chains like MegaETH are available for PK, Seed Phrase, and Impersonator accounts only.
+
+**Constants** (in `src/constants/networks.ts`):
+
+| Constant | Purpose |
+| --- | --- |
+| `ALLOWED_CHAIN_IDS` | All supported chain IDs (superset, used for global validation) |
+| `BANKR_SUPPORTED_CHAIN_IDS` | Chain IDs supported by Bankr API accounts only |
+| `OP_STACK_CHAIN_IDS` | OP Stack L2 chains (for L1 fee breakdown in gas display) |
+
+**Enforcement points:**
+
+1. **UI dropdown** (`App.tsx`): Chain dropdown filters by `activeAccount.type` — Bankr accounts only see `BANKR_SUPPORTED_CHAIN_IDS` chains
+2. **Account switch** (`App.tsx`): When switching to a Bankr account, if current chain isn't supported, auto-switches to first supported chain
+3. **Background validation** (`txHandlers.ts`): `handleConfirmTransactionAsync` (Bankr path) rejects chains not in `BANKR_SUPPORTED_CHAIN_IDS`
+4. **Inpage validation** (`impersonator.ts`): Validates against `ALLOWED_CHAIN_IDS` (imports from constants, no longer hardcoded)
+
+**When adding a new chain:**
+- Add to `DEFAULT_NETWORKS`, `ALLOWED_CHAIN_IDS`, `CHAIN_NAMES` in `networks.ts`
+- Add to `CHAIN_CONFIG` in `chainConfig.ts` with icon
+- If supported by Bankr API: also add to `BANKR_SUPPORTED_CHAIN_IDS`
+- If OP Stack L2: also add to `OP_STACK_CHAIN_IDS`
 
 ## Provider Discovery (EIP-6963)
 
