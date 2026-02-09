@@ -15,6 +15,7 @@ import {
   pulsechain,
   soneium,
   sonic,
+  megaeth,
 } from "wagmi/chains";
 import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 import {
@@ -57,6 +58,7 @@ export const walletChains = [
   pulsechain,
   soneium,
   sonic,
+  megaeth,
 ] as const;
 
 export const config = createConfig({
@@ -88,4 +90,5 @@ export const CHAIN_RPC_URLS: Record<number, string> = {
   369: "https://rpc.pulsechain.com",
   1868: "https://rpc.soneium.org",
   146: "https://rpc.soniclabs.com",
+  4326: "https://mainnet.megaeth.com/rpc",
 };
