@@ -66,7 +66,7 @@ import {
   tryRestoreSession,
 } from "./sessionCache";
 import { handleUnlockWallet } from "./authHandlers";
-import { getSidePanelMode, isSidePanelSupported } from "./sidepanelManager";
+import { getSidePanelMode, setSidePanelMode, isSidePanelSupported } from "./sidepanelManager";
 
 // In-memory map for resolving transaction promises back to content script
 export interface PendingResolver {
@@ -224,25 +224,53 @@ export async function handleSignatureRequest(
 
 /**
  * Opens the extension popup window for transaction confirmation
- * Respects user preference, falls back to popup for unsupported browsers (e.g., Arc)
+ * Respects user preference: tries sidePanel.open() first in sidepanel mode,
+ * falls back to popup window if sidepanel fails (e.g., Arc browser)
  */
 export async function openExtensionPopup(senderWindowId?: number): Promise<void> {
   const useSidePanel = await getSidePanelMode();
 
-  // If sidepanel mode is enabled, check if we can detect an open sidepanel
-  // by trying to send a ping message - if a view responds, it's open
+  // If sidepanel mode is enabled, try to open the sidepanel directly
   if (useSidePanel && isSidePanelSupported()) {
     try {
-      // Try to ping any open extension views
+      // Try to ping any open extension views first
       const response = await chrome.runtime.sendMessage({ type: "ping" }).catch(() => null);
       if (response === "pong") {
         // An extension view is open and responded, don't open popup
         return;
       }
     } catch {
-      // No views responded, continue to open popup
+      // No views responded, continue
+    }
+
+    // Try sidePanel.open() with the sender's window, then verify it actually opened
+    try {
+      const windowId = senderWindowId || (await chrome.windows.getLastFocused({ populate: false })).id;
+      if (windowId) {
+        await chrome.sidePanel.open({ windowId });
+
+        // Verify the sidepanel actually opened (Arc resolves but does nothing)
+        await new Promise((r) => setTimeout(r, 600));
+        let opened = false;
+        if (chrome.runtime.getContexts) {
+          const contexts = await chrome.runtime.getContexts({ contextTypes: [("SIDE_PANEL" as chrome.runtime.ContextType)] });
+          opened = contexts.length > 0;
+        } else {
+          const pong = await chrome.runtime.sendMessage({ type: "ping" }).catch(() => null);
+          opened = pong === "pong";
+        }
+
+        if (opened) return;
+        // Sidepanel didn't actually open — fall through to popup
+        await setSidePanelMode(false);
+      }
+    } catch (error) {
+      console.warn("Sidepanel failed to open for tx confirmation, falling back to popup:", error);
+      await setSidePanelMode(false);
     }
   }
+
+  // Popup window fallback (also used when sidepanel is disabled)
   const existingWindows = await chrome.windows.getAll({ windowTypes: ["popup"] });
   const popupUrl = chrome.runtime.getURL("index.html");
 
@@ -258,7 +286,6 @@ export async function openExtensionPopup(senderWindowId?: number): Promise<void>
   }
 
   // Get the window where the dapp is running
-  // Try multiple methods to ensure we get the correct window
   let targetWindow: chrome.windows.Window | null = null;
 
   // Method 1: Use sender's window ID (most accurate)
@@ -266,7 +293,6 @@ export async function openExtensionPopup(senderWindowId?: number): Promise<void>
     try {
       targetWindow = await chrome.windows.get(senderWindowId, { populate: false });
     } catch {
-      // Window might have been closed
       targetWindow = null;
     }
   }
@@ -283,8 +309,6 @@ export async function openExtensionPopup(senderWindowId?: number): Promise<void>
   const popupWidth = 360;
   const popupHeight = 680;
 
-  // Calculate position: top-right of target window
-  // Use the window's actual coordinates (which include multi-monitor offsets)
   let left: number | undefined;
   let top: number | undefined;
 
@@ -292,13 +316,10 @@ export async function openExtensionPopup(senderWindowId?: number): Promise<void>
       targetWindow.left !== undefined &&
       targetWindow.width !== undefined &&
       targetWindow.top !== undefined) {
-    // Position at right edge of target window, with small margin
     left = targetWindow.left + targetWindow.width - popupWidth - 10;
-    // Position at top of target window, with margin for toolbar
     top = targetWindow.top + 80;
   }
 
-  // Create new popup window
   const createOptions: chrome.windows.CreateData = {
     url: popupUrl,
     type: "popup",
@@ -307,8 +328,6 @@ export async function openExtensionPopup(senderWindowId?: number): Promise<void>
     focused: true,
   };
 
-  // Only set position if we have valid coordinates
-  // This allows Chrome to handle positioning on the correct monitor
   if (left !== undefined && top !== undefined) {
     createOptions.left = left;
     createOptions.top = top;

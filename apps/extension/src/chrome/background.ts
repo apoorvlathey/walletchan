@@ -316,6 +316,43 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 // Initialize sidepanel behavior on startup
 initSidePanel();
 
+// Handle extension icon click when popup is cleared (sidepanel mode)
+// When sidepanel mode is active, setPopup('') causes onClicked to fire instead of opening a popup.
+// We try sidePanel.open() and verify it actually opened. Some browsers (Arc) resolve the promise
+// successfully but silently do nothing, so we check for a SIDE_PANEL context after a delay.
+chrome.action.onClicked.addListener(async (tab) => {
+  try {
+    await chrome.sidePanel.open({ windowId: tab.windowId! });
+
+    // Verify the sidepanel actually opened — some browsers (Arc) resolve the promise
+    // successfully but render nothing. Check for a SIDE_PANEL context after a brief delay.
+    await new Promise((r) => setTimeout(r, 600));
+
+    let sidePanelActuallyOpen = false;
+    if (chrome.runtime.getContexts) {
+      const contexts = await chrome.runtime.getContexts({ contextTypes: [("SIDE_PANEL" as chrome.runtime.ContextType)] });
+      sidePanelActuallyOpen = contexts.length > 0;
+    } else {
+      try {
+        const response = await chrome.runtime.sendMessage({ type: "ping" });
+        sidePanelActuallyOpen = response === "pong";
+      } catch {
+        sidePanelActuallyOpen = false;
+      }
+    }
+
+    if (!sidePanelActuallyOpen) {
+      // Self-heal: disable sidepanel mode and fall back to popup window
+      await setSidePanelMode(false);
+      await openPopupWindow();
+    }
+  } catch {
+    // sidePanel.open() threw — disable sidepanel and fall back to popup
+    await setSidePanelMode(false);
+    await openPopupWindow();
+  }
+});
+
 // Port connection listener - used for waking up the service worker and UI keepalive
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "popup-wake") {
@@ -1123,9 +1160,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "setArcBrowser": {
       if (message.isArc) {
         chrome.storage.sync.set({ sidePanelVerified: false, sidePanelMode: false, isArcBrowser: true });
-        if (chrome.sidePanel?.setPanelBehavior) {
-          chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
-        }
+        // Restore native popup so clicks work on Arc
+        chrome.action.setPopup({ popup: "popup-init.html" }).catch(() => {});
       }
       sendResponse({ success: true });
       return false;
