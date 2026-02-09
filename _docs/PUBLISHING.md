@@ -9,7 +9,7 @@ BankrWallet is distributed through two independent channels with separate extens
 | **Extension ID** | `gmfimlibjdfoeoiohiaipblfklgammci` | `kofbkhbkfhiollbhjkbebajngppmpbgc` |
 | **ID derived from** | `bankr-wallet.pem` signing key | Google's key (CWS-assigned, immutable) |
 | **Update mechanism** | `update_url` in manifest.json → website API → CRX from GitHub Release | CWS built-in auto-update |
-| **Audience** | Beta testers, sideloaders | General public |
+| **Audience** | Enterprise/managed installs | General public |
 | **Speed** | Instant (GitHub Release publishes immediately) | CWS review (hours to days) |
 | **Listing** | [GitHub Releases](https://github.com/apoorvlathey/bankr-wallet/releases) | [Chrome Web Store](https://chromewebstore.google.com/detail/bankrwallet/kofbkhbkfhiollbhjkbebajngppmpbgc) |
 
@@ -84,6 +84,21 @@ Then upload `apps/extension/zip/bankr-wallet-vX.Y.Z.zip` to a new GitHub release
 4. If a newer version exists, Chrome downloads and installs the signed CRX automatically
 
 CWS installs ignore `update_url` entirely — CWS has its own update mechanism.
+
+### Important: Chrome Sideloading Restrictions
+
+Chrome **blocks enabling sideloaded CRX extensions** that aren't from the Chrome Web Store. Dragging a `.crx` file into `chrome://extensions` will install it, but Chrome disables it with the warning: *"This extension is not listed in the Chrome Web Store and may have been added without your knowledge."*
+
+The self-hosted auto-update via `update_url` **only works for**:
+
+| Install method | Auto-update works? | Notes |
+|---|---|---|
+| **Chrome Web Store** | Yes (via CWS) | Ignores `update_url`, uses CWS mechanism |
+| **Enterprise policy** | Yes (via `update_url`) | Deployed via group policy / managed preferences |
+| **Unpacked (developer mode)** | No | Must manually rebuild + refresh on `chrome://extensions` |
+| **CRX drag-and-drop** | No | Chrome disables the extension, cannot be enabled |
+
+**In practice**: General users get updates through CWS. The self-hosted CRX + `update_url` channel is for enterprise/managed deployments only.
 
 ### Version Flow
 
