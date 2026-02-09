@@ -1,23 +1,20 @@
 # Publishing & Distribution
 
-BankrWallet is distributed through two independent channels with separate extension IDs.
+BankrWallet is distributed through two channels.
 
 ## Distribution Channels
 
-| | Self-hosted (GitHub) | Chrome Web Store |
+| | GitHub Releases (sideloading) | Chrome Web Store |
 |---|---|---|
-| **Extension ID** | `gmfimlibjdfoeoiohiaipblfklgammci` | `kofbkhbkfhiollbhjkbebajngppmpbgc` |
-| **ID derived from** | `bankr-wallet.pem` signing key | Google's key (CWS-assigned, immutable) |
-| **Update mechanism** | `update_url` in manifest.json → website API → CRX from GitHub Release | CWS built-in auto-update |
-| **Audience** | Enterprise/managed installs | General public |
+| **Format** | ZIP (load as unpacked in developer mode) | CWS package |
+| **Update mechanism** | Manual (download new zip, refresh) | CWS built-in auto-update |
+| **Audience** | Beta testers, developers | General public |
 | **Speed** | Instant (GitHub Release publishes immediately) | CWS review (hours to days) |
 | **Listing** | [GitHub Releases](https://github.com/apoorvlathey/bankr-wallet/releases) | [Chrome Web Store](https://chromewebstore.google.com/detail/bankrwallet/kofbkhbkfhiollbhjkbebajngppmpbgc) |
 
-### Why Two IDs?
+### Two Zip Variants
 
-Chrome extension IDs are derived from cryptographic keys. CWS assigns its own key (Google holds the private key), while self-hosted CRX files are signed with `bankr-wallet.pem`. These are fundamentally different keys, so the IDs differ. This is expected and cannot be changed.
-
-CWS **rejects** uploads containing `key` or `update_url` fields. Use `pnpm zip:cws` to create a CWS-ready zip — it strips these fields from the build output before zipping (via `scripts/strip-cws-keys.sh`). The plain `pnpm zip` keeps all fields intact (used by GitHub Releases for self-hosted distribution).
+CWS **rejects** uploads containing `key` or `update_url` fields in `manifest.json`. Use `pnpm zip:cws` to create a CWS-ready zip — it strips these fields from the build output before zipping (via `scripts/strip-cws-keys.sh`). The plain `pnpm zip` keeps all fields intact (used for GitHub Releases).
 
 ## Release Process
 
@@ -41,11 +38,10 @@ This automatically:
 The [release workflow](/.github/workflows/release.yml) triggers on `v*` tags and:
 
 1. Builds the extension
-2. Signs with `bankr-wallet.pem` → creates `bankr-wallet-vX.Y.Z.crx` (for self-hosted)
-3. Creates `bankr-wallet-vX.Y.Z.zip` (with `key` + `update_url` intact)
-4. Publishes both to [GitHub Releases](https://github.com/apoorvlathey/bankr-wallet/releases)
+2. Creates `bankr-wallet-vX.Y.Z.zip`
+3. Publishes to [GitHub Releases](https://github.com/apoorvlathey/bankr-wallet/releases)
 
-At this point, **self-hosted users** start receiving the update automatically (Chrome checks `update_url` every few hours).
+Users can download the zip from GitHub Releases and load it as an unpacked extension in developer mode.
 
 ### 3. Upload to Chrome Web Store
 
@@ -56,7 +52,7 @@ At this point, **self-hosted users** start receiving the update automatically (C
    ```
 2. Go to the [CWS Developer Dashboard](https://chrome.google.com/webstore/devconsole)
 3. Select the BankrWallet extension
-4. Upload `apps/extension/cws-zip/bankr-wallet-vX.Y.Z.zip` (not the GitHub Release zip or CRX)
+4. Upload `apps/extension/cws-zip/bankr-wallet-vX.Y.Z.zip` (not the GitHub Release zip)
 5. Fill in any release notes
 6. Submit for review
 
@@ -74,31 +70,23 @@ pnpm zip:cws    # strips key + update_url (for CWS upload)
 
 Then upload `apps/extension/zip/bankr-wallet-vX.Y.Z.zip` to a new GitHub release.
 
-## Self-hosted Auto-Update System
+## GitHub Releases (Sideloading)
 
-### How It Works
+GitHub Releases provide a ZIP file for users who want to sideload the extension in developer mode. This is useful for beta testing or trying out the extension before it's approved on CWS.
 
-1. `manifest.json` includes `update_url` pointing to `https://bankrwallet.app/api/extension/update.xml`
-2. Chrome checks this URL every few hours for self-hosted installs
-3. The website API fetches the latest GitHub Release and returns update XML with the CRX download URL
-4. If a newer version exists, Chrome downloads and installs the signed CRX automatically
+### How to install from GitHub Release
 
-CWS installs ignore `update_url` entirely — CWS has its own update mechanism.
+1. Download `bankr-wallet-vX.Y.Z.zip` from [GitHub Releases](https://github.com/apoorvlathey/bankr-wallet/releases)
+2. Extract the zip
+3. Go to `chrome://extensions` → enable Developer mode
+4. Click "Load unpacked" → select the extracted folder
+5. To update: download the new zip, extract, and click the refresh icon on `chrome://extensions`
 
-### Important: Chrome Sideloading Restrictions
+### Chrome CRX Sideloading Restrictions
 
 Chrome **blocks enabling sideloaded CRX extensions** that aren't from the Chrome Web Store. Dragging a `.crx` file into `chrome://extensions` will install it, but Chrome disables it with the warning: *"This extension is not listed in the Chrome Web Store and may have been added without your knowledge."*
 
-The self-hosted auto-update via `update_url` **only works for**:
-
-| Install method | Auto-update works? | Notes |
-|---|---|---|
-| **Chrome Web Store** | Yes (via CWS) | Ignores `update_url`, uses CWS mechanism |
-| **Enterprise policy** | Yes (via `update_url`) | Deployed via group policy / managed preferences |
-| **Unpacked (developer mode)** | No | Must manually rebuild + refresh on `chrome://extensions` |
-| **CRX drag-and-drop** | No | Chrome disables the extension, cannot be enabled |
-
-**In practice**: General users get updates through CWS. The self-hosted CRX + `update_url` channel is for enterprise/managed deployments only.
+This is why we only distribute ZIP files (for unpacked loading) and not CRX files on GitHub Releases. CRX-based auto-update via `update_url` only works for enterprise/managed installs deployed via group policy.
 
 ### Version Flow
 
@@ -110,31 +98,19 @@ pnpm release:patch
 
 GitHub Actions (.github/workflows/release.yml)
   → builds extension
-  → creates ZIP + signed CRX (using EXTENSION_SIGNING_KEY secret)
-  → attaches both to GitHub Release
-
-Chrome (periodic check, self-hosted installs only)
-  → fetches https://bankrwallet.app/api/extension/update.xml
-  → sees version 0.2.1 > installed 0.2.0
-  → downloads CRX from GitHub Release
-  → installs update automatically
+  → creates ZIP
+  → attaches to GitHub Release
 ```
 
-### Verification
+### Update XML Endpoint
 
-**Test the XML endpoint:**
+The website still serves `update_url` XML at `https://bankrwallet.app/api/extension/update.xml` for any enterprise installs using the CRX + policy approach. This endpoint fetches the latest GitHub Release version dynamically.
 
 ```bash
 curl https://bankrwallet.app/api/extension/update.xml
 ```
 
 Should return XML with `appid='gmfimlibjdfoeoiohiaipblfklgammci'` and the latest version.
-
-**Force update check in Chrome:**
-
-1. Go to `chrome://extensions`
-2. Enable Developer mode
-3. Click "Update" button
 
 ## One-Time Setup (Already Done)
 
@@ -276,7 +252,5 @@ Before every release that touches `chrome.storage`:
 ## Security Notes
 
 - **Never commit the .pem file** to the repository (it's in `.gitignore`)
-- Both `update_url` and CRX download URL must be HTTPS
 - The website API caches GitHub responses for 5 minutes to avoid rate limits
-- GitHub Actions decodes the signing key from a secret and deletes it immediately after use
 - CWS publishing info and permission justifications are in `CHROME_WEBSTORE.md`
