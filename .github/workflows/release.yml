@@ -38,7 +38,9 @@ jobs:
         run: echo "${{ secrets.EXTENSION_SIGNING_KEY }}" | base64 -d > bankr-wallet.pem
 
       - name: Create CRX
-        run: npx crx3 pack apps/extension/build -o apps/extension/zip/bankr-wallet-v${{ steps.version.outputs.version }}.crx -p bankr-wallet.pem
+        run: |
+          mkdir -p apps/extension/zip
+          npx crx3 pack apps/extension/build -o apps/extension/zip/bankr-wallet-v${{ steps.version.outputs.version }}.crx -p bankr-wallet.pem
 
       - name: Clean up key
         run: rm -f bankr-wallet.pem
