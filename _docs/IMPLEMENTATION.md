@@ -1682,93 +1682,101 @@ Build command: `pnpm build`
 
 ## Sidepanel Support
 
-The extension supports Chrome's Side Panel API for browsers that implement it (Chrome 114+). Some browsers like Arc have the `chrome.sidePanel` API but it doesn't function properly, so the extension uses a conservative approach to ensure compatibility.
+The extension supports Chrome's Side Panel API (Chrome 114+). Sidepanel mode is only enabled on genuine Google Chrome — other Chromium browsers (Arc, Brave, Opera, Edge) may expose `chrome.sidePanel` but it silently fails to render. The extension uses `navigator.userAgentData.brands` to detect genuine Chrome and multiple fallback layers to ensure the popup always works.
 
 ### Browser Compatibility
 
-| Browser | Sidepanel Support | Default Mode |
-| ------- | ----------------- | ------------ |
-| Chrome  | ✅ Full support   | Sidepanel    |
-| Brave   | ✅ Full support   | Sidepanel    |
-| Arc     | ❌ Broken API     | Popup        |
-| Firefox | ❌ No API         | Popup        |
+| Browser         | Sidepanel Support       | Default Mode |
+| --------------- | ----------------------- | ------------ |
+| Google Chrome   | ✅ Full support          | Sidepanel    |
+| Arc             | ❌ Phantom API (silent)  | Popup        |
+| Brave / Edge    | ❌ Blocked (unverified)  | Popup        |
+| Firefox         | ❌ No API                | Popup        |
 
-### Arc Browser Detection
+### Non-Chrome Browser Detection
 
-Arc browser has `chrome.sidePanel` defined but it doesn't work properly. The extension detects Arc using a CSS variable that Arc injects:
+Arc's sidePanel API is a "perfect phantom" — `sidePanel.open()` resolves successfully, `getContexts()` reports a `SIDE_PANEL` context, but nothing is rendered. Arc also removed its UA string (`Arc/`) and CSS variable (`--arc-palette-title`) signals, making those detection methods unreliable.
+
+The primary detection uses `navigator.userAgentData.brands`:
 
 ```typescript
-function isArcBrowser(): boolean {
-  try {
-    const arcPaletteTitle = getComputedStyle(
-      document.documentElement,
-    ).getPropertyValue("--arc-palette-title");
-    return !!arcPaletteTitle && arcPaletteTitle.trim().length > 0;
-  } catch {
-    return false;
-  }
+function isNonChromeBrowser(): boolean {
+  const uaData = (navigator as any).userAgentData;
+  if (!uaData?.brands) return false;
+  // Genuine Chrome always includes "Google Chrome" in brands
+  return !uaData.brands.some((b: { brand: string }) => b.brand === "Google Chrome");
 }
 ```
 
-This detection happens in:
+Legacy fallbacks are retained:
+- **UA string**: `navigator.userAgent.includes("Arc/")` (older Arc versions)
+- **CSS variable**: `--arc-palette-title` check in `App.tsx` / onboarding (sets `isArcBrowser` storage flag)
 
-- **Onboarding page**: Sets `isArcBrowser` flag in storage before user completes setup
-- **App.tsx**: Checks on mount and updates storage if Arc is detected
+### How It Works — Never Use `openPanelOnActionClick`
 
-### How It Works
+**Key design rule**: Never set `openPanelOnActionClick: true`. It's an all-or-nothing setting — when true, Chrome suppresses the popup completely. If the sidepanel doesn't work (Arc), there's no fallback and nothing happens on icon click.
+
+Instead, the extension controls popup vs sidepanel via `chrome.action.setPopup()`:
+
+- **Popup mode**: `setPopup({ popup: 'popup-init.html' })` → native popup opens on icon click
+- **Sidepanel mode**: `setPopup({ popup: '' })` → `chrome.action.onClicked` fires → calls `sidePanel.open()` with try/catch fallback
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    Sidepanel Initialization Flow                            │
 │                                                                             │
-│  Background Service Worker Startup:                                         │
-│    1. Check storage for isArcBrowser, sidePanelMode, sidePanelVerified      │
-│    2. If Arc browser detected → ensure popup mode (openPanelOnActionClick   │
-│       = false)                                                              │
-│    3. If sidePanelVerified === false → ensure popup mode                    │
-│    4. If sidePanelMode === true AND sidePanelVerified === true:             │
-│       - Enable sidepanel (openPanelOnActionClick: true)                     │
-│    5. Otherwise → default to popup mode (safe default)                      │
+│  Background Service Worker Startup (initSidePanel):                         │
+│    1. Always set openPanelOnActionClick: false                              │
+│    2. Check isNonChromeBrowser() via userAgentData.brands                   │
+│       - If non-Chrome → force sidePanelMode=false, set popup, return       │
+│    3. Check storage for isArcBrowser, sidePanelMode, sidePanelVerified      │
+│    4. If Arc stored OR sidePanelVerified=false → set popup, return          │
+│    5. If sidePanelMode=true AND sidePanelVerified=true AND supported:       │
+│       - setPopup('') → action.onClicked will handle sidepanel opening      │
+│    6. Otherwise → setPopup('popup-init.html') (safe default)               │
 │                                                                             │
-│  After Onboarding Completes (non-Arc browsers):                             │
-│    1. Check if Arc was detected during onboarding                           │
-│    2. If NOT Arc → send setSidePanelMode(true) to background                │
-│    3. Background verifies sidepanel works and enables it                    │
-│    4. sidePanelVerified set to true on success                              │
+│  Icon Click (action.onClicked listener, fires when popup=''):               │
+│    1. Call sidePanel.open({ windowId })                                     │
+│    2. Wait 600ms, verify via getContexts({ contextTypes: ['SIDE_PANEL'] }) │
+│    3. If context exists → sidepanel is open, done                           │
+│    4. If no context or open() threw → self-heal:                            │
+│       - setSidePanelMode(false) → restores popup                            │
+│       - openPopupWindow() → immediate fallback                              │
 │                                                                             │
-│  On App.tsx Mount (existing users):                                         │
-│    1. If sidePanelMode is undefined (never set) and not Arc:                │
-│       - Try to enable sidepanel mode                                        │
-│       - This handles upgrades from older versions                           │
+│  Transaction Request (openExtensionPopup):                                  │
+│    1. If sidepanel mode → try sidePanel.open() with same verification      │
+│    2. If fails → self-heal and fall through to popup window                 │
+│    3. If popup mode → open/focus popup window directly                      │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Configuration
 
-| Setting     | Storage Key         | Default                                 | Description                                 |
-| ----------- | ------------------- | --------------------------------------- | ------------------------------------------- |
-| Mode        | `sidePanelMode`     | `true` (after onboarding, if supported) | Whether to use sidepanel or popup           |
-| Verified    | `sidePanelVerified` | Set on first successful enable          | Whether sidepanel has been tested and works |
-| Arc Browser | `isArcBrowser`      | Detected via CSS variable               | Whether running in Arc browser              |
+| Setting     | Storage Key         | Default                                 | Description                                       |
+| ----------- | ------------------- | --------------------------------------- | ------------------------------------------------- |
+| Mode        | `sidePanelMode`     | `true` (after onboarding, if supported) | Whether to use sidepanel or popup                 |
+| Verified    | `sidePanelVerified` | Set on first successful enable          | Whether sidepanel has been tested and works        |
+| Arc Browser | `isArcBrowser`      | Detected via CSS variable (legacy)      | Whether running in Arc browser (legacy detection) |
 
 ### UI Toggle
 
-A sidepanel toggle button is available on both the **unlock screen** (top-right corner) and **main view header** (only visible when sidepanel is supported).
+A sidepanel toggle button is available on both the **unlock screen** (top-right corner) and **main view header** (only visible when sidepanel is supported, i.e., genuine Chrome).
 
 When toggling from popup to sidepanel mode:
 
 - The setting is persisted in `chrome.storage.sync`
-- The extension's action behavior is updated via `chrome.sidePanel.setPanelBehavior`
-- A toast notification instructs user to close popup and click extension icon (Chrome doesn't allow programmatic sidepanel opening)
+- `chrome.action.setPopup({ popup: '' })` is called so `action.onClicked` fires on icon click
+- A toast notification instructs user to close popup and click extension icon
 
 When toggling from sidepanel to popup mode:
 
+- `chrome.action.setPopup({ popup: 'popup-init.html' })` restores the native popup
 - A popup window is opened
 - The sidepanel closes automatically
 
 ### Transaction Requests
 
-When a dapp requests a transaction, the extension uses a ping/pong mechanism to detect open views:
+When a dapp requests a transaction, the extension opens the appropriate UI:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -1777,18 +1785,15 @@ When a dapp requests a transaction, the extension uses a ping/pong mechanism to 
 │  1. Background receives eth_sendTransaction from dapp                       │
 │  2. Stores pending tx in chrome.storage.local                               │
 │  3. Broadcasts "newPendingTxRequest" message to all extension views         │
-│  4. Sends "ping" message to check if any view is open                       │
-│     - If view responds "pong": Don't open popup (broadcast updated it)      │
-│     - If no response: Open popup window                                     │
-│  5. Open view displays transaction confirmation UI                          │
+│  4. If sidepanel mode:                                                      │
+│     a. Ping existing views — if "pong" response, view is open, done        │
+│     b. Try sidePanel.open() + verify via getContexts                       │
+│     c. If verification fails → self-heal, fall through to popup window     │
+│  5. If popup mode (or fallback):                                            │
+│     - Check for existing popup window → focus it                            │
+│     - Otherwise create new popup window positioned at dapp window           │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
-
-This ensures:
-
-- If sidepanel is already open → it updates in-place, no popup opened
-- If popup is already open → it updates in-place, no duplicate popup
-- If nothing is open → a popup window is opened (can't programmatically open sidepanel)
 
 ### Message Types for Sidepanel
 
@@ -1804,17 +1809,13 @@ This ensures:
 
 ### Key Design Decisions
 
-**Conservative Default**: The extension defaults to popup mode on startup and only enables sidepanel after verification. This ensures:
+**Chrome-only sidepanel**: Sidepanel is only enabled on genuine Google Chrome (`navigator.userAgentData.brands` includes "Google Chrome"). Non-Chrome Chromium browsers get popup mode automatically on every service worker startup — even if sidepanel was previously enabled, `initSidePanel()` force-disables it.
 
-- Arc browser users always get a working popup
-- New installs work immediately without sidepanel configuration issues
-- Sidepanel is only enabled after explicit verification that it works
+**Self-healing fallback**: The `action.onClicked` listener and `openExtensionPopup()` both verify sidepanel actually opened after calling `sidePanel.open()`. If verification fails, they auto-disable sidepanel mode and open a popup window. This catches any future browser regressions.
 
-**Detection Timing**: Arc detection happens at multiple points:
+**Never `openPanelOnActionClick`**: This setting is always `false`. Using `chrome.action.setPopup()` to control behavior provides a fallback path — `action.onClicked` fires when popup is empty, allowing try/catch around `sidePanel.open()`.
 
-1. **Onboarding page** (first install): Earliest possible detection, before user ever clicks extension icon
-2. **App.tsx mount** (subsequent loads): Catches cases where onboarding was skipped or flags were cleared
-3. **Storage persistence**: Once detected, the `isArcBrowser` flag persists across sessions
+**Multi-layer detection**: Non-Chrome detection cascades through: (1) `userAgentData.brands` check, (2) legacy `Arc/` UA string, (3) stored `isArcBrowser` flag from CSS variable detection in UI.
 
 ### CSS Handling
 
