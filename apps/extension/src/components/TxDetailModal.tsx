@@ -28,7 +28,7 @@ import {
 } from "@chakra-ui/icons";
 import { CompletedTransaction, GasData } from "@/chrome/txHistoryStorage";
 import { getChainConfig } from "@/constants/chainConfig";
-import { DEFAULT_NETWORKS } from "@/constants/networks";
+import { DEFAULT_NETWORKS, OP_STACK_CHAIN_IDS } from "@/constants/networks";
 import { AddressParam } from "@/components/decodedParams/AddressParam";
 import { CopyButton } from "@/components/CopyButton";
 import CalldataDecoder from "@/components/CalldataDecoder";
@@ -40,9 +40,6 @@ interface TxDetailModalProps {
   onClose: () => void;
   tx: CompletedTransaction;
 }
-
-/** OP Stack L2 chain IDs */
-const OP_STACK_CHAIN_IDS = new Set([4326, 8453, 130]);
 
 function formatValue(value: string | undefined): string {
   if (!value || value === "0" || value === "0x0") {

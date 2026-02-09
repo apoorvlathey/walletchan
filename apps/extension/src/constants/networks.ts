@@ -28,9 +28,20 @@ export const DEFAULT_NETWORKS: NetworksInfo = {
 };
 
 /**
- * Chain IDs that are allowed for transaction signing
+ * Chain IDs that are allowed for transaction signing (all account types)
  */
 export const ALLOWED_CHAIN_IDS = new Set([1, 137, 4326, 8453, 130]);
+
+/**
+ * Chain IDs supported by Bankr API accounts.
+ * New chains that aren't supported by the Bankr API should NOT be added here.
+ */
+export const BANKR_SUPPORTED_CHAIN_IDS = new Set([1, 137, 8453, 130]);
+
+/**
+ * OP Stack L2 chain IDs (for L1 fee breakdown in gas display)
+ */
+export const OP_STACK_CHAIN_IDS = new Set([4326, 8453, 130]);
 
 /**
  * Human-readable chain names by chain ID
