@@ -20,6 +20,7 @@ import {
   IconButton,
   Alert,
   AlertIcon,
+  Tooltip,
 } from "@chakra-ui/react";
 import { SettingsIcon, DeleteIcon, ViewIcon, WarningTwoIcon, EditIcon, ViewOffIcon, ArrowBackIcon, RepeatIcon } from "@chakra-ui/icons";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
@@ -35,6 +36,7 @@ interface AccountSettingsModalProps {
   onRevealPrivateKey: (account: Account) => void;
   onRevealSeedPhrase: (account: Account) => void;
   onAccountUpdated: () => void;
+  totalAccounts: number;
 }
 
 type ModalView = "settings" | "confirmDelete" | "changeApiKey";
@@ -46,6 +48,7 @@ function AccountSettingsModal({
   onRevealPrivateKey,
   onRevealSeedPhrase,
   onAccountUpdated,
+  totalAccounts,
 }: AccountSettingsModalProps) {
   const toast = useBauhausToast();
   const [view, setView] = useState<ModalView>("settings");
@@ -931,23 +934,31 @@ function AccountSettingsModal({
                 </Button>
               )}
 
-              <Button
-                variant="ghost"
-                size="sm"
-                leftIcon={<DeleteIcon color="bauhaus.red" />}
-                onClick={() => setView("confirmDelete")}
-                justifyContent="flex-start"
-                color="bauhaus.red"
-                fontWeight="700"
-                border="2px solid transparent"
-                _hover={{
-                  bg: "red.50",
-                  borderColor: "bauhaus.red",
-                }}
-                w="full"
+              <Tooltip
+                label="Cannot remove the last account"
+                isDisabled={totalAccounts > 1}
+                placement="top"
+                hasArrow
               >
-                Remove Account
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<DeleteIcon color={totalAccounts <= 1 ? "gray.400" : "bauhaus.red"} />}
+                  onClick={() => setView("confirmDelete")}
+                  justifyContent="flex-start"
+                  color={totalAccounts <= 1 ? "gray.400" : "bauhaus.red"}
+                  fontWeight="700"
+                  border="2px solid transparent"
+                  _hover={totalAccounts > 1 ? {
+                    bg: "red.50",
+                    borderColor: "bauhaus.red",
+                  } : undefined}
+                  w="full"
+                  isDisabled={totalAccounts <= 1}
+                >
+                  Remove Account
+                </Button>
+              </Tooltip>
             </VStack>
           </VStack>
         </ModalBody>

@@ -2070,6 +2070,7 @@ function App() {
             onRevealSeedOpen();
           }}
           onAccountUpdated={loadAccounts}
+          totalAccounts={accounts.length}
         />
       </Suspense>
     </Box>
