@@ -97,7 +97,7 @@ export function StatsBar() {
           direction="row"
         >
           <StatItem
-            value="4+"
+            value="5+"
             label="Chains Supported"
             shape="circle"
             color="red"

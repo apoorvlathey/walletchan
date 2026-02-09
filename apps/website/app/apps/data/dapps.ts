@@ -27,4 +27,5 @@ export const CHAIN_NAMES: Record<number, string> = {
   369: "PulseChain",
   1868: "Soneium",
   146: "Sonic",
+  4326: "MegaETH",
 };

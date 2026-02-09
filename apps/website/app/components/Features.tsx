@@ -98,7 +98,7 @@ const features = [
   {
     icon: <Link2 size={28} />,
     title: "Multi-Chain Support",
-    description: "Base, Ethereum, Polygon, Unichain - all in one wallet.",
+    description: "Base, Ethereum, MegaETH, Polygon, Unichain - all in one wallet.",
     decoratorColor: "yellow" as const,
     decoratorShape: "triangle" as const,
   },
@@ -214,6 +214,30 @@ export function Features() {
                   color="bauhaus.foreground"
                 >
                   Ethereum
+                </Text>
+              </HStack>
+            </Box>
+            <Box
+              bg="white"
+              border="3px solid"
+              borderColor="#19191A"
+              boxShadow="3px 3px 0px 0px #19191A"
+              px={4}
+              py={2}
+            >
+              <HStack spacing={2}>
+                <Image
+                  src="/images/megaeth.svg"
+                  alt="MegaETH"
+                  w="24px"
+                  h="24px"
+                />
+                <Text
+                  fontWeight="bold"
+                  fontSize="sm"
+                  color="bauhaus.foreground"
+                >
+                  MegaETH
                 </Text>
               </HStack>
             </Box>
