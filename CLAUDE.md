@@ -159,6 +159,7 @@ When working on features, refer to these docs:
 | `_docs/DEVELOPMENT.md`          | Build process, dev environment setup                  |
 | `_docs/PUBLISHING.md`           | Release workflow, CWS upload, auto-update, signing    |
 | `_docs/STORAGE.md`              | Every chrome.storage key, shapes, version history     |
+| `_docs/ADD_CHAIN.md`           | How to add a new chain (single registry entry)        |
 | `openclaw-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling     |
 
 ## Important Patterns
