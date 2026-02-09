@@ -17,7 +17,7 @@ BankrWallet is distributed through two independent channels with separate extens
 
 Chrome extension IDs are derived from cryptographic keys. CWS assigns its own key (Google holds the private key), while self-hosted CRX files are signed with `bankr-wallet.pem`. These are fundamentally different keys, so the IDs differ. This is expected and cannot be changed.
 
-CWS **rejects** uploads containing `key` or `update_url` fields. The `pnpm zip` command automatically strips these from the build output before zipping (via `scripts/strip-cws-keys.sh`). The source `manifest.json` keeps both fields for self-hosted distribution.
+CWS **rejects** uploads containing `key` or `update_url` fields. Use `pnpm zip:cws` to create a CWS-ready zip — it strips these fields from the build output before zipping (via `scripts/strip-cws-keys.sh`). The plain `pnpm zip` keeps all fields intact (used by GitHub Releases for self-hosted distribution).
 
 ## Release Process
 
@@ -41,19 +41,24 @@ This automatically:
 The [release workflow](/.github/workflows/release.yml) triggers on `v*` tags and:
 
 1. Builds the extension
-2. Creates `bankr-wallet-vX.Y.Z.zip` (for CWS upload)
-3. Signs with `bankr-wallet.pem` → creates `bankr-wallet-vX.Y.Z.crx` (for self-hosted)
+2. Signs with `bankr-wallet.pem` → creates `bankr-wallet-vX.Y.Z.crx` (for self-hosted)
+3. Creates `bankr-wallet-vX.Y.Z.zip` (with `key` + `update_url` intact)
 4. Publishes both to [GitHub Releases](https://github.com/apoorvlathey/bankr-wallet/releases)
 
 At this point, **self-hosted users** start receiving the update automatically (Chrome checks `update_url` every few hours).
 
 ### 3. Upload to Chrome Web Store
 
-1. Go to the [CWS Developer Dashboard](https://chrome.google.com/webstore/devconsole)
-2. Select the BankrWallet extension
-3. Upload the **ZIP** file from the GitHub Release (not the CRX)
-4. Fill in any release notes
-5. Submit for review
+1. Build locally and create the CWS zip:
+   ```bash
+   pnpm build:extension
+   pnpm zip:cws
+   ```
+2. Go to the [CWS Developer Dashboard](https://chrome.google.com/webstore/devconsole)
+3. Select the BankrWallet extension
+4. Upload `apps/extension/cws-zip/bankr-wallet-vX.Y.Z.zip` (not the GitHub Release zip or CRX)
+5. Fill in any release notes
+6. Submit for review
 
 Once approved, **CWS users** receive the update.
 
@@ -63,7 +68,8 @@ If you need to create a release without the automated workflow:
 
 ```bash
 pnpm build:extension
-pnpm zip
+pnpm zip        # keeps key + update_url (for GitHub Release)
+pnpm zip:cws    # strips key + update_url (for CWS upload)
 ```
 
 Then upload `apps/extension/zip/bankr-wallet-vX.Y.Z.zip` to a new GitHub release.

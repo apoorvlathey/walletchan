@@ -78,7 +78,8 @@ pnpm build:extension    # Build extension only (output: apps/extension/build/)
 pnpm build:website      # Build website only
 
 # Extension-specific
-pnpm zip                # Create distribution zip
+pnpm zip                # Create distribution zip (keeps all manifest fields)
+pnpm zip:cws            # Create CWS-ready zip (strips key + update_url)
 pnpm lint               # Lint extension code
 
 # Release (auto-bumps version, syncs manifest, creates tag, pushes)

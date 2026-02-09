@@ -20,6 +20,7 @@ node_modules
 # production builds
 build
 zip
+cws-zip
 .next
 out
 
