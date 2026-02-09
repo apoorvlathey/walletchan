@@ -26,12 +26,15 @@ pnpm release:minor  # 0.2.0 → 0.3.0 (new features)
 pnpm release:major  # 0.2.0 → 1.0.0 (breaking changes)
 ```
 
-This automatically:
+**Important:** The working tree must be clean (no uncommitted changes) before running a release command.
+
+This automatically (via `scripts/release.sh`):
 
 1. Bumps the version in `apps/extension/package.json`
-2. Syncs the version to `apps/extension/public/manifest.json` (via `scripts/sync-version.sh`)
-3. Creates a commit and git tag (e.g. `v0.2.1`)
-4. Pushes to origin with tags
+2. Syncs the version to `apps/extension/public/manifest.json`
+3. Commits both files from the repo root (so monorepo paths resolve correctly)
+4. Creates a git tag (e.g. `v0.2.1`)
+5. Pushes to origin with tags
 
 ### 2. GitHub Actions builds the release
 
