@@ -1120,6 +1120,12 @@ export async function handleRemoveAccount(
       return { success: false, error: "Account not found" };
     }
 
+    // Prevent removing the last account
+    const allAccounts = await getAccounts();
+    if (allAccounts.length <= 1) {
+      return { success: false, error: "Cannot remove the last account" };
+    }
+
     // If it's a PK or seed phrase account, remove from vault
     if (account.type === "privateKey" || account.type === "seedPhrase") {
       await removeKeyFromVault(accountId);
