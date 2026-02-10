@@ -780,6 +780,7 @@ website/
 ## References
 
 - STYLING.md - Full Bauhaus design system
+- COINS.md - `/coins` page: real-time coin launches (SSE streaming, indexer API)
 - README.md - Feature list and installation
 - IMPLEMENTATION.md - Technical architecture
 - TODO.md - Roadmap and marketing ideas

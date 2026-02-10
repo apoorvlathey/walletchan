@@ -22,3 +22,7 @@ export const GECKOTERMINAL_URL = `https://www.geckoterminal.com/base/pools/${POO
 export const GECKOTERMINAL_EMBED_URL = `https://www.geckoterminal.com/base/pools/${POOL_ADDRESS}?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&chart_type=market_cap&resolution=1h`;
 export const GECKOTERMINAL_API_URL = `https://api.geckoterminal.com/api/v2/networks/base/pools/${POOL_ADDRESS}`;
 export const COINGECKO_URL = `https://www.coingecko.com/en/coins/bankrwallet`;
+
+// Indexer API
+export const INDEXER_API_URL =
+  process.env.NEXT_PUBLIC_INDEXER_API_URL || "http://localhost:42069";

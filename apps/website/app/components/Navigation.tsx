@@ -25,6 +25,7 @@ import { CHROME_STORE_URL } from "../constants";
 const navLinks = [
   { label: "Features", href: "#features" },
   { label: "Token", href: "#token" },
+  { label: "Coins", href: "/coins" },
   // { label: "Apps", href: "/apps" },
   { label: "Install", href: "#install" },
   { label: "Tweets", href: "#tweets" },
