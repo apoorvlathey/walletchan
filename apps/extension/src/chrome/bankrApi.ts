@@ -73,7 +73,6 @@ export async function submitTransactionDirect(
       chainId: tx.chainId,
       value: hexToDecimalString(tx.value),
       data: tx.data && tx.data !== "0x" ? tx.data : undefined,
-      gas: tx.gas || undefined,
       gasPrice: tx.gasPrice || undefined,
       maxFeePerGas: tx.maxFeePerGas || undefined,
       maxPriorityFeePerGas: tx.maxPriorityFeePerGas || undefined,
