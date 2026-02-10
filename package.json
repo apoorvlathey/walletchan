@@ -12,6 +12,8 @@
     "lint": "pnpm --filter @bankr-wallet/extension lint",
     "zip": "pnpm --filter @bankr-wallet/extension zip",
     "zip:cws": "pnpm --filter @bankr-wallet/extension zip:cws",
+    "dev:indexer": "pnpm --filter @bankr-wallet/indexer dev",
+    "start:indexer": "pnpm --filter @bankr-wallet/indexer start",
     "icons": "pnpm --filter @bankr-wallet/extension icons",
     "release:patch": "pnpm --filter @bankr-wallet/extension release:patch",
     "release:minor": "pnpm --filter @bankr-wallet/extension release:minor",

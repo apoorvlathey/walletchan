@@ -155,6 +155,7 @@ When working on features, refer to these docs:
 | `_docs/STYLING.md`              | UI components, design tokens, Bauhaus system          |
 | `_docs/WEBSITE.md`              | Website sections, layout specs, animations            |
 | `_docs/APPS.md`                 | Apps page data source, fetch script, adding chains     |
+| `_docs/COINS.md`                | Coins page: SSE streaming, indexer API, pagination     |
 | `_docs/CALLDATA.md`             | Calldata decoder UI, param components, type routing   |
 | `_docs/DEVELOPMENT.md`          | Build process, dev environment setup                  |
 | `_docs/PUBLISHING.md`           | Release workflow, CWS upload, auto-update, signing    |

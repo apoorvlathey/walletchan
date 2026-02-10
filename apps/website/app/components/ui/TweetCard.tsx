@@ -373,6 +373,159 @@ function QuotedTweetCardContent({
   );
 }
 
+/**
+ * Lightweight tweet embed without Card/MotionBox wrapper.
+ * Used to embed tweet content inside other cards (e.g. CoinCard).
+ */
+export function TweetEmbed({ tweetId, hideQuotedTweet }: { tweetId: string; hideQuotedTweet?: boolean }) {
+  const { data: tweet, isLoading, error } = useTweet(tweetId);
+
+  if (isLoading) {
+    return (
+      <VStack align="stretch" spacing={3}>
+        <HStack spacing={2}>
+          <SkeletonCircle size="8" />
+          <VStack align="flex-start" spacing={1}>
+            <Skeleton height="12px" width="100px" />
+            <Skeleton height="10px" width="70px" />
+          </VStack>
+        </HStack>
+        <Skeleton height="14px" width="100%" />
+        <Skeleton height="14px" width="80%" />
+      </VStack>
+    );
+  }
+
+  if (error || !tweet) {
+    return (
+      <Text color="gray.400" fontSize="xs">
+        Tweet unavailable
+      </Text>
+    );
+  }
+
+  const tweetUrl = `https://x.com/${tweet.user.screen_name}/status/${tweet.id_str}`;
+  const quotedTweet = tweet.quoted_tweet;
+
+  return (
+    <VStack align="stretch" spacing={3}>
+      {/* Author */}
+      <HStack justify="space-between">
+        <HStack spacing={2}>
+          <Link href={`https://x.com/${tweet.user.screen_name}`} isExternal>
+            <Avatar
+              size="xs"
+              name={tweet.user.name}
+              src={tweet.user.profile_image_url_https}
+              bg="bauhaus.blue"
+              color="white"
+              sx={{
+                ...hdrToSdrStyle,
+                border: "2px solid var(--chakra-colors-bauhaus-black)",
+                boxShadow: "2px 2px 0px 0px #121212",
+              }}
+            />
+          </Link>
+          <VStack align="flex-start" spacing={0}>
+            <HStack spacing={1}>
+              <Link
+                href={`https://x.com/${tweet.user.screen_name}`}
+                isExternal
+                _hover={{ textDecoration: "none" }}
+              >
+                <Text fontWeight="bold" fontSize="xs" color="bauhaus.black">
+                  {tweet.user.name}
+                </Text>
+              </Link>
+              {tweet.user.is_blue_verified && <VerifiedBadge size={14} />}
+            </HStack>
+            <Text color="gray.500" fontSize="2xs">
+              @{tweet.user.screen_name}
+            </Text>
+          </VStack>
+        </HStack>
+        <Link
+          href={tweetUrl}
+          isExternal
+          color="bauhaus.black"
+          _hover={{ color: "bauhaus.blue" }}
+          transition="color 0.2s"
+        >
+          <XIcon size={16} />
+        </Link>
+      </HStack>
+
+      {/* Tweet text */}
+      <Text
+        fontSize="sm"
+        fontWeight="medium"
+        color="bauhaus.black"
+        lineHeight="1.4"
+        whiteSpace="pre-wrap"
+        noOfLines={6}
+      >
+        {processTweetText(tweet.text, tweet.entities)}
+      </Text>
+
+      {/* Quoted Tweet */}
+      {quotedTweet && !hideQuotedTweet && <QuotedTweetCardContent tweet={quotedTweet} />}
+
+      {/* Media */}
+      {tweet.photos && tweet.photos.length > 0 && (
+        <Box
+          overflow="hidden"
+          border="2px solid"
+          borderColor="bauhaus.black"
+        >
+          <Box
+            as="img"
+            src={tweet.photos[0].url}
+            alt="Tweet media"
+            w="full"
+            maxH="200px"
+            objectFit="cover"
+          />
+        </Box>
+      )}
+
+      {/* Footer */}
+      <HStack
+        justify="space-between"
+        pt={2}
+        borderTop="2px solid"
+        borderColor="bauhaus.black"
+      >
+        <Link
+          href={tweetUrl}
+          isExternal
+          fontSize="2xs"
+          color="gray.500"
+          _hover={{ color: "bauhaus.blue", textDecoration: "underline" }}
+        >
+          {formatDate(tweet.created_at)}
+        </Link>
+        <Link
+          href={tweetUrl}
+          isExternal
+          display="flex"
+          alignItems="center"
+          gap={1}
+          fontWeight="bold"
+          textTransform="uppercase"
+          letterSpacing="wider"
+          fontSize="2xs"
+          color="bauhaus.black"
+          _hover={{ color: "bauhaus.blue" }}
+          transition="color 0.2s"
+        >
+          <Text>View on X</Text>
+          <Icon as={ExternalLink} boxSize={2.5} />
+        </Link>
+      </HStack>
+    </VStack>
+  );
+}
+
 export function TweetCard({
   tweetId,
   decoratorColor = "blue",
