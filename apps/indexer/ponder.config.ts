@@ -16,6 +16,7 @@ export default createConfig({
       startBlock: 36659443,
       filter: {
         event: "Lock",
+        args: {},
       },
     },
   },

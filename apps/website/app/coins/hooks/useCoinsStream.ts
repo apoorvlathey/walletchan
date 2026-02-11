@@ -6,6 +6,7 @@ import { INDEXER_API_URL } from "../../constants";
 export interface Coin {
   id: string;
   coinAddress: string;
+  poolId: string | null;
   name: string;
   symbol: string;
   tokenURI: string;

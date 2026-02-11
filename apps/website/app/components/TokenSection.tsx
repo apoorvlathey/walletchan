@@ -10,6 +10,7 @@ import {
   VStack,
   Flex,
   useClipboard,
+  useDisclosure,
   Image,
 } from "@chakra-ui/react";
 import { motion, useInView } from "framer-motion";
@@ -21,16 +22,24 @@ import {
   DEXSCREENER_URL,
   GECKOTERMINAL_URL,
   GECKOTERMINAL_EMBED_URL,
-  BUY_LINK,
 } from "../constants";
+import { BuyModal, type BuyToken } from "../coins/components/BuyModal";
 
 const MotionBox = motion(Box);
+
+const BNKRW_TOKEN: BuyToken = {
+  address: TOKEN_ADDRESS,
+  name: "BankrWallet",
+  symbol: "BNKRW",
+  imageUrl: "/images/bankrwallet-icon-nobg.png",
+};
 
 export function TokenSection() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
   const { hasCopied, onCopy } = useClipboard(TOKEN_ADDRESS);
   const { tokenData } = useTokenData();
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   const truncatedAddress = `${TOKEN_ADDRESS.slice(0, 6)}...${TOKEN_ADDRESS.slice(-4)}`;
 
@@ -295,16 +304,15 @@ export function TokenSection() {
             <Button
               variant="green"
               size="lg"
-              as="a"
-              href={BUY_LINK}
-              target="_blank"
-              rightIcon={<ExternalLink size={18} />}
+              onClick={onOpen}
             >
               Buy
             </Button>
           </HStack>
         </VStack>
       </Container>
+
+      <BuyModal token={BNKRW_TOKEN} isOpen={isOpen} onClose={onClose} showWallet />
     </Box>
   );
 }

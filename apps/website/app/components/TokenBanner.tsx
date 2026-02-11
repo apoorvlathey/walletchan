@@ -1,53 +1,26 @@
 "use client";
 
-import { Box, HStack, Text, Link } from "@chakra-ui/react";
-import { ExternalLink } from "lucide-react";
+import { Box, HStack, Text, Link, useDisclosure } from "@chakra-ui/react";
 import { useTokenData } from "../contexts/TokenDataContext";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BUY_LINK, DEXSCREENER_URL } from "../constants";
+import { DEXSCREENER_URL, TOKEN_ADDRESS } from "../constants";
+import { BuyModal, type BuyToken } from "../coins/components/BuyModal";
+import { LoadingShapes } from "./ui/LoadingShapes";
 
 const MotionText = motion(Text);
 const MotionBox = motion(Box);
 
-function LoadingShapes() {
-  return (
-    <HStack spacing={1}>
-      {/* Circle - Red */}
-      <MotionBox
-        w="6px"
-        h="6px"
-        borderRadius="full"
-        bg="bauhaus.red"
-        animate={{ y: [0, -4, 0] }}
-        transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
-      />
-      {/* Diamond - Blue */}
-      <MotionBox
-        w="6px"
-        h="6px"
-        bg="bauhaus.blue"
-        transform="rotate(45deg)"
-        animate={{ y: [0, -4, 0] }}
-        transition={{ duration: 0.6, repeat: Infinity, delay: 0.15 }}
-      />
-      {/* Triangle - Yellow */}
-      <MotionBox
-        w={0}
-        h={0}
-        borderLeft="4px solid transparent"
-        borderRight="4px solid transparent"
-        borderBottom="7px solid"
-        borderBottomColor="bauhaus.yellow"
-        animate={{ y: [0, -4, 0] }}
-        transition={{ duration: 0.6, repeat: Infinity, delay: 0.3 }}
-      />
-    </HStack>
-  );
-}
+const BNKRW_TOKEN: BuyToken = {
+  address: TOKEN_ADDRESS,
+  name: "BankrWallet",
+  symbol: "BNKRW",
+  imageUrl: "/images/bankrwallet-icon-nobg.png",
+};
 
 export function TokenBanner() {
   const { tokenData, isLoading } = useTokenData();
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const [displayValue, setDisplayValue] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [direction, setDirection] = useState<"up" | "down">("up");
@@ -220,9 +193,8 @@ export function TokenBanner() {
             )}
           </HStack>
 
-          <Link
-            href={BUY_LINK}
-            isExternal
+          <Box
+            as="button"
             bg="bauhaus.green"
             color="white"
             px={3}
@@ -237,9 +209,9 @@ export function TokenBanner() {
             display="flex"
             alignItems="center"
             gap={1}
+            onClick={onOpen}
             _hover={{
               opacity: 0.9,
-              textDecoration: "none",
               transform: "translateY(-1px)",
               boxShadow: "3px 3px 0px 0px #121212",
             }}
@@ -250,8 +222,7 @@ export function TokenBanner() {
             transition="all 0.2s ease-out"
           >
             Buy
-            <ExternalLink size={10} />
-          </Link>
+          </Box>
         </HStack>
 
         {/* Right decorative square */}
@@ -262,6 +233,7 @@ export function TokenBanner() {
           display={{ base: "none", md: "block" }}
         />
       </HStack>
+      <BuyModal token={BNKRW_TOKEN} isOpen={isOpen} onClose={onClose} showWallet />
     </Box>
   );
 }

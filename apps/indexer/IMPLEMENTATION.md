@@ -8,13 +8,15 @@ Ponder.sh indexer that tracks Bankr coin launches on Base by listening to the Un
 Base chain (block 36,659,443+)
     │
     │  Lock(address indexed pool, (address,uint96)[] beneficiaries)
+    │  + Initialize(bytes32 indexed id, ...) from PoolManager (same tx)
     ▼
 ┌──────────────────────┐
 │  ponder.config.ts    │  Subscribes to Lock events from 0xA367...ED8E
 └──────────┬───────────┘
            ▼
 ┌──────────────────────┐
-│  src/index.ts        │  Filters by beneficiary pattern, reads on-chain metadata
+│  src/index.ts        │  Filters by beneficiary pattern, reads on-chain metadata,
+│                      │  extracts poolId from PoolManager Initialize log in receipt
 └──────────┬───────────┘
            ▼
 ┌──────────────────────┐
@@ -36,6 +38,16 @@ Base chain (block 36,659,443+)
 | Event       | `Lock(address indexed pool, (address,uint96)[] beneficiaries)` |
 
 The `pool` address (topic 1) is also the coin/token address. The `beneficiaries` array is non-indexed event data containing `(address account, uint96 bips)` tuples.
+
+### PoolManager (for poolId extraction)
+
+| Field       | Value                                                          |
+| ----------- | -------------------------------------------------------------- |
+| Contract    | `0x498581ff718922c3f8e6a244956af099b2652b2b` (Uniswap V4 PoolManager) |
+| Event       | `Initialize(bytes32 indexed id, address indexed currency0, address indexed currency1, uint24 fee, int24 tickSpacing, address hooks, uint160 sqrtPriceX96, int24 tick)` |
+| Topic0      | `0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438` |
+
+The `Initialize` event is emitted in the same transaction as `Lock`. Since Ponder v0.8+ removed `transactionReceipt.logs`, we fetch the receipt via `context.client.getTransactionReceipt()` (a direct RPC call) and extract the poolId (`topics[1]`) from the Initialize log.
 
 ## Event Filtering
 
@@ -61,24 +73,27 @@ Filtering happens at the handler level (not config level) because beneficiaries 
 For each qualifying Lock event:
 
 1. **Extract data** - pool address (= coin address) and `beneficiaries[2]` (= creator address)
-2. **Read on-chain metadata** - call `name()`, `symbol()`, `tokenURI()` on the coin address via `context.client.multicall()`. To optimize for 1 RPC call instead of 3.
-3. **Insert into DB** - write to `coin_launch` table with `onConflictDoNothing()` for idempotency (the primary key is the lowercased coin address)
+2. **Extract poolId** - fetch the transaction receipt via `context.client.getTransactionReceipt()`, scan its logs for the Initialize event from PoolManager (matched by address + topic0), read `topics[1]` as the poolId (bytes32)
+3. **Read on-chain metadata** - call `name()`, `symbol()`, `tokenURI()` on the coin address via `context.client.multicall()`. To optimize for 1 RPC call instead of 3.
+4. **Insert into DB** - write to `coin_launch` table with `onConflictDoNothing()` for idempotency (the primary key is the lowercased coin address)
 
 ## Schema
 
 **`coin_launch` table** (`ponder.schema.ts`):
 
-| Column            | Type            | Description                             |
-| ----------------- | --------------- | --------------------------------------- |
-| `id`              | text (PK)       | Pool/coin address, lowercased           |
-| `coinAddress`     | hex             | Pool/coin address (checksummed)         |
-| `name`            | text (nullable) | From `name()` on-chain call             |
-| `symbol`          | text (nullable) | From `symbol()` on-chain call           |
-| `tokenURI`        | text (nullable) | From `tokenURI()` on-chain call         |
-| `creatorAddress`  | hex             | `beneficiaries[2].account`              |
-| `blockNumber`     | bigint          | Block the Lock event was emitted in     |
-| `timestamp`       | bigint          | Block timestamp                         |
-| `transactionHash` | hex             | Transaction that emitted the Lock event |
+| Column            | Type            | Description                                          |
+| ----------------- | --------------- | ---------------------------------------------------- |
+| `id`              | text (PK)       | Pool/coin address, lowercased                        |
+| `coinAddress`     | hex             | Pool/coin address (checksummed)                      |
+| `poolId`          | hex (nullable)  | Uniswap V4 pool ID (bytes32) from Initialize event   |
+| `name`            | text (nullable) | From `name()` on-chain call                          |
+| `symbol`          | text (nullable) | From `symbol()` on-chain call                        |
+| `tokenURI`        | text (nullable) | From `tokenURI()` on-chain call                      |
+| `tweetUrl`        | text (nullable) | Resolved from IPFS tokenURI metadata via Pinata      |
+| `creatorAddress`  | hex             | `beneficiaries[2].account`                           |
+| `blockNumber`     | bigint          | Block the Lock event was emitted in                  |
+| `timestamp`       | bigint          | Block timestamp                                      |
+| `transactionHash` | hex             | Transaction that emitted the Lock event              |
 
 **Indexes**: `creatorAddress`, `timestamp`
 
