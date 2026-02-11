@@ -22,8 +22,10 @@ interface Stats {
   latestCoin: Coin | null;
 }
 
-const MAX_RECONNECT_DELAY = 30000;
-const BASE_RECONNECT_DELAY = 1000;
+const POLL_INTERVAL = 5000;
+const MAX_BACKOFF = 30000;
+const BASE_BACKOFF = 1000;
+const DISCONNECT_AFTER = 3; // consecutive failures before marking disconnected
 const PAGE_SIZE = 200;
 
 export function useCoinsStream() {
@@ -33,58 +35,81 @@ export function useCoinsStream() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectAttemptRef = useRef(0);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Track how many SSE coins were prepended so offset stays correct
-  const sseCountRef = useRef(0);
 
-  const connectSSE = useCallback((sinceTimestamp?: string) => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-    }
+  // Track latest timestamp to detect new coins
+  const latestTimestampRef = useRef<string>("0");
+  // Track how many new coins were prepended via polling so offset stays correct
+  const newCountRef = useRef(0);
+  // Guard against overlapping polls
+  const pollActiveRef = useRef(false);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const consecutiveErrorsRef = useRef(0);
+  const mountedRef = useRef(true);
 
-    const params = sinceTimestamp ? `?since=${sinceTimestamp}` : "";
-    const es = new EventSource(`${INDEXER_API_URL}/coins/stream${params}`);
-    eventSourceRef.current = es;
+  const poll = useCallback(async () => {
+    if (pollActiveRef.current || !mountedRef.current) return;
+    pollActiveRef.current = true;
 
-    es.onopen = () => {
-      setIsConnected(true);
-      reconnectAttemptRef.current = 0;
-    };
-
-    es.addEventListener("coin", (event) => {
-      try {
-        const coin: Coin = JSON.parse(event.data);
-        setCoins((prev) => {
-          if (prev.some((c) => c.id === coin.id)) return prev;
-          sseCountRef.current += 1;
-          return [coin, ...prev];
-        });
-        setTotalCoins((prev) => prev + 1);
-      } catch {
-        // Ignore malformed events
-      }
-    });
-
-    es.onerror = () => {
-      setIsConnected(false);
-      es.close();
-
-      const delay = Math.min(
-        BASE_RECONNECT_DELAY * 2 ** reconnectAttemptRef.current,
-        MAX_RECONNECT_DELAY
+    try {
+      const res = await fetch(
+        `${INDEXER_API_URL}/coins?limit=50&offset=0`
       );
-      reconnectAttemptRef.current += 1;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: Coin[] = await res.json();
 
-      reconnectTimerRef.current = setTimeout(() => {
+      if (!mountedRef.current) return;
+
+      consecutiveErrorsRef.current = 0;
+      setIsConnected(true);
+
+      const currentTs = latestTimestampRef.current;
+
+      // Find coins newer than what we've seen (use >= for same-second coins, dedup by id)
+      const newCoins = data.filter(
+        (c) => c.timestamp >= currentTs
+      );
+
+      if (newCoins.length > 0) {
         setCoins((prev) => {
-          const latest = prev[0]?.timestamp;
-          connectSSE(latest);
-          return prev;
+          const existingIds = new Set(prev.map((c) => c.id));
+          const fresh = newCoins.filter((c) => !existingIds.has(c.id));
+          if (fresh.length === 0) return prev;
+          newCountRef.current += fresh.length;
+          setTotalCoins((t) => t + fresh.length);
+          return [...fresh, ...prev];
         });
-      }, delay);
-    };
+
+        // Update latest timestamp
+        const maxTs = newCoins.reduce(
+          (max, c) => (c.timestamp > max ? c.timestamp : max),
+          currentTs
+        );
+        latestTimestampRef.current = maxTs;
+      }
+
+      // Schedule next poll at normal interval
+      if (mountedRef.current) {
+        pollTimerRef.current = setTimeout(poll, POLL_INTERVAL);
+      }
+    } catch {
+      consecutiveErrorsRef.current += 1;
+      const errors = consecutiveErrorsRef.current;
+
+      if (errors >= DISCONNECT_AFTER) {
+        setIsConnected(false);
+      }
+
+      // Exponential backoff
+      const delay = Math.min(
+        BASE_BACKOFF * 2 ** (errors - 1),
+        MAX_BACKOFF
+      );
+      if (mountedRef.current) {
+        pollTimerRef.current = setTimeout(poll, delay);
+      }
+    } finally {
+      pollActiveRef.current = false;
+    }
   }, []);
 
   // Load more (older) coins
@@ -93,8 +118,8 @@ export function useCoinsStream() {
     setIsLoadingMore(true);
 
     try {
-      // Current REST-fetched count = total coins minus SSE-prepended ones
-      const restCount = coins.length - sseCountRef.current;
+      // Current REST-fetched count = total coins minus polling-prepended ones
+      const restCount = coins.length - newCountRef.current;
       const res = await fetch(
         `${INDEXER_API_URL}/coins?limit=${PAGE_SIZE}&offset=${restCount}`
       );
@@ -119,7 +144,7 @@ export function useCoinsStream() {
   }, [coins.length, isLoadingMore, hasMore]);
 
   useEffect(() => {
-    let cancelled = false;
+    mountedRef.current = true;
 
     async function init() {
       try {
@@ -129,7 +154,7 @@ export function useCoinsStream() {
           fetch(`${INDEXER_API_URL}/stats`),
         ]);
 
-        if (cancelled) return;
+        if (!mountedRef.current) return;
 
         let initialCoins: Coin[] = [];
 
@@ -148,15 +173,21 @@ export function useCoinsStream() {
 
         setIsLoading(false);
 
-        // Start SSE from the latest coin's timestamp
-        const latestTimestamp = initialCoins[0]?.timestamp;
-        if (!cancelled) {
-          connectSSE(latestTimestamp);
+        // Record latest timestamp for polling comparison
+        if (initialCoins.length > 0) {
+          latestTimestampRef.current = initialCoins[0].timestamp;
+        }
+
+        // Start polling for new coins
+        if (mountedRef.current) {
+          setIsConnected(true);
+          pollTimerRef.current = setTimeout(poll, POLL_INTERVAL);
         }
       } catch {
-        if (!cancelled) {
+        if (mountedRef.current) {
           setIsLoading(false);
-          connectSSE();
+          // Start polling even on init failure — it will retry
+          pollTimerRef.current = setTimeout(poll, POLL_INTERVAL);
         }
       }
     }
@@ -164,13 +195,12 @@ export function useCoinsStream() {
     init();
 
     return () => {
-      cancelled = true;
-      eventSourceRef.current?.close();
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
+      mountedRef.current = false;
+      if (pollTimerRef.current) {
+        clearTimeout(pollTimerRef.current);
       }
     };
-  }, [connectSSE]);
+  }, [poll]);
 
   return { coins, totalCoins, isConnected, isLoading, isLoadingMore, hasMore, loadMore };
 }
