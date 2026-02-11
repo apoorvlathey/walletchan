@@ -12,26 +12,39 @@ const POOL_MANAGER = "0x498581ff718922c3f8e6a244956af099b2652b2b";
 const INITIALIZE_TOPIC0 =
   "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438";
 
-const PINATA_GATEWAY_URL = process.env.PINTATA_GATEWAY_URL;
+const PINATA_GATEWAY_URL = process.env.PINATA_GATEWAY_URL;
 const PINATA_GATEWAY_TOKEN = process.env.PINATA_GATEWAY_TOKEN;
 
 /**
  * Resolve an ipfs:// URI to a Pinata gateway URL and fetch the tweet_url from metadata.
  */
 async function fetchTweetUrl(tokenURI: string): Promise<string | null> {
-  if (!PINATA_GATEWAY_URL || !PINATA_GATEWAY_TOKEN) return null;
-  if (!tokenURI.startsWith("ipfs://")) return null;
+  if (!PINATA_GATEWAY_URL || !PINATA_GATEWAY_TOKEN) {
+    console.warn(`[fetchTweetUrl] Skipping: PINATA_GATEWAY_URL=${!!PINATA_GATEWAY_URL}, PINATA_GATEWAY_TOKEN=${!!PINATA_GATEWAY_TOKEN}`);
+    return null;
+  }
+  if (!tokenURI.startsWith("ipfs://")) {
+    console.warn(`[fetchTweetUrl] tokenURI is not ipfs://, got: ${tokenURI.slice(0, 80)}`);
+    return null;
+  }
 
   const ipfsHash = tokenURI.slice("ipfs://".length);
   const url = `${PINATA_GATEWAY_URL}/ipfs/${ipfsHash}?pinataGatewayToken=${PINATA_GATEWAY_TOKEN}`;
 
   try {
     const res = await fetch(url);
-    if (!res.ok) return null;
-    const metadata = (await res.json()) as { tweet_url?: string };
-    return typeof metadata.tweet_url === "string" ? metadata.tweet_url : null;
+    if (!res.ok) {
+      console.warn(`[fetchTweetUrl] Pinata fetch failed: HTTP ${res.status} for ${tokenURI}`);
+      return null;
+    }
+    const metadata = (await res.json()) as Record<string, unknown>;
+    const tweetUrl = typeof metadata.tweet_url === "string" ? metadata.tweet_url : null;
+    if (!tweetUrl) {
+      console.warn(`[fetchTweetUrl] No tweet_url in metadata for ${tokenURI}. Keys: ${Object.keys(metadata).join(", ")}`);
+    }
+    return tweetUrl;
   } catch (e) {
-    console.error(`Failed to fetch tokenURI metadata for ${tokenURI}:`, e);
+    console.error(`[fetchTweetUrl] Failed to fetch metadata for ${tokenURI}:`, e);
     return null;
   }
 }
