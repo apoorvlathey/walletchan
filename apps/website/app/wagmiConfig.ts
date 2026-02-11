@@ -61,22 +61,10 @@ export const walletChains = [
   megaeth,
 ] as const;
 
-export const config = createConfig({
-  connectors,
-  chains: walletChains,
-  transports: walletChains.reduce<Record<number, ReturnType<typeof http>>>(
-    (acc, chain) => {
-      acc[chain.id] = http();
-      return acc;
-    },
-    {}
-  ),
-});
-
 /** Custom RPC URLs for the ImpersonatorIframeProvider */
 export const CHAIN_RPC_URLS: Record<number, string> = {
-  1: "https://eth.llamarpc.com",
-  8453: "https://base.llamarpc.com",
+  1: process.env.NEXT_PUBLIC_ETH_RPC_URL || "https://eth.llamarpc.com",
+  8453: process.env.NEXT_PUBLIC_BASE_RPC_URL || "https://base.llamarpc.com",
   137: "https://polygon.llamarpc.com",
   130: "https://mainnet.unichain.org",
   42161: "https://arb1.arbitrum.io/rpc",
@@ -92,3 +80,15 @@ export const CHAIN_RPC_URLS: Record<number, string> = {
   146: "https://rpc.soniclabs.com",
   4326: "https://mainnet.megaeth.com/rpc",
 };
+
+export const config = createConfig({
+  connectors,
+  chains: walletChains,
+  transports: walletChains.reduce<Record<number, ReturnType<typeof http>>>(
+    (acc, chain) => {
+      acc[chain.id] = http(CHAIN_RPC_URLS[chain.id]);
+      return acc;
+    },
+    {}
+  ),
+});
