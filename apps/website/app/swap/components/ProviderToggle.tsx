@@ -11,6 +11,7 @@ interface ProviderToggleProps {
 const PROVIDERS: { key: SwapProvider; label: string }[] = [
   { key: "0x", label: "0x" },
   { key: "bungee", label: "Bungee" },
+  { key: "relay", label: "Relay" },
 ];
 
 export function ProviderToggle({

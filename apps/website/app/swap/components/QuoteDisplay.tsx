@@ -87,9 +87,9 @@ export function QuoteDisplay({
           {integratorFee && (
             <HStack justify="space-between">
               <Text fontSize="xs" fontWeight="bold" textTransform="uppercase">
-                {provider === "bungee"
-                  ? "BankrWallet Fee (0.9%)"
-                  : "$BNKRW Fee (0.9%)"}
+                {provider === "0x"
+                  ? "$BNKRW Fee (0.9%)"
+                  : "BankrWallet Fee (0.9%)"}
               </Text>
               <Text fontSize="sm" fontWeight="medium">
                 {formatTokenAmount(

@@ -19,6 +19,7 @@ import { base } from "wagmi/chains";
 import { useTokenInfo } from "../hooks/useTokenInfo";
 import { useSwapQuote, formatTokenAmount } from "../hooks/useSwapQuote";
 import { useBungeeQuote } from "../hooks/useBungeeQuote";
+import { useRelayQuote } from "../hooks/useRelayQuote";
 import { NATIVE_TOKEN_ADDRESS, DEFAULT_SLIPPAGE_BPS } from "../constants";
 import type { SwapProvider } from "../types";
 import { QuoteDisplay } from "./QuoteDisplay";
@@ -123,12 +124,45 @@ export function SwapCard() {
     enabled: provider === "bungee" && isBuyTokenValid && sellAmountValid,
   });
 
+  const {
+    quote: relayQuote,
+    isLoading: isRelayLoading,
+    error: relayError,
+    fetchFirmQuote: fetchRelayFirmQuote,
+  } = useRelayQuote({
+    sellToken,
+    buyToken: buyTokenAddress,
+    sellAmountEth: sellAmount,
+    taker: address,
+    slippageBps,
+    enabled: provider === "relay" && isBuyTokenValid && sellAmountValid,
+  });
+
   // Derive active provider values
-  const quote = provider === "0x" ? zeroXQuote : bungeeQuote;
-  const isQuoteLoading = provider === "0x" ? isZeroXLoading : isBungeeLoading;
-  const quoteError = provider === "0x" ? zeroXError : bungeeError;
+  const quote =
+    provider === "0x"
+      ? zeroXQuote
+      : provider === "bungee"
+        ? bungeeQuote
+        : relayQuote;
+  const isQuoteLoading =
+    provider === "0x"
+      ? isZeroXLoading
+      : provider === "bungee"
+        ? isBungeeLoading
+        : isRelayLoading;
+  const quoteError =
+    provider === "0x"
+      ? zeroXError
+      : provider === "bungee"
+        ? bungeeError
+        : relayError;
   const fetchFirmQuote =
-    provider === "0x" ? fetchZeroXFirmQuote : fetchBungeeFirmQuote;
+    provider === "0x"
+      ? fetchZeroXFirmQuote
+      : provider === "bungee"
+        ? fetchBungeeFirmQuote
+        : fetchRelayFirmQuote;
 
   const formattedBalance = ethBalance
     ? parseFloat(formatEther(ethBalance.value)).toFixed(4)

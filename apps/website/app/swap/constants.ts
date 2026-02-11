@@ -19,3 +19,8 @@ export const SLIPPAGE_PRESETS = [100, 300, 500]; // 1%, 3%, 5%
 export const BUNGEE_BASE_URL = "https://public-backend.bungee.exchange";
 export const BUNGEE_NATIVE_TOKEN =
   "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+
+// Relay API (no API key needed for public access)
+export const RELAY_BASE_URL = "https://api.relay.link";
+export const RELAY_NATIVE_TOKEN =
+  "0x0000000000000000000000000000000000000000";

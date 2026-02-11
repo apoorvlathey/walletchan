@@ -156,6 +156,8 @@ When working on features, refer to these docs:
 | `_docs/WEBSITE.md`              | Website sections, layout specs, animations            |
 | `_docs/APPS.md`                 | Apps page data source, fetch script, adding chains     |
 | `_docs/SWAP.md`                 | Swap page: 0x API integration, fees, slippage, UI      |
+| `_docs/BUNGEE.md`              | Bungee swap provider: client-side API, fee handling    |
+| `_docs/RELAY.md`               | Relay swap provider: client-side API, app fees, USDC   |
 | `_docs/COINS.md`                | Coins page: SSE streaming, indexer API, pagination     |
 | `_docs/CALLDATA.md`             | Calldata decoder UI, param components, type routing   |
 | `_docs/DEVELOPMENT.md`          | Build process, dev environment setup                  |

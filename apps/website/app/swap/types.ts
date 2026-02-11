@@ -1,4 +1,4 @@
-export type SwapProvider = "0x" | "bungee";
+export type SwapProvider = "0x" | "bungee" | "relay";
 
 export interface SwapQuote {
   buyAmount: string;
