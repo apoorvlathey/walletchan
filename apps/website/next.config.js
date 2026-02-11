@@ -7,7 +7,7 @@ const nextConfig = {
       beforeFiles: [
         // coins.bankrwallet.app -> /coins
         {
-          source: "/:path((?!_next|api).*)",
+          source: "/:path((?!_next|api|images|og|screenshots).*)",
           has: [
             {
               type: "host",
