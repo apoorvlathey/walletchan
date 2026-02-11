@@ -15,7 +15,7 @@ import {
 import { erc20Abi, type Address, maxUint256 } from "viem";
 import { base } from "wagmi/chains";
 import { NATIVE_TOKEN_ADDRESS, SWAP_CHAIN_ID } from "../constants";
-import type { SwapQuote } from "../hooks/useSwapQuote";
+import type { SwapQuote } from "../types";
 
 type SwapStep = "idle" | "switching" | "approving" | "quoting" | "swapping";
 

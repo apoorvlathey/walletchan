@@ -73,8 +73,7 @@ export default function SwapPage() {
               textAlign="center"
               maxW="md"
             >
-              Swap ETH for any token on Base. Powered by 0x aggregator for the
-              best prices across all DEXs.
+              Swap ETH for any token on Base. Best prices across all DEXs.
             </Text>
 
             <SwapCard />

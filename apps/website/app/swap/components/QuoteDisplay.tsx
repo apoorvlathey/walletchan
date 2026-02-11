@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Box, HStack, Text, VStack, Icon, Collapse } from "@chakra-ui/react";
-import { formatTokenAmount, type SwapQuote } from "../hooks/useSwapQuote";
+import { formatTokenAmount } from "../hooks/useSwapQuote";
+import type { SwapQuote, SwapProvider } from "../types";
 
 function ChevronIcon({
   isOpen,
@@ -26,6 +27,7 @@ interface QuoteDisplayProps {
   buyTokenDecimals: number;
   sellTokenSymbol: string;
   sellTokenDecimals: number;
+  provider: SwapProvider;
 }
 
 export function QuoteDisplay({
@@ -34,6 +36,7 @@ export function QuoteDisplay({
   buyTokenDecimals,
   sellTokenSymbol,
   sellTokenDecimals,
+  provider,
 }: QuoteDisplayProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -84,19 +87,21 @@ export function QuoteDisplay({
           {integratorFee && (
             <HStack justify="space-between">
               <Text fontSize="xs" fontWeight="bold" textTransform="uppercase">
-                $BNKRW Fee (0.9%)
+                {provider === "bungee"
+                  ? "BankrWallet Fee (0.9%)"
+                  : "$BNKRW Fee (0.9%)"}
               </Text>
               <Text fontSize="sm" fontWeight="medium">
                 {formatTokenAmount(
                   integratorFee.amount,
-                  sellTokenDecimals
+                  provider === "bungee" ? buyTokenDecimals : sellTokenDecimals
                 )}{" "}
-                {sellTokenSymbol}
+                {provider === "bungee" ? buyTokenSymbol : sellTokenSymbol}
               </Text>
             </HStack>
           )}
 
-          {zeroExFee && (
+          {provider === "0x" && zeroExFee && (
             <HStack justify="space-between">
               <Text fontSize="xs" fontWeight="bold" textTransform="uppercase">
                 0x Fee

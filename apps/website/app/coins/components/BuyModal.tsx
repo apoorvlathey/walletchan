@@ -471,6 +471,7 @@ export function BuyModal({ token, isOpen, onClose, showWallet }: BuyModalProps) 
                 buyTokenDecimals={buyTokenInfo.decimals}
                 sellTokenSymbol={sellTokenInfo.symbol}
                 sellTokenDecimals={sellTokenInfo.decimals}
+                provider="0x"
               />
             )}
 

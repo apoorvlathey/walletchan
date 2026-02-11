@@ -18,10 +18,13 @@ import { formatEther } from "viem";
 import { base } from "wagmi/chains";
 import { useTokenInfo } from "../hooks/useTokenInfo";
 import { useSwapQuote, formatTokenAmount } from "../hooks/useSwapQuote";
+import { useBungeeQuote } from "../hooks/useBungeeQuote";
 import { NATIVE_TOKEN_ADDRESS, DEFAULT_SLIPPAGE_BPS } from "../constants";
+import type { SwapProvider } from "../types";
 import { QuoteDisplay } from "./QuoteDisplay";
 import { SwapButton } from "./SwapButton";
 import { SlippageSettings } from "./SlippageSettings";
+import { ProviderToggle } from "./ProviderToggle";
 
 function ArrowDownIcon(props: React.ComponentProps<typeof Icon>) {
   return (
@@ -37,6 +40,7 @@ export function SwapCard() {
   const [buyTokenAddress, setBuyTokenAddress] = useState("");
   const [sellAmount, setSellAmount] = useState("");
   const [slippageBps, setSlippageBps] = useState(DEFAULT_SLIPPAGE_BPS);
+  const [provider, setProvider] = useState<SwapProvider>("0x");
 
   // Read token from URL on mount (avoids useSearchParams + Suspense flash)
   useEffect(() => {
@@ -90,20 +94,41 @@ export function SwapCard() {
     return !isNaN(num) && num > 0;
   }, [sellAmount]);
 
-  // Fetch price quote (debounced auto-fetch, no periodic refresh)
+  // Fetch price quote from active provider (debounced auto-fetch, no periodic refresh)
   const {
-    quote,
-    isLoading: isQuoteLoading,
-    error: quoteError,
-    fetchFirmQuote,
+    quote: zeroXQuote,
+    isLoading: isZeroXLoading,
+    error: zeroXError,
+    fetchFirmQuote: fetchZeroXFirmQuote,
   } = useSwapQuote({
     sellToken,
     buyToken: buyTokenAddress,
     sellAmountEth: sellAmount,
     taker: address,
     slippageBps,
-    enabled: isBuyTokenValid && sellAmountValid,
+    enabled: provider === "0x" && isBuyTokenValid && sellAmountValid,
   });
+
+  const {
+    quote: bungeeQuote,
+    isLoading: isBungeeLoading,
+    error: bungeeError,
+    fetchFirmQuote: fetchBungeeFirmQuote,
+  } = useBungeeQuote({
+    sellToken,
+    buyToken: buyTokenAddress,
+    sellAmountEth: sellAmount,
+    taker: address,
+    slippageBps,
+    enabled: provider === "bungee" && isBuyTokenValid && sellAmountValid,
+  });
+
+  // Derive active provider values
+  const quote = provider === "0x" ? zeroXQuote : bungeeQuote;
+  const isQuoteLoading = provider === "0x" ? isZeroXLoading : isBungeeLoading;
+  const quoteError = provider === "0x" ? zeroXError : bungeeError;
+  const fetchFirmQuote =
+    provider === "0x" ? fetchZeroXFirmQuote : fetchBungeeFirmQuote;
 
   const formattedBalance = ethBalance
     ? parseFloat(formatEther(ethBalance.value)).toFixed(4)
@@ -164,17 +189,23 @@ export function SwapCard() {
       />
 
       <VStack spacing={6} align="stretch">
-        {/* Header row: title + wallet */}
+        {/* Header row: title + toggle + wallet */}
         <HStack justify="space-between" align="center">
           <VStack align="start" spacing={1}>
-            <Heading
-              size="lg"
-              textTransform="uppercase"
-              letterSpacing="tight"
-              lineHeight="1"
-            >
-              Swap
-            </Heading>
+            <HStack spacing={3} align="center">
+              <Heading
+                size="lg"
+                textTransform="uppercase"
+                letterSpacing="tight"
+                lineHeight="1"
+              >
+                Swap
+              </Heading>
+              <ProviderToggle
+                provider={provider}
+                onProviderChange={setProvider}
+              />
+            </HStack>
             {buyTokenInfo && (
               <Text
                 fontSize="sm"
@@ -422,6 +453,7 @@ export function SwapCard() {
             buyTokenDecimals={buyTokenInfo.decimals}
             sellTokenSymbol={sellTokenInfo.symbol}
             sellTokenDecimals={sellTokenInfo.decimals}
+            provider={provider}
           />
         )}
 
