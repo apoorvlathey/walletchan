@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
-import { GECKOTERMINAL_API_URL } from "../constants";
 import { formatMarketCap } from "../utils/formatters";
 
 const POLLING_INTERVAL = 5000; // 5 seconds
@@ -54,7 +53,7 @@ export function TokenDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function fetchTokenData() {
       try {
-        const res = await fetch(GECKOTERMINAL_API_URL);
+        const res = await fetch("/api/token-data");
         const data = await res.json();
         if (data.data?.attributes) {
           const attrs = data.data.attributes;
