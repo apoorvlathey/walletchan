@@ -168,7 +168,7 @@ export default function CoinsPage() {
     hasMore,
     loadMore,
   } = useCoinsStream();
-  const coins = allCoins.filter((c) => c.tweetUrl);
+  const coins = allCoins;
   // TODO: revisit once we have a GeckoTerminal API key to avoid rate limits
   const poolMarketData = new Map<string, PoolMarketData>();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
