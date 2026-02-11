@@ -1,12 +1,14 @@
 "use client";
 
-import { Box, Text, HStack, VStack, Image } from "@chakra-ui/react";
+import { Box, Text, HStack, VStack, Image, Button, IconButton, Spinner } from "@chakra-ui/react";
+import { Zap, Copy, Check } from "lucide-react";
 import { keyframes } from "@emotion/react";
 import { Card } from "../../components/ui/Card";
 import { TweetEmbed } from "../../components/ui/TweetCard";
 import { getTweetId } from "../../data/tweets";
 import type { Coin } from "../hooks/useCoinsStream";
-import { useState, useEffect } from "react";
+import type { PoolMarketData } from "../hooks/usePoolMarketData";
+import { useState, useEffect, useCallback } from "react";
 
 const newCoinFade = keyframes`
   0% { background-color: #F0C020; }
@@ -74,13 +76,25 @@ interface CoinCardProps {
   coin: Coin;
   index: number;
   isNew?: boolean;
+  onBuy?: () => void;
+  onInstaBuy?: () => void;
+  isInstaBuying?: boolean;
+  marketData?: PoolMarketData;
 }
 
-export function CoinCard({ coin, index, isNew }: CoinCardProps) {
+export function CoinCard({ coin, index, isNew, onBuy, onInstaBuy, isInstaBuying, marketData }: CoinCardProps) {
   const colorIndex = index % DECORATOR_COLORS.length;
   const shapeIndex = index % DECORATOR_SHAPES.length;
   const imageUrl = useTokenImage(coin.tokenURI);
   const tweetId = coin.tweetUrl ? getTweetId(coin.tweetUrl) : null;
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(coin.coinAddress);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }, [coin.coinAddress]);
 
   return (
       <Card
@@ -104,29 +118,120 @@ export function CoinCard({ coin, index, isNew }: CoinCardProps) {
               objectFit="cover"
             />
           )}
-          <VStack align="flex-start" spacing={0} flex={1}>
-            <Text
-              fontWeight="900"
-              fontSize="lg"
-              textTransform="uppercase"
-              letterSpacing="wide"
-              lineHeight="1.2"
-            >
-              ${coin.symbol}
-            </Text>
+          <VStack align="flex-start" spacing={0} flex={1} minW={0}>
+            <HStack spacing={1.5} w="full">
+              <Box
+                as="button"
+                onClick={handleCopy}
+                color={copied ? "green.500" : "gray.400"}
+                _hover={{ color: copied ? "green.500" : "gray.600" }}
+                display="flex"
+                alignItems="center"
+                flexShrink={0}
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+              </Box>
+              <Text
+                fontWeight="900"
+                fontSize="lg"
+                textTransform="uppercase"
+                letterSpacing="wide"
+                lineHeight="1.2"
+                noOfLines={1}
+                flex={1}
+                minW={0}
+              >
+                ${coin.symbol}
+              </Text>
+              <Text fontSize="xs" color="gray.400" fontWeight="600" flexShrink={0}>
+                {getRelativeTime(coin.timestamp)}
+              </Text>
+            </HStack>
             <Text
               fontSize="sm"
               color="gray.600"
               fontWeight="600"
               noOfLines={1}
+              w="full"
             >
               {coin.name}
             </Text>
           </VStack>
-          <Text fontSize="xs" color="gray.400" fontWeight="600">
-            {getRelativeTime(coin.timestamp)}
-          </Text>
         </HStack>
+
+        {/* Market data — only show when there's a real mcap value */}
+        {marketData && marketData.marketCapRaw > 0 && (
+          <HStack spacing={2} mt={2} justify="space-between">
+            <HStack spacing={1}>
+              <Text fontSize="xs" fontWeight="800" textTransform="uppercase" color="gray.500">
+                MCap:
+              </Text>
+              <Text fontSize="xs" fontWeight="800" color="bauhaus.blue">
+                {marketData.marketCap}
+              </Text>
+            </HStack>
+            {marketData.change5m !== null && marketData.change5m !== 0 && (
+              <HStack spacing={1}>
+                <Text fontSize="xs" fontWeight="800" textTransform="uppercase" color="gray.500">
+                  5m:
+                </Text>
+                <Text
+                  fontSize="xs"
+                  fontWeight="800"
+                  color={marketData.change5m >= 0 ? "#22c55e" : "bauhaus.red"}
+                >
+                  {marketData.change5m >= 0 ? "+" : ""}
+                  {marketData.change5m.toFixed(2)}%
+                </Text>
+              </HStack>
+            )}
+          </HStack>
+        )}
+
+        {/* Buy buttons */}
+        {onBuy && (
+          <HStack spacing={2} mt={3} w="full">
+            {onInstaBuy && (
+              <IconButton
+                aria-label="Insta Buy"
+                icon={isInstaBuying ? <Spinner size="xs" /> : <Zap size={16} fill="currentColor" />}
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onInstaBuy();
+                }}
+                isDisabled={isInstaBuying}
+                bg="bauhaus.yellow"
+                color="bauhaus.black"
+                fontWeight="900"
+                borderRadius={0}
+                border="2px solid"
+                borderColor="bauhaus.black"
+                _hover={{ bg: "#d4a818" }}
+                _disabled={{ opacity: 0.7, cursor: "not-allowed" }}
+              />
+            )}
+            <Button
+              size="sm"
+              flex={1}
+              onClick={(e) => {
+                e.stopPropagation();
+                onBuy();
+              }}
+              bg="bauhaus.red"
+              color="white"
+              fontWeight="900"
+              textTransform="uppercase"
+              letterSpacing="wide"
+              borderRadius={0}
+              border="2px solid"
+              borderColor="bauhaus.black"
+              _hover={{ bg: "#b01a1a" }}
+            >
+              Buy
+            </Button>
+          </HStack>
+        )}
 
         {/* Embedded tweet */}
         {tweetId && (
@@ -136,10 +241,10 @@ export function CoinCard({ coin, index, isNew }: CoinCardProps) {
             mb={-6}
             px={5}
             py={4}
-            flex={1}
             bg="blue.50"
             borderTop="2px solid"
             borderColor="bauhaus.black"
+            flex={1}
           >
             <TweetEmbed tweetId={tweetId} hideQuotedTweet />
           </Box>

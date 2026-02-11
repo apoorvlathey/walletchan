@@ -83,6 +83,15 @@ const theme = extendTheme({
             transform: "translate(2px, 2px)",
             boxShadow: "none",
           },
+          _disabled: {
+            bg: "bauhaus.red",
+            color: "white",
+            opacity: 0.5,
+            _hover: {
+              bg: "bauhaus.red !important",
+              opacity: 0.5,
+            },
+          },
         },
         secondary: {
           bg: "bauhaus.blue",

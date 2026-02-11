@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { GECKOTERMINAL_API_URL } from "../constants";
+import { formatMarketCap } from "../utils/formatters";
 
 const POLLING_INTERVAL = 5000; // 5 seconds
 
@@ -43,16 +44,6 @@ function formatPrice(priceValue: number): string {
     return `$0.0${subscript}${significantDigits}`;
   }
   return `$${priceValue.toFixed(8)}`;
-}
-
-function formatMarketCap(mcap: number): string {
-  if (mcap >= 1_000_000) {
-    return `$${(mcap / 1_000_000).toFixed(2)}M`;
-  } else if (mcap >= 1_000) {
-    return `$${(mcap / 1_000).toFixed(2)}K`;
-  } else {
-    return `$${mcap.toFixed(2)}`;
-  }
 }
 
 export function TokenDataProvider({ children }: { children: ReactNode }) {

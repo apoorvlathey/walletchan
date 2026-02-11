@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button, VStack, Text, Link } from "@chakra-ui/react";
+import { Button, VStack, Text, Link, HStack } from "@chakra-ui/react";
+import { LoadingShapes } from "../../components/ui/LoadingShapes";
 import {
   useAccount,
   useChainId,
@@ -60,10 +61,7 @@ export function SwapButton({
     address: sellToken as Address,
     abi: erc20Abi,
     functionName: "allowance",
-    args:
-      address && allowanceSpender
-        ? [address, allowanceSpender]
-        : undefined,
+    args: address && allowanceSpender ? [address, allowanceSpender] : undefined,
     chainId: base.id,
     query: {
       enabled: !isNativeSell && !!address && !!allowanceSpender,
@@ -148,12 +146,12 @@ export function SwapButton({
   const getButtonText = () => {
     if (!isConnected) return "Connect Wallet";
     if (!sellAmountValid) return "Enter Amount";
-    if (isQuoteLoading) return "Fetching Price...";
+    if (isQuoteLoading) return "Fetching Quote...";
     if (!quote) return "Enter Amount";
     if (chainId !== SWAP_CHAIN_ID) return "Switch to Base";
     if (step === "switching") return "Switching Chain...";
     if (step === "approving") return "Approving Token...";
-    if (step === "quoting") return "Getting Quote...";
+    if (step === "quoting") return "Swapping...";
     if (step === "swapping") return "Confirm in Wallet...";
     if (isConfirming) return "Confirming...";
     if (needsApproval) return "Approve & Swap";
@@ -176,17 +174,15 @@ export function SwapButton({
         w="full"
         onClick={handleSwap}
         isDisabled={isDisabled}
-        isLoading={step !== "idle" || isConfirming || isQuoteLoading}
-        loadingText={getButtonText()}
         fontSize="md"
         py={6}
-        _loading={{
-          bg: "bauhaus.red",
-          opacity: 0.85,
-          _hover: { bg: "bauhaus.red", opacity: 0.85 },
-        }}
       >
-        {getButtonText()}
+        <HStack spacing={3}>
+          {(step !== "idle" || isConfirming || isQuoteLoading) && (
+            <LoadingShapes />
+          )}
+          <Text>{getButtonText()}</Text>
+        </HStack>
       </Button>
 
       {error && (

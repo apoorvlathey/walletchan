@@ -5,6 +5,7 @@ export const coinLaunch = onchainTable(
   (t) => ({
     id: t.text().primaryKey(),
     coinAddress: t.hex().notNull(),
+    poolId: t.hex(),
     name: t.text(),
     symbol: t.text(),
     tokenURI: t.text(),
