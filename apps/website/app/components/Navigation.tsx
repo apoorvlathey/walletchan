@@ -26,6 +26,7 @@ import { LogoShapes } from "./ui/GeometricShape";
 import { CHROME_STORE_URL } from "../constants";
 
 const COINS_SUBDOMAIN = "coins.bankrwallet.app";
+const COINS_SUBDOMAIN_URL = "https://coins.bankrwallet.app";
 const MAIN_SITE = "https://bankrwallet.app";
 
 const revolveBorder = keyframes`
@@ -46,9 +47,14 @@ export function Navigation() {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const pathname = usePathname();
   const [isCoinsSubdomain, setIsCoinsSubdomain] = useState(false);
+  const [isLocalhost, setIsLocalhost] = useState(false);
 
   useEffect(() => {
     setIsCoinsSubdomain(window.location.hostname === COINS_SUBDOMAIN);
+    setIsLocalhost(
+      window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1"
+    );
   }, []);
 
   const isOnCoins = pathname === "/coins" || isCoinsSubdomain;
@@ -57,6 +63,10 @@ export function Navigation() {
     if (isCoinsSubdomain) {
       if (href === "/coins") return "/";
       if (href.startsWith("#")) return `${MAIN_SITE}/${href}`;
+    }
+    // On production main site, coins link goes to subdomain
+    if (!isLocalhost && !isCoinsSubdomain && href === "/coins") {
+      return COINS_SUBDOMAIN_URL;
     }
     return href;
   };
