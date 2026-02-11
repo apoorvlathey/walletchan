@@ -64,43 +64,65 @@ app.get("/coins/stream", (c) => {
   return streamSSE(c, async (stream) => {
     // Send initial batch if no cursor provided
     if (!sinceParam) {
-      const latest = await db
-        .select()
-        .from(schema.coinLaunch)
-        .orderBy(desc(schema.coinLaunch.timestamp))
-        .limit(10);
+      try {
+        const latest = await db
+          .select()
+          .from(schema.coinLaunch)
+          .orderBy(desc(schema.coinLaunch.timestamp))
+          .limit(10);
 
-      for (const coin of latest.reverse()) {
-        seen.add(coin.id);
-        await stream.writeSSE({
-          data: JSON.stringify(replaceBigInts(coin)),
-          event: "coin",
-          id: String(++eventId),
-        });
+        for (const coin of latest.reverse()) {
+          seen.add(coin.id);
+          await stream.writeSSE({
+            data: JSON.stringify(replaceBigInts(coin)),
+            event: "coin",
+            id: String(++eventId),
+          });
+        }
+        if (latest.length > 0) cursor = latest[0].timestamp;
+      } catch (e) {
+        console.error("SSE initial batch error:", e instanceof Error ? e.message : e);
       }
-      if (latest.length > 0) cursor = latest[0].timestamp;
     }
 
     // Poll for new coins every 2s
+    let consecutiveErrors = 0;
     while (true) {
       await stream.sleep(2000);
 
-      const rows = await db
-        .select()
-        .from(schema.coinLaunch)
-        .where(gte(schema.coinLaunch.timestamp, cursor))
-        .orderBy(schema.coinLaunch.timestamp)
-        .limit(50);
+      try {
+        const rows = await db
+          .select()
+          .from(schema.coinLaunch)
+          .where(gte(schema.coinLaunch.timestamp, cursor))
+          .orderBy(schema.coinLaunch.timestamp)
+          .limit(50);
 
-      for (const coin of rows) {
-        if (seen.has(coin.id)) continue;
-        seen.add(coin.id);
-        await stream.writeSSE({
-          data: JSON.stringify(replaceBigInts(coin)),
-          event: "coin",
-          id: String(++eventId),
-        });
-        if (coin.timestamp > cursor) cursor = coin.timestamp;
+        consecutiveErrors = 0;
+
+        for (const coin of rows) {
+          if (seen.has(coin.id)) continue;
+          seen.add(coin.id);
+          await stream.writeSSE({
+            data: JSON.stringify(replaceBigInts(coin)),
+            event: "coin",
+            id: String(++eventId),
+          });
+          if (coin.timestamp > cursor) cursor = coin.timestamp;
+        }
+      } catch (e) {
+        consecutiveErrors++;
+        console.error(
+          `SSE poll error (attempt ${consecutiveErrors}):`,
+          e instanceof Error ? e.message : e
+        );
+        // Back off on repeated failures, close stream after too many
+        if (consecutiveErrors >= 10) {
+          console.error("SSE stream: too many consecutive DB errors, closing stream");
+          break;
+        }
+        // Exponential backoff: wait longer on repeated failures
+        await stream.sleep(Math.min(consecutiveErrors * 2000, 10000));
       }
     }
   });
