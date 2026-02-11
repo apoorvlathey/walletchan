@@ -7,7 +7,7 @@
 
 ## Overview
 
-The `/coins` page displays Bankr coin launches in real-time. It fetches an initial batch via REST, then streams new coins via SSE. Follows the Bauhaus design system and mirrors patterns from `/apps`.
+The `/coins` page displays Bankr coin launches in near-real-time. It fetches an initial batch via REST, then polls for new coins every 5 seconds. Follows the Bauhaus design system and mirrors patterns from `/apps`.
 
 ---
 
@@ -19,18 +19,18 @@ The `/coins` page displays Bankr coin launches in real-time. It fetches an initi
 │   CoinsPage      │     GET /stats           │  Indexer API │
 │   (page.tsx)     │ ◄────────────────────── │  :42069      │
 │                  │                          │              │
-│  useCoinsStream  │     SSE /coins/stream    │              │
-│  (hook)          │ ◄═══════════════════════ │              │
+│  useCoinsStream  │     Poll /coins (5s)     │              │
+│  (hook)          │ ◄────────────────────── │              │
 └─────────────────┘                          └──────────────┘
 ```
 
 ### Data Flow
 
 1. **Initial load**: `GET /coins?limit=200&offset=0` + `GET /stats` in parallel
-2. **SSE connection**: Opens `EventSource` to `/coins/stream?since=<latestTimestamp>`
-3. **New coins**: SSE `coin` events are prepended to the list with a yellow highlight animation
+2. **Polling**: Every 5s, fetches `GET /coins?limit=50&offset=0` and compares timestamps to detect new coins
+3. **New coins**: New coins are prepended to the list with a yellow highlight animation
 4. **Pagination**: `IntersectionObserver` on a sentinel element triggers `loadMore()` which fetches next 200 coins at the correct offset
-5. **Reconnection**: On SSE error, reconnects with exponential backoff (1s base, 30s max)
+5. **Error handling**: Exponential backoff on fetch errors (1s base, 30s max). Marks disconnected after 3 consecutive failures.
 
 ---
 
@@ -42,7 +42,6 @@ The `/coins` page displays Bankr coin launches in real-time. It fetches an initi
 | `/coins/creator/:address` | GET | Coins by creator. Same pagination params |
 | `/coins/:address` | GET | Single coin by address |
 | `/stats` | GET | Returns `{ totalCoins, latestCoin }` |
-| `/coins/stream` | GET (SSE) | Real-time stream. Param: `since` (unix timestamp). Events: `coin` with JSON data |
 
 ### Coin Data Shape
 
@@ -70,7 +69,7 @@ apps/website/app/coins/
 ├── components/
 │   └── CoinCard.tsx            # Individual coin card
 └── hooks/
-    └── useCoinsStream.ts       # SSE + REST data hook
+    └── useCoinsStream.ts       # Polling + REST data hook
 ```
 
 ### `useCoinsStream` Hook
@@ -78,16 +77,17 @@ apps/website/app/coins/
 Returns:
 - `coins: Coin[]` — all loaded coins, newest first
 - `totalCoins: number` — total count from `/stats`
-- `isConnected: boolean` — SSE connection status
+- `isConnected: boolean` — polling status (false after 3 consecutive failures)
 - `isLoading: boolean` — true during initial REST fetch
 - `isLoadingMore: boolean` — true while fetching next page
 - `hasMore: boolean` — false when all coins have been loaded
 - `loadMore: () => Promise<void>` — fetch next page of older coins
 
 Key implementation details:
-- **SSE offset tracking**: A `sseCountRef` tracks how many coins were prepended via SSE so `loadMore` calculates the correct REST offset
-- **Deduplication**: Both SSE handler and `loadMore` deduplicate by coin `id`
-- **Reconnection**: Exponential backoff on SSE errors, reconnects with `since=<latestTimestamp>`
+- **Polling offset tracking**: A `newCountRef` tracks how many coins were prepended via polling so `loadMore` calculates the correct REST offset
+- **Deduplication**: Both poll handler and `loadMore` deduplicate by coin `id`
+- **Overlap guard**: `pollActiveRef` prevents concurrent polls from stacking
+- **Error handling**: Exponential backoff on errors, marks disconnected after 3 consecutive failures
 
 ### `CoinCard` Component
 
@@ -103,12 +103,12 @@ New coin animation: `@keyframes` that holds yellow (`#F0C020`) for ~1.75s then f
 ### `page.tsx`
 
 - **Header**: "COIN LAUNCHES" with geometric decorators (yellow square + red circle)
-- **Live indicator**: Green dot + "LIVE" when SSE connected, gray "CONNECTING..." otherwise
+- **Live indicator**: Green dot + "LIVE" when polling is healthy, gray "CONNECTING..." after 3+ consecutive failures
 - **Stats badge**: Blue chip showing total coin count
 - **Grid**: `SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 4 }}`
 - **Infinite scroll**: `IntersectionObserver` with 400px root margin triggers `loadMore`
 - **Scroll animations**: Framer Motion `useInView` for staggered card entrance
-- **New coin tracking**: `newCoinIds` Set tracks SSE arrivals for highlight animation (cleared after 2.5s)
+- **New coin tracking**: `newCoinIds` Set tracks new arrivals for highlight animation (cleared after 2.5s)
 - **Loading state**: Skeleton cards matching the card layout
 - **Empty state**: "No coins found" message
 
