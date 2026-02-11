@@ -2,7 +2,7 @@
 dockerfilePath = "apps/indexer/Dockerfile"
 
 [deploy]
-startCommand = "ponder start --schema $RAILWAY_DEPLOYMENT_ID"
+startCommand = "pnpm ponder start --schema $RAILWAY_DEPLOYMENT_ID"
 healthcheckPath = "/ready"
 healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"
