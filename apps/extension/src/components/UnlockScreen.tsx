@@ -34,6 +34,16 @@ const SidePanelIcon = (props: any) => (
   </Icon>
 );
 
+// Fullscreen icon
+const FullScreenIcon = (props: any) => (
+  <Icon viewBox="0 0 24 24" {...props}>
+    <path
+      fill="currentColor"
+      d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"
+    />
+  </Icon>
+);
+
 interface UnlockScreenProps {
   onUnlock: () => void;
   pendingTxCount: number;
@@ -124,6 +134,11 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
     }
   };
 
+  const openFullScreen = () => {
+    // Open extension in a new tab
+    chrome.tabs.create({ url: chrome.runtime.getURL("index.html") });
+  };
+
   const handleUnlock = async () => {
     if (!password) {
       setError("Password is required");
@@ -204,7 +219,7 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
       <Box
         position="absolute"
         top={4}
-        right={sidePanelSupported ? 12 : 4}
+        right={sidePanelSupported ? 20 : 12}
         w="0"
         h="0"
         borderLeft="6px solid transparent"
@@ -213,9 +228,18 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
         borderBottomColor="bauhaus.blue"
       />
 
-      {/* Sidepanel toggle - top right */}
-      {sidePanelSupported && (
-        <Box position="absolute" top={3} right={3}>
+      {/* Top right controls - fullscreen and sidepanel toggle */}
+      <HStack position="absolute" top={3} right={3} spacing={1}>
+        <Tooltip label="Open in fullscreen" placement="bottom">
+          <IconButton
+            aria-label="Open in fullscreen"
+            icon={<FullScreenIcon />}
+            variant="ghost"
+            size="sm"
+            onClick={openFullScreen}
+          />
+        </Tooltip>
+        {sidePanelSupported && (
           <Tooltip
             label={sidePanelMode ? "Switch to popup mode" : "Switch to sidepanel mode"}
             placement="bottom"
@@ -228,8 +252,8 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
               onClick={toggleSidePanelMode}
             />
           </Tooltip>
-        </Box>
-      )}
+        )}
+      </HStack>
 
       {/* Pending requests banner */}
       {(pendingTxCount > 0 || pendingSignatureCount > 0) && (
@@ -237,7 +261,7 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
           position="absolute"
           top={3}
           left={3}
-          right={sidePanelSupported ? 12 : 3}
+          right={sidePanelSupported ? 20 : 12}
           bg="bauhaus.yellow"
           border="2px solid"
           borderColor="bauhaus.black"
