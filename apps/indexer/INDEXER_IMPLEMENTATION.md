@@ -1,17 +1,17 @@
 # Bankr Token Launcher Indexer
 
-Ponder.sh indexer that tracks Bankr coin launches on Base by listening to the UniswapV4ScheduledMulticurveInitializer contract. Exposes indexed data via REST and GraphQL APIs.
+Ponder.sh indexer that tracks Bankr coin launches on Base by listening to Lock events from both the old UniswapV4ScheduledMulticurveInitializer and the new DecayMulticurveInitializer contracts. Exposes indexed data via REST and GraphQL APIs.
 
 ## Architecture
 
 ```
-Base chain (block 36,659,443+)
+Base chain
     │
     │  Lock(address indexed pool, (address,uint96)[] beneficiaries)
     │  + Initialize(bytes32 indexed id, ...) from PoolManager (same tx)
     ▼
 ┌──────────────────────┐
-│  ponder.config.ts    │  Subscribes to Lock events from 0xA367...ED8E
+│  ponder.config.ts    │  Subscribes to Lock events from both initializer contracts
 └──────────┬───────────┘
            ▼
 ┌──────────────────────┐
@@ -30,12 +30,15 @@ Base chain (block 36,659,443+)
 
 ## Contract Details
 
-| Field       | Value                                                          |
-| ----------- | -------------------------------------------------------------- |
-| Contract    | `0xA36715dA46Ddf4A769f3290f49AF58bF8132ED8E`                   |
-| Chain       | Base (8453)                                                    |
-| Start block | `36,659,443` (contract deployment)                             |
-| Event       | `Lock(address indexed pool, (address,uint96)[] beneficiaries)` |
+Two initializer contracts are indexed. The token launcher migrated from the old contract to the new one; both emit the same `Lock` event with the same beneficiary pattern.
+
+| Contract                                   | Address                                      | Start Block  | End Block    |
+| ------------------------------------------ | -------------------------------------------- | ------------ | ------------ |
+| UniswapV4ScheduledMulticurveInitializer    | `0xA36715dA46Ddf4A769f3290f49AF58bF8132ED8E` | `36,659,443` | `42,029,753` |
+| DecayMulticurveInitializer                 | `0xD59cE43E53D69F190E15d9822Fb4540dCcc91178` | `42,019,831` | —            |
+
+Both contracts share the same ABI for the `Lock` event:
+`Lock(address indexed pool, (address,uint96)[] beneficiaries)`
 
 The `pool` address (topic 1) is also the coin/token address. The `beneficiaries` array is non-indexed event data containing `(address account, uint96 bips)` tuples.
 

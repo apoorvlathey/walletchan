@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Text, HStack, VStack, Image, Button, IconButton, Spinner } from "@chakra-ui/react";
+import { Box, Text, HStack, VStack, Button, IconButton, Spinner } from "@chakra-ui/react";
 import { Zap, Copy, Check } from "lucide-react";
 import { keyframes } from "@emotion/react";
 import { Card } from "../../components/ui/Card";
@@ -8,7 +8,8 @@ import { TweetEmbed } from "../../components/ui/TweetCard";
 import { getTweetId } from "../../data/tweets";
 import type { Coin } from "../hooks/useCoinsStream";
 import type { PoolMarketData } from "../hooks/usePoolMarketData";
-import { useState, useEffect, useCallback } from "react";
+import { useTweetUrl } from "../hooks/useTweetUrl";
+import { useState, useCallback } from "react";
 
 const newCoinFade = keyframes`
   0% { background-color: #F0C020; }
@@ -37,41 +38,6 @@ function getRelativeTime(timestamp: string): string {
   return `${days}d ago`;
 }
 
-interface TokenURIMetadata {
-  image?: string;
-  name?: string;
-}
-
-function useTokenImage(tokenURI: string | undefined) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!tokenURI) return;
-
-    let cancelled = false;
-
-    async function fetchMetadata() {
-      try {
-        const res = await fetch(tokenURI!);
-        if (!res.ok || cancelled) return;
-        const data: TokenURIMetadata = await res.json();
-        if (!cancelled && data.image) {
-          setImageUrl(data.image);
-        }
-      } catch {
-        // Ignore fetch errors for token metadata
-      }
-    }
-
-    fetchMetadata();
-    return () => {
-      cancelled = true;
-    };
-  }, [tokenURI]);
-
-  return imageUrl;
-}
-
 interface CoinCardProps {
   coin: Coin;
   index: number;
@@ -85,8 +51,8 @@ interface CoinCardProps {
 export function CoinCard({ coin, index, isNew, onBuy, onInstaBuy, isInstaBuying, marketData }: CoinCardProps) {
   const colorIndex = index % DECORATOR_COLORS.length;
   const shapeIndex = index % DECORATOR_SHAPES.length;
-  const imageUrl = useTokenImage(coin.tokenURI);
-  const tweetId = coin.tweetUrl ? getTweetId(coin.tweetUrl) : null;
+  const tweetUrl = useTweetUrl(coin.tokenURI, coin.tweetUrl);
+  const tweetId = tweetUrl ? getTweetId(tweetUrl) : null;
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback((e: React.MouseEvent) => {
@@ -105,19 +71,8 @@ export function CoinCard({ coin, index, isNew, onBuy, onInstaBuy, isInstaBuying,
         display="flex"
         flexDirection="column"
       >
-        {/* Coin image + ticker + name */}
+        {/* Coin ticker + name */}
         <HStack spacing={3}>
-          {imageUrl && (
-            <Image
-              src={imageUrl}
-              alt={coin.name}
-              w="40px"
-              h="40px"
-              border="2px solid"
-              borderColor="bauhaus.black"
-              objectFit="cover"
-            />
-          )}
           <VStack align="flex-start" spacing={0} flex={1} minW={0}>
             <HStack spacing={1.5} w="full">
               <Box

@@ -9,6 +9,7 @@ import { getTweetId } from "../../data/tweets";
 import { VerifiedBadge } from "../../components/ui/TweetCard";
 import type { Coin } from "../hooks/useCoinsStream";
 import type { PoolMarketData } from "../hooks/usePoolMarketData";
+import { useTweetUrl } from "../hooks/useTweetUrl";
 
 function getTweetUsername(url: string): string | null {
   const match = url.match(/(?:twitter\.com|x\.com)\/(\w+)\/status\//);
@@ -49,8 +50,9 @@ interface CoinListItemProps {
 }
 
 export function CoinListItem({ coin, isNew, onBuy, onInstaBuy, isInstaBuying, marketData }: CoinListItemProps) {
-  const tweetId = coin.tweetUrl ? getTweetId(coin.tweetUrl) : null;
-  const username = coin.tweetUrl ? getTweetUsername(coin.tweetUrl) : null;
+  const tweetUrl = useTweetUrl(coin.tokenURI, coin.tweetUrl);
+  const tweetId = tweetUrl ? getTweetId(tweetUrl) : null;
+  const username = tweetUrl ? getTweetUsername(tweetUrl) : null;
   const { data: tweet } = useTweet(tweetId ?? undefined);
   const isVerified = tweet?.user?.is_blue_verified;
   const [copied, setCopied] = useState(false);
