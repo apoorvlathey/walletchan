@@ -25,6 +25,15 @@ interface EncryptedKeystore {
 }
 
 /**
+ * Vault-key encrypted format (no salt, uses vault key directly)
+ */
+interface EncryptedKeystoreVault {
+  ciphertext: string; // base64
+  iv: string; // base64
+  salt: ""; // Empty salt indicates vault-key encryption
+}
+
+/**
  * Encrypts a private key using AES-256-GCM
  */
 export async function encryptPrivateKey(
@@ -75,6 +84,61 @@ export async function decryptPrivateKey(
 }
 
 /**
+ * Checks if a keystore is encrypted with vault key (empty salt)
+ */
+export function isVaultKeyEncrypted(keystore: any): keystore is EncryptedKeystoreVault {
+  return keystore && keystore.salt === "";
+}
+
+/**
+ * Encrypts a private key using vault key (no password derivation needed)
+ */
+export async function encryptPrivateKeyWithVaultKey(
+  privateKey: `0x${string}`,
+  vaultKey: CryptoKey
+): Promise<EncryptedKeystoreVault> {
+  const encoder = new TextEncoder();
+  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv.buffer as ArrayBuffer },
+    vaultKey,
+    encoder.encode(privateKey)
+  );
+
+  return {
+    ciphertext: arrayBufferToBase64(ciphertext),
+    iv: arrayBufferToBase64(iv.buffer as ArrayBuffer),
+    salt: "", // Empty salt indicates vault-key encryption
+  };
+}
+
+/**
+ * Decrypts a vault-key encrypted keystore to get the private key
+ * CRITICAL: Only call from background.ts
+ */
+export async function decryptPrivateKeyWithVaultKey(
+  keystore: EncryptedKeystoreVault,
+  vaultKey: CryptoKey
+): Promise<`0x${string}` | null> {
+  try {
+    const decoder = new TextDecoder();
+    const iv = base64ToUint8Array(keystore.iv);
+    const ciphertext = base64ToArrayBuffer(keystore.ciphertext);
+
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: iv.buffer as ArrayBuffer },
+      vaultKey,
+      ciphertext
+    );
+
+    return decoder.decode(plaintext) as `0x${string}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Loads the vault from chrome storage
  */
 export async function loadVault(): Promise<Vault | null> {
@@ -101,6 +165,7 @@ function createEmptyVault(): Vault {
 
 /**
  * Adds an encrypted private key to the vault
+ * Uses vault key encryption if available, otherwise falls back to password encryption
  */
 export async function addKeyToVault(
   accountId: string,
@@ -118,8 +183,19 @@ export async function addKeyToVault(
     throw new Error("Account already exists in vault");
   }
 
+  // Check if vault key system is active
+  const { getCachedVaultKey } = await import("./sessionCache");
+  const vaultKey = getCachedVaultKey();
+
   // Encrypt the private key
-  const keystore = await encryptPrivateKey(privateKey, password);
+  let keystore: EncryptedKeystore | EncryptedKeystoreVault;
+  if (vaultKey) {
+    // Use vault key encryption (agent password compatible)
+    keystore = await encryptPrivateKeyWithVaultKey(privateKey, vaultKey);
+  } else {
+    // Fall back to password encryption (legacy)
+    keystore = await encryptPrivateKey(privateKey, password);
+  }
 
   // Add to vault
   const entry: VaultEntry = {
