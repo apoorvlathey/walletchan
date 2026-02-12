@@ -1192,12 +1192,30 @@ Decrypt Sensitive Data:
   encryptedVaultKeyMaster: { ... },  // Vault key encrypted with master password
   encryptedVaultKeyAgent: { ... },   // Vault key encrypted with agent password (optional)
   encryptedApiKeyVault: { ... },     // API key encrypted with vault key
-  encryptedVault: { ... },           // Private keys (still uses legacy format)
-  accounts: [...]                     // Account metadata (no sensitive data)
+  pkVault: {                         // Private keys encrypted with vault key
+    entries: [
+      { id: "...", keystore: { ciphertext, iv, salt: "" } }  // salt="" indicates vault-key encryption
+    ]
+  },
+  accounts: [...]                    // Account metadata (no sensitive data)
 }
 ```
 
-**IMPORTANT**: When saving API keys after vault key migration, always use `encryptedApiKeyVault` (encrypted with vault key), NOT `encryptedApiKey` (encrypted with password). The background worker's `handleSaveApiKeyWithCachedPassword()` and `addBankrAccount` handler automatically detect which system is in use and save to the correct location.
+**Migration Process**:
+1. On first unlock with master password after v1.3.0+, vault key system is created
+2. API key is re-encrypted with vault key → saved to `encryptedApiKeyVault`
+3. All private keys are re-encrypted with vault key → `pkVault` entries updated with `salt: ""`
+4. Agent password can now decrypt vault key → vault key decrypts API key and private keys
+5. Both master and agent passwords work for all operations (except private key reveal)
+
+**Storage Format Detection**:
+- `salt === ""` in keystore → vault-key encrypted (current format)
+- `salt !== ""` in keystore → password encrypted (legacy format, backward compatible)
+
+**IMPORTANT**: When saving credentials after vault key migration:
+- API keys: Use `encryptedApiKeyVault` (encrypted with vault key), NOT `encryptedApiKey`
+- Private keys: Use vault-key encryption via `encryptPrivateKeyWithVaultKey()`, NOT password encryption
+- The system automatically detects which format is in use and saves to the correct location
 
 **Security Note**: Private keys are ONLY decrypted in the service worker (background.ts) and NEVER exposed to content scripts, inpage scripts, or the UI layer. See [PK_ACCOUNTS.md](./PK_ACCOUNTS.md) for detailed security architecture.
 
@@ -1269,16 +1287,31 @@ Users can optionally configure an **agent password** that allows AI agents to un
 | `encryptedApiKey` | API key encrypted with password (legacy, kept for migration) |
 | `agentPasswordEnabled` | Boolean flag for UI |
 
-**Migration**: Existing users are automatically migrated to the vault key system on first unlock. The migration:
+**Migration**: Existing users are automatically migrated to the vault key system on first unlock with master password. The migration:
 1. Generates a new 256-bit vault key
-2. Encrypts vault key with master password
-3. Re-encrypts API key with vault key into `encryptedApiKeyVault`
+2. Encrypts vault key with master password → saved to `encryptedVaultKeyMaster`
+3. Re-encrypts API key with vault key → saved to `encryptedApiKeyVault`
+4. Re-encrypts all private keys with vault key → `pkVault` entries updated (v1.3.0+)
+5. Re-encrypts all seed phrases with vault key → `mnemonicVault` entries updated (v1.3.0+)
+
+**Partial Migration Detection**: If vault key system exists but private keys are still password-encrypted (e.g., upgraded from v1.2.0 to v1.3.0), the system automatically detects this on next master password unlock and completes the migration. Agent password unlock will fail with "Failed to decrypt vault" until migration is complete.
 4. Legacy `encryptedApiKey` is kept but no longer read after migration
 
-**API Key Saving**: When saving/updating API keys after wallet setup:
+**Credential Saving** (v1.3.0+): When saving/updating credentials after wallet setup:
+
+**API Keys**:
 - If `cachedVaultKey` exists → encrypt with vault key → save to `encryptedApiKeyVault`
 - If no vault key (legacy) → encrypt with password → save to `encryptedApiKey`
-- This is handled automatically by `handleSaveApiKeyWithCachedPassword()` and `addBankrAccount` handler
+- Handled automatically by `handleSaveApiKeyWithCachedPassword()` and `addBankrAccount` handler
+
+**Private Keys**:
+- If `cachedVaultKey` exists → encrypt with vault key via `encryptPrivateKeyWithVaultKey()` → save to `pkVault` with `salt: ""`
+- If no vault key (legacy) → encrypt with password via `encryptPrivateKey()` → save to `pkVault` with `salt: "base64..."`
+- Handled automatically by `addKeyToVault()` in `vaultCrypto.ts`
+
+**Seed Phrases**:
+- Same pattern as private keys using `encryptMnemonicWithVaultKey()` or `encryptMnemonic()`
+- Saved to `mnemonicVault` with appropriate salt indicator
 
 **Security Invariants**:
 1. Private key reveal is **always blocked** when unlocked with agent password
@@ -1475,15 +1508,21 @@ When changing the wallet password (Settings → Change Password):
 **With Vault Key System** (current) — atomic write pattern:
 1. Decrypt vault key with cached (old) password to get raw bytes
 2. Compute re-encrypted vault key with new password (in memory)
-3. Compute re-encrypted `pkVault` entries with new password via `computeReEncryptedVault()` (in memory)
-4. Compute re-encrypted `mnemonicVault` entries with new password via `computeReEncryptedMnemonicVault()` (in memory)
-5. **Single atomic `chrome.storage.local.set()`** writes all re-encrypted data at once
-6. API key stays encrypted with the vault key (unchanged)
-7. **Agent password remains valid** - `encryptedVaultKeyAgent` is unchanged
+3. **Only re-encrypt legacy entries** (if any exist):
+   - Check if `pkVault` entries have `salt !== ""` (legacy password encryption)
+   - If yes: re-encrypt with new password via `computeReEncryptedVault()` (in memory)
+   - If no (vault-key encrypted): skip re-encryption
+   - Same check for `mnemonicVault` entries
+4. **Single atomic `chrome.storage.local.set()`** writes all re-encrypted data at once
+5. **Vault-key encrypted data stays unchanged**:
+   - API key (in `encryptedApiKeyVault`) unchanged
+   - Private keys (in `pkVault` with `salt: ""`) unchanged
+   - Seed phrases (in `mnemonicVault` with `salt: ""`) unchanged
+6. **Agent password remains valid** - `encryptedVaultKeyAgent` is unchanged
 
-**Why atomic**: If any re-encryption step fails (OOM, crypto error), no storage writes happen. Without atomicity, the vault key could be updated to the new password while `pkVault`/`mnemonicVault` remain encrypted with the old password, making private keys permanently inaccessible.
+**Why atomic**: If any re-encryption step fails (OOM, crypto error), no storage writes happen. Without atomicity, the vault key could be updated to the new password while legacy entries remain encrypted with the old password, making data inaccessible.
 
-**Note**: `pkVault` and `mnemonicVault` entries are encrypted directly with the user's password (via PBKDF2), not with the vault key. Both must be re-encrypted when the password changes, or the private keys and seed phrases become inaccessible.
+**Note (v1.3.0+)**: After migration, `pkVault` and `mnemonicVault` entries are encrypted with the vault key (indicated by `salt: ""`), NOT with the user's password. Only legacy entries (pre-migration) need re-encryption during password change.
 
 **Legacy System** (pre-vault key migration):
 1. Decrypt API key with old password

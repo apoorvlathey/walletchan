@@ -62,6 +62,8 @@ import {
   getCachedVault,
   setCachedVault,
   getPrivateKeyFromCache,
+  getCachedPassword,
+  getCachedVaultKey,
   getAutoLockTimeout,
   tryRestoreSession,
 } from "./sessionCache";
@@ -409,13 +411,28 @@ export async function handleConfirmTransaction(
   let apiKey = getCachedApiKey();
 
   if (!apiKey) {
-    // Decrypt API key with provided password
-    apiKey = await loadDecryptedApiKey(password);
-    if (!apiKey) {
-      return { success: false, error: "Invalid password" };
+    // Try session restoration if cache is empty and auto-lock is "Never"
+    if (!getCachedPassword()) {
+      const { getAutoLockTimeout } = await import("./sessionCache");
+      const autoLockTimeout = await getAutoLockTimeout();
+      if (autoLockTimeout === 0) {
+        const { tryRestoreSession } = await import("./sessionCache");
+        const { handleUnlockWallet } = await import("./authHandlers");
+        await tryRestoreSession(handleUnlockWallet);
+        // Check if API key was restored
+        apiKey = getCachedApiKey();
+      }
     }
-    // Cache the API key and password for future transactions
-    setCachedApiKey(apiKey, password);
+
+    // If still no cached API key, try to decrypt with provided password
+    if (!apiKey) {
+      apiKey = await loadDecryptedApiKey(password);
+      if (!apiKey) {
+        return { success: false, error: "Invalid password" };
+      }
+      // Cache the API key and password for future transactions
+      setCachedApiKey(apiKey, password);
+    }
   }
 
   // Create AbortController for this transaction
@@ -625,14 +642,29 @@ export async function handleConfirmTransactionAsync(
   let apiKey = getCachedApiKey();
 
   if (!apiKey) {
-    // Decrypt API key with provided password
-    apiKey = await loadDecryptedApiKey(password);
-    if (!apiKey) {
-      processingTxIds.delete(txId);
-      return { success: false, error: "Invalid password" };
+    // Try session restoration if cache is empty and auto-lock is "Never"
+    if (!getCachedPassword()) {
+      const { getAutoLockTimeout } = await import("./sessionCache");
+      const autoLockTimeout = await getAutoLockTimeout();
+      if (autoLockTimeout === 0) {
+        const { tryRestoreSession } = await import("./sessionCache");
+        const { handleUnlockWallet } = await import("./authHandlers");
+        await tryRestoreSession(handleUnlockWallet);
+        // Check if API key was restored
+        apiKey = getCachedApiKey();
+      }
     }
-    // Cache the API key and password for future transactions
-    setCachedApiKey(apiKey, password);
+
+    // If still no cached API key, try to decrypt with provided password
+    if (!apiKey) {
+      apiKey = await loadDecryptedApiKey(password);
+      if (!apiKey) {
+        processingTxIds.delete(txId);
+        return { success: false, error: "Invalid password" };
+      }
+      // Cache the API key and password for future transactions
+      setCachedApiKey(apiKey, password);
+    }
   }
 
   // Remove from pending storage immediately
@@ -937,28 +969,55 @@ export async function handleConfirmTransactionAsyncPK(
   let privateKey = getPrivateKeyFromCache(account.id);
 
   if (!privateKey) {
-    // Need to decrypt the vault
-    const vault = await decryptAllKeys(password);
-    if (!vault) {
-      processingTxIds.delete(txId);
-      return { success: false, error: "Invalid password" };
-    }
-    setCachedVault(vault);
-
-    // Also cache API key and password if we have encrypted API key
-    const hasApiKey = await hasEncryptedApiKey();
-    if (hasApiKey) {
-      const apiKey = await loadDecryptedApiKey(password);
-      if (apiKey) {
-        setCachedApiKey(apiKey, password);
+    // Try session restoration if vault key isn't cached and auto-lock is "Never"
+    const vaultKey = getCachedVaultKey();
+    if (!vaultKey) {
+      const autoLockTimeout = await getAutoLockTimeout();
+      if (autoLockTimeout === 0) {
+        const { handleUnlockWallet } = await import("./authHandlers");
+        const restored = await tryRestoreSession(handleUnlockWallet);
+        if (restored) {
+          // Vault should be cached now
+          privateKey = getPrivateKeyFromCache(account.id);
+        }
       }
     }
 
-    // Get the private key from the now-cached vault
-    privateKey = getPrivateKeyFromCache(account.id);
+    // If still no private key, need to decrypt vault
     if (!privateKey) {
-      processingTxIds.delete(txId);
-      return { success: false, error: "Private key not found for account" };
+      const cachedVaultKey = getCachedVaultKey();
+      let vault;
+
+      if (cachedVaultKey) {
+        // Use vault-key decryption (supports both migrated and legacy entries)
+        const { decryptAllKeysWithVaultKey } = await import("./authHandlers");
+        vault = await decryptAllKeysWithVaultKey(cachedVaultKey);
+      } else {
+        // Fall back to password decryption (legacy format only)
+        vault = await decryptAllKeys(password);
+      }
+
+      if (!vault) {
+        processingTxIds.delete(txId);
+        return { success: false, error: "Invalid password" };
+      }
+      setCachedVault(vault);
+
+      // Also cache API key and password if we have encrypted API key
+      const hasApiKey = await hasEncryptedApiKey();
+      if (hasApiKey) {
+        const apiKey = await loadDecryptedApiKey(password);
+        if (apiKey) {
+          setCachedApiKey(apiKey, password);
+        }
+      }
+
+      // Get the private key from the now-cached vault
+      privateKey = getPrivateKeyFromCache(account.id);
+      if (!privateKey) {
+        processingTxIds.delete(txId);
+        return { success: false, error: "Private key not found for account" };
+      }
     }
   }
 
@@ -998,26 +1057,53 @@ export async function handleConfirmSignatureRequest(
   let privateKey = getPrivateKeyFromCache(account.id);
 
   if (!privateKey) {
-    // Need to decrypt the vault
-    const vault = await decryptAllKeys(password);
-    if (!vault) {
-      return { success: false, error: "Invalid password" };
-    }
-    setCachedVault(vault);
-
-    // Also cache API key and password if we have encrypted API key
-    const hasApiKey = await hasEncryptedApiKey();
-    if (hasApiKey) {
-      const apiKey = await loadDecryptedApiKey(password);
-      if (apiKey) {
-        setCachedApiKey(apiKey, password);
+    // Try session restoration if vault key isn't cached and auto-lock is "Never"
+    const vaultKey = getCachedVaultKey();
+    if (!vaultKey) {
+      const autoLockTimeout = await getAutoLockTimeout();
+      if (autoLockTimeout === 0) {
+        const { handleUnlockWallet } = await import("./authHandlers");
+        const restored = await tryRestoreSession(handleUnlockWallet);
+        if (restored) {
+          // Vault should be cached now
+          privateKey = getPrivateKeyFromCache(account.id);
+        }
       }
     }
 
-    // Get the private key from the now-cached vault
-    privateKey = getPrivateKeyFromCache(account.id);
+    // If still no private key, need to decrypt vault
     if (!privateKey) {
-      return { success: false, error: "Private key not found for account" };
+      const cachedVaultKey = getCachedVaultKey();
+      let vault;
+
+      if (cachedVaultKey) {
+        // Use vault-key decryption (supports both migrated and legacy entries)
+        const { decryptAllKeysWithVaultKey } = await import("./authHandlers");
+        vault = await decryptAllKeysWithVaultKey(cachedVaultKey);
+      } else {
+        // Fall back to password decryption (legacy format only)
+        vault = await decryptAllKeys(password);
+      }
+
+      if (!vault) {
+        return { success: false, error: "Invalid password" };
+      }
+      setCachedVault(vault);
+
+      // Also cache API key and password if we have encrypted API key
+      const hasApiKey = await hasEncryptedApiKey();
+      if (hasApiKey) {
+        const apiKey = await loadDecryptedApiKey(password);
+        if (apiKey) {
+          setCachedApiKey(apiKey, password);
+        }
+      }
+
+      // Get the private key from the now-cached vault
+      privateKey = getPrivateKeyFromCache(account.id);
+      if (!privateKey) {
+        return { success: false, error: "Private key not found for account" };
+      }
     }
   }
 
@@ -1058,12 +1144,27 @@ export async function handleConfirmSignatureRequestBankr(
   let apiKey = getCachedApiKey();
 
   if (!apiKey) {
-    // Decrypt API key with provided password
-    apiKey = await loadDecryptedApiKey(password);
-    if (!apiKey) {
-      return { success: false, error: "Invalid password" };
+    // Try session restoration if cache is empty and auto-lock is "Never"
+    if (!getCachedPassword()) {
+      const { getAutoLockTimeout } = await import("./sessionCache");
+      const autoLockTimeout = await getAutoLockTimeout();
+      if (autoLockTimeout === 0) {
+        const { tryRestoreSession } = await import("./sessionCache");
+        const { handleUnlockWallet } = await import("./authHandlers");
+        await tryRestoreSession(handleUnlockWallet);
+        // Check if API key was restored
+        apiKey = getCachedApiKey();
+      }
     }
-    setCachedApiKey(apiKey, password);
+
+    // If still no cached API key, try to decrypt with provided password
+    if (!apiKey) {
+      apiKey = await loadDecryptedApiKey(password);
+      if (!apiKey) {
+        return { success: false, error: "Invalid password" };
+      }
+      setCachedApiKey(apiKey, password);
+    }
   }
 
   try {

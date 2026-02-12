@@ -295,11 +295,16 @@ export async function getSessionPassword(): Promise<string | null> {
  * Stores session metadata in chrome.storage.session.
  * Called after successful unlock when auto-lock is "Never".
  */
-export async function storeSessionMetadata(sessionId: string, autoLockNever: boolean): Promise<void> {
+export async function storeSessionMetadata(
+  sessionId: string,
+  autoLockNever: boolean,
+  passwordType?: PasswordType
+): Promise<void> {
   await chrome.storage.session.set({
     sessionId,
     sessionStartedAt: Date.now(),
     autoLockNever,
+    passwordType, // Store password type to restore agent password guards after restart
   });
 }
 
@@ -320,12 +325,13 @@ export async function clearSessionStorage(): Promise<void> {
  * @param unlockFn - The unlock function to call with the stored password
  */
 export async function tryRestoreSession(
-  unlockFn: (password: string) => Promise<{ success: boolean }>
+  unlockFn: (password: string) => Promise<{ success: boolean; passwordType?: PasswordType }>
 ): Promise<boolean> {
   const session = await chrome.storage.session.get([
     "sessionId",
     "autoLockNever",
     "encryptedSessionPassword",
+    "passwordType",
   ]);
 
   // Check if we have a valid session to restore
@@ -351,8 +357,14 @@ export async function tryRestoreSession(
     // Restore session ID
     currentSessionId = session.sessionId;
 
-    // Re-store the session password for future restarts
+    // Restore password type (maintains agent password guards after restart)
+    if (session.passwordType) {
+      setCachedPasswordType(session.passwordType as PasswordType);
+    }
+
+    // Re-store the session password and metadata for future restarts
     await storeSessionPassword(password);
+    await storeSessionMetadata(session.sessionId, true, session.passwordType as PasswordType);
 
     console.log("Session restored successfully after service worker restart");
     return true;

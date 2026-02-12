@@ -219,6 +219,7 @@ Chrome extensions auto-update silently. Users cannot choose to stay on an old ve
 |---------|-----------|--------------|
 | v1.0.0 | `migrateFromLegacyStorage` | Creates `accounts` array + `activeAccountId` from legacy `address` / `encryptedApiKey` storage (v0.1.1/v0.2.0 had no multi-account system) |
 | v1.0.0 | Vault key (on first unlock) | `authHandlers.ts` auto-migrates `encryptedApiKey` → `encryptedVaultKeyMaster` + `encryptedApiKeyVault` |
+| v1.3.0 | Private key vault-key encryption (on first unlock with master password) | `authHandlers.ts` auto-migrates `pkVault` and `mnemonicVault` entries from password encryption (`salt !== ""`) to vault-key encryption (`salt === ""`). Enables agent password to sign transactions. Idempotent, dual-format support maintained. |
 
 ### Testing an update locally
 
