@@ -24,8 +24,8 @@ Persists across extension restarts. Cleared only on manual reset or uninstall.
 |-----|-------|-------------|------------|
 | `accounts` | `Account[]` — `{ id, type, address, displayName?, createdAt }` | All account metadata. Types: `bankr`, `privateKey`, `seedPhrase`, `impersonator`. | v1.0.0 |
 | `seedGroups` | `SeedGroup[]` — `{ id, name, createdAt, accountCount }` | Metadata for imported BIP39 seed phrase groups. | v1.0.0 |
-| `pkVault` | `{ version: 1, entries: [{ id, keystore }] }` | Encrypted private keys. `id` matches account ID. Keystore is AES-256-GCM encrypted with password (not yet vault key). | v1.0.0 |
-| `mnemonicVault` | `{ version: 1, entries: [{ id, keystore }] }` | Encrypted seed phrases. `id` matches seed group ID. AES-256-GCM encrypted with password. | v1.0.0 |
+| `pkVault` | `{ version: 1, entries: [{ id, keystore }] }` | Encrypted private keys. `id` matches account ID. Keystore is AES-256-GCM encrypted with vault key (`salt === ""`) or password (`salt !== ""`). Migration to vault key format happens on first unlock with master password (v1.3.0+). | v1.0.0 |
+| `mnemonicVault` | `{ version: 1, entries: [{ id, keystore }] }` | Encrypted seed phrases. `id` matches seed group ID. AES-256-GCM encrypted with vault key (`salt === ""`) or password (`salt !== ""`). Migration to vault key format happens on first unlock with master password (v1.3.0+). | v1.0.0 |
 
 ### Transaction & Request State
 
@@ -88,6 +88,7 @@ Cleared when browser closes. NOT synced. Used only for session restoration when 
 | `sessionStartedAt` | `number` (timestamp) | When the session was established. | v1.0.0 |
 | `autoLockNever` | `boolean` | Flag indicating this session uses "Never" auto-lock. | v1.0.0 |
 | `encryptedSessionPassword` | `{ data, key, iv }` (base64) | Password encrypted with random AES-GCM key for session restoration after service worker restart. Only set when auto-lock is "Never". | v1.0.0 |
+| `passwordType` | `"master" \| "agent"` | Which password was used to unlock. Restored to maintain agent password access control guards after service worker restart. | v1.3.0 |
 
 ---
 
@@ -115,3 +116,18 @@ sync:   address, displayAddress, chainName, networksInfo,
 All keys listed above. Migration from v0.1.x/v0.2.0:
 - `accounts` array created from legacy `address` by `migrateFromLegacyStorage()` in background.ts
 - `encryptedApiKey` → vault key system migrated on first unlock by `authHandlers.ts`
+
+### v1.3.0 (agent password transaction signing, password type persistence)
+
+New keys:
+- `chrome.storage.session.passwordType` (optional)
+
+Modified keys (dual-format support):
+- `pkVault` entries now support vault-key encryption (`salt === ""`) in addition to password encryption (`salt !== ""`)
+- `mnemonicVault` entries now support vault-key encryption (same dual-format pattern)
+
+Migration from v1.0.0+:
+- Private keys and seed phrases migrated from password encryption to vault-key encryption on first unlock with master password
+- Migration is idempotent and checks format before re-encrypting
+- Both formats continue to work (backward compatible)
+- Agent password can sign transactions after migration completes

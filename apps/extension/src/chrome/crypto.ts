@@ -80,10 +80,27 @@ export async function saveEncryptedApiKey(
 
 /**
  * Loads and decrypts API key from chrome storage
+ * Tries vault key system first (if available), then falls back to legacy format
  */
 export async function loadDecryptedApiKey(
   password: string
 ): Promise<string | null> {
+  // Try vault key system first
+  const { getCachedVaultKey } = await import("./sessionCache");
+  const vaultKey = getCachedVaultKey();
+
+  if (vaultKey) {
+    // Vault key is cached, try to decrypt API key with it
+    const { encryptedApiKeyVault } = await chrome.storage.local.get("encryptedApiKeyVault");
+    if (encryptedApiKeyVault) {
+      const apiKey = await decryptWithVaultKey(vaultKey, encryptedApiKeyVault);
+      if (apiKey) {
+        return apiKey;
+      }
+    }
+  }
+
+  // Fall back to legacy system (decrypt with password directly)
   const { encryptedApiKey } = (await chrome.storage.local.get(
     "encryptedApiKey"
   )) as { encryptedApiKey: EncryptedData | undefined };

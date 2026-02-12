@@ -116,6 +116,18 @@ async function unlockWithVaultKeySystem(password: string): Promise<{ success: bo
   // Decrypt vault entries (private keys) using the vault key
   const hasVault = await hasVaultEntries();
   if (hasVault) {
+    // Check if private keys need migration (only possible with master password)
+    if (passwordType === "master") {
+      const { loadVault, isVaultKeyEncrypted } = await import("./vaultCrypto");
+      const vault = await loadVault();
+      const needsMigration = vault?.entries.some(e => !isVaultKeyEncrypted(e.keystore));
+
+      if (needsMigration) {
+        // Migrate private keys to vault-key encryption
+        await migratePrivateKeysToVaultKey(password, vaultKey);
+      }
+    }
+
     const vault = await decryptAllKeysWithVaultKey(vaultKey);
     if (vault) {
       setCachedVault(vault);
@@ -127,7 +139,7 @@ async function unlockWithVaultKeySystem(password: string): Promise<{ success: bo
   if (autoLockTimeout === 0) {
     const sessionId = crypto.randomUUID();
     setCurrentSessionId(sessionId);
-    await storeSessionMetadata(sessionId, true);
+    await storeSessionMetadata(sessionId, true, passwordType);
     await storeSessionPassword(password);
   }
 
@@ -182,7 +194,7 @@ async function unlockWithLegacySystem(password: string): Promise<{ success: bool
   if (autoLockTimeout === 0) {
     const sessionId = crypto.randomUUID();
     setCurrentSessionId(sessionId);
-    await storeSessionMetadata(sessionId, true);
+    await storeSessionMetadata(sessionId, true, "master");
     await storeSessionPassword(password);
   }
 
@@ -190,7 +202,37 @@ async function unlockWithLegacySystem(password: string): Promise<{ success: bool
 }
 
 /**
+ * Migrates private keys to vault-key encryption (used when vault key system exists but private keys aren't migrated)
+ */
+async function migratePrivateKeysToVaultKey(password: string, vaultKey: CryptoKey): Promise<void> {
+  try {
+    const { loadVault, saveVault, decryptPrivateKey, encryptPrivateKeyWithVaultKey } = await import("./vaultCrypto");
+    const vault = await loadVault();
+    if (!vault || vault.entries.length === 0) {
+      return;
+    }
+
+    const newEntries: any[] = [];
+    for (const entry of vault.entries) {
+      // Decrypt with password
+      const privateKey = await decryptPrivateKey(entry.keystore as any, password);
+      // Re-encrypt with vault key
+      const newKeystore = await encryptPrivateKeyWithVaultKey(privateKey, vaultKey);
+      newEntries.push({ id: entry.id, keystore: newKeystore });
+    }
+    vault.entries = newEntries;
+    await saveVault(vault);
+
+    console.log("Private key migration to vault key completed");
+  } catch (error) {
+    console.error("Failed to migrate private keys to vault key:", error);
+    // Continue without migration - will try again next unlock
+  }
+}
+
+/**
  * Migrates from legacy direct-password encryption to vault key system
+ * Migrates both API key and all private keys to vault-key encryption
  */
 async function migrateToVaultKeySystem(password: string, apiKey: string | null): Promise<void> {
   try {
@@ -207,6 +249,22 @@ async function migrateToVaultKeySystem(password: string, apiKey: string | null):
       encryptedApiKeyVault = await encryptWithVaultKey(vaultKey, apiKey);
     }
 
+    // Re-encrypt all private keys with vault key (if vault exists)
+    const { loadVault, saveVault, decryptPrivateKey, encryptPrivateKeyWithVaultKey } = await import("./vaultCrypto");
+    const vault = await loadVault();
+    if (vault && vault.entries.length > 0) {
+      const newEntries: any[] = [];
+      for (const entry of vault.entries) {
+        // Decrypt with password
+        const privateKey = await decryptPrivateKey(entry.keystore as any, password);
+        // Re-encrypt with vault key
+        const newKeystore = await encryptPrivateKeyWithVaultKey(privateKey, vaultKey);
+        newEntries.push({ id: entry.id, keystore: newKeystore });
+      }
+      vault.entries = newEntries;
+      await saveVault(vault);
+    }
+
     // Save to storage
     const storageData: Record<string, any> = {
       encryptedVaultKeyMaster,
@@ -220,7 +278,7 @@ async function migrateToVaultKeySystem(password: string, apiKey: string | null):
     // Cache the vault key
     setCachedVaultKey(vaultKey);
 
-    console.log("Migration to vault key system completed");
+    console.log("Migration to vault key system completed (API key + private keys)");
   } catch (error) {
     console.error("Failed to migrate to vault key system:", error);
     // Continue without migration - will try again next unlock
@@ -229,19 +287,42 @@ async function migrateToVaultKeySystem(password: string, apiKey: string | null):
 
 /**
  * Decrypts all private keys using the vault key
- * Note: This requires the vault entries to be re-encrypted with vault key
- * For now, falls back to password-based decryption during transition
+ * Supports both vault-key and password-encrypted entries for backward compatibility
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function decryptAllKeysWithVaultKey(_vaultKey: CryptoKey): Promise<import("./types").DecryptedEntry[] | null> {
-  // During transition, the vault entries are still password-encrypted
-  // We need to use the cached password to decrypt them
-  const password = getCachedPassword();
-  if (!password) {
+export async function decryptAllKeysWithVaultKey(vaultKey: CryptoKey): Promise<import("./types").DecryptedEntry[] | null> {
+  const { loadVault, isVaultKeyEncrypted, decryptPrivateKeyWithVaultKey, decryptPrivateKey } = await import("./vaultCrypto");
+
+  const vault = await loadVault();
+  if (!vault || vault.entries.length === 0) {
     return [];
   }
 
-  return await decryptAllKeys(password);
+  try {
+    const decrypted: import("./types").DecryptedEntry[] = [];
+    for (const entry of vault.entries) {
+      const keystore = entry.keystore;
+
+      // Check if vault-key encrypted or password-encrypted
+      if (isVaultKeyEncrypted(keystore)) {
+        // New format: decrypt with vault key
+        const privateKey = await decryptPrivateKeyWithVaultKey(keystore, vaultKey);
+        if (!privateKey) throw new Error("Vault key decryption failed");
+        decrypted.push({ id: entry.id, privateKey });
+      } else {
+        // Legacy format: need password (fallback during transition)
+        const password = getCachedPassword();
+        if (!password) {
+          throw new Error("Password required for legacy keystore format");
+        }
+        const privateKey = await decryptPrivateKey(keystore, password);
+        decrypted.push({ id: entry.id, privateKey });
+      }
+    }
+    return decrypted;
+  } catch (error) {
+    console.error("Failed to decrypt vault with vault key:", error);
+    return null;
+  }
 }
 
 /**

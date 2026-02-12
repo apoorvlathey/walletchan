@@ -8,6 +8,22 @@ Browser wallet extension + landing page website in a pnpm workspace monorepo.
 
 **Supported chains**: Base (8453), Ethereum (1), Polygon (137), Unichain (130)
 
+## Critical: Test ALL Wallet Types
+
+**IMPORTANT**: BankrWallet supports THREE wallet types:
+
+1. **Bankr API accounts** (`type: "impersonator"`) - API-based impersonation, transactions via Bankr API
+2. **Private Key accounts** (`type: "privateKey"`) - Local signing with imported private keys
+3. **Seed Phrase accounts** (`type: "seedPhrase"`) - Local signing with HD wallet derivation
+
+**When implementing ANY feature that touches transactions, signatures, or authentication:**
+- **Test with ALL THREE wallet types** before considering it done
+- Different wallet types use different code paths (e.g., `confirmTransactionAsync` vs `confirmTransactionAsyncPK`)
+- Agent password must work for signing transactions/messages for ALL types (not just Bankr API accounts)
+- Private key reveal is blocked for agent password regardless of wallet type
+
+**Common mistake**: Fixing something only for Bankr API accounts and forgetting that private key/seed phrase accounts have separate handlers.
+
 ## AI Session Workflow
 
 **At the start of each session**, before writing any code:

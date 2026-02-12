@@ -14,8 +14,10 @@ This document is the security reference for the BankrWallet Chrome extension. It
 |--------|---------|-----------------|
 | Master password | Never stored (except encrypted session restore for "Never" auto-lock) | `cachedPassword` in `sessionCache.ts` |
 | Agent password | Never stored directly (encrypts vault key) | Not cached separately (same `cachedPassword` slot) |
-| Bankr API key | `encryptedApiKeyVault` (AES-256-GCM via vault key) | `cachedApiKey` in `sessionCache.ts` |
-| Private keys | `pkVault` entries (AES-256-GCM via PBKDF2) | `cachedVault` array in `sessionCache.ts` |
+| Password type | `chrome.storage.session` (for session restoration) | `cachedPasswordType` in `sessionCache.ts` |
+| Bankr API key | `encryptedApiKeyVault` (AES-256-GCM via vault key) or `encryptedApiKey` (legacy, password-based) | `cachedApiKey` in `sessionCache.ts` |
+| Private keys | `pkVault` entries (AES-256-GCM via vault key or password, indicated by `salt` field) | `cachedVault` array in `sessionCache.ts` |
+| Seed phrases | `mnemonicVault` entries (AES-256-GCM via vault key or password) | Not cached (retrieved on-demand for signing) |
 | Vault key | `encryptedVaultKeyMaster` / `encryptedVaultKeyAgent` (PBKDF2-wrapped) | `cachedVaultKey` as CryptoKey in `sessionCache.ts` |
 
 ### Trust Boundaries
@@ -51,6 +53,57 @@ background.ts (message router)
 | Vault key | 256-bit random (generated once, encrypted per-password) |
 
 **Files**: `cryptoUtils.ts` (shared constants), `crypto.ts` (API key + vault key ops), `vaultCrypto.ts` (private key vault)
+
+---
+
+## Vault Key System Architecture
+
+BankrWallet uses a **two-tier encryption** system (vault key wrapping) to enable multiple passwords to decrypt the same data without key duplication:
+
+```
+Master Password → PBKDF2 (600k) → Decrypt encryptedVaultKeyMaster → Vault Key (256-bit)
+Agent Password  → PBKDF2 (600k) → Decrypt encryptedVaultKeyAgent  → Same Vault Key
+                                         ↓
+                          Vault Key → AES-256-GCM → Decrypt:
+                                    - encryptedApiKeyVault
+                                    - pkVault entries (salt === "")
+                                    - mnemonicVault entries (salt === "")
+```
+
+### Storage Format Detection
+
+**Vault-key encrypted** (current, v1.3.0+):
+- `salt === ""` in keystore object
+- Encrypted directly with vault key (no PBKDF2 derivation)
+- Both master and agent passwords can decrypt (via vault key)
+
+**Password encrypted** (legacy, pre-v1.3.0):
+- `salt !== ""` (16-byte base64 salt)
+- Encrypted with PBKDF2-derived key from password
+- Only the specific password that encrypted it can decrypt
+- Supported for backward compatibility during migration
+
+### Migration Strategy
+
+**Automatic migration** on first unlock after v1.3.0 upgrade:
+1. User unlocks with master password → triggers `migrateToVaultKeySystem()`
+2. Generate 256-bit random vault key
+3. Encrypt vault key with master password → save to `encryptedVaultKeyMaster`
+4. Re-encrypt API key with vault key → save to `encryptedApiKeyVault`
+5. Re-encrypt all private keys with vault key → update `pkVault` entries (`salt: ""`)
+6. Re-encrypt all seed phrases with vault key → update `mnemonicVault` entries (`salt: ""`)
+
+**Partial migration detection**: If vault key system exists (`encryptedVaultKeyMaster` present) but private keys are still password-encrypted (`salt !== ""`), migration is completed on next master password unlock via `migratePrivateKeysToVaultKey()`.
+
+### Password Type Persistence (v1.3.0+)
+
+To maintain agent password access control guards across service worker restarts:
+
+**Storage**: `chrome.storage.session.passwordType` (stored alongside session password)
+
+**Restoration**: When `tryRestoreSession()` succeeds, `passwordType` is restored to `cachedPasswordType`, ensuring operations remain blocked for agent password sessions even after restart.
+
+**Critical**: Without password type persistence, agent password users could temporarily bypass guards (reveal private keys, change settings) after service worker restart until manual lock/unlock. This is now mitigated in v1.3.0+.
 
 ---
 
@@ -208,10 +261,11 @@ The `isExtensionPage()` helper verifies `sender.url` starts with `chrome-extensi
 
 | Key | Contains Secrets | Description |
 |-----|-----------------|-------------|
-| `encryptedSessionPassword` | Yes (encrypted) | Password for "Never" auto-lock restore |
-| `sessionId` | No | Session identifier |
-| `sessionStartedAt` | No | Session timestamp |
-| `autoLockNever` | No | Boolean flag |
+| `encryptedSessionPassword` | Yes (encrypted) | Password for "Never" auto-lock restore (AES-GCM with random key) |
+| `sessionId` | No | Session identifier (UUID) |
+| `sessionStartedAt` | No | Session timestamp (milliseconds since epoch) |
+| `autoLockNever` | No | Boolean flag indicating "Never" auto-lock mode |
+| `passwordType` | No | `"master" | "agent"` - Which password was used to unlock. Restored to maintain agent password access control guards after service worker restart (v1.3.0+) |
 
 ### chrome.storage.sync (synced, no secrets)
 
@@ -372,3 +426,5 @@ These are security characteristics that have been reviewed and accepted:
 4. **Content script runs on all websites**. Required for wallet provider injection. The content script only bridges specific message types and does not expose any secrets.
 
 5. **RPC proxy in background (`rpcRequest` handler)** accepts URLs from content scripts with protocol validation (HTTP/HTTPS only) and a 15-second timeout. This bypasses page CSP for legitimate RPC calls. The background worker acts as a fetch proxy but does not attach credentials to these requests.
+
+6. **Console logging of migration events and decryption operations** in `authHandlers.ts`, `vaultCrypto.ts`, and `sessionCache.ts`. Logs include timing information ("API key migration completed", "Private key migration completed", "Session restored after service worker restart") but never log the actual secrets (keys, passwords). Acceptable because: (a) Chrome DevTools requires explicit user action to open, (b) logs provide critical debugging info for migration and session restore flows, (c) industry standard practice (MetaMask logs extensively), (d) no secrets are exposed in log messages.
