@@ -327,6 +327,38 @@ window.addEventListener("message", async (e) => {
           favicon: getFaviconUrl(),
         },
         (result: { success: boolean; signature?: string; error?: string }) => {
+          // Check for Chrome runtime errors
+          if (chrome.runtime.lastError) {
+            window.postMessage(
+              {
+                type: "signatureRequestResult",
+                msg: {
+                  id,
+                  success: false,
+                  error: chrome.runtime.lastError.message || "Extension error",
+                },
+              },
+              "*"
+            );
+            return;
+          }
+
+          // Check if result is undefined
+          if (!result) {
+            window.postMessage(
+              {
+                type: "signatureRequestResult",
+                msg: {
+                  id,
+                  success: false,
+                  error: "No response from background script",
+                },
+              },
+              "*"
+            );
+            return;
+          }
+
           // Send result back to impersonator.ts
           window.postMessage(
             {

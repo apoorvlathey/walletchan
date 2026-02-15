@@ -193,6 +193,56 @@ These are the message handlers in `background.ts` that touch secrets, modify acc
 
 ---
 
+## EIP-712 Signature Request Validation
+
+**File**: `apps/extension/src/chrome/eip712Validator.ts`
+**Added**: v1.4.0
+
+All `eth_signTypedData_v3` and `eth_signTypedData_v4` requests are validated before processing to prevent denial-of-service attacks from malicious dapps.
+
+### Validation Rules
+
+| Check | Limit | Purpose |
+|-------|-------|---------|
+| Nesting depth | 50 levels | Prevent stack overflow and DoS from deeply nested types |
+| Circular references | None allowed | Prevent infinite recursion in type resolution |
+| Schema structure | Must have domain, types, primaryType, message | EIP-712 conformance |
+| Type definitions | All referenced types must exist | Prevent undefined type errors |
+
+### Attack Scenarios Blocked
+
+1. **Deep nesting DoS**: 60,825 nested types attempting to crash extension
+2. **Circular reference DoS**: Types referencing themselves causing infinite loops
+3. **Malformed schemas**: Invalid JSON or missing required fields
+
+### Validation Flow
+
+```
+handleSignatureRequest() → validateEIP712TypedData()
+  ├─ Check method (only v3/v4)
+  ├─ Parse typed data
+  ├─ Validate schema structure
+  ├─ Detect circular references (DFS)
+  ├─ Check nesting depth
+  └─ Validate type definitions
+     ↓
+if invalid: console.error() + return error to dapp + no popup
+if valid: continue to normal flow
+```
+
+### Console Logging
+
+Failed validations log to console for debugging:
+
+```
+[BankrWallet] EIP-712 validation failed for https://malicious.site:
+  Type 'Attack' exceeds maximum nesting depth of 50 (found 60825)
+```
+
+This helps developers identify malicious sites attempting attacks.
+
+---
+
 ## Content Script Message Filtering
 
 ### Inpage-to-Background Messages (via inject.ts)
