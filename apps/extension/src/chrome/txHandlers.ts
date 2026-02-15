@@ -196,6 +196,8 @@ export async function handleSignatureRequest(
 ): Promise<void> {
   const { signature, origin, favicon } = message;
 
+  // Note: EIP-712 validation now happens in background.ts before this function is called
+
   // Create pending signature request
   const sigId = crypto.randomUUID();
   const chainName = CHAIN_NAMES[signature.chainId] || `Chain ${signature.chainId}`;

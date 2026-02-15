@@ -45,6 +45,7 @@ import {
   getMnemonic,
 } from "./mnemonicStorage";
 import { deriveAddress } from "./localSigner";
+import { validateEIP712TypedData } from "./eip712Validator";
 import {
   removePendingTxRequest,
   getPendingTxRequests,
@@ -378,6 +379,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "signatureRequest": {
+      // Validate EIP-712 schema BEFORE async handler (synchronous sendResponse)
+      const { signature } = message;
+      if (
+        signature.method === "eth_signTypedData_v3" ||
+        signature.method === "eth_signTypedData_v4"
+      ) {
+        const validationResult = validateEIP712TypedData(
+          signature.method,
+          signature.params[1]
+        );
+
+        if (!validationResult.valid) {
+          console.warn(
+            `[BankrWallet] EIP-712 validation failed for ${message.origin}:`,
+            validationResult.error
+          );
+          sendResponse({
+            success: false,
+            error: "Data must conform to EIP-712 schema",
+          });
+          return false; // Synchronous response, don't keep channel open
+        }
+      }
+
+      // Validation passed, proceed with async handler
       const senderWindowId = sender.tab?.windowId;
       handleSignatureRequest(message, sendResponse, senderWindowId);
       return true;

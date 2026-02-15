@@ -491,15 +491,26 @@ window.addEventListener("message", (e: any) => {
           callbacks.resolve(e.data.msg.signature);
         } else {
           const errorMessage = e.data.msg.error || "Signature request rejected";
+
           // Check if this is a user rejection (EIP-1193 error code 4001)
           const isUserRejection =
             errorMessage.toLowerCase().includes("rejected") ||
             errorMessage.toLowerCase().includes("cancelled") ||
             errorMessage.toLowerCase().includes("denied");
-          const error = new Error(errorMessage) as Error & { code: number };
+
+          // Check if this is an EIP-712 schema validation error (JSON-RPC error code -32603)
+          const isSchemaError = errorMessage.includes("EIP-712 schema");
+
+          // Prefix error message with "BankrWallet - " for clarity
+          const prefixedMessage = `BankrWallet - ${errorMessage}`;
+          const error = new Error(prefixedMessage) as Error & { code: number };
+
           if (isUserRejection) {
             error.code = 4001; // EIP-1193: User Rejected Request
+          } else if (isSchemaError) {
+            error.code = -32603; // JSON-RPC Internal Error
           }
+
           callbacks.reject(error);
         }
       }
