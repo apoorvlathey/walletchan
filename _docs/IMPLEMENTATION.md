@@ -720,6 +720,28 @@ When both transaction and signature requests are pending:
 - "Reject All" button rejects both transactions and signatures
 - Pending list shows both types with TX/SIG badges
 
+### EIP-712 Validation (v1.4.0+)
+
+Before storing or displaying EIP-712 signature requests, typed data is validated to prevent malicious attacks.
+
+**When**: Before storing in `pendingSignatureRequests`
+**Methods validated**: `eth_signTypedData_v3`, `eth_signTypedData_v4`
+**Location**: `txHandlers.ts:handleSignatureRequest()` line ~197
+
+**Checks performed**:
+1. Schema structure (domain, types, primaryType, message fields exist)
+2. Circular reference detection (DFS traversal)
+3. Nesting depth limit (50 levels maximum)
+4. Type definition conformance (all referenced types exist and are valid)
+
+**On validation failure**:
+- Console error with details logged
+- Dapp receives: `{ success: false, error: "Data must conform to EIP-712 schema" }`
+- No popup shown
+- Request not stored in chrome.storage.local
+
+**Files**: `eip712Validator.ts` (validation logic), `txHandlers.ts` (integration)
+
 ## Async Transaction Confirmation
 
 When a user confirms a transaction, the extension uses an async flow that allows the popup to close immediately while processing continues in the background.
