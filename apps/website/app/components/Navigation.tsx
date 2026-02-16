@@ -81,6 +81,10 @@ export function Navigation() {
       if (href === "/coins") return COINS_SUBDOMAIN_URL;
       if (href === "/stake") return STAKE_SUBDOMAIN_URL;
     }
+    // On localhost /coins or /stake paths, anchor links need absolute path
+    if (isLocalhost && (pathname === "/coins" || pathname === "/stake") && href.startsWith("#")) {
+      return `/${href}`;
+    }
     return href;
   };
 
