@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
+import {
+  BASE_CHAIN_ID,
+  BNKRW_TOKEN_ADDRESS,
+} from "@bankr-wallet/shared/contracts";
 
 const WASABI_API_URL = "https://api.wasabi.xyz";
-const BNKRW_TOKEN_ADDRESS = "0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07";
-const CHAIN_ID = 8453;
 
 export async function GET() {
   try {
-    const url = `${WASABI_API_URL}/v1/perps/vaults?chainId=${CHAIN_ID}&token=${BNKRW_TOKEN_ADDRESS}`;
+    const url = `${WASABI_API_URL}/v1/perps/vaults?chainId=${BASE_CHAIN_ID}&token=${BNKRW_TOKEN_ADDRESS}`;
 
     const headers: Record<string, string> = {
       accept: "application/json",

@@ -1,7 +1,7 @@
-// Token addresses
-export const TOKEN_ADDRESS = "0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07";
-export const POOL_ADDRESS =
-  "0x6c8fd04c19e3c6c3efc21f6f5ae79c1453a19d971b7b7d4969df1928c380aaad";
+export {
+  BNKRW_TOKEN_ADDRESS as TOKEN_ADDRESS,
+  BNKRW_POOL_ADDRESS as POOL_ADDRESS,
+} from "@bankr-wallet/shared/contracts";
 
 // App URLs
 export const CHROME_STORE_URL =
