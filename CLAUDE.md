@@ -56,11 +56,13 @@ Browser wallet extension + landing page website in a pnpm workspace monorepo.
 ```
 bankr-wallet/
 ├── apps/
-│   ├── extension/    # Browser extension (Vite + React + Chakra UI)
-│   └── website/      # Landing page (Next.js + Chakra UI)
+│   ├── extension/        # Browser extension (Vite + React + Chakra UI)
+│   ├── website/          # Landing page (Next.js + Chakra UI)
+│   ├── indexer/          # Ponder indexer for coin launches
+│   └── staking-indexer/  # Ponder indexer for sBNKRW vault staking
 ├── packages/
-│   └── shared/       # Shared design tokens and assets
-├── _docs/             # LLM-facing documentation
+│   └── shared/           # Shared design tokens, assets, and contract constants
+├── _docs/                # LLM-facing documentation
 │   ├── IMPLEMENTATION.md  # Extension architecture and message flows
 │   ├── SECURITY.md        # Security audit guide, threat model, pre-commit checklists
 │   ├── STYLING.md         # Bauhaus design system (colors, typography, components)
@@ -71,10 +73,12 @@ bankr-wallet/
 
 ## Tech Stack
 
-| App       | Framework               | UI Library | Build Tool |
-| --------- | ----------------------- | ---------- | ---------- |
-| Extension | React 18                | Chakra UI  | Vite       |
-| Website   | Next.js 14 (App Router) | Chakra UI  | Next.js    |
+| App             | Framework               | UI Library | Build Tool |
+| --------------- | ----------------------- | ---------- | ---------- |
+| Extension       | React 18                | Chakra UI  | Vite       |
+| Website         | Next.js 14 (App Router) | Chakra UI  | Next.js    |
+| Indexer          | Ponder                  | Hono       | Ponder     |
+| Staking Indexer  | Ponder                  | Hono       | Ponder     |
 
 **Design System**: Bauhaus - geometric, primary colors (Red #D02020, Blue #1040C0, Yellow #F0C020), hard shadows, thick borders. See `_docs/STYLING.md`.
 
@@ -85,8 +89,9 @@ bankr-wallet/
 pnpm install
 
 # Development
-pnpm dev:extension      # Build extension in dev mode
-pnpm dev:website        # Start website dev server at localhost:3000
+pnpm dev:extension         # Build extension in dev mode
+pnpm dev:website           # Start website dev server at localhost:3000
+pnpm dev:staking-indexer   # Start staking indexer at localhost:42070
 
 # Build
 pnpm build              # Build both extension and website
@@ -174,6 +179,7 @@ When working on features, refer to these docs:
 | `_docs/SWAP.md`                 | Swap page: 0x API integration, fees, slippage, UI      |
 | `_docs/COINS.md`                | Coins page: SSE streaming, indexer API, pagination     |
 | `_docs/CALLDATA.md`             | Calldata decoder UI, param components, type routing   |
+| `apps/staking-indexer/STAKING_INDEXER_IMPLEMENTATION.md` | Staking indexer: vault events, balance tracking, API |
 | `_docs/DEVELOPMENT.md`          | Build process, dev environment setup                  |
 | `_docs/PUBLISHING.md`           | Release workflow, CWS upload, auto-update, signing    |
 | `_docs/STORAGE.md`              | Every chrome.storage key, shapes, version history     |
@@ -187,6 +193,7 @@ When working on features, refer to these docs:
 - **Per-tab chain state**: Each browser tab maintains its own selected chain
 - **Transaction persistence**: Pending transactions survive popup close (stored in chrome.storage.local)
 - **EIP-6963**: Modern wallet discovery alongside legacy window.ethereum
+- **Shared contract constants**: `packages/shared/src/contracts.ts` is the single source of truth for `BASE_CHAIN_ID`, `BNKRW_TOKEN_ADDRESS`, `SBNKRW_VAULT_ADDRESS`, `BNKRW_POOL_ADDRESS`. Import via `@bankr-wallet/shared/contracts`.
 - **Address display standard**: Whenever a `0x` address is shown in the UI, always include a **copy button** (CopyIcon/CheckIcon toggle) and a **view on explorer** link (ExternalLinkIcon, opens `${chainConfig.explorer}/address/${addr}`). See `TypedDataDisplay.tsx` `AddressValue` component for the reference pattern.
 
 ## Code Quality Guidelines

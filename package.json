@@ -14,6 +14,8 @@
     "zip:cws": "pnpm --filter @bankr-wallet/extension zip:cws",
     "dev:indexer": "pnpm --filter @bankr-wallet/indexer dev",
     "start:indexer": "pnpm --filter @bankr-wallet/indexer start",
+    "dev:staking-indexer": "pnpm --filter @bankr-wallet/staking-indexer dev",
+    "start:staking-indexer": "pnpm --filter @bankr-wallet/staking-indexer start",
     "icons": "pnpm --filter @bankr-wallet/extension icons",
     "release:patch": "pnpm --filter @bankr-wallet/extension release:patch",
     "release:minor": "pnpm --filter @bankr-wallet/extension release:minor",

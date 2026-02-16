@@ -8,6 +8,7 @@
   "exports": {
     ".": "./index.ts",
     "./theme": "./theme/tokens.ts",
+    "./contracts": "./src/contracts.ts",
     "./assets/*": "./assets/*"
   }
 }

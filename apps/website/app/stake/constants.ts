@@ -1,13 +1,8 @@
-// Base chain ID
-export const STAKE_CHAIN_ID = 8453;
+export {
+  BASE_CHAIN_ID as STAKE_CHAIN_ID,
+  BNKRW_TOKEN_ADDRESS,
+  SBNKRW_VAULT_ADDRESS,
+} from "@bankr-wallet/shared/contracts";
 
-// BNKRW token on Base
-export const BNKRW_TOKEN_ADDRESS =
-  "0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07";
-
-// sBNKRW vault on Base (Wasabi)
-export const SBNKRW_VAULT_ADDRESS =
-  "0x7ac242481d5122c4d3400492af6adfbce21d7113";
-
-// Wasabi API
+// Wasabi API (website-only, not shared)
 export const WASABI_API_URL = "https://api.wasabi.xyz";
