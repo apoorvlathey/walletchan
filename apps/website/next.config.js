@@ -16,6 +16,17 @@ const nextConfig = {
           ],
           destination: "/coins/:path*",
         },
+        // stake.bankrwallet.app -> /stake
+        {
+          source: "/:path((?!_next|api|images|og|screenshots).*)",
+          has: [
+            {
+              type: "host",
+              value: "stake.bankrwallet.app",
+            },
+          ],
+          destination: "/stake/:path*",
+        },
       ],
     };
   },

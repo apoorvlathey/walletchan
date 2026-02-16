@@ -3,6 +3,7 @@
 import { ChakraProvider } from "@chakra-ui/react";
 import theme from "@/theme";
 import { TokenDataProvider } from "./contexts/TokenDataContext";
+import { VaultDataProvider } from "./contexts/VaultDataContext";
 
 import "@rainbow-me/rainbowkit/styles.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -18,7 +19,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <WagmiProvider config={config}>
         <QueryClientProvider client={queryClient}>
           <RainbowKitProvider modalSize="compact">
-            <TokenDataProvider>{children}</TokenDataProvider>
+            <TokenDataProvider>
+              <VaultDataProvider>{children}</VaultDataProvider>
+            </TokenDataProvider>
           </RainbowKitProvider>
         </QueryClientProvider>
       </WagmiProvider>
