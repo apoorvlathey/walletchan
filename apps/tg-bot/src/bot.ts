@@ -10,6 +10,7 @@ import {
   formatThreshold,
 } from "./services/balance.js";
 import { formatUnits } from "viem";
+import { kickUser, sendKickDM } from "./services/group.js";
 
 const isAdmin = (userId: number) => BigInt(userId) === config.ADMIN_TG_ID;
 const isDM = (chatType: string) => chatType === "private";
@@ -99,17 +100,35 @@ export function createBot(): Bot {
   });
 
   // Track when users join/leave the private group
+  // Kick unverified users who join directly (e.g. via leaked invite link)
   bot.on("chat_member", async (ctx) => {
     if (!config.PRIVATE_GROUP_ID || ctx.chatMember.chat.id !== config.PRIVATE_GROUP_ID) return;
 
     const userId = BigInt(ctx.chatMember.new_chat_member.user.id);
     const status = ctx.chatMember.new_chat_member.status;
-    const isMember = status === "member" || status === "administrator";
+    const joined = status === "member" || status === "administrator";
 
-    await db
-      .update(users)
-      .set({ isMember })
-      .where(eq(users.tgId, userId));
+    if (joined) {
+      // Skip admin — never kick
+      if (userId === config.ADMIN_TG_ID) return;
+
+      // Check if user is verified
+      const user = await db.query.users.findFirst({
+        where: eq(users.tgId, userId),
+      });
+
+      if (!user || !user.walletAddress) {
+        // Unverified — kick immediately
+        console.log(`[ChatMember] Unverified user ${userId} joined, kicking...`);
+        await kickUser(bot, Number(userId));
+        await sendKickDM(bot, Number(userId));
+        return;
+      }
+
+      await db.update(users).set({ isMember: true }).where(eq(users.tgId, userId));
+    } else {
+      await db.update(users).set({ isMember: false }).where(eq(users.tgId, userId));
+    }
   });
 
   // Register slash commands menu with Telegram

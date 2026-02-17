@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { Bot } from "grammy";
+import { config } from "../config.js";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
 import { getUserBalance, meetsThreshold } from "../services/balance.js";
@@ -16,6 +17,9 @@ async function checkBalances(bot: Bot): Promise<void> {
 
   for (const member of members) {
     if (!member.walletAddress) continue;
+
+    // Never kick admin
+    if (member.tgId === config.ADMIN_TG_ID) continue;
 
     try {
       const balance = await getUserBalance(member.walletAddress);
