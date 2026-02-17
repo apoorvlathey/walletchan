@@ -1,0 +1,6 @@
+[build]
+dockerfilePath = "apps/tg-bot/Dockerfile"
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

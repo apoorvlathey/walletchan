@@ -59,7 +59,8 @@ bankr-wallet/
 │   ├── extension/        # Browser extension (Vite + React + Chakra UI)
 │   ├── website/          # Landing page (Next.js + Chakra UI)
 │   ├── indexer/          # Ponder indexer for coin launches
-│   └── staking-indexer/  # Ponder indexer for sBNKRW vault staking
+│   ├── staking-indexer/  # Ponder indexer for sBNKRW vault staking
+│   └── tg-bot/           # Token-gated Telegram bot (Grammy + Hono)
 ├── packages/
 │   └── shared/           # Shared design tokens, assets, and contract constants
 ├── _docs/                # LLM-facing documentation
@@ -79,6 +80,7 @@ bankr-wallet/
 | Website         | Next.js 14 (App Router) | Chakra UI  | Next.js    |
 | Indexer          | Ponder                  | Hono       | Ponder     |
 | Staking Indexer  | Ponder                  | Hono       | Ponder     |
+| TG Bot           | Grammy + Hono           | —          | tsc        |
 
 **Design System**: Bauhaus - geometric, primary colors (Red #D02020, Blue #1040C0, Yellow #F0C020), hard shadows, thick borders. See `_docs/STYLING.md`.
 
@@ -92,6 +94,7 @@ pnpm install
 pnpm dev:extension         # Build extension in dev mode
 pnpm dev:website           # Start website dev server at localhost:3000
 pnpm dev:staking-indexer   # Start staking indexer at localhost:42070
+pnpm dev:tg-bot            # Start TG bot + API at localhost:3001
 
 # Build
 pnpm build              # Build both extension and website
@@ -184,6 +187,8 @@ When working on features, refer to these docs:
 | `_docs/PUBLISHING.md`           | Release workflow, CWS upload, auto-update, signing    |
 | `_docs/STORAGE.md`              | Every chrome.storage key, shapes, version history     |
 | `_docs/ADD_CHAIN.md`           | How to add a new chain (single registry entry)        |
+| `apps/tg-bot/IMPLEMENTATION.md`  | TG bot: verification flow, commands, API, balance checker |
+| `_docs/TOKEN_GATED_TG.md`       | Token-gated TG system: architecture, DB schema, security |
 | `openclaw-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling     |
 
 ## Important Patterns
@@ -283,6 +288,16 @@ When a user reports something unexpected (like a wrong value appearing):
 - Don't dismiss it - trace the full data flow
 - Ask: "Where does this value come from? What code path could produce it?"
 - The anomaly is often a symptom of a deeper storage/migration issue
+
+## Railway Deployment (pnpm Monorepo)
+
+Railway's default Nixpacks builder does NOT work for this pnpm monorepo with `workspace:*` dependencies. Always use a **Dockerfile** + **`railway.toml`**.
+
+**Pattern** (see `apps/indexer/` for reference):
+- `Dockerfile`: `node:20-slim`, enable corepack/pnpm, copy workspace root files + the app + any `packages/*` workspace deps, `pnpm install --frozen-lockfile --filter <pkg>`
+- `railway.toml`: sets `dockerfilePath` (from repo root), deploy config
+- Do NOT set Root Directory, Build Command, or Start Command in Railway UI — `railway.toml` handles it
+- For Ponder indexers: start command uses `--schema $RAILWAY_DEPLOYMENT_ID` for zero-downtime deploys
 
 ## Testing Extension Changes
 
