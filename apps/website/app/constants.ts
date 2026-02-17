@@ -26,3 +26,11 @@ export const COINGECKO_URL = `https://www.coingecko.com/en/coins/bankrwallet`;
 // Indexer API
 export const INDEXER_API_URL =
   process.env.NEXT_PUBLIC_INDEXER_API_URL || "http://localhost:42069";
+
+// TG Bot API
+export const TG_BOT_API_URL =
+  process.env.NEXT_PUBLIC_TG_BOT_API_URL || "http://localhost:3001";
+
+// Staking Indexer API (separate from coin indexer)
+export const STAKING_INDEXER_API_URL =
+  process.env.NEXT_PUBLIC_STAKING_INDEXER_API_URL || "http://localhost:42070";
