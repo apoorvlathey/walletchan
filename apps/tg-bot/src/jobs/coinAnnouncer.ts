@@ -6,6 +6,7 @@ import { resolveTokenURI } from "../services/ipfs.js";
 interface Coin {
   id: string;
   coinAddress: string;
+  poolId: string | null;
   name: string;
   symbol: string;
   tokenURI: string;
@@ -77,6 +78,9 @@ export function startCoinAnnouncer(
           if (tweetUrl) {
             tweetUrl = tweetUrl.replace("twitter.com", "x.com");
             text += `\n\nTweet: ${tweetUrl}`;
+          }
+          if (coin.poolId) {
+            text += `\nhttps://www.geckoterminal.com/base/pools/${coin.poolId}`;
           }
 
           const keyboard = new InlineKeyboard().url(
