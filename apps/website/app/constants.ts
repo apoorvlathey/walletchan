@@ -1,7 +1,7 @@
-export {
-  BNKRW_TOKEN_ADDRESS as TOKEN_ADDRESS,
-  BNKRW_POOL_ADDRESS as POOL_ADDRESS,
-} from "@bankr-wallet/shared/contracts";
+import { BNKRW_TOKEN_ADDRESS, BNKRW_POOL_ADDRESS } from "@bankr-wallet/shared/contracts";
+
+export const TOKEN_ADDRESS = BNKRW_TOKEN_ADDRESS;
+export const POOL_ADDRESS = BNKRW_POOL_ADDRESS;
 
 // App URLs
 export const CHROME_STORE_URL =
