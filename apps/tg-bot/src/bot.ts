@@ -33,6 +33,27 @@ export function createBot(): Bot {
   // --- DM-only commands below ---
 
   bot.command("start", async (ctx) => {
+    // Deep link: t.me/BotName?start=verify → auto-trigger /verify
+    const payload = ctx.match;
+    if (payload === "verify") {
+      const tgId = BigInt(ctx.from!.id);
+      const tgUsername = ctx.from!.username ?? undefined;
+      const token = await createVerificationToken(tgId, tgUsername);
+      const verifyUrl = `${config.VERIFY_URL}?token=${token}`;
+      const keyboard = new InlineKeyboard().url("Verify Wallet", verifyUrl);
+
+      await ctx.reply(
+        `Click the button below to verify your wallet.\n\n` +
+          `You'll need to:\n` +
+          `1. Connect your wallet\n` +
+          `2. Have at least ${formatThreshold()} sBNKRW staked\n` +
+          `3. Sign a verification message\n\n` +
+          `This link expires in 10 minutes.`,
+        { reply_markup: keyboard }
+      );
+      return;
+    }
+
     await ctx.reply(
       `Welcome to the BankrWallet Token Gate Bot!\n\n` +
         `This bot manages access to the private BankrWallet holders group.\n\n` +
