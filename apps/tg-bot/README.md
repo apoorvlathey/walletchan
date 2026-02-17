@@ -26,32 +26,24 @@ To find your group's chat ID, leave `PRIVATE_GROUP_ID` empty, start the bot, add
 
 ## Deploy to Railway
 
+This is a pnpm monorepo with workspace dependencies, so Railway needs a **Dockerfile** (not the default Nixpacks builder). The repo includes `Dockerfile` and `railway.toml` which handle this automatically.
+
 ### 1. Create project
 
 - Go to [railway.app](https://railway.app) → New Project
 - Select "Deploy from GitHub repo" → pick the `bankr-wallet` monorepo
+- **Do NOT set** Root Directory, Build Command, or Start Command — `railway.toml` handles everything
 
 ### 2. Add PostgreSQL
 
 - Click "+ New" → Database → PostgreSQL
 - Railway auto-provisions it and provides `DATABASE_URL`
 
-### 3. Configure the service
+### 3. Generate a public domain
 
-**Root Directory:**
-```
-apps/tg-bot
-```
-
-**Build Command:**
-```bash
-npm run build
-```
-
-**Start Command:**
-```bash
-npm run start
-```
+- Go to Settings → Networking → Generate Domain
+- Railway gives you a `*.up.railway.app` URL
+- The website needs this URL as `NEXT_PUBLIC_TG_BOT_API_URL`
 
 ### 4. Set environment variables
 
@@ -67,7 +59,7 @@ In the service's Variables tab, add:
 | `ADMIN_TG_ID` | Your Telegram user ID |
 | `VERIFY_URL` | `https://bankrwallet.app/verify` |
 | `STAKE_URL` | `https://stake.bankrwallet.app` |
-| `PORT` | `3001` (or use Railway's `${{PORT}}`) |
+| `PORT` | `3001` |
 
 ### 5. Run migrations
 
@@ -77,24 +69,7 @@ After the first deploy, open the service's shell (Railway dashboard → service 
 npx drizzle-kit migrate
 ```
 
-Or add a release command in Railway settings:
-
-**Release Command:**
-```bash
-npx drizzle-kit migrate
-```
-
-This runs automatically before each deploy.
-
-### 6. Expose the API
-
-The Hono API needs to be publicly accessible for the website to POST verification results.
-
-- Go to Settings → Networking → Generate Domain
-- Railway gives you a `*.up.railway.app` URL
-- Set `NEXT_PUBLIC_TG_BOT_API_URL` on the website to this URL
-
-### 7. Bot permissions
+### 6. Bot permissions
 
 The bot needs these permissions in the private TG group (set as admin):
 - **Invite Users via Link** — to create one-time invite links
