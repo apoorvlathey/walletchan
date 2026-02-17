@@ -128,7 +128,7 @@ export default function StakePage() {
     functionName: "allowance",
     args: address ? [address, VAULT_ADDR] : undefined,
     chainId: STAKE_CHAIN_ID,
-    query: { enabled: !!address },
+    query: { enabled: !!address, refetchInterval: 2000 },
   });
 
   // Preview deposit (BNKRW -> sBNKRW)
@@ -240,7 +240,14 @@ export default function StakePage() {
       const txUrl = `https://basescan.org/tx/${depositTxHash}`;
       toast({
         title: "Deposit successful",
-        description: `Your BNKRW has been staked. View on BaseScan: ${txUrl}`,
+        description: (
+          <>
+            Your BNKRW has been staked.{" "}
+            <a href={txUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
+              View on BaseScan
+            </a>
+          </>
+        ),
         status: "success",
         duration: 10000,
         isClosable: true,
@@ -260,7 +267,14 @@ export default function StakePage() {
       const txUrl = `https://basescan.org/tx/${redeemTxHash}`;
       toast({
         title: "Withdrawal successful",
-        description: `Your BNKRW has been unstaked. View on BaseScan: ${txUrl}`,
+        description: (
+          <>
+            Your BNKRW has been unstaked.{" "}
+            <a href={txUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
+              View on BaseScan
+            </a>
+          </>
+        ),
         status: "success",
         duration: 10000,
         isClosable: true,
@@ -310,7 +324,7 @@ export default function StakePage() {
         },
       }
     );
-  }, [writeApprove, toast]);
+  }, [writeApprove, parsedAmount, toast]);
 
   const handleDeposit = useCallback(() => {
     if (!parsedAmount || !address) return;
