@@ -30,7 +30,7 @@ All commands are DM-only except `/chatid` (admin-only, works in groups).
 
 | Command | Handler | Description |
 |---------|---------|-------------|
-| `/start` | Welcome message | Shows threshold + points to `/help` |
+| `/start` | Welcome message | Shows threshold + points to `/help`. Supports deep link: `?start=verify` auto-triggers verification |
 | `/help` | Command list | Lists available commands |
 | `/verify` | Creates token, sends link | Generates UUID, stores in DB, sends inline button URL |
 | `/status` | Shows wallet + balance | Fetches balance from indexer, shows eligibility |
@@ -49,10 +49,22 @@ bot.on("chat_member", ...) ← passes through (not a chat message)
 
 The middleware at `bot.use()` checks `ctx.chat.type !== "private"` and silently returns (no response) for group messages. `chat_member` events pass through because they don't have `ctx.chat` in the same way — the guard checks `!ctx.chatMember` to let those through.
 
+## Deep Links
+
+`https://t.me/WalletChanBot?start=verify` — opens bot DM and auto-triggers verification (same as `/verify`).
+
+The `/start` command checks `ctx.match` for the payload. If it equals `"verify"`, it runs the verification flow instead of showing the welcome message. This is used in the public channel's pinned message button.
+
+## Admin Protection
+
+- **Balance checker**: skips `ADMIN_TG_ID` — admin is never kicked for low balance
+- **chat_member handler**: skips admin on join — admin is never kicked as "unverified"
+- **Unverified users**: anyone who joins the private group without being in the `users` table gets kicked immediately (except admin)
+
 ## Verification Flow
 
 ```
-1. User DMs bot → /verify
+1. User DMs bot → /verify (or opens deep link ?start=verify)
 2. Bot creates UUID token (10min expiry) → stores in verification_tokens
 3. Bot sends inline button: bankrwallet.app/verify?token=xxx
 

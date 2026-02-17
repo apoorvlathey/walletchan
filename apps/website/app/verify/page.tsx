@@ -181,6 +181,25 @@ function VerifyContent() {
             Please use the /verify command in the Telegram bot to get a
             verification link.
           </Text>
+          <Link
+            href="https://t.me/WalletChanBot?start=verify"
+            isExternal
+            display="inline-flex"
+            alignItems="center"
+            gap={1}
+            mt={4}
+            bg="bauhaus.blue"
+            color="white"
+            px={6}
+            py={3}
+            fontWeight="900"
+            textTransform="uppercase"
+            letterSpacing="wider"
+            _hover={{ opacity: 0.9, textDecoration: "none" }}
+          >
+            Open Bot
+            <ExternalLink size={14} />
+          </Link>
         </Box>
       </Container>
     );
@@ -220,6 +239,25 @@ function VerifyContent() {
             This verification link has expired or has already been used.
             Use /verify in the Telegram bot to get a new link.
           </Text>
+          <Link
+            href="https://t.me/WalletChanBot?start=verify"
+            isExternal
+            display="inline-flex"
+            alignItems="center"
+            gap={1}
+            mt={4}
+            bg="bauhaus.blue"
+            color="white"
+            px={6}
+            py={3}
+            fontWeight="900"
+            textTransform="uppercase"
+            letterSpacing="wider"
+            _hover={{ opacity: 0.9, textDecoration: "none" }}
+          >
+            Get New Link
+            <ExternalLink size={14} />
+          </Link>
         </Box>
       </Container>
     );
