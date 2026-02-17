@@ -106,6 +106,34 @@ Timestamp: {unix_timestamp}
 5. **Re-verify updates wallet** — same TG user can link a different wallet (updates existing row)
 6. **Balance checked at verify time AND ongoing** — background job re-checks every 5 minutes
 
+## Telegram Channel Setup
+
+### Structure
+- **Public channel** (`@bnkrwpublic`) — announcements, anyone can view
+- **Private group** — token-gated, only verified holders with sufficient sBNKRW stake
+
+### Posting a Verify Button to the Public Channel
+
+The bot must be added as an **admin** of the public channel (with "Post Messages" permission). Then use the Telegram Bot API to post a message with an inline button:
+
+```bash
+curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/sendMessage" \
+-H "Content-Type: application/json" \
+-d '{
+  "chat_id": "@bnkrwpublic",
+  "text": "Want access to the stakers-only group?\n\nStake and hold at least 20M sBNKRW to join.\n\nhttps://stake.bankrwallet.app/",
+  "reply_markup": {
+    "inline_keyboard": [[{"text": "✅ Verify & Join", "url": "https://t.me/WalletChanBot?start=verify"}]]
+  }
+}'
+```
+
+Pin this message in the channel. The button opens the bot DM and auto-triggers the verification flow via the `?start=verify` deep link.
+
+### Deep Link
+
+`https://t.me/WalletChanBot?start=verify` — Telegram deep link that opens the bot and auto-runs the verification flow (generates token + sends verify button). Used in the public channel button and on the website's error states.
+
 ## Deployment (Railway)
 
 Single service running Grammy long polling + Hono HTTP server:
