@@ -80,7 +80,7 @@ export function startCoinAnnouncer(
             text += `\n\nTweet: ${tweetUrl}`;
           }
           if (coin.poolId) {
-            text += `\nhttps://www.geckoterminal.com/base/pools/${coin.poolId}`;
+            text += `\n\nhttps://www.geckoterminal.com/base/pools/${coin.poolId}`;
           }
 
           const keyboard = new InlineKeyboard().url(
