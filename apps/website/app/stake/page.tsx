@@ -102,7 +102,7 @@ export default function StakePage() {
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     chainId: STAKE_CHAIN_ID,
-    query: { enabled: !!address },
+    query: { enabled: !!address, refetchInterval: 2000 },
   });
 
   // sBNKRW (staked) balance
@@ -115,7 +115,7 @@ export default function StakePage() {
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     chainId: STAKE_CHAIN_ID,
-    query: { enabled: !!address },
+    query: { enabled: !!address, refetchInterval: 2000 },
   });
 
   // BNKRW allowance for vault
