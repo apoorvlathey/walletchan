@@ -778,7 +778,7 @@ export default function StakePage() {
                   </Flex>
 
                   {/* Percentage slider */}
-                  {isWalletConnected && currentBalance && (currentBalance as bigint) > 0n && (
+                  {isWalletConnected && currentBalance !== undefined && (currentBalance as bigint) > 0n && (
                     <Box px={2} pt={2} pb={6}>
                       <Slider
                         min={0}
