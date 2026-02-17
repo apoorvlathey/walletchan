@@ -77,11 +77,13 @@ export function Navigation() {
     // On coins subdomain
     if (isCoinsSubdomain) {
       if (href === "/coins") return "/";
+      if (href === "/stake") return STAKE_SUBDOMAIN_URL;
       if (href.startsWith("#")) return `${MAIN_SITE}/${href}`;
     }
     // On stake subdomain
     if (isStakeSubdomain) {
       if (href === "/stake") return "/";
+      if (href === "/coins") return COINS_SUBDOMAIN_URL;
       if (href.startsWith("#")) return `${MAIN_SITE}/${href}`;
     }
     // On production main site, route to subdomains
