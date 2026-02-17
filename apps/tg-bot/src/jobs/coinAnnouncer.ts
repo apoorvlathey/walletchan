@@ -75,6 +75,7 @@ export function startCoinAnnouncer(
           // Build message
           let text = `<b>$${escapeHtml(coin.symbol)}</b> (${escapeHtml(coin.name)}) launched`;
           if (tweetUrl) {
+            tweetUrl = tweetUrl.replace("twitter.com", "x.com");
             text += `\n\nTweet: ${tweetUrl}`;
           }
 
