@@ -75,11 +75,11 @@ export function startCoinAnnouncer(
           // Build message
           let text = `<b>$${escapeHtml(coin.symbol)}</b> (${escapeHtml(coin.name)}) launched`;
           if (tweetUrl) {
-            text += ` via tweet: ${tweetUrl}`;
+            text += `\n\nTweet: ${tweetUrl}`;
           }
 
           const keyboard = new InlineKeyboard().url(
-            "Buy",
+            "\u26A1 Buy",
             `https://coins.bankrwallet.app?buy=${coin.coinAddress}`
           );
 
