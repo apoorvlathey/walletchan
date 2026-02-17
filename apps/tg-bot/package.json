@@ -1,0 +1,34 @@
+{
+  "name": "@bankr-wallet/tg-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/index.ts",
+    "build": "tsc",
+    "start": "node --env-file=.env dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "grammy": "^1.35.0",
+    "hono": "^4.5.0",
+    "@hono/node-server": "^1.13.0",
+    "drizzle-orm": "^0.38.0",
+    "postgres": "^3.4.0",
+    "viem": "^2.21.3",
+    "zod": "^3.24.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.30.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.3.3",
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
