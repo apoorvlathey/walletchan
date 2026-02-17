@@ -24,6 +24,9 @@ cws-zip
 .next
 out
 
+# typescript
+*.tsbuildinfo
+
 # misc
 .DS_Store
 .env
