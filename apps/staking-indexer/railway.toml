@@ -1,0 +1,7 @@
+[build]
+dockerfilePath = "apps/staking-indexer/Dockerfile"
+
+[deploy]
+startCommand = "sh -c 'pnpm ponder start --port 42070 --schema $RAILWAY_DEPLOYMENT_ID'"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
