@@ -63,10 +63,16 @@ In the service's Variables tab, add:
 
 ### 5. Run migrations
 
-After the first deploy, open the service's shell (Railway dashboard → service → "Shell" tab):
+Railway's internal `DATABASE_URL` (`postgres.railway.internal`) is only reachable from inside their network. To run migrations, use the **public** URL:
+
+1. In Railway dashboard, click your **PostgreSQL** service → **Variables** tab
+2. Copy **`DATABASE_PUBLIC_URL`** (not `DATABASE_URL`)
+3. Locally, generate and apply migrations:
 
 ```bash
-npx drizzle-kit migrate
+cd apps/tg-bot
+npx drizzle-kit generate
+DATABASE_URL="<paste_DATABASE_PUBLIC_URL>" npx drizzle-kit migrate
 ```
 
 ### 6. Bot permissions
