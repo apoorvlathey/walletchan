@@ -86,7 +86,9 @@ export function startCoinAnnouncer(
 
           await bot.api.sendMessage(chatId, text, {
             parse_mode: "HTML",
-            link_preview_options: { is_disabled: true },
+            link_preview_options: tweetUrl
+              ? { url: tweetUrl, prefer_large_media: true }
+              : { is_disabled: true },
             reply_markup: keyboard,
             ...(threadId ? { message_thread_id: threadId } : {}),
           });
