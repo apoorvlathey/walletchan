@@ -22,6 +22,9 @@ import { motion, useInView } from "framer-motion";
 import { LayoutGrid, List, Zap, AlertTriangle } from "lucide-react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
+import { readContracts } from "wagmi/actions";
+import { base } from "wagmi/chains";
+import { config as wagmiConfig } from "../wagmiConfig";
 import { Navigation } from "../components/Navigation";
 import { TokenBanner } from "../components/TokenBanner";
 import { CoinCard } from "./components/CoinCard";
@@ -33,6 +36,22 @@ import { useCoinsStream, type Coin } from "./hooks/useCoinsStream";
 import type { PoolMarketData } from "./hooks/usePoolMarketData";
 import { useInstaBuy } from "./hooks/useInstaBuy";
 import { SWAP_CHAIN_ID } from "../swap/constants";
+import { INDEXER_API_URL } from "../constants";
+import { CoinAbi } from "./abi";
+
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+
+function setBuyParam(address: string) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("buy", address);
+  window.history.replaceState(null, "", url.toString());
+}
+
+function clearBuyParam() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("buy");
+  window.history.replaceState(null, "", url.toString());
+}
 
 const INSTA_BUY_AMOUNT_KEY = "instaBuyAmount";
 const DEFAULT_INSTA_BUY_AMOUNT = "0.01";
@@ -223,10 +242,95 @@ export default function CoinsPage() {
         symbol: coin.symbol,
         tokenURI: coin.tokenURI,
       });
+      setBuyParam(coin.coinAddress);
       onOpen();
     },
     [onOpen],
   );
+
+  const handleClose = useCallback(() => {
+    clearBuyParam();
+    onClose();
+  }, [onClose]);
+
+  // Auto-open buy modal from URL param (?buy=0x...)
+  const buyParamHandledRef = useRef(false);
+  useEffect(() => {
+    if (buyParamHandledRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const buyAddress = params.get("buy");
+    if (!buyAddress || !ADDRESS_RE.test(buyAddress)) {
+      if (buyAddress) clearBuyParam(); // invalid address, clean up
+      return;
+    }
+
+    // 1. Check loaded coins array
+    if (!isLoading && coins.length > 0) {
+      const match = coins.find(
+        (c) => c.coinAddress.toLowerCase() === buyAddress.toLowerCase()
+      );
+      if (match) {
+        buyParamHandledRef.current = true;
+        setSelectedToken({
+          address: match.coinAddress,
+          name: match.name,
+          symbol: match.symbol,
+          tokenURI: match.tokenURI,
+        });
+        onOpen();
+        return;
+      }
+    }
+
+    // Wait for initial coins to load before trying remote lookups
+    if (isLoading) return;
+
+    buyParamHandledRef.current = true;
+
+    // 2. Try indexer API, then 3. RPC fallback
+    (async () => {
+      try {
+        const res = await fetch(`${INDEXER_API_URL}/coins/${buyAddress}`);
+        if (res.ok) {
+          const coin: Coin = await res.json();
+          setSelectedToken({
+            address: coin.coinAddress,
+            name: coin.name,
+            symbol: coin.symbol,
+            tokenURI: coin.tokenURI,
+          });
+          onOpen();
+          return;
+        }
+      } catch {
+        // indexer failed, try RPC
+      }
+
+      try {
+        const results = await readContracts(wagmiConfig, {
+          contracts: [
+            { address: buyAddress as `0x${string}`, abi: CoinAbi, functionName: "name", chainId: base.id },
+            { address: buyAddress as `0x${string}`, abi: CoinAbi, functionName: "symbol", chainId: base.id },
+            { address: buyAddress as `0x${string}`, abi: CoinAbi, functionName: "tokenURI", chainId: base.id },
+          ],
+        });
+        const name = results[0].status === "success" ? (results[0].result as string) : "";
+        const symbol = results[1].status === "success" ? (results[1].result as string) : "";
+        const tokenURI = results[2].status === "success" ? (results[2].result as string) : "";
+
+        if (name || symbol) {
+          setSelectedToken({ address: buyAddress, name, symbol, tokenURI });
+          onOpen();
+          return;
+        }
+      } catch {
+        // RPC also failed
+      }
+
+      // All lookups failed — clear param
+      clearBuyParam();
+    })();
+  }, [isLoading, coins, onOpen]);
 
   // Infinite scroll sentinel
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -591,7 +695,7 @@ export default function CoinsPage() {
         </VStack>
       </Container>
 
-      <BuyModal token={selectedToken} isOpen={isOpen} onClose={onClose} />
+      <BuyModal token={selectedToken} isOpen={isOpen} onClose={handleClose} />
     </Box>
   );
 }

@@ -19,6 +19,14 @@ const envSchema = z.object({
     .default("https://stake.bankrwallet.app"),
   ADMIN_TG_ID: z.coerce.bigint(),
   PORT: z.coerce.number().int().default(3001),
+  COINS_INDEXER_API_URL: z
+    .string()
+    .url()
+    .default("http://localhost:42069"),
+  COIN_ANNOUNCE_CHAT_ID: z.coerce.number().int().optional(),
+  COIN_ANNOUNCE_THREAD_ID: z.coerce.number().int().optional(),
+  PINATA_GATEWAY_URL: z.string().url().optional(),
+  PINATA_GATEWAY_TOKEN: z.string().optional(),
 });
 
 export const config = envSchema.parse(process.env);

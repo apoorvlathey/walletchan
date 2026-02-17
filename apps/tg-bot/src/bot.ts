@@ -21,7 +21,12 @@ export function createBot(): Bot {
   // Admin-only group command — must be registered before the DM guard
   bot.command("chatid", async (ctx) => {
     if (!isAdmin(ctx.from!.id)) return;
-    await ctx.reply(`Chat ID: \`${ctx.chat.id}\``, { parse_mode: "Markdown" });
+    const threadId = ctx.message?.message_thread_id;
+    let text = `Chat ID: \`${ctx.chat.id}\``;
+    if (threadId) {
+      text += `\nTopic/Thread ID: \`${threadId}\``;
+    }
+    await ctx.reply(text, { parse_mode: "Markdown" });
   });
 
   // Block all other commands in groups
