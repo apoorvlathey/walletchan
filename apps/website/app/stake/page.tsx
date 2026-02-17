@@ -273,7 +273,18 @@ export default function StakePage() {
   const handleAmountChange = (val: string) => {
     if (val === "" || /^\d*\.?\d*$/.test(val)) {
       setAmount(val);
-      setSliderValue(0);
+      if (val === "" || parseFloat(val) === 0 || !currentBalance || (currentBalance as bigint) === 0n) {
+        setSliderValue(0);
+      } else {
+        try {
+          const parsed = parseUnits(val, 18);
+          const bal = currentBalance as bigint;
+          const pct = Number((parsed * 100n) / bal);
+          setSliderValue(Math.min(pct, 100));
+        } catch {
+          setSliderValue(0);
+        }
+      }
     }
   };
 
