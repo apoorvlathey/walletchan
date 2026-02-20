@@ -1,9 +1,15 @@
 import { v4 as uuidv4 } from "uuid";
 import { eq } from "drizzle-orm";
-import { verifyMessage } from "viem";
+import { createPublicClient, http } from "viem";
+import { base } from "viem/chains";
 import { db } from "../db/index.js";
 import { users, verificationTokens } from "../db/schema.js";
 import { config } from "../config.js";
+
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(),
+});
 
 const TOKEN_EXPIRY_MINUTES = 10;
 const SIGNATURE_MAX_AGE_SECONDS = 5 * 60; // 5 minutes
@@ -65,9 +71,9 @@ export async function verifySignature(
     return { valid: false, error: "Invalid or expired verification token" };
   }
 
-  // Verify the signature
+  // Verify the signature (supports both EOA and ERC-1271 smart contract wallets)
   const message = buildVerificationMessage(token, timestamp);
-  const isValid = await verifyMessage({
+  const isValid = await publicClient.verifyMessage({
     address,
     message,
     signature,
