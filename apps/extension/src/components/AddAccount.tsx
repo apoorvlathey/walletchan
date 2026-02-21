@@ -74,7 +74,7 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
     impersonatorAddress?: string;
   }>({});
 
-  // ENS/Basename/.wei resolution for impersonator address
+  // ENS/Basename/.wei/.mega resolution for impersonator address
   const {
     resolvedAddress: impersonatorResolvedAddress,
     resolvedName: impersonatorResolvedName,
@@ -702,7 +702,7 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                 )}
               </HStack>
               <Input
-                placeholder="0x..., ENS, Basename, or .wei"
+                placeholder="0x..., ENS, Basename, .wei, or .mega"
                 value={impersonatorAddress}
                 onChange={(e) => {
                   setImpersonatorAddress(e.target.value);

@@ -256,7 +256,7 @@ function ApiKeySetup({
       <FormControl isInvalid={!!errors.walletAddress}>
         <FormLabel color="text.secondary">Wallet Address</FormLabel>
         <Input
-          placeholder="0x... or name (e.g., vitalik.eth, name.wei)"
+          placeholder="0x... or name (e.g., vitalik.eth, name.mega)"
           value={walletAddress}
           onChange={(e) => setWalletAddress(e.target.value)}
           bg="bg.subtle"
