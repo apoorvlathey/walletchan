@@ -13,6 +13,12 @@ import { L2ResolverAbi } from "./L2ResolverAbi";
 import { DEFAULT_NETWORKS } from "@/constants/networks";
 import type { NetworksInfo } from "@/types";
 import wei from "@/utils/wei";
+import {
+  isMega,
+  megaNamesAbi,
+  MEGA_NAMES_CONTRACT,
+  MEGAETH_CHAIN_ID,
+} from "@/utils/mega";
 
 // ============================================================================
 // Constants
@@ -68,6 +74,19 @@ async function getBaseClient() {
   });
 }
 
+async function getMegaEthClient() {
+  const rpcUrl = await getUserRpcUrl(MEGAETH_CHAIN_ID);
+  return createPublicClient({
+    chain: {
+      id: MEGAETH_CHAIN_ID,
+      name: "MegaETH",
+      nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+      rpcUrls: { default: { http: [rpcUrl] } },
+    },
+    transport: http(rpcUrl),
+  });
+}
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -107,6 +126,59 @@ const convertReverseNodeToBytes = (
 // Forward Resolution (Name → Address)
 // ============================================================================
 
+const resolveMegaName = async (
+  name: string
+): Promise<Address | null> => {
+  try {
+    const client = await getMegaEthClient();
+    const tokenId = BigInt(namehash(name.toLowerCase()));
+    const ZERO = "0x0000000000000000000000000000000000000000";
+
+    // Primary: ownerOf (ERC-721 owner is the resolved address)
+    try {
+      const owner = await client.readContract({
+        abi: megaNamesAbi,
+        address: MEGA_NAMES_CONTRACT,
+        functionName: "ownerOf",
+        args: [tokenId],
+      });
+      if (owner && owner !== ZERO) return owner as Address;
+    } catch {
+      // Token may not exist — fall through to addr
+    }
+
+    // Fallback: explicit addr mapping (for subdomains or custom setAddr)
+    const address = await client.readContract({
+      abi: megaNamesAbi,
+      address: MEGA_NAMES_CONTRACT,
+      functionName: "addr",
+      args: [tokenId],
+    });
+    if (!address || address === ZERO) return null;
+    return address as Address;
+  } catch {
+    return null;
+  }
+};
+
+const getMegaName = async (
+  address: string
+): Promise<string | null> => {
+  try {
+    const client = await getMegaEthClient();
+    const name = await client.readContract({
+      abi: megaNamesAbi,
+      address: MEGA_NAMES_CONTRACT,
+      functionName: "getName",
+      args: [address as Address],
+    });
+    if (!name || name.length === 0) return null;
+    return name as string;
+  } catch {
+    return null;
+  }
+};
+
 export const resolveNameToAddress = async (
   name: string
 ): Promise<Address | null> => {
@@ -115,6 +187,11 @@ export const resolveNameToAddress = async (
     if (wei.isWei(name)) {
       const address = await wei.resolve(name);
       return address as Address | null;
+    }
+
+    // Handle .mega names via MegaNames
+    if (isMega(name)) {
+      return await resolveMegaName(name);
     }
 
     // ENS handles .eth, .base.eth, and other names
@@ -177,13 +254,14 @@ export const resolveAddressToName = async (
   address: string
 ): Promise<string | null> => {
   try {
-    const [ensName, basename, weiName] = await Promise.all([
+    const [ensName, basename, weiName, megaName] = await Promise.all([
       getEnsName(address),
       getBasename(address as Address),
       getWeiName(address),
+      getMegaName(address),
     ]);
-    // Priority: ENS > Basename > WNS
-    return ensName || basename || weiName || null;
+    // Priority: ENS > Basename > WNS > Mega
+    return ensName || basename || weiName || megaName || null;
   } catch (error) {
     console.error("Error resolving address to name:", error);
     return null;
@@ -227,9 +305,31 @@ const getBasenameAvatar = async (
   }
 };
 
+const getMegaAvatar = async (
+  megaName: string
+): Promise<string | null> => {
+  try {
+    const client = await getMegaEthClient();
+    const tokenId = BigInt(namehash(megaName.toLowerCase()));
+    const avatar = await client.readContract({
+      abi: megaNamesAbi,
+      address: MEGA_NAMES_CONTRACT,
+      functionName: "text",
+      args: [tokenId, "avatar"],
+    });
+    if (avatar && avatar.length > 0) return avatar as string;
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 export const getNameAvatar = async (
   name: string
 ): Promise<string | null> => {
+  if (isMega(name)) {
+    return await getMegaAvatar(name);
+  }
   if (isBasename(name)) {
     const basenameAvatar = await getBasenameAvatar(name);
     if (basenameAvatar) return basenameAvatar;
@@ -239,25 +339,27 @@ export const getNameAvatar = async (
 };
 
 // ============================================================================
-// Combined Identity Resolution (ENS > Basename > WNS)
+// Combined Identity Resolution (ENS > Basename > WNS > Mega)
 // ============================================================================
 
 /**
  * Resolves name + avatar for an address with explicit priority:
- * ENS > Basename > WNS (Wei Name Service)
+ * ENS > Basename > WNS > Mega
  * - Resolves all name services in parallel for speed
  * - If ENS name exists, uses ENS name + ENS avatar
  * - Falls back to Basename name + Basename avatar
  * - Falls back to WNS name (no avatar support for .wei names)
+ * - Falls back to Mega name + Mega avatar (via text record)
  */
 export const resolveEnsIdentity = async (
   address: string
 ): Promise<{ name: string | null; avatar: string | null }> => {
   try {
-    const [ensName, basename, weiName] = await Promise.all([
+    const [ensName, basename, weiName, megaName] = await Promise.all([
       getEnsName(address),
       getBasename(address as Address),
       getWeiName(address),
+      getMegaName(address),
     ]);
 
     // ENS takes priority
@@ -275,6 +377,12 @@ export const resolveEnsIdentity = async (
     // Fall back to WNS (no avatar support)
     if (weiName) {
       return { name: weiName, avatar: null };
+    }
+
+    // Fall back to Mega
+    if (megaName) {
+      const avatar = await getMegaAvatar(megaName);
+      return { name: megaName, avatar };
     }
 
     return { name: null, avatar: null };

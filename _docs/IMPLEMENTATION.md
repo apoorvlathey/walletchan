@@ -339,12 +339,13 @@ src/
 │       └── PrivateKeyInput.tsx  # Reusable PK import/generate input with address derivation
 ├── utils/
 │   ├── privateKeyUtils.ts   # generatePrivateKey(), validateAndDeriveAddress()
-│   └── wei.ts               # Wei Name Service SDK (forward/reverse .wei resolution)
+│   ├── wei.ts               # Wei Name Service SDK (forward/reverse .wei resolution)
+│   └── mega.ts              # MegaNames utility (.mega resolution on MegaETH chain 4326)
 ├── hooks/
 │   ├── useChat.ts           # Chat state management hook
-│   └── useEnsIdentities.ts  # ENS/Basename/WNS identity resolution + caching hook
+│   └── useEnsIdentities.ts  # ENS/Basename/WNS/Mega identity resolution + caching hook
 ├── lib/
-│   ├── ensUtils.ts          # ENS/Basename/WNS resolution (name, avatar, forward/reverse)
+│   ├── ensUtils.ts          # ENS/Basename/WNS/Mega resolution (name, avatar, forward/reverse)
 │   ├── ensIdentityCache.ts  # ENS identity cache (chrome.storage.local, 6-hour TTL)
 │   └── gasFormatUtils.ts    # Gas formatting utilities (formatEth, formatGwei, formatNumber)
 ├── onboarding.tsx           # React entry point for onboarding page
@@ -390,7 +391,7 @@ The onboarding flow varies based on account type selection:
 **Step 2a: Bankr Setup** (if Bankr or both selected)
 
 - API key input field
-- Wallet address input (supports ENS, Basename, and WNS `.wei` resolution)
+- Wallet address input (supports ENS, Basename, WNS `.wei`, and MegaNames `.mega` resolution)
 - Display name (optional) - allows custom naming like "My Bankr Wallet"
 - Links to bankr.bot for API key and terminal
 
@@ -904,7 +905,7 @@ Each transaction card shows:
 
 - Status badge, chain info, and explorer link
 - Function name (if decoded)
-- From/To addresses with `AddressParam` (ENS/Basename/WNS resolution, labels, copy + explorer links)
+- From/To addresses with `AddressParam` (ENS/Basename/WNS/Mega resolution, labels, copy + explorer links)
 - Value in ETH
 - Gas fee breakdown: total fee, gas price (Gwei), gas limit & usage with percentage
 - **OP Stack L2 breakdown** (Base, Unichain): separate L2 fees, L1 fees, L1 gas price, L1 gas used
@@ -1027,18 +1028,18 @@ Transaction confirmation includes a "Simulate on Tenderly" button:
 - No API key needed (URL-based simulation)
 - Skipped for contract deployments (no `to` address)
 
-## ENS/Basename/WNS Identity Resolution
+## ENS/Basename/WNS/Mega Identity Resolution
 
-Accounts in the dropdown automatically resolve ENS names, Basenames, WNS `.wei` names, and avatars. Results are cached in `chrome.storage.local` for 6 hours.
+Accounts in the dropdown automatically resolve ENS names, Basenames, WNS `.wei` names, MegaNames `.mega` names, and avatars. Results are cached in `chrome.storage.local` for 6 hours.
 
 ### Resolution Priority
 
-ENS (Ethereum mainnet) takes precedence over Basename (Base L2), which takes precedence over WNS (Wei Name Service):
+ENS (Ethereum mainnet) takes precedence over Basename (Base L2), which takes precedence over WNS (Wei Name Service), which takes precedence over MegaNames (MegaETH):
 
-1. **Name**: ENS name > Basename > WNS `.wei` name > truncated address
-2. **Avatar**: ENS avatar (when ENS name exists) > Basename avatar (when only Basename exists) > BankrAvatar (Bankr accounts) > BlockieAvatar (fallback). WNS names have no avatar support.
+1. **Name**: ENS name > Basename > WNS `.wei` name > MegaNames `.mega` name > truncated address
+2. **Avatar**: ENS avatar (when ENS name exists) > Basename avatar (when only Basename exists) > Mega avatar (when only Mega name exists) > BankrAvatar (Bankr accounts) > BlockieAvatar (fallback). WNS names have no avatar support.
 
-All name services are resolved in parallel for speed via `resolveEnsIdentity()` in `ensUtils.ts`. If ENS name exists, ENS avatar is fetched; Basename avatar is only fetched when no ENS name is found; WNS names are used as final fallback with no avatar.
+All name services are resolved in parallel for speed via `resolveEnsIdentity()` in `ensUtils.ts`. If ENS name exists, ENS avatar is fetched; Basename avatar is only fetched when no ENS name is found; Mega avatar is fetched via `text(tokenId, "avatar")` when only Mega name exists; WNS names have no avatar support.
 
 ### Display Priority in AccountSwitcher
 
@@ -1059,8 +1060,10 @@ AccountSwitcher.tsx
                     ├── getEnsName()      # mainnet reverse resolution
                     ├── getBasename()     # Base L2 reverse resolution
                     ├── getWeiName()      # WNS reverse resolution (via wei.ts SDK)
+                    ├── getMegaName()     # MegaNames reverse resolution (MegaETH chain 4326)
                     ├── getEnsAvatar()    # mainnet avatar lookup
-                    └── getBasenameAvatar() # Base L2 avatar lookup
+                    ├── getBasenameAvatar() # Base L2 avatar lookup
+                    └── getMegaAvatar()   # MegaNames avatar lookup (text record)
 ```
 
 ### Cache
@@ -1072,15 +1075,16 @@ AccountSwitcher.tsx
 
 ### RPC Configuration
 
-`ensUtils.ts` reads user-configured RPCs from `chrome.storage.sync` (`networksInfo`), falling back to `DEFAULT_NETWORKS` defaults. This ensures ENS resolution uses the same RPC endpoints configured in Settings → Chains. WNS resolution uses its own RPC endpoints (configured in `src/utils/wei.ts`) with automatic failover.
+`ensUtils.ts` reads user-configured RPCs from `chrome.storage.sync` (`networksInfo`), falling back to `DEFAULT_NETWORKS` defaults. This ensures ENS and MegaNames resolution uses the same RPC endpoints configured in Settings → Chains. MegaNames uses the user's MegaETH RPC (chain 4326, default `https://mainnet.megaeth.com/rpc`). WNS resolution uses its own RPC endpoints (configured in `src/utils/wei.ts`) with automatic failover.
 
 ### Files
 
 | File | Purpose |
 |------|---------|
-| `src/lib/ensUtils.ts` | ENS/Basename/WNS name + avatar resolution, `resolveEnsIdentity()` |
+| `src/lib/ensUtils.ts` | ENS/Basename/WNS/Mega name + avatar resolution, `resolveEnsIdentity()` |
 | `src/lib/ensIdentityCache.ts` | Cache read/write, `resolveAndCacheIdentity()` |
 | `src/utils/wei.ts` | Wei Name Service SDK — forward/reverse `.wei` name resolution |
+| `src/utils/mega.ts` | MegaNames utility — ABI, constants, `isMega()` for `.mega` resolution |
 | `src/hooks/useEnsIdentities.ts` | React hook: loads cache, resolves stale entries, exposes `refreshAddress()` |
 | `src/components/AccountSwitcher.tsx` | Integrates hook, renders ENS avatars/names/tags |
 | `src/components/AccountSettingsModal.tsx` | "Refresh ENS Data" button |
