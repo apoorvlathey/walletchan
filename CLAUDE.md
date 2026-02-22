@@ -60,7 +60,8 @@ bankr-wallet/
 │   ├── website/          # Landing page (Next.js + Chakra UI)
 │   ├── indexer/          # Ponder indexer for coin launches
 │   ├── staking-indexer/  # Ponder indexer for sBNKRW vault staking
-│   └── tg-bot/           # Token-gated Telegram bot (Grammy + Hono)
+│   ├── tg-bot/           # Token-gated Telegram bot (Grammy + Hono)
+│   └── contracts/        # Solidity smart contracts (Foundry)
 ├── packages/
 │   └── shared/           # Shared design tokens, assets, and contract constants
 ├── _docs/                # LLM-facing documentation
@@ -81,6 +82,7 @@ bankr-wallet/
 | Indexer          | Ponder                  | Hono       | Ponder     |
 | Staking Indexer  | Ponder                  | Hono       | Ponder     |
 | TG Bot           | Grammy + Hono           | —          | tsc        |
+| Contracts        | Solidity                | —          | Foundry    |
 
 **Design System**: Bauhaus - geometric, primary colors (Red #D02020, Blue #1040C0, Yellow #F0C020), hard shadows, thick borders. See `_docs/STYLING.md`.
 
@@ -105,6 +107,10 @@ pnpm build:website      # Build website only
 pnpm zip                # Build + zip (keeps all manifest fields, for GitHub Releases)
 pnpm zip:cws            # Build + zip (strips key + update_url, for CWS upload)
 pnpm lint               # Lint extension code
+
+# Contracts
+pnpm build:contracts    # Compile Solidity contracts
+pnpm test:contracts     # Run Foundry tests
 
 # Release (auto-bumps version, syncs manifest, creates tag, pushes)
 pnpm release:patch      # 0.1.0 → 0.1.1
