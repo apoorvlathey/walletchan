@@ -1,0 +1,14 @@
+{
+  "name": "@bankr-wallet/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test",
+    "test:v": "forge test -vvv",
+    "snapshot": "forge snapshot",
+    "fmt": "forge fmt",
+    "fmt:check": "forge fmt --check",
+    "clean": "forge clean"
+  }
+}
