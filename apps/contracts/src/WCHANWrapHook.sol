@@ -51,11 +51,11 @@ contract WCHANWrapHook is IHooks {
      * Sets our immutable {PoolManager} contract reference.
      * Validates that the deployed address matches the declared hook permissions.
      *
-     * @param _poolManager The Uniswap V4 {PoolManager} contract address
+     * @param poolManager_ The Uniswap V4 {PoolManager} contract address
      * @param wchan_ Our token contract address
      */
-    constructor(address _poolManager, WCHAN wchan_) {
-        poolManager = IPoolManager(_poolManager);
+    constructor(address poolManager_, WCHAN wchan_) {
+        poolManager = IPoolManager(poolManager_);
         wchan = wchan_;
         OLD_TOKEN = wchan.OLD_TOKEN();
 
