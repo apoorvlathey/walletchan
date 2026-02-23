@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {Script, console} from "forge-std/Script.sol";
+import {console} from "forge-std/Script.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
@@ -11,9 +11,12 @@ import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {WCHAN} from "@src/WCHAN.sol";
 import {WCHANWrapHook} from "@src/WCHANWrapHook.sol";
 import {HookMiner} from "@src/utils/HookMiner.sol";
+import {DeployHelper} from "./DeployHelper.s.sol";
 
 /**
  * Deploys the WCHANWrapHook and initializes the WCHAN/OLD_TOKEN pool.
+ *
+ * Required in addresses.json: POOL_MANAGER, WCHAN
  *
  * IMPORTANT: After deployment, you must seed the PoolManager with both tokens
  * so that the first swap can succeed. The hook calls `poolManager.take()` during
@@ -26,24 +29,24 @@ import {HookMiner} from "@src/utils/HookMiner.sol";
  *   3. Call wchan.wrap(SEED_AMOUNT) to mint WCHAN
  *   4. Have SEED_AMOUNT of WCHAN in the PoolManager address (by providing liquidity to some other pool)
  *
- * The seed amount determines the max single-swap size initially. As swaps occur,
- * the PM accumulates converted tokens from prior swaps, increasing capacity.
- *
- * Usage:
- *   cd apps/contracts && source .env && \
- *   forge script --chain base script/DeployWCHANWrapHook.s.sol:DeployWCHANWrapHook \
- *     --rpc-url $BASE_RPC_URL --broadcast --verify -vvvv
+ * Base mainnet:
+ *   cd apps/contracts && source .env && forge script script/02_DeployWCHANWrapHook.s.sol:DeployWCHANWrapHook --broadcast --verify -vvvv --rpc-url $BASE_RPC_URL
+ * 
+ * Base Sepolia:
+ *  cd apps/contracts && source .env && forge script script/02_DeployWCHANWrapHook.s.sol:DeployWCHANWrapHook --broadcast --verify -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL
  */
-contract DeployWCHANWrapHook is Script {
-    // Base mainnet addresses
-    address constant POOL_MANAGER = address(0); // FIXME: set to Base PoolManager address
-    address constant WCHAN_ADDR = address(0);   // FIXME: set to deployed WCHAN address
-
+contract DeployWCHANWrapHook is DeployHelper {
     int24 constant TICK_SPACING = 60;
+    address constant CREATE2_DEPLOYER = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     function run() external {
-        IPoolManager poolManager = IPoolManager(POOL_MANAGER);
-        WCHAN wchan = WCHAN(WCHAN_ADDR);
+        _loadAddresses();
+
+        address poolManagerAddr = _requireAddress("POOL_MANAGER");
+        address wchanAddr = _requireAddress("WCHAN");
+
+        IPoolManager poolManager = IPoolManager(poolManagerAddr);
+        WCHAN wchan = WCHAN(wchanAddr);
 
         // 1. Mine a CREATE2 salt whose address encodes the required hook flags
         uint160 flags = uint160(
@@ -52,9 +55,9 @@ contract DeployWCHANWrapHook is Script {
             | Hooks.BEFORE_SWAP_FLAG
             | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
-        bytes memory constructorArgs = abi.encode(POOL_MANAGER, WCHAN_ADDR);
+        bytes memory constructorArgs = abi.encode(poolManagerAddr, wchanAddr);
         (address hookAddr, bytes32 salt) = HookMiner.find(
-            msg.sender,
+            CREATE2_DEPLOYER,
             flags,
             type(WCHANWrapHook).creationCode,
             constructorArgs
@@ -64,7 +67,7 @@ contract DeployWCHANWrapHook is Script {
         vm.startBroadcast(vm.envUint("DEV_PRIVATE_KEY"));
 
         // 2. Deploy the hook
-        WCHANWrapHook hook = new WCHANWrapHook{salt: salt}(POOL_MANAGER, wchan);
+        WCHANWrapHook hook = new WCHANWrapHook{salt: salt}(poolManagerAddr, wchan);
         require(address(hook) == hookAddr, "Hook address mismatch");
         console.log("WCHANWrapHook deployed at:", address(hook));
 
@@ -80,10 +83,12 @@ contract DeployWCHANWrapHook is Script {
 
         vm.stopBroadcast();
 
+        _saveAddress("WCHAN_WRAP_HOOK", address(hook));
+
         // Remind deployer to seed the PoolManager
         console.log("");
         console.log("=== POST-DEPLOYMENT: Seed the PoolManager ===");
-        console.log("PoolManager:", POOL_MANAGER);
+        console.log("PoolManager:", poolManagerAddr);
         console.log("Send OLD_TOKEN and WCHAN to the PoolManager so the first swap can succeed.");
         console.log("See apps/contracts/README.md for details.");
     }
