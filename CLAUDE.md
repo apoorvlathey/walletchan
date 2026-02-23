@@ -112,6 +112,9 @@ pnpm lint               # Lint extension code
 pnpm build:contracts    # Compile Solidity contracts
 pnpm test:contracts     # Run Foundry tests
 
+# Foundry library installation (ALWAYS use git submodules)
+cd apps/contracts && forge install <org>/<repo>   # Do NOT use --no-git
+
 # Release (auto-bumps version, syncs manifest, creates tag, pushes)
 pnpm release:patch      # 0.1.0 → 0.1.1
 pnpm release:minor      # 0.1.0 → 0.2.0
