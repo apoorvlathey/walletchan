@@ -13,3 +13,4 @@
 [submodule "apps/contracts/lib/ERADICATE2"]
 	path = apps/contracts/lib/ERADICATE2
 	url = https://github.com/apoorvlathey/ERADICATE2
+	ignore = dirty
