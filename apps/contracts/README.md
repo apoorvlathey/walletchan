@@ -1,5 +1,89 @@
 # Contracts
 
+Solidity smart contracts for WCHAN token, built with [Foundry](https://book.getfoundry.sh/).
+
+## Setup
+
+```bash
+cp .env.example .env
+# Fill in DEV_PRIVATE_KEY, BASE_SEPOLIA_RPC_URL, ETHERSCAN_API_KEY
+```
+
+## Deploy Scripts
+
+Scripts are numbered and form a dependency chain (`00` -> `01` -> `02` -> `03`). Deployed addresses are read from and written to `addresses.json` keyed by chain ID.
+
+| Script | Contract | Notes |
+| --- | --- | --- |
+| `00_DeployMockOldToken` | MockOldToken | Testnet only |
+| `01_DeployWCHAN` | WCHAN / WCHANTestnet | Vanity CREATE2 address (see below) |
+| `02_DeployWCHANWrapHook` | WCHANWrapHook | Uniswap v4 hook |
+| `03_DeployWCHANDevFeeHook` | WCHANDevFeeHook | Uniswap v4 hook |
+
+Deploy a script:
+
+```bash
+cd apps/contracts && source .env
+forge script script/01_DeployWCHAN.s.sol:DeployWCHAN --broadcast --verify -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL
+```
+
+## WCHAN Vanity Address
+
+WCHAN is deployed via CREATE2 to a vanity address starting with `0xBA5ED...`. The flow uses [ERADICATE2](https://github.com/apoorvlathey/ERADICATE2) (GPU-accelerated OpenCL) to mine a salt that produces the desired address prefix.
+
+### How it works
+
+1. Foundry's `new Contract{salt: salt}(args)` routes through the [deterministic deployer](https://github.com/Arachnid/deterministic-deployment-proxy) at `0x4e59b44847b379578588920cA78FbF26c0B4956C`
+2. The resulting address is: `keccak256(0xff ++ deployer ++ salt ++ keccak256(init_code))[12:]`
+3. ERADICATE2 brute-forces salts on GPU until it finds one where the address matches the desired prefix
+
+### Mining a vanity salt
+
+```bash
+cd apps/contracts
+
+# Build ERADICATE2 (first time only)
+make -C lib/ERADICATE2
+
+# Mine a salt (computes init code, then runs ERADICATE2)
+./script/process/mine_vanity.sh base-sepolia
+./script/process/mine_vanity.sh base
+```
+
+The script:
+1. Runs `GetInitCodeHash.s.sol` via Forge to compute the contract's init code and save it to a `.hex` file
+2. Launches ERADICATE2 with the init code file, deployer address, and target prefix
+3. Prints matching salts and addresses as they're found
+
+### After mining
+
+Once you have a salt with a satisfactory address, add both to `addresses.json` under the target chain:
+
+```json
+{
+  "84532": {
+    "WCHAN_SALT": "0x<salt from ERADICATE2>",
+    "EXPECTED_WCHAN_ADDRESS": "0x<address from ERADICATE2>",
+    ...
+  }
+}
+```
+
+Then deploy:
+
+```bash
+source .env && forge script script/01_DeployWCHAN.s.sol:DeployWCHAN --broadcast --verify -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL
+```
+
+The deploy script verifies the deployed address matches `EXPECTED_WCHAN_ADDRESS` and reverts on mismatch.
+
+## Build & Test
+
+```bash
+forge build
+forge test
+```
+
 ## WCHANWrapHook
 
 A Uniswap V4 hook that creates a 1:1 swap pool between OLD_TOKEN and WCHAN. The hook fully bypasses the concentrated liquidity AMM — it takes the input from the PoolManager, performs wrap/unwrap via the WCHAN contract, and settles the output back.
