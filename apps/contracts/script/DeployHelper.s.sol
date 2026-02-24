@@ -74,4 +74,12 @@ abstract contract DeployHelper is Script {
         // Re-read so subsequent saves within the same script see prior writes
         _addressesJson = vm.readFile(ADDRESSES_FILE);
     }
+
+    /// @notice Write a bytes32 value to addresses.json for the current chain.
+    function _saveBytes32(string memory name, bytes32 val) internal {
+        string memory key = string.concat(".", vm.toString(block.chainid), ".", name);
+        string memory value = vm.toString(val);
+        vm.writeJson(value, ADDRESSES_FILE, key);
+        _addressesJson = vm.readFile(ADDRESSES_FILE);
+    }
 }

@@ -2,8 +2,9 @@
 # Mine a vanity CREATE2 salt for WCHAN using ERADICATE2.
 #
 # Usage:
-#   ./script/process/mine_vanity.sh base-sepolia
-#   ./script/process/mine_vanity.sh base
+#   ./script/mine_vanity_WCHAN.sh base-sepolia
+#   ./script/mine_vanity_WCHAN.sh eth-sepolia
+#   ./script/mine_vanity_WCHAN.sh base
 
 set -euo pipefail
 
