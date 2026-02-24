@@ -4,13 +4,13 @@ BankrWallet is distributed through two channels.
 
 ## Distribution Channels
 
-| | GitHub Releases (sideloading) | Chrome Web Store |
-|---|---|---|
-| **Format** | ZIP (load as unpacked in developer mode) | CWS package |
-| **Update mechanism** | Manual (download new zip, refresh) | CWS built-in auto-update |
-| **Audience** | Beta testers, developers | General public |
-| **Speed** | Instant (GitHub Release publishes immediately) | CWS review (hours to days) |
-| **Listing** | [GitHub Releases](https://github.com/apoorvlathey/bankr-wallet/releases) | [Chrome Web Store](https://chromewebstore.google.com/detail/bankrwallet/kofbkhbkfhiollbhjkbebajngppmpbgc) |
+|                      | GitHub Releases (sideloading)                                          | Chrome Web Store                                                                                          |
+| -------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Format**           | ZIP (load as unpacked in developer mode)                               | CWS package                                                                                               |
+| **Update mechanism** | Manual (download new zip, refresh)                                     | CWS built-in auto-update                                                                                  |
+| **Audience**         | Beta testers, developers                                               | General public                                                                                            |
+| **Speed**            | Instant (GitHub Release publishes immediately)                         | CWS review (hours to days)                                                                                |
+| **Listing**          | [GitHub Releases](https://github.com/apoorvlathey/walletchan/releases) | [Chrome Web Store](https://chromewebstore.google.com/detail/bankrwallet/kofbkhbkfhiollbhjkbebajngppmpbgc) |
 
 ### Two Zip Variants
 
@@ -43,7 +43,7 @@ This automatically (via `scripts/release.sh`):
 The [release workflow](/.github/workflows/release.yml) triggers on `v*` tags and:
 
 1. Runs `pnpm zip` (which builds the extension and creates the zip)
-2. Publishes `bankr-wallet-vX.Y.Z.zip` to [GitHub Releases](https://github.com/apoorvlathey/bankr-wallet/releases)
+2. Publishes `bankr-wallet-vX.Y.Z.zip` to [GitHub Releases](https://github.com/apoorvlathey/walletchan/releases)
 
 Users can download the zip from GitHub Releases and load it as an unpacked extension in developer mode.
 
@@ -78,7 +78,7 @@ GitHub Releases provide a ZIP file for users who want to sideload the extension 
 
 ### How to install from GitHub Release
 
-1. Download `bankr-wallet-vX.Y.Z.zip` from [GitHub Releases](https://github.com/apoorvlathey/bankr-wallet/releases)
+1. Download `bankr-wallet-vX.Y.Z.zip` from [GitHub Releases](https://github.com/apoorvlathey/walletchan/releases)
 2. Extract the zip
 3. Go to `chrome://extensions` → enable Developer mode
 4. Click "Load unpacked" → select the extracted folder
@@ -86,7 +86,7 @@ GitHub Releases provide a ZIP file for users who want to sideload the extension 
 
 ### Chrome CRX Sideloading Restrictions
 
-Chrome **blocks enabling sideloaded CRX extensions** that aren't from the Chrome Web Store. Dragging a `.crx` file into `chrome://extensions` will install it, but Chrome disables it with the warning: *"This extension is not listed in the Chrome Web Store and may have been added without your knowledge."*
+Chrome **blocks enabling sideloaded CRX extensions** that aren't from the Chrome Web Store. Dragging a `.crx` file into `chrome://extensions` will install it, but Chrome disables it with the warning: _"This extension is not listed in the Chrome Web Store and may have been added without your knowledge."_
 
 This is why we only distribute ZIP files (for unpacked loading) and not CRX files on GitHub Releases. CRX-based auto-update via `update_url` only works for enterprise/managed installs deployed via group policy.
 
@@ -215,11 +215,11 @@ Chrome extensions auto-update silently. Users cannot choose to stay on an old ve
 
 ### Migration history
 
-| Version | Migration | What it does |
-|---------|-----------|--------------|
-| v1.0.0 | `migrateFromLegacyStorage` | Creates `accounts` array + `activeAccountId` from legacy `address` / `encryptedApiKey` storage (v0.1.1/v0.2.0 had no multi-account system) |
-| v1.0.0 | Vault key (on first unlock) | `authHandlers.ts` auto-migrates `encryptedApiKey` → `encryptedVaultKeyMaster` + `encryptedApiKeyVault` |
-| v1.3.0 | Private key vault-key encryption (on first unlock with master password) | `authHandlers.ts` auto-migrates `pkVault` and `mnemonicVault` entries from password encryption (`salt !== ""`) to vault-key encryption (`salt === ""`). Enables agent password to sign transactions. Idempotent, dual-format support maintained. |
+| Version | Migration                                                               | What it does                                                                                                                                                                                                                                     |
+| ------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| v1.0.0  | `migrateFromLegacyStorage`                                              | Creates `accounts` array + `activeAccountId` from legacy `address` / `encryptedApiKey` storage (v0.1.1/v0.2.0 had no multi-account system)                                                                                                       |
+| v1.0.0  | Vault key (on first unlock)                                             | `authHandlers.ts` auto-migrates `encryptedApiKey` → `encryptedVaultKeyMaster` + `encryptedApiKeyVault`                                                                                                                                           |
+| v1.3.0  | Private key vault-key encryption (on first unlock with master password) | `authHandlers.ts` auto-migrates `pkVault` and `mnemonicVault` entries from password encryption (`salt !== ""`) to vault-key encryption (`salt === ""`). Enables agent password to sign transactions. Idempotent, dual-format support maintained. |
 
 ### Testing an update locally
 
@@ -229,12 +229,12 @@ Chrome extensions auto-update silently. Users cannot choose to stay on an old ve
    ```js
    // Simulate v0.2.0 storage state
    chrome.storage.local.remove([
-     'accounts',
-     'encryptedVaultKeyMaster',
-     'encryptedApiKeyVault',
-     'agentPasswordEnabled',
+     "accounts",
+     "encryptedVaultKeyMaster",
+     "encryptedApiKeyVault",
+     "agentPasswordEnabled",
    ]);
-   chrome.storage.sync.remove(['activeAccountId', 'tabAccounts']);
+   chrome.storage.sync.remove(["activeAccountId", "tabAccounts"]);
    ```
 4. Click **Reload** on `chrome://extensions` (fires `onInstalled` with `reason === "update"`)
 5. Open the popup — should show unlock screen, not onboarding

@@ -37,7 +37,7 @@
 
 ### Download
 
-1. Go to the [latest release](https://github.com/apoorvlathey/bankr-wallet/releases/latest) on GitHub
+1. Go to the [latest release](https://github.com/apoorvlathey/walletchan/releases/latest) on GitHub
 2. Download the `bankr-wallet-vX.Y.Z.zip` file from the release assets (e.g., `bankr-wallet-v0.1.0.zip`)
 3. Extract the zip file to a folder on your computer
 

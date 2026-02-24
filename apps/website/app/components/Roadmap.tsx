@@ -131,8 +131,7 @@ const roadmapItems: RoadmapItemProps[] = [
     shape: "square",
     color: "red",
     filled: true,
-    githubUrl:
-      "https://github.com/apoorvlathey/bankr-wallet/releases/tag/v0.1.0",
+    githubUrl: "https://github.com/apoorvlathey/walletchan/tag/v0.1.0",
   },
   {
     version: "v0.2.0",
@@ -194,7 +193,12 @@ export function Roadmap() {
           </VStack>
 
           {/* Timeline */}
-          <VStack align="flex-start" spacing={0} w="full" pl={{ base: 2, md: 8 }}>
+          <VStack
+            align="flex-start"
+            spacing={0}
+            w="full"
+            pl={{ base: 2, md: 8 }}
+          >
             {roadmapItems.map((item, index) => (
               <RoadmapItem key={item.version} {...item} delay={index * 0.15} />
             ))}
