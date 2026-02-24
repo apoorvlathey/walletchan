@@ -51,6 +51,11 @@ abstract contract DeployHelper is Script {
         return _addressesJson.readAddress(key);
     }
 
+    /// @notice Returns true if running on a known testnet chain.
+    function _isTestnet() internal view returns (bool) {
+        return block.chainid == 84532 || block.chainid == 11155111; // Base Sepolia, Eth Sepolia
+    }
+
     /// @notice Read bytes32 by name for the current chain. Reverts if missing.
     function _requireBytes32(string memory name) internal view returns (bytes32) {
         string memory key = string.concat(".", vm.toString(block.chainid), ".", name);

@@ -12,7 +12,8 @@ remappings = [
 fs_permissions = [
     { access = "read-write", path = "addresses.json" },
     { access = "write", path = "wchan_init_code_8453.hex" },
-    { access = "write", path = "wchan_init_code_84532.hex" }
+    { access = "write", path = "wchan_init_code_84532.hex" },
+    { access = "write", path = "wchan_init_code_11155111.hex" }
 ]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
