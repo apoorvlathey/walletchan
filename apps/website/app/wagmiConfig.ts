@@ -16,6 +16,7 @@ import {
   soneium,
   sonic,
   megaeth,
+  sepolia,
 } from "wagmi/chains";
 import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 import {
@@ -39,7 +40,7 @@ const connectors = connectorsForWallets(
       ],
     },
   ],
-  { appName: "BankrWallet", projectId }
+  { appName: "WalletChan", projectId }
 );
 
 export const walletChains = [
@@ -59,6 +60,7 @@ export const walletChains = [
   soneium,
   sonic,
   megaeth,
+  sepolia,
 ] as const;
 
 /** Custom RPC URLs for the ImpersonatorIframeProvider */
@@ -79,6 +81,7 @@ export const CHAIN_RPC_URLS: Record<number, string> = {
   1868: "https://rpc.soneium.org",
   146: "https://rpc.soniclabs.com",
   4326: "https://mainnet.megaeth.com/rpc",
+  11155111: "https://ethereum-sepolia-rpc.publicnode.com",
 };
 
 export const config = createConfig({

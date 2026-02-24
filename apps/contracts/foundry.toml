@@ -1,0 +1,20 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@src/=src/",
+    "@uniswap/v4-core/=lib/v4-core/",
+    "@uniswap-periphery/=lib/v4-periphery/src/",
+    "vulcan/=lib/vulcan/src/"
+]
+
+fs_permissions = [
+    { access = "read-write", path = "addresses.json" },
+    { access = "write", path = "wchan_init_code_8453.hex" },
+    { access = "write", path = "wchan_init_code_84532.hex" },
+    { access = "write", path = "wchan_init_code_11155111.hex" }
+]
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

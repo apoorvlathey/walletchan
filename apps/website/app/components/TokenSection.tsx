@@ -29,9 +29,9 @@ const MotionBox = motion(Box);
 
 const BNKRW_TOKEN: BuyToken = {
   address: TOKEN_ADDRESS,
-  name: "BankrWallet",
+  name: "WalletChan",
   symbol: "BNKRW",
-  imageUrl: "/images/bankrwallet-icon-nobg.png",
+  imageUrl: "/images/walletchan-icon-nobg.png",
 };
 
 export function TokenSection() {

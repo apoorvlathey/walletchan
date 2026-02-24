@@ -101,7 +101,7 @@ export default function AppsPage() {
               maxW="500px"
               fontWeight="500"
             >
-              Browse and interact with dApps directly through BankrWallet.
+              Browse and interact with dApps directly through WalletChan.
               Connect your wallet to get started.
             </Text>
             <ConnectButton />

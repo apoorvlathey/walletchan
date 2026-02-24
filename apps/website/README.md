@@ -1,6 +1,6 @@
-# BankrWallet Website
+# WalletChan Website
 
-Landing page for BankrWallet at [bankrwallet.app](https://bankrwallet.app).
+Landing page for WalletChan at [walletchan.com](https://walletchan.com).
 
 ## Tech Stack
 
