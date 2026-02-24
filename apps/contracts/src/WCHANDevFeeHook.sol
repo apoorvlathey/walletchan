@@ -210,7 +210,7 @@ contract WCHANDevFeeHook is Ownable, IHooks {
         // non-zero means user is swapping WETH for WCHAN
         if (_wethIn + _wchanOut > 0) {
             /**
-             * We need to update our hook delta to reduce the upcoming swap amount via the Uniswap pool, as we already fulfilled some WCHAN to WETH swap
+             * We need to update our hook delta to reduce the upcoming swap amount via the Uniswap pool, as we already fulfilled some in our WCHAN to WETH swap
             */
 
             // first determine the swap delta for our ISP swap
@@ -405,7 +405,7 @@ contract WCHANDevFeeHook is Ownable, IHooks {
                 feePips: 0
             });
         }
-        // As we have a negative amountSpecified (exact WETH input), this means that we are spending fixed amount of WETH to get any amount of WCHAN.
+        // As we have a negative amountSpecified (exact WETH input), this means that the user is spending fixed amount of WETH to get any amount of WCHAN.
         else {
             // We need to calculate how much WCHAN is needed by the Hook to get that WETH from user, meaning a swap in the opposite direction (WCHAN for WETH, exact out) that'll give us the WCHAN amount
             // Suppose isWETHCurrencyZero = true => zeroForOne = true (WETH for WCHAN), we'll simulate oneForZero (WCHAN for WETH) as exact output
