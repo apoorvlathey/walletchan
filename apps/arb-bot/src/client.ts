@@ -5,7 +5,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
-import { config } from "./config";
+import { config } from "./config.js";
 
 const transport = http(config.rpcUrl);
 

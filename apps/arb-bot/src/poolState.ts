@@ -11,7 +11,7 @@ import {
   buildOldTokenPoolKey,
   type PoolKey,
 } from "@bankr-wallet/wchan-swap";
-import { config } from "./config";
+import { config } from "./config.js";
 
 // PoolManager storage: mapping(PoolId => Pool.State) at slot 6
 const POOLS_SLOT = 6n;

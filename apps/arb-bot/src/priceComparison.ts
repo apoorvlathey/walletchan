@@ -1,4 +1,4 @@
-import type { PoolSlot0 } from "./poolState";
+import type { PoolSlot0 } from "./poolState.js";
 
 export type ArbDirection = "buy-direct-sell-bnkrw" | "buy-bnkrw-sell-direct";
 

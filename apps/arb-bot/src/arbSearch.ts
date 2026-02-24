@@ -7,9 +7,9 @@ import {
   isWethCurrency0ForOldToken,
   quoterAbi,
 } from "@bankr-wallet/wchan-swap";
-import type { ArbDirection } from "./priceComparison";
-import { config } from "./config";
-import { log } from "./logger";
+import type { ArbDirection } from "./priceComparison.js";
+import { config } from "./config.js";
+import { log } from "./logger.js";
 
 export interface ArbResult {
   direction: ArbDirection;
