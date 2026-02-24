@@ -131,7 +131,7 @@ None of these requests involve downloading or executing code. They are purely da
 
 ## Privacy Policy URL
 
-https://github.com/apoorvlathey/bankr-wallet/blob/master/PRIVACY_POLICY.md
+https://github.com/apoorvlathey/walletchan/blob/master/PRIVACY_POLICY.md
 
 ---
 
