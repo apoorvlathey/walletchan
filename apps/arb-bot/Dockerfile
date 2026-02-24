@@ -16,7 +16,4 @@ RUN pnpm install --frozen-lockfile --filter @bankr-wallet/arb-bot
 
 WORKDIR /app/apps/arb-bot
 
-# Build TypeScript
-RUN pnpm build
-
-CMD ["node", "dist/index.js"]
+CMD ["pnpm", "start"]

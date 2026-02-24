@@ -5,15 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file=.env src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "tsx src/index.ts"
   },
   "dependencies": {
     "@bankr-wallet/wchan-swap": "workspace:*",
+    "tsx": "^4.19.0",
     "viem": "^2.30.4"
   },
   "devDependencies": {
-    "tsx": "^4.19.0",
     "typescript": "^5.6.3",
     "@types/node": "^22.0.0"
   },

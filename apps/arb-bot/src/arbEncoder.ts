@@ -18,8 +18,8 @@ import {
   encodeSweep,
   MSG_SENDER,
 } from "@bankr-wallet/wchan-swap";
-import type { ArbDirection } from "./priceComparison";
-import { config } from "./config";
+import type { ArbDirection } from "./priceComparison.js";
+import { config } from "./config.js";
 import { applySlippage } from "@bankr-wallet/wchan-swap";
 
 // OLD_TOKEN pool constants (duplicated for path building)

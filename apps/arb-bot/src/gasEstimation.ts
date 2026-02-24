@@ -1,6 +1,6 @@
 import { formatEther } from "viem";
-import { config } from "./config";
-import { log } from "./logger";
+import { config } from "./config.js";
+import { log } from "./logger.js";
 
 export interface GasCost {
   gasLimit: bigint;

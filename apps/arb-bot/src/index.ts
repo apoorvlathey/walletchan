@@ -1,12 +1,12 @@
 import { formatEther } from "viem";
-import { config } from "./config";
-import { account, publicClient, walletClient } from "./client";
-import { log } from "./logger";
-import { readPoolStates } from "./poolState";
-import { detectArbDirection } from "./priceComparison";
-import { findOptimalArb } from "./arbSearch";
-import { encodeArbTx } from "./arbEncoder";
-import { estimateGasCost } from "./gasEstimation";
+import { config } from "./config.js";
+import { account, publicClient, walletClient } from "./client.js";
+import { log } from "./logger.js";
+import { readPoolStates } from "./poolState.js";
+import { detectArbDirection } from "./priceComparison.js";
+import { findOptimalArb } from "./arbSearch.js";
+import { encodeArbTx } from "./arbEncoder.js";
+import { estimateGasCost } from "./gasEstimation.js";
 
 let consecutiveErrors = 0;
 const MAX_CONSECUTIVE_ERRORS = 10;
