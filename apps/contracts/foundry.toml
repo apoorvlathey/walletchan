@@ -6,7 +6,8 @@ remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@src/=src/",
     "@uniswap/v4-core/=lib/v4-core/",
-    "@uniswap-periphery/=lib/v4-periphery/src/"
+    "@uniswap-periphery/=lib/v4-periphery/src/",
+    "vulcan/=lib/vulcan/src/"
 ]
 
 fs_permissions = [

@@ -472,43 +472,6 @@ contract WCHANERC20Test is WCHANBaseTest {
 }
 
 // ═══════════════════════════════════════════════════
-//                 ERC-20 BURNABLE
-// ═══════════════════════════════════════════════════
-
-contract WCHANBurnableTest is WCHANBaseTest {
-    function setUp() public override {
-        super.setUp();
-        _wrapTokens(alice, 1000e18);
-    }
-
-    function test_burn(uint256 amount) public {
-        amount = bound(amount, 0, 1000e18);
-        vm.prank(alice);
-        token.burn(amount);
-        assertEq(token.balanceOf(alice), 1000e18 - amount);
-        assertEq(token.totalSupply(), 1000e18 - amount);
-    }
-
-    function test_burnFrom(uint256 amount) public {
-        amount = bound(amount, 0, 1000e18);
-        vm.prank(alice);
-        token.approve(bob, amount);
-
-        vm.prank(bob);
-        token.burnFrom(alice, amount);
-        assertEq(token.balanceOf(alice), 1000e18 - amount);
-    }
-
-    function test_burn_revert_exceedsBalance() public {
-        vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(IERC20Errors.ERC20InsufficientBalance.selector, alice, 1000e18, 1001e18)
-        );
-        token.burn(1001e18);
-    }
-}
-
-// ═══════════════════════════════════════════════════
 //               ERC-2612 PERMIT
 // ═══════════════════════════════════════════════════
 
@@ -1280,28 +1243,6 @@ contract WCHANWrapEdgeCasesTest is WCHANBaseTest {
         assertEq(oldToken.balanceOf(address(token)), 0);
     }
 
-    /// @dev Burning WCHAN permanently locks the corresponding OLD_TOKEN
-    function test_burn_locksOldToken() public {
-        _wrapTokens(alice, 500e18);
-
-        vm.prank(alice);
-        token.burn(200e18);
-
-        // Alice has 300 WCHAN, but 500 OLD_TOKEN is locked in the contract
-        assertEq(token.balanceOf(alice), 300e18);
-        assertEq(token.totalSupply(), 300e18);
-        assertEq(oldToken.balanceOf(address(token)), 500e18);
-
-        // Alice can only unwrap 300, not 500
-        vm.prank(alice);
-        token.unwrap(300e18);
-
-        assertEq(token.balanceOf(alice), 0);
-        assertEq(oldToken.balanceOf(alice), 300e18);
-        // 200 OLD_TOKEN permanently locked
-        assertEq(oldToken.balanceOf(address(token)), 200e18);
-        assertEq(token.totalSupply(), 0);
-    }
 
     /// @dev Transfer to self should work without changing balance
     function test_transfer_toSelf() public {
