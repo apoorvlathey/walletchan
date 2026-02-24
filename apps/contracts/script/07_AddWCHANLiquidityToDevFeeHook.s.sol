@@ -29,17 +29,19 @@ import {GetETHUSDPrice} from "./reporting/GetETHUSDPrice.s.sol";
  *   Current chain: POOL_MANAGER, POSITION_MANAGER, WETH, WCHAN, WCHAN_DEV_FEE_HOOK
  *
  * Dry-run:
+ *   cd apps/contracts && source .env && forge script script/07_AddWCHANLiquidityToDevFeeHook.s.sol:AddWCHANLiquidityToDevFeeHook -vvvv --rpc-url $BASE_RPC_URL
  *   cd apps/contracts && source .env && forge script script/07_AddWCHANLiquidityToDevFeeHook.s.sol:AddWCHANLiquidityToDevFeeHook -vvvv --rpc-url $ETH_SEPOLIA_RPC_URL
  *
  * Broadcast:
+ *   cd apps/contracts && source .env && forge script script/07_AddWCHANLiquidityToDevFeeHook.s.sol:AddWCHANLiquidityToDevFeeHook --broadcast -vvvv --rpc-url $BASE_RPC_URL
  *   cd apps/contracts && source .env && forge script script/07_AddWCHANLiquidityToDevFeeHook.s.sol:AddWCHANLiquidityToDevFeeHook --broadcast -vvvv --rpc-url $ETH_SEPOLIA_RPC_URL
  */
 contract AddWCHANLiquidityToDevFeeHook is GetETHUSDPrice {
     using StateLibrary for IPoolManager;
     using PoolIdLibrary for PoolKey;
 
-    uint256 constant MAX_ETH_AMOUNT = 0.01 ether;
-    uint256 constant MAX_WCHAN_AMOUNT = 1_000_000 ether;
+    uint256 constant MAX_ETH_AMOUNT = 5 ether;
+    uint256 constant MAX_WCHAN_AMOUNT = 2_023_660_350 ether;
     uint256 constant HARDCODED_TOTAL_SUPPLY = 100_000_000_000 ether; // 100B tokens (OLD_TOKEN supply)
 
     uint256 constant MIN_MARKETCAP_USD6 = 100_000e6;     // $100K
