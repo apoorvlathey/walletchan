@@ -99,7 +99,7 @@ const steps = [
   {
     number: 1,
     title: "Install",
-    description: "Add BankrWallet to Chrome from the Chrome Web Store.",
+    description: "Add WalletChan to Chrome from the Chrome Web Store.",
     color: "red" as const,
     shape: "circle" as const,
   },
@@ -361,7 +361,7 @@ export function InstallGuide() {
               >
                 <OrderedList spacing={2} fontWeight="medium" pl={2}>
                   <ListItem>
-                    Click the BankrWallet extension icon to open the{" "}
+                    Click the WalletChan extension icon to open the{" "}
                     <Text as="span" fontWeight="black">
                       setup wizard
                     </Text>

@@ -40,7 +40,7 @@ const connectors = connectorsForWallets(
       ],
     },
   ],
-  { appName: "BankrWallet", projectId }
+  { appName: "WalletChan", projectId }
 );
 
 export const walletChains = [

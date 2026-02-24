@@ -2,27 +2,51 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@bankr-wallet/shared"],
-  rewrites() {
+  async redirects() {
+    return [
+      // Redirect bankrwallet.app subdomains -> walletchan.com subdomains
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "coins.bankrwallet.app" }],
+        destination: "https://coins.walletchan.com/:path*",
+        permanent: true,
+      },
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "stake.bankrwallet.app" }],
+        destination: "https://stake.walletchan.com/:path*",
+        permanent: true,
+      },
+      // Redirect bankrwallet.app -> walletchan.com (main domain, must be last)
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "bankrwallet.app" }],
+        destination: "https://walletchan.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
+  async rewrites() {
     return {
       beforeFiles: [
-        // coins.bankrwallet.app -> /coins
+        // coins.walletchan.com -> /coins
         {
           source: "/:path((?!_next|api|images|og|screenshots).*)",
           has: [
             {
               type: "host",
-              value: "coins.bankrwallet.app",
+              value: "coins.walletchan.com",
             },
           ],
           destination: "/coins/:path*",
         },
-        // stake.bankrwallet.app -> /stake
+        // stake.walletchan.com -> /stake
         {
           source: "/:path((?!_next|api|images|og|screenshots).*)",
           has: [
             {
               type: "host",
-              value: "stake.bankrwallet.app",
+              value: "stake.walletchan.com",
             },
           ],
           destination: "/stake/:path*",
