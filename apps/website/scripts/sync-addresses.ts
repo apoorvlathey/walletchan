@@ -23,6 +23,8 @@ const KEY_MAP: Record<string, string> = {
   WETH: "weth",
   UNIVERSAL_ROUTER: "universalRouter",
   POOL_MANAGER: "poolManager",
+  OLD_TOKEN: "oldToken",
+  WCHAN_WRAP_HOOK: "wrapHook",
 };
 
 // Addresses not in contracts/addresses.json — preserved per chain
@@ -30,10 +32,12 @@ const EXTRA_ADDRESSES: Record<string, Record<string, string>> = {
   "11155111": {
     quoter: "0x61b3f2011a92d183c7dbadbda940a7555ccf9227",
     permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+    oldTokenPoolHook: "0x0000000000000000000000000000000000000000",
   },
   "8453": {
     quoter: "0x0d5e0f971ed27fbff6c2837bf31316121532048d",
     permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+    oldTokenPoolHook: "0xb429d62f8f3bFFb98CdB9569533eA23bF0Ba28CC",
   },
 };
 
@@ -93,6 +97,9 @@ interface ChainAddresses {
   quoter: Address;
   permit2: Address;
   poolManager: Address;
+  oldToken: Address;
+  wrapHook: Address;
+  oldTokenPoolHook: Address;
 }
 
 export const ADDRESSES: Record<number, ChainAddresses> = {

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { usePublicClient } from "wagmi";
 import { parseEther } from "viem";
-import { getQuote, type SwapDirection, type WchanQuote } from "../../../lib/wchan-swap";
+import { getBestQuote, type SwapDirection, type WchanQuote } from "../../../lib/wchan-swap";
 
 const DEBOUNCE_MS = 500;
 
@@ -48,7 +48,7 @@ export function useSwapQuote({ chainId, direction, amount, enabled }: UseSwapQuo
 
     const timer = setTimeout(async () => {
       try {
-        const result = await getQuote(client, chainId, direction, parsed);
+        const result = await getBestQuote(client, chainId, direction, parsed);
         if (abortRef.current === id) {
           setQuote(result);
           setIsLoading(false);
@@ -83,7 +83,7 @@ export function useSwapQuote({ chainId, direction, amount, enabled }: UseSwapQuo
     setIsLoading(true);
     setError(null);
     try {
-      const result = await getQuote(client, chainId, direction, parsed);
+      const result = await getBestQuote(client, chainId, direction, parsed);
       setQuote(result);
       setIsLoading(false);
       return result;
