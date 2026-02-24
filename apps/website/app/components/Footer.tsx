@@ -61,8 +61,9 @@ export function Footer() {
                 <Image
                   border="4px solid"
                   borderColor="white"
-                  src="/images/bankrwallet-animated.gif"
-                  alt="BankrWallet"
+                  // src="/images/walletchan-animated.gif" // FIXME: use animated gif
+                  src="/images/walletchan-icon.png"
+                  alt="WalletChan"
                   w="32px"
                   h="32px"
                 />
@@ -72,7 +73,7 @@ export function Footer() {
                   fontSize="xl"
                   textTransform="uppercase"
                 >
-                  BANKRWALLET
+                  WALLETCHAN
                 </Text>
               </HStack>
               <Text
@@ -81,7 +82,7 @@ export function Footer() {
                 fontSize="sm"
                 textAlign={{ base: "center", md: "left" }}
               >
-                Your Bankr wallet, anywhere!
+                The Wallet for AI Era
               </Text>
 
               {/* Contract Address */}
@@ -210,7 +211,7 @@ export function Footer() {
                 _hover={{ color: "bauhaus.yellow" }}
               >
                 <XIcon size={16} />
-                @bankrwalletapp
+                @walletchan_
               </Link>
               <Link
                 href={TELEGRAM_URL}
@@ -261,7 +262,7 @@ export function Footer() {
               fontSize="sm"
               display={{ base: "none", md: "block" }}
             >
-              © {new Date().getFullYear()} BankrWallet
+              © {new Date().getFullYear()} WalletChan
             </Text>
           </Flex>
         </VStack>

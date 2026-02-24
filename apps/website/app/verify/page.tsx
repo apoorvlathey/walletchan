@@ -106,7 +106,7 @@ function VerifyContent() {
     setIsSigning(true);
     try {
       const timestamp = Math.floor(Date.now() / 1000);
-      const message = `Verify Telegram account for BankrWallet\nToken: ${token}\nTimestamp: ${timestamp}`;
+      const message = `Verify Telegram account for WalletChan\nToken: ${token}\nTimestamp: ${timestamp}`;
 
       const signature = await signMessageAsync({ message });
 
@@ -547,7 +547,7 @@ function VerifyContent() {
                       {!hasEnoughStake && (
                         <HStack spacing={2} w="full">
                           <Link
-                            href="https://stake.bankrwallet.app"
+                            href="https://stake.walletchan.com"
                             isExternal
                             flex={1}
                           >
