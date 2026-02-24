@@ -7,16 +7,17 @@ import {WCHANTestnet} from "@src/mocks/WCHANTestnet.sol";
 import {DeployHelper} from "./DeployHelper.s.sol";
 
 /**
- * Deploys WCHAN (or WCHANTestnet on Base Sepolia) at a vanity CREATE2 address.
+ * Deploys WCHAN (or WCHANTestnet on testnets) at a vanity CREATE2 address.
  *
  * Prerequisites — mine a vanity salt using the helper script (runs GetInitCodeHash + ERADICATE2):
  *   1. cd apps/contracts && ./script/process/mine_vanity.sh base-sepolia
- *      (or: ./script/process/mine_vanity.sh base)
+ *      (or: ./script/process/mine_vanity.sh base, ./script/process/mine_vanity.sh eth-sepolia)
  *   2. Save the found salt and expected address to addresses.json as WCHAN_SALT and EXPECTED_WCHAN_ADDRESS.
  *
  * Deploy:
  *   cd apps/contracts && source .env && forge script script/01_DeployWCHAN.s.sol:DeployWCHAN --broadcast --verify -vvvv --rpc-url $BASE_RPC_URL
  *   cd apps/contracts && source .env && forge script script/01_DeployWCHAN.s.sol:DeployWCHAN --broadcast --verify -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL
+ *   cd apps/contracts && source .env && forge script script/01_DeployWCHAN.s.sol:DeployWCHAN --broadcast --verify -vvvv --rpc-url $ETH_SEPOLIA_RPC_URL
  */
 
 contract DeployWCHAN is DeployHelper {
@@ -35,14 +36,14 @@ contract DeployWCHAN is DeployHelper {
         vm.startBroadcast(vm.envUint("DEV_PRIVATE_KEY"));
 
         address deployed;
-        if (block.chainid == 84532) {
-            // Base Sepolia — WCHANTestnet with configurable OLD_TOKEN
+        if (_isTestnet()) {
+            // Testnets — WCHANTestnet with configurable OLD_TOKEN
             address oldToken = _requireAddress("OLD_TOKEN");
             WCHANTestnet token = new WCHANTestnet{salt: salt}(TOKEN_URI, oldToken);
             deployed = address(token);
             console.log("WCHANTestnet deployed at:", deployed);
         } else {
-            // Base mainnet — WCHAN with hardcoded OLD_TOKEN
+            // Mainnet — WCHAN with hardcoded OLD_TOKEN
             require(BASE_MAINNET_OLD_TOKEN != address(0), "Set BASE_MAINNET_OLD_TOKEN");
             _saveAddress("OLD_TOKEN", BASE_MAINNET_OLD_TOKEN);
 

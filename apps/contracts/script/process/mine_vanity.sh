@@ -14,7 +14,7 @@ if [[ -f .env ]]; then
   set +a
 fi
 
-NETWORK="${1:?Usage: $0 <base|base-sepolia>}"
+NETWORK="${1:?Usage: $0 <base|base-sepolia|eth-sepolia>}"
 ADDRESSES_FILE="addresses.json"
 ERADICATE2="./lib/ERADICATE2/ERADICATE2.x64"
 DEPLOYER="0x4e59b44847b379578588920cA78FbF26c0B4956C"
@@ -22,9 +22,10 @@ PATTERN="ba5ed"
 
 # Resolve chain ID and RPC URL env var from network name
 case "$NETWORK" in
-  base)         CHAIN_ID="8453";  RPC_VAR="BASE_RPC_URL" ;;
-  base-sepolia) CHAIN_ID="84532"; RPC_VAR="BASE_SEPOLIA_RPC_URL" ;;
-  *)            echo "Error: Unknown network '$NETWORK'. Use 'base' or 'base-sepolia'." >&2; exit 1 ;;
+  base)         CHAIN_ID="8453";     RPC_VAR="BASE_RPC_URL" ;;
+  base-sepolia) CHAIN_ID="84532";    RPC_VAR="BASE_SEPOLIA_RPC_URL" ;;
+  eth-sepolia)  CHAIN_ID="11155111"; RPC_VAR="ETH_SEPOLIA_RPC_URL" ;;
+  *)            echo "Error: Unknown network '$NETWORK'. Use 'base', 'base-sepolia', or 'eth-sepolia'." >&2; exit 1 ;;
 esac
 
 if [[ ! -f "$ADDRESSES_FILE" ]]; then

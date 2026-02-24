@@ -18,16 +18,17 @@ contract GetInitCodeHash is DeployWCHAN {
     function run() external override {
         bytes memory initCode;
 
-        if (block.chainid == 84532) {
-            // Base Sepolia — WCHANTestnet(tokenURI, oldToken)
-            _loadAddresses();
+        _loadAddresses();
+
+        if (_isTestnet()) {
+            // Testnets — WCHANTestnet(tokenURI, oldToken)
             address oldToken = _requireAddress("OLD_TOKEN");
             initCode = abi.encodePacked(
                 type(WCHANTestnet).creationCode,
                 abi.encode(TOKEN_URI, oldToken)
             );
         } else {
-            // Base mainnet — WCHAN(tokenURI)
+            // Mainnet — WCHAN(tokenURI)
             initCode = abi.encodePacked(
                 type(WCHAN).creationCode,
                 abi.encode(TOKEN_URI)
