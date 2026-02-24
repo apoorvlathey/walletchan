@@ -14,7 +14,7 @@ const CONTRACTS_ADDRESSES = resolve(
   __dirname,
   "../../contracts/addresses.json",
 );
-const OUTPUT_FILE = resolve(__dirname, "../lib/wchan-swap/addresses.ts");
+const OUTPUT_FILE = resolve(__dirname, "../../../packages/wchan-swap/src/addresses.ts");
 
 // Mapping: addresses.json key → ChainAddresses field
 const KEY_MAP: Record<string, string> = {
