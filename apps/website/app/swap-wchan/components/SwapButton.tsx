@@ -206,7 +206,7 @@ export function SwapButton({
     if (insufficientBalance) return "Insufficient Balance";
     if (isQuoteLoading) return "Fetching Quote...";
     if (!quote) return "Enter Amount";
-    if (currentChainId !== chainId) return "Switch to Sepolia";
+    if (currentChainId !== chainId) return "Switch to Base";
     if (step === "switching") return "Switching Chain...";
     if (step === "approving") return "Approving WCHAN...";
     if (step === "signing-permit") return "Sign Permit...";
@@ -225,7 +225,7 @@ export function SwapButton({
     isQuoteLoading ||
     isConfirming;
 
-  const explorerBase = "https://sepolia.etherscan.io";
+  const explorerBase = "https://basescan.org";
 
   return (
     <VStack spacing={3} align="stretch">

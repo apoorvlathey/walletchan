@@ -73,7 +73,7 @@ export default function SwapWchanPage() {
               textAlign="center"
               maxW="md"
             >
-              Swap directly through the WCHAN Uniswap V4 pool on Sepolia.
+              Swap directly through the WCHAN Uniswap V4 pool on Base.
             </Text>
 
             <SwapCard />

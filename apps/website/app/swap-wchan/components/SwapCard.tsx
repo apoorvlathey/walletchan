@@ -15,7 +15,7 @@ import {
 import { useAccount, useBalance, useReadContract } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { formatEther, erc20Abi } from "viem";
-import { sepolia } from "wagmi/chains";
+import { base } from "wagmi/chains";
 import {
   type SwapDirection,
   getAddresses,
@@ -27,7 +27,7 @@ import { useSwapQuote } from "../hooks/useSwapQuote";
 import { SwapButton } from "./SwapButton";
 import { SlippageSettings } from "../../swap/components/SlippageSettings";
 
-const CHAIN_ID = sepolia.id;
+const CHAIN_ID = base.id;
 
 function ArrowDownIcon(props: React.ComponentProps<typeof Icon>) {
   return (
