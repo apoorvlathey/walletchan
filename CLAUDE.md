@@ -61,9 +61,11 @@ bankr-wallet/
 │   ├── indexer/          # Ponder indexer for coin launches
 │   ├── staking-indexer/  # Ponder indexer for sBNKRW vault staking
 │   ├── tg-bot/           # Token-gated Telegram bot (Grammy + Hono)
+│   ├── arb-bot/          # WETH↔WCHAN/BNKRW cross-pool arbitrage bot (Base)
 │   └── contracts/        # Solidity smart contracts (Foundry)
 ├── packages/
-│   └── shared/           # Shared design tokens, assets, and contract constants
+│   ├── shared/           # Shared design tokens, assets, and contract constants
+│   └── wchan-swap/       # Shared swap logic (quoting, encoding, permit2)
 ├── _docs/                # LLM-facing documentation
 │   ├── IMPLEMENTATION.md  # Extension architecture and message flows
 │   ├── SECURITY.md        # Security audit guide, threat model, pre-commit checklists
@@ -82,6 +84,7 @@ bankr-wallet/
 | Indexer          | Ponder                  | Hono       | Ponder     |
 | Staking Indexer  | Ponder                  | Hono       | Ponder     |
 | TG Bot           | Grammy + Hono           | —          | tsc        |
+| Arb Bot          | Node.js + viem          | —          | tsc        |
 | Contracts        | Solidity                | —          | Foundry    |
 
 **Design System**: Bauhaus - geometric, primary colors (Red #D02020, Blue #1040C0, Yellow #F0C020), hard shadows, thick borders. See `_docs/STYLING.md`.
@@ -97,6 +100,7 @@ pnpm dev:extension         # Build extension in dev mode
 pnpm dev:website           # Start website dev server at localhost:3000
 pnpm dev:staking-indexer   # Start staking indexer at localhost:42070
 pnpm dev:tg-bot            # Start TG bot + API at localhost:3001
+pnpm dev:arb-bot           # Start arb bot (requires .env with PRIVATE_KEY + BASE_RPC_URL)
 
 # Build
 pnpm build              # Build both extension and website
@@ -197,6 +201,7 @@ When working on features, refer to these docs:
 | `_docs/STORAGE.md`              | Every chrome.storage key, shapes, version history     |
 | `_docs/ADD_CHAIN.md`           | How to add a new chain (single registry entry)        |
 | `apps/tg-bot/IMPLEMENTATION.md`  | TG bot: verification flow, commands, API, balance checker |
+| `apps/arb-bot/IMPLEMENTATION.md` | Arb bot: cross-pool arb strategy, batched RPC, encoding   |
 | `_docs/TOKEN_GATED_TG.md`       | Token-gated TG system: architecture, DB schema, security |
 | `openclaw-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling     |
 

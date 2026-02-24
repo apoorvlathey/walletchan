@@ -1,0 +1,17 @@
+{
+  "name": "@bankr-wallet/wchan-swap",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "viem": "^2.30.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
