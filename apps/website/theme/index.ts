@@ -7,7 +7,7 @@ import {
 } from "@bankr-wallet/shared";
 
 /**
- * Bauhaus Design System Theme for BankrWallet Website
+ * Bauhaus Design System Theme for WalletChan Website
  * Extends the shared design tokens for use with Chakra UI
  */
 

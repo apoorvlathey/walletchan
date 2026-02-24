@@ -1,4 +1,7 @@
-import { BNKRW_TOKEN_ADDRESS, BNKRW_POOL_ADDRESS } from "@bankr-wallet/shared/contracts";
+import {
+  BNKRW_TOKEN_ADDRESS,
+  BNKRW_POOL_ADDRESS,
+} from "@bankr-wallet/shared/contracts";
 
 export const TOKEN_ADDRESS = BNKRW_TOKEN_ADDRESS;
 export const POOL_ADDRESS = BNKRW_POOL_ADDRESS;
@@ -6,10 +9,10 @@ export const POOL_ADDRESS = BNKRW_POOL_ADDRESS;
 // App URLs
 export const CHROME_STORE_URL =
   "https://chromewebstore.google.com/detail/bankrwallet/kofbkhbkfhiollbhjkbebajngppmpbgc";
-export const GITHUB_URL = "https://github.com/apoorvlathey/bankr-wallet";
+export const GITHUB_URL = "https://github.com/apoorvlathey/walletchan";
 export const GITHUB_RELEASES_URL =
-  "https://github.com/apoorvlathey/bankr-wallet/releases/latest";
-export const TWITTER_URL = "https://x.com/bankrwalletapp";
+  "https://github.com/apoorvlathey/walletchan/releases/latest";
+export const TWITTER_URL = "https://x.com/walletchan_";
 export const TELEGRAM_URL = "https://t.me/bnkrwpublic";
 export const BANKR_API_URL = "https://bankr.bot/api";
 

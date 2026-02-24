@@ -46,12 +46,12 @@ export function Hero() {
                   lineHeight="0.9"
                   letterSpacing="tighter"
                 >
-                  USE YOUR
+                  THE
                   <br />
-                  BANKR WALLET
+                  WALLET
                   <br />
                   <Box as="span" color="bauhaus.red">
-                    ANYWHERE
+                    FOR AI ERA
                   </Box>
                 </Heading>
               </motion.div>
@@ -281,8 +281,9 @@ export function Hero() {
             }}
           >
             <Image
-              src="/images/bankrwallet-animated.gif"
-              alt="BankrWallet Mascot"
+              // src="/images/walletchan-animated.gif" // FIXME: use animated gif
+              src="/images/walletchan-icon.png"
+              alt="WalletChan Mascot"
               w={{ base: "130px", md: "160px", lg: "200px" }}
               h={{ base: "130px", md: "160px", lg: "200px" }}
               border="4px solid"

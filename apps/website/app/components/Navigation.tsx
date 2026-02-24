@@ -26,11 +26,11 @@ import { LogoShapes } from "./ui/GeometricShape";
 import { CHROME_STORE_URL, TELEGRAM_URL } from "../constants";
 import { useVaultData } from "../contexts/VaultDataContext";
 
-const COINS_SUBDOMAIN = "coins.bankrwallet.app";
-const COINS_SUBDOMAIN_URL = "https://coins.bankrwallet.app";
-const STAKE_SUBDOMAIN = "stake.bankrwallet.app";
-const STAKE_SUBDOMAIN_URL = "https://stake.bankrwallet.app";
-const MAIN_SITE = "https://bankrwallet.app";
+const COINS_SUBDOMAIN = "coins.walletchan.com";
+const COINS_SUBDOMAIN_URL = "https://coins.walletchan.com";
+const STAKE_SUBDOMAIN = "stake.walletchan.com";
+const STAKE_SUBDOMAIN_URL = "https://stake.walletchan.com";
+const MAIN_SITE = "https://walletchan.com";
 
 const revolveBorder = keyframes`
   0% { transform: rotate(0deg); }
@@ -113,8 +113,8 @@ export function Navigation() {
           <Link href={logoHref} _hover={{ textDecoration: "none" }}>
             <HStack spacing={3}>
               <Image
-                src="/images/bankrwallet-icon-nobg.png"
-                alt="BankrWallet"
+                src="/images/walletchan-icon-nobg.png"
+                alt="WalletChan"
                 w="40px"
                 h="40px"
               />
@@ -124,7 +124,7 @@ export function Navigation() {
                 textTransform="uppercase"
                 letterSpacing="tight"
               >
-                BANKRWALLET
+                WALLETCHAN
               </Box>
             </HStack>
           </Link>
@@ -276,7 +276,7 @@ export function Navigation() {
                 textTransform="uppercase"
                 ml={2}
               >
-                BANKRWALLET
+                WALLETCHAN
               </Box>
             </HStack>
           </DrawerHeader>
