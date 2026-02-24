@@ -22,6 +22,8 @@ import {
   applySlippage,
   encodeBuyWchan,
   encodeSellWchan,
+  encodeBuyWchanViaBnkrw,
+  encodeSellWchanViaBnkrw,
   getErc20AllowanceToPermit2,
   getPermit2Allowance,
   buildPermitSingle,
@@ -96,9 +98,12 @@ export function SwapButton({
       const minAmountOut = applySlippage(quote.amountOut, slippageBps);
 
       if (direction === "buy") {
-        // Buy: ETH → WCHAN
+        // Buy: ETH → WCHAN (direct or via BNKRW)
         setStep("swapping");
-        const tx = encodeBuyWchan(chainId, quote.amountIn, minAmountOut, deadline);
+        const tx =
+          quote.route === "via-bnkrw"
+            ? encodeBuyWchanViaBnkrw(chainId, quote.amountIn, minAmountOut, deadline)
+            : encodeBuyWchan(chainId, quote.amountIn, minAmountOut, deadline);
         const hash = await sendTransactionAsync({
           to: tx.to,
           data: tx.data,
@@ -164,15 +169,24 @@ export function SwapButton({
           permit = { permitSingle, signature };
         }
 
-        // 3. Execute sell swap
+        // 3. Execute sell swap (direct or via BNKRW)
         setStep("swapping");
-        const tx = encodeSellWchan(
-          chainId,
-          quote.amountIn,
-          minAmountOut,
-          deadline,
-          permit
-        );
+        const tx =
+          quote.route === "via-bnkrw"
+            ? encodeSellWchanViaBnkrw(
+                chainId,
+                quote.amountIn,
+                minAmountOut,
+                deadline,
+                permit
+              )
+            : encodeSellWchan(
+                chainId,
+                quote.amountIn,
+                minAmountOut,
+                deadline,
+                permit
+              );
         const hash = await sendTransactionAsync({
           to: tx.to,
           data: tx.data,
