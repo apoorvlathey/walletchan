@@ -24,7 +24,8 @@
     "release:minor": "pnpm --filter @bankr-wallet/extension release:minor",
     "release:major": "pnpm --filter @bankr-wallet/extension release:major",
     "build:contracts": "pnpm --filter @bankr-wallet/contracts build",
-    "test:contracts": "pnpm --filter @bankr-wallet/contracts test"
+    "test:contracts": "pnpm --filter @bankr-wallet/contracts test",
+    "sync:addresses": "pnpm dlx tsx apps/website/scripts/sync-addresses.ts"
   },
   "devDependencies": {
     "typescript": "^5.3.3"
