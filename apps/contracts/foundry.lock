@@ -1,4 +1,7 @@
 {
+  "lib/ERADICATE2": {
+    "rev": "c151e14814fa5afecb32dc0f5381e1140c34dba6"
+  },
   "lib/forge-std": {
     "rev": "0844d7e1fc5e60d77b68e469bff60265f236c398"
   },
@@ -16,5 +19,11 @@
   },
   "lib/v4-periphery": {
     "rev": "5da22e609fd78c01fb7ddf2a6abb1f2ec7dc2b87"
+  },
+  "lib/vulcan": {
+    "tag": {
+      "name": "v0.4.7",
+      "rev": "3c1edfb0ceb656fee653f81256e4fecfc074f546"
+    }
   }
 }
