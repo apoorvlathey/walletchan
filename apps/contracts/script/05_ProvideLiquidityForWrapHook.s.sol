@@ -16,12 +16,7 @@ import {LiquidityAmounts} from "@uniswap-periphery/libraries/LiquidityAmounts.so
 import {IPositionManager} from "@uniswap-periphery/interfaces/IPositionManager.sol";
 import {Actions} from "@uniswap-periphery/libraries/Actions.sol";
 import {ActionConstants} from "@uniswap-periphery/libraries/ActionConstants.sol";
-import {DeployHelper} from "../DeployHelper.s.sol";
-
-interface IPermit2 {
-    function approve(address token, address spender, uint160 amount, uint48 expiration) external;
-    function allowance(address user, address token, address spender) external view returns (uint160 amount, uint48 expiration, uint48 nonce);
-}
+import {GetOldTokenPoolInfo} from "./reporting/GetOldTokenPoolInfo.s.sol";
 
 /**
  * Creates TOKEN/WETH pools and provides single-sided token liquidity so the
@@ -32,17 +27,17 @@ interface IPermit2 {
  * Required in addresses.json: POOL_MANAGER, POSITION_MANAGER, WETH, WCHAN, OLD_TOKEN
  *
  * Dry-run:
- *   cd apps/contracts && source .env && forge script script/process/ProvideLiquidity.s.sol:ProvideLiquidity -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL
+ *   cd apps/contracts && source .env && forge script script/05_ProvideLiquidityForWrapHook.s.sol:ProvideLiquidity -vvvv --rpc-url $BASE_RPC_URL
+ *   cd apps/contracts && source .env && forge script script/05_ProvideLiquidityForWrapHook.s.sol:ProvideLiquidity -vvvv --rpc-url $ETH_SEPOLIA_RPC_URL
  *
  * Broadcast:
- *   cd apps/contracts && source .env && forge script script/process/ProvideLiquidity.s.sol:ProvideLiquidity --broadcast -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL
+ *   cd apps/contracts && source .env && forge script script/05_ProvideLiquidityForWrapHook.s.sol:ProvideLiquidity --broadcast -vvvv --rpc-url $BASE_RPC_URL
+ *   cd apps/contracts && source .env && forge script script/05_ProvideLiquidityForWrapHook.s.sol:ProvideLiquidity --broadcast -vvvv --rpc-url $ETH_SEPOLIA_RPC_URL
  */
-contract ProvideLiquidity is DeployHelper {
+contract ProvideLiquidity is GetOldTokenPoolInfo {
     using StateLibrary for IPoolManager;
     using PoolIdLibrary for PoolKey;
 
-    uint256 constant ETH_PRICE = 1953; // USD per ETH
-    uint256 constant TOKEN_MCAP = 300_000; // USD market cap
     int24 constant TICK_SPACING = 60;
 
     address constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
@@ -50,23 +45,74 @@ contract ProvideLiquidity is DeployHelper {
     uint256 constant SEED_AMOUNT_WCHAN = 50_000e18;
     uint256 constant SEED_AMOUNT_OLD_TOKEN = 50_000e18;
 
+    // WCHAN's totalSupply() returns only the wrapped supply (small), not the full 100B.
+    // Use this constant for price/tick calculations involving WCHAN.
+    uint256 constant HARDCODED_TOTAL_SUPPLY = 100_000_000_000e18; // 100B tokens
+
     IPoolManager poolManager;
     IPositionManager positionManager;
     address weth;
 
-    function run() external {
+    uint256 ethPriceRaw; // USD per ETH, 6 decimals (fetched from Base USDC/ETH pool)
+    uint256 tokenMcapUsd6; // OLD_TOKEN market cap in USD, 6 decimals (fetched from pool)
+
+    function run() external override {
         _loadAddresses();
+
+        // Fetch live ETH/USD price and OLD_TOKEN market cap
+        (tokenMcapUsd6, ethPriceRaw) = _getOldTokenMcapUsd6();
+        console.log("--- Live Price Data ---");
+        console.log("  ETH/USD (6 dec):", ethPriceRaw);
+        console.log("  OLD_TOKEN mcap USD (6 dec):", tokenMcapUsd6);
 
         poolManager = IPoolManager(_requireAddress("POOL_MANAGER"));
         positionManager = IPositionManager(_requireAddress("POSITION_MANAGER"));
         weth = _requireAddress("WETH");
 
-        vm.startBroadcast(vm.envUint("DEV_PRIVATE_KEY"));
+        address wchan = _requireAddress("WCHAN");
+        address oldToken = _requireAddress("OLD_TOKEN");
 
-        _provideLiquidityForToken(_requireAddress("WCHAN"), SEED_AMOUNT_WCHAN, "WCHAN");
-        _provideLiquidityForToken(_requireAddress("OLD_TOKEN"), SEED_AMOUNT_OLD_TOKEN, "OLD_TOKEN");
+        uint256 deployerPk = vm.envUint("DEV_PRIVATE_KEY");
+        address deployer = vm.addr(deployerPk);
+
+        // Check balances before broadcast; returns amount of OLD_TOKEN to wrap into WCHAN
+        uint256 toWrap = _checkBalances(wchan, oldToken, deployer);
+
+        vm.startBroadcast(deployerPk);
+
+        // Wrap OLD_TOKEN → WCHAN if deployer doesn't have enough WCHAN
+        if (toWrap > 0) {
+            console.log("Wrapping OLD_TOKEN -> WCHAN:", toWrap / 1e18);
+            IERC20(oldToken).approve(wchan, toWrap);
+            IWCHAN(wchan).wrap(toWrap);
+        }
+
+        _provideLiquidityForToken(wchan, SEED_AMOUNT_WCHAN, "WCHAN");
+        _provideLiquidityForToken(oldToken, SEED_AMOUNT_OLD_TOKEN, "OLD_TOKEN");
 
         vm.stopBroadcast();
+    }
+
+    /// @dev Verify deployer has enough OLD_TOKEN for wrapping + seeding. Returns amount to wrap.
+    function _checkBalances(address wchan, address oldToken, address deployer) internal view returns (uint256 toWrap) {
+        uint256 wchanBal = IERC20(wchan).balanceOf(deployer);
+        uint256 oldTokenBal = IERC20(oldToken).balanceOf(deployer);
+        uint256 oldTokenNeeded = SEED_AMOUNT_OLD_TOKEN;
+
+        if (wchanBal < SEED_AMOUNT_WCHAN) {
+            toWrap = SEED_AMOUNT_WCHAN - wchanBal;
+            oldTokenNeeded += toWrap;
+        }
+
+        require(
+            oldTokenBal >= oldTokenNeeded,
+            string.concat(
+                "Insufficient OLD_TOKEN. Have: ", vm.toString(oldTokenBal / 1e18),
+                "e18, Need: ", vm.toString(oldTokenNeeded / 1e18),
+                "e18 (", vm.toString(toWrap / 1e18), "e18 to wrap + ",
+                vm.toString(SEED_AMOUNT_OLD_TOKEN / 1e18), "e18 for OLD_TOKEN pool)"
+            )
+        );
     }
 
     function _provideLiquidityForToken(address token, uint256 seedAmount, string memory label) internal {
@@ -81,7 +127,7 @@ contract ProvideLiquidity is DeployHelper {
         PoolKey memory poolKey = PoolKey({
             currency0: Currency.wrap(tokenIsC0 ? token : weth),
             currency1: Currency.wrap(tokenIsC0 ? weth : token),
-            fee: 1_00,
+            fee: 10_000,
             tickSpacing: TICK_SPACING,
             hooks: IHooks(address(0))
         });
@@ -106,11 +152,17 @@ contract ProvideLiquidity is DeployHelper {
         console.log("  Liquidity provided successfully");
     }
 
-    /// @dev Calculate sqrtPriceX96 from TOKEN_MCAP and ETH_PRICE.
+    /// @dev Returns HARDCODED_TOTAL_SUPPLY for WCHAN (whose totalSupply is only the wrapped amount),
+    ///      or the actual on-chain totalSupply for any other token.
+    function _getEffectiveTotalSupply(address token, address wchanAddr) internal view returns (uint256) {
+        return token == wchanAddr ? HARDCODED_TOTAL_SUPPLY : IERC20(token).totalSupply();
+    }
+
+    /// @dev Calculate sqrtPriceX96 from tokenMcapUsd6 and ethPriceRaw (fetched live).
     ///      sqrtPriceX96 = sqrt(currency1_amount * 2^192 / currency0_amount)
     function _calculateSqrtPrice(address token, bool tokenIsC0) internal view returns (uint160) {
-        uint256 totalSupply = IERC20(token).totalSupply();
-        uint256 ethAmount = TOKEN_MCAP * 1 ether / ETH_PRICE;
+        uint256 totalSupply = _getEffectiveTotalSupply(token, _requireAddress("WCHAN"));
+        uint256 ethAmount = FullMath.mulDiv(tokenMcapUsd6, 1e18, ethPriceRaw);
 
         // price = currency1 / currency0
         // tokenIsC0 → price = ethAmount / totalSupply  (WETH is currency1)
@@ -140,13 +192,13 @@ contract ProvideLiquidity is DeployHelper {
         return existing;
     }
 
-    // Seed range corresponds to $1B–$2B market cap — far from $300k current mcap,
+    // Seed range corresponds to $1B–$2B market cap — far from current mcap,
     // but in a normal sqrtPrice range that avoids uint128 overflow and max-liquidity-per-tick limits.
-    uint256 constant RANGE_MCAP_LOW = 1_000_000_000; // $1B
-    uint256 constant RANGE_MCAP_HIGH = 2_000_000_000; // $2B
+    uint256 constant RANGE_MCAP_LOW_USD6 = 1_000_000_000e6; // $1B (6 decimals)
+    uint256 constant RANGE_MCAP_HIGH_USD6 = 2_000_000_000e6; // $2B (6 decimals)
 
     /// @dev Mint single-sided TOKEN position in the $1B–$2B mcap tick range.
-    ///      Far enough from current price (~$300k mcap) that normal trading won't convert tokens,
+    ///      Far enough from current price that normal trading won't convert tokens,
     ///      but in a reasonable sqrtPrice range that avoids math overflow.
     function _mintPosition(PoolKey memory poolKey, uint160 sqrtPriceX96, uint256 seedAmount, bool tokenIsC0) internal {
         (int24 tickLower, int24 tickUpper) = _seedTickRange(poolKey, tokenIsC0);
@@ -176,10 +228,10 @@ contract ProvideLiquidity is DeployHelper {
     /// @dev Compute tick range from RANGE_MCAP_LOW and RANGE_MCAP_HIGH for the given token.
     function _seedTickRange(PoolKey memory poolKey, bool tokenIsC0) internal view returns (int24 tickLower, int24 tickUpper) {
         address token = Currency.unwrap(tokenIsC0 ? poolKey.currency0 : poolKey.currency1);
-        uint256 totalSupply = IERC20(token).totalSupply();
+        uint256 totalSupply = _getEffectiveTotalSupply(token, _requireAddress("WCHAN"));
 
-        int24 tickA = _mcapToTick(totalSupply, RANGE_MCAP_LOW, tokenIsC0);
-        int24 tickB = _mcapToTick(totalSupply, RANGE_MCAP_HIGH, tokenIsC0);
+        int24 tickA = _mcapToTick(totalSupply, RANGE_MCAP_LOW_USD6, tokenIsC0);
+        int24 tickB = _mcapToTick(totalSupply, RANGE_MCAP_HIGH_USD6, tokenIsC0);
 
         // Ensure tickLower < tickUpper (ordering flips depending on tokenIsC0)
         (int24 rawLower, int24 rawUpper) = tickA < tickB ? (tickA, tickB) : (tickB, tickA);
@@ -187,9 +239,9 @@ contract ProvideLiquidity is DeployHelper {
         tickUpper = _roundUpToTickSpacing(rawUpper + 1);
     }
 
-    /// @dev Convert a USD market cap to the corresponding pool tick.
-    function _mcapToTick(uint256 totalSupply, uint256 mcap, bool tokenIsC0) internal pure returns (int24) {
-        uint256 ethAmount = mcap * 1 ether / ETH_PRICE;
+    /// @dev Convert a USD market cap (6 decimals) to the corresponding pool tick.
+    function _mcapToTick(uint256 totalSupply, uint256 mcapUsd6, bool tokenIsC0) internal view returns (int24) {
+        uint256 ethAmount = FullMath.mulDiv(mcapUsd6, 1e18, ethPriceRaw);
         uint256 ratioX192 = tokenIsC0
             ? FullMath.mulDiv(ethAmount, uint256(1) << 192, totalSupply)
             : FullMath.mulDiv(totalSupply, uint256(1) << 192, ethAmount);
@@ -275,4 +327,13 @@ contract ProvideLiquidity is DeployHelper {
         if (tick > 0) return tick - mod;
         return tick - (TICK_SPACING + mod); // negative: away from zero (down)
     }
+}
+
+interface IPermit2 {
+    function approve(address token, address spender, uint160 amount, uint48 expiration) external;
+    function allowance(address user, address token, address spender) external view returns (uint160 amount, uint48 expiration, uint48 nonce);
+}
+
+interface IWCHAN {
+    function wrap(uint256 amount_) external;
 }

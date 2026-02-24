@@ -15,9 +15,8 @@ import {DeployHelper} from "./DeployHelper.s.sol";
  *   2. Save the found salt and expected address to addresses.json as WCHAN_SALT and EXPECTED_WCHAN_ADDRESS.
  *
  * Deploy:
- *   cd apps/contracts && source .env && forge script script/01_DeployWCHAN.s.sol:DeployWCHAN --broadcast --verify -vvvv --rpc-url $BASE_RPC_URL
- *   cd apps/contracts && source .env && forge script script/01_DeployWCHAN.s.sol:DeployWCHAN --broadcast --verify -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL
- *   cd apps/contracts && source .env && forge script script/01_DeployWCHAN.s.sol:DeployWCHAN --broadcast --verify -vvvv --rpc-url $ETH_SEPOLIA_RPC_URL
+ *   cd apps/contracts && source .env && forge script script/03_DeployWCHAN.s.sol:DeployWCHAN --broadcast --verify -vvvv --rpc-url $ETH_SEPOLIA_RPC_URL
+ *   cd apps/contracts && source .env && forge script script/03_DeployWCHAN.s.sol:DeployWCHAN --broadcast --verify -vvvv --rpc-url $BASE_RPC_URL
  */
 
 contract DeployWCHAN is DeployHelper {

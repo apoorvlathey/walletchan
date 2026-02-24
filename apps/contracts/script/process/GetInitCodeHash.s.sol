@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import {console} from "forge-std/Script.sol";
 import {WCHAN} from "@src/WCHAN.sol";
 import {WCHANTestnet} from "@src/mocks/WCHANTestnet.sol";
-import {DeployWCHAN} from "../01_DeployWCHAN.s.sol";
+import {DeployWCHAN} from "../03_DeployWCHAN.s.sol";
 
 /**
  * Computes the WCHAN init code for the target chain and writes it to a file

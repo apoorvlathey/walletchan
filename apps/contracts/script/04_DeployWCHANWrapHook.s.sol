@@ -30,10 +30,10 @@ import {DeployHelper} from "./DeployHelper.s.sol";
  *   4. Have SEED_AMOUNT of WCHAN in the PoolManager address (by providing liquidity to some other pool)
  *
  * Base mainnet:
- *   cd apps/contracts && source .env && forge script script/02_DeployWCHANWrapHook.s.sol:DeployWCHANWrapHook --broadcast --verify -vvvv --rpc-url $BASE_RPC_URL
+ *   cd apps/contracts && source .env && forge script script/04_DeployWCHANWrapHook.s.sol:DeployWCHANWrapHook --broadcast --verify -vvvv --rpc-url $BASE_RPC_URL
  * 
- * Base Sepolia:
- *  cd apps/contracts && source .env && forge script script/02_DeployWCHANWrapHook.s.sol:DeployWCHANWrapHook --broadcast --verify -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL
+ * ETH Sepolia:
+ *  cd apps/contracts && source .env && forge script script/04_DeployWCHANWrapHook.s.sol:DeployWCHANWrapHook --broadcast --verify -vvvv --rpc-url $ETH_SEPOLIA_RPC_URL
  */
 contract DeployWCHANWrapHook is DeployHelper {
     int24 constant TICK_SPACING = 60;
