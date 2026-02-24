@@ -21,8 +21,7 @@ import {DeployHelper} from "./DeployHelper.s.sol";
  */
 
 contract DeployWCHAN is DeployHelper {
-    // FIXME: add ipfs hash
-    string constant TOKEN_URI = "ipfs://";
+    string constant TOKEN_URI = "ipfs://bafkreiczfp26ebjzf4trydz74n2bzxg7uxemiujfulfp54nytayc6djx3i";
 
     /// @dev Known OLD_TOKEN address on Base mainnet
     address constant BASE_MAINNET_OLD_TOKEN = 0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07;
