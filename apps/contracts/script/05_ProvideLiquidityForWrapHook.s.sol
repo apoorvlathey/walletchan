@@ -42,8 +42,8 @@ contract ProvideLiquidity is GetOldTokenPoolInfo {
 
     address constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
-    uint256 constant SEED_AMOUNT_WCHAN = 50_000e18;
-    uint256 constant SEED_AMOUNT_OLD_TOKEN = 50_000e18;
+    uint256 constant SEED_AMOUNT_WCHAN = 899404600 ether;
+    uint256 constant SEED_AMOUNT_OLD_TOKEN = 0 ether;
 
     // WCHAN's totalSupply() returns only the wrapped supply (small), not the full 100B.
     // Use this constant for price/tick calculations involving WCHAN.
@@ -88,7 +88,8 @@ contract ProvideLiquidity is GetOldTokenPoolInfo {
         }
 
         _provideLiquidityForToken(wchan, SEED_AMOUNT_WCHAN, "WCHAN");
-        _provideLiquidityForToken(oldToken, SEED_AMOUNT_OLD_TOKEN, "OLD_TOKEN");
+        // FIXME: for testnet uncomment this, on base mainnet we already have sufficient tokens in the pool
+        // _provideLiquidityForToken(oldToken, SEED_AMOUNT_OLD_TOKEN, "OLD_TOKEN");
 
         vm.stopBroadcast();
     }

@@ -14,14 +14,16 @@ import {DeployHelper} from "../DeployHelper.s.sol";
  * Required in addresses.json: OLD_TOKEN, WCHAN
  *
  * Dry-run:
+ *   cd apps/contracts && source .env && forge script script/process/WrapOldTokenToWCHAN.s.sol:WrapOldTokenToWCHAN -vvvv --rpc-url $BASE_RPC_URL
  *   cd apps/contracts && source .env && forge script script/process/WrapOldTokenToWCHAN.s.sol:WrapOldTokenToWCHAN -vvvv --rpc-url $ETH_SEPOLIA_RPC_URL
  *
  * Broadcast:
+ *   cd apps/contracts && source .env && forge script script/process/WrapOldTokenToWCHAN.s.sol:WrapOldTokenToWCHAN --broadcast -vvvv --rpc-url $BASE_RPC_URL
  *   cd apps/contracts && source .env && forge script script/process/WrapOldTokenToWCHAN.s.sol:WrapOldTokenToWCHAN --broadcast -vvvv --rpc-url $ETH_SEPOLIA_RPC_URL
  */
 contract WrapOldTokenToWCHAN is DeployHelper {
     /// @dev Amount of OLD_TOKEN to wrap into WCHAN (in wei). Adjust as needed.
-    uint256 constant AMOUNT_TO_WRAP = 1_000_000 ether;
+    uint256 constant AMOUNT_TO_WRAP = 2_023_660_350 ether;
 
     function run() external {
         _loadAddresses();
