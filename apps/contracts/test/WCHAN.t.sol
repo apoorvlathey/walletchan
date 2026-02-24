@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {WCHAN} from "../src/WCHAN.sol";
 import {ERC3009} from "../src/utils/token/ERC3009.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
@@ -180,6 +181,23 @@ contract WCHANMetadataTest is WCHANBaseTest {
 
     function test_tokenURI_and_contractURI_match() public view {
         assertEq(token.tokenURI(), token.contractURI());
+    }
+
+    function test_supportsInterface_ERC165() public view {
+        assertTrue(token.supportsInterface(type(IERC165).interfaceId));
+    }
+
+    function test_supportsInterface_ERC7572() public view {
+        assertTrue(token.supportsInterface(WCHAN.contractURI.selector));
+    }
+
+    function test_supportsInterface_tokenURI() public view {
+        assertTrue(token.supportsInterface(WCHAN.tokenURI.selector));
+    }
+
+    function test_supportsInterface_unsupported() public view {
+        assertFalse(token.supportsInterface(0xffffffff));
+        assertFalse(token.supportsInterface(0x00000000));
     }
 
     function test_domainSeparatorMatchesExpected() public view {

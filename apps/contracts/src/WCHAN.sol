@@ -18,6 +18,7 @@ import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC2
 import {ERC20Votes} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {ERC3009} from "./utils/token/ERC3009.sol";
 
 /**
@@ -31,7 +32,7 @@ import {ERC3009} from "./utils/token/ERC3009.sol";
  *  - On-chain governance via ERC20Votes (timestamp-based clock)
  *  - ERC-7572 contract-level metadata
  */
-contract WCHAN is ERC20, ERC20Permit, ERC20Votes, ERC20Burnable, ERC3009 {
+contract WCHAN is ERC20, ERC20Permit, ERC20Votes, ERC20Burnable, ERC3009, IERC165 {
 
     /// @notice Address of the legacy token on Base
     address public constant OLD_TOKEN = 0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07;
@@ -92,6 +93,15 @@ contract WCHAN is ERC20, ERC20Permit, ERC20Votes, ERC20Burnable, ERC3009 {
     /// @notice Returns the contract-level metadata URI (ERC-7572)
     function contractURI() external view returns (string memory) {
         return _tokenURI;
+    }
+
+    /// @notice ERC-165 interface detection
+    /// @dev Reports support for ERC-165 and ERC-7572 (contractURI)
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return
+            interfaceId == type(IERC165).interfaceId || // 0x01ffc9a7
+            interfaceId == 0xe8a3d485 ||                 // ERC-7572 contractURI()
+            interfaceId == 0x3c130d90;                   // tokenURI()
     }
 
     /**
