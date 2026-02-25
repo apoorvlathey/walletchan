@@ -8,7 +8,7 @@ const POLLING_INTERVAL = 5000; // 5 seconds
 export interface TokenData {
   price: string;
   priceRaw: number;
-  change1h: number;
+  change1d: number;
   marketCap: string;
   marketCapRaw: number;
 }
@@ -67,13 +67,13 @@ export function TokenDataProvider({ children }: { children: ReactNode }) {
           // Get price
           const priceValue = parseFloat(attrs.base_token_price_usd || "0");
 
-          // Get 1h change
-          const change1h = parseFloat(attrs.price_change_percentage?.h1 || "0");
+          // Get 24h change
+          const change1d = parseFloat(attrs.price_change_percentage?.h24 || "0");
 
           setTokenData({
             price: formatPrice(priceValue),
             priceRaw: priceValue,
-            change1h,
+            change1d,
             marketCap: formatMarketCap(mcapValue),
             marketCapRaw: mcapValue,
           });

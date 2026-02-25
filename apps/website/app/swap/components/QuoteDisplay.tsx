@@ -15,7 +15,10 @@ function ChevronIcon({
       transition="transform 0.2s"
       {...props}
     >
-      <path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+      <path
+        fill="currentColor"
+        d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"
+      />
     </Icon>
   );
 }
@@ -37,10 +40,7 @@ export function QuoteDisplay({
 }: QuoteDisplayProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const minBuyAmount = formatTokenAmount(
-    quote.minBuyAmount,
-    buyTokenDecimals
-  );
+  const minBuyAmount = formatTokenAmount(quote.minBuyAmount, buyTokenDecimals);
 
   const integratorFee = quote.fees?.integratorFee;
   const zeroExFee = quote.fees?.zeroExFee;
@@ -80,17 +80,21 @@ export function QuoteDisplay({
 
       {/* Collapsible details */}
       <Collapse in={isOpen} animateOpacity>
-        <VStack spacing={2} align="stretch" mt={3} pt={3} borderTop="1px solid" borderColor="gray.300">
+        <VStack
+          spacing={2}
+          align="stretch"
+          mt={3}
+          pt={3}
+          borderTop="1px solid"
+          borderColor="gray.300"
+        >
           {integratorFee && (
             <HStack justify="space-between">
               <Text fontSize="xs" fontWeight="bold" textTransform="uppercase">
-                $BNKRW Fee (0.9%)
+                $WCHAN Fee (0.9%)
               </Text>
               <Text fontSize="sm" fontWeight="medium">
-                {formatTokenAmount(
-                  integratorFee.amount,
-                  sellTokenDecimals
-                )}{" "}
+                {formatTokenAmount(integratorFee.amount, sellTokenDecimals)}{" "}
                 {sellTokenSymbol}
               </Text>
             </HStack>
@@ -102,10 +106,7 @@ export function QuoteDisplay({
                 0x Fee
               </Text>
               <Text fontSize="sm" fontWeight="medium">
-                {formatTokenAmount(
-                  zeroExFee.amount,
-                  sellTokenDecimals
-                )}{" "}
+                {formatTokenAmount(zeroExFee.amount, sellTokenDecimals)}{" "}
                 {sellTokenSymbol}
               </Text>
             </HStack>

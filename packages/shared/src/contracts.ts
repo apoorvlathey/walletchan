@@ -14,3 +14,11 @@ export const SBNKRW_VAULT_ADDRESS =
 // Uniswap V4 pool ID for BNKRW
 export const BNKRW_POOL_ADDRESS =
   "0x6c8fd04c19e3c6c3efc21f6f5ae79c1453a19d971b7b7d4969df1928c380aaad";
+
+// WCHAN token on Base
+export const WCHAN_TOKEN_ADDRESS =
+  "0xBa5ED0000e1CA9136a695f0a848012A16008B032";
+
+// Uniswap V4 pool ID for WCHAN
+export const WCHAN_POOL_ID =
+  "0x5a7b2f855c58a230afd95981147bd4c15f074ad22e18318140bbe2bfbb79f062";

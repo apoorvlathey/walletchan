@@ -33,9 +33,12 @@ import {
   DEFAULT_SLIPPAGE_BPS,
   SWAP_CHAIN_ID,
 } from "../../swap/constants";
+import { DEFAULT_SLIPPAGE_BPS as WCHAN_DEFAULT_SLIPPAGE_BPS } from "../../../lib/wchan-swap";
 import { QuoteDisplay } from "../../swap/components/QuoteDisplay";
 import { SwapButton } from "../../swap/components/SwapButton";
 import { SlippageSettings } from "../../swap/components/SlippageSettings";
+import { WchanBuyContent } from "./WchanBuyContent";
+import { TOKEN_ADDRESS } from "../../constants";
 
 export interface BuyToken {
   address: string;
@@ -127,7 +130,7 @@ function WalletDisplay() {
   );
 }
 
-const ETH_PRESETS = ["2", "1", "0.1", "0.01"];
+const ETH_PRESETS = ["1", "0.1", "0.01", "0.001"];
 
 interface BuyModalProps {
   token: BuyToken | null;
@@ -150,17 +153,22 @@ export function BuyModal({ token, isOpen, onClose, showWallet }: BuyModalProps) 
   const fetchedImageUrl = useCoinImage(token?.tokenURI);
   const imageUrl = token?.imageUrl ?? fetchedImageUrl;
 
+  const sellToken = NATIVE_TOKEN_ADDRESS;
+  const buyTokenAddress = token?.address ?? "";
+  const isWchan =
+    !!buyTokenAddress &&
+    buyTokenAddress.toLowerCase() === TOKEN_ADDRESS.toLowerCase();
+
   // Reset form when token changes or modal closes
   useEffect(() => {
     if (!isOpen) {
       setSellAmount("");
-      setSlippageBps(DEFAULT_SLIPPAGE_BPS);
+      setSlippageBps(
+        isWchan ? WCHAN_DEFAULT_SLIPPAGE_BPS : DEFAULT_SLIPPAGE_BPS
+      );
       setCopied(false);
     }
-  }, [isOpen]);
-
-  const sellToken = NATIVE_TOKEN_ADDRESS;
-  const buyTokenAddress = token?.address ?? "";
+  }, [isOpen, isWchan]);
 
   // Fetch ETH balance on Base
   const { data: ethBalance, refetch: refetchBalance } = useBalance({
@@ -192,7 +200,7 @@ export function BuyModal({ token, isOpen, onClose, showWallet }: BuyModalProps) 
     sellAmountEth: sellAmount,
     taker: address,
     slippageBps,
-    enabled: !!buyTokenAddress && sellAmountValid && isOpen,
+    enabled: !isWchan && !!buyTokenAddress && sellAmountValid && isOpen,
   });
 
   const formattedBalance = ethBalance
@@ -401,132 +409,148 @@ export function BuyModal({ token, isOpen, onClose, showWallet }: BuyModalProps) 
                 </Flex>
               </Flex>
 
-              {/* You Receive */}
-              <Box>
-                <HStack justify="space-between" mb={2}>
-                  <Text
-                    fontSize="xs"
-                    fontWeight="bold"
-                    textTransform="uppercase"
-                    letterSpacing="widest"
-                  >
-                    You Receive
-                  </Text>
-                  <SlippageSettings
-                    slippageBps={slippageBps}
-                    onSlippageChange={setSlippageBps}
-                  />
-                </HStack>
-                <HStack
-                  border="2px solid"
-                  borderColor="bauhaus.border"
-                  p={3}
-                  spacing={3}
-                  bg="gray.50"
-                >
-                  <Input
-                    placeholder={
-                      quote === null && !isQuoteLoading ? "\u2014" : "0.0"
-                    }
-                    value={isQuoteLoading ? "" : outputAmount}
-                    readOnly
-                    border="none"
-                    _focus={{ boxShadow: "none" }}
-                    fontSize="xl"
-                    fontWeight="black"
-                    p={0}
-                    flex={1}
-                    cursor="default"
-                    tabIndex={-1}
-                  />
-                  {isQuoteLoading && <LoadingShapes />}
-                  {buyTokenInfo && (
-                    <Flex
-                      bg="bauhaus.blue"
-                      color="white"
-                      px={3}
-                      py={1}
-                      align="center"
-                      flexShrink={0}
+              {/* You Receive (0x flow only) */}
+              {!isWchan && (
+                <Box>
+                  <HStack justify="space-between" mb={2}>
+                    <Text
+                      fontSize="xs"
+                      fontWeight="bold"
+                      textTransform="uppercase"
+                      letterSpacing="widest"
                     >
-                      <Text
-                        fontWeight="bold"
-                        fontSize="sm"
-                        textTransform="uppercase"
+                      You Receive
+                    </Text>
+                    <SlippageSettings
+                      slippageBps={slippageBps}
+                      onSlippageChange={setSlippageBps}
+                    />
+                  </HStack>
+                  <HStack
+                    border="2px solid"
+                    borderColor="bauhaus.border"
+                    p={3}
+                    spacing={3}
+                    bg="gray.50"
+                  >
+                    <Input
+                      placeholder={
+                        quote === null && !isQuoteLoading ? "\u2014" : "0.0"
+                      }
+                      value={isQuoteLoading ? "" : outputAmount}
+                      readOnly
+                      border="none"
+                      _focus={{ boxShadow: "none" }}
+                      fontSize="xl"
+                      fontWeight="black"
+                      p={0}
+                      flex={1}
+                      cursor="default"
+                      tabIndex={-1}
+                    />
+                    {isQuoteLoading && <LoadingShapes />}
+                    {buyTokenInfo && (
+                      <Flex
+                        bg="bauhaus.blue"
+                        color="white"
+                        px={3}
+                        py={1}
+                        align="center"
+                        flexShrink={0}
                       >
-                        {buyTokenInfo.symbol}
-                      </Text>
-                    </Flex>
-                  )}
-                </HStack>
-              </Box>
+                        <Text
+                          fontWeight="bold"
+                          fontSize="sm"
+                          textTransform="uppercase"
+                        >
+                          {buyTokenInfo.symbol}
+                        </Text>
+                      </Flex>
+                    )}
+                  </HStack>
+                </Box>
+              )}
 
             </Box>
 
-            {/* Quote breakdown */}
-            {quote && !isQuoteLoading && buyTokenInfo && sellTokenInfo && (
-              <QuoteDisplay
-                quote={quote}
-                buyTokenSymbol={buyTokenInfo.symbol}
-                buyTokenDecimals={buyTokenInfo.decimals}
-                sellTokenSymbol={sellTokenInfo.symbol}
-                sellTokenDecimals={sellTokenInfo.decimals}
-              />
-            )}
-
-            {/* Error display */}
-            {quoteError && (
-              <Text
-                fontSize="sm"
-                color="bauhaus.red"
-                fontWeight="bold"
-                textAlign="center"
-              >
-                {quoteError}
-              </Text>
-            )}
-
-            {/* Action button */}
-            {!isConnected ? (
-              <Button
-                variant="primary"
-                size="lg"
-                w="full"
-                onClick={openConnectModal}
-                fontSize="md"
-                py={6}
-              >
-                Connect Wallet
-              </Button>
-            ) : isWrongChain ? (
-              <Button
-                size="lg"
-                w="full"
-                bg="orange.500"
-                color="white"
-                fontWeight="900"
-                textTransform="uppercase"
-                letterSpacing="wide"
-                borderRadius={0}
-                border="3px solid"
-                borderColor="bauhaus.black"
-                fontSize="md"
-                py={6}
-                _hover={{ bg: "orange.600" }}
-                onClick={() => switchChain({ chainId: SWAP_CHAIN_ID })}
-                leftIcon={<Image src="/images/base.svg" alt="Base" w="20px" h="20px" />}
-              >
-                Switch to Base
-              </Button>
-            ) : (
-              <SwapButton
-                sellToken={sellToken}
-                quote={quote}
-                fetchFirmQuote={fetchFirmQuote}
-                isQuoteLoading={isQuoteLoading}
+            {isWchan ? (
+              <WchanBuyContent
+                sellAmount={sellAmount}
                 sellAmountValid={sellAmountValid}
+                slippageBps={slippageBps}
+                onSlippageChange={setSlippageBps}
+                buyTokenSymbol={buyTokenInfo?.symbol ?? "WCHAN"}
+                ethBalanceWei={ethBalance?.value}
                 onTxConfirmed={handleTxConfirmed}
               />
+            ) : (
+              <>
+                {/* Quote breakdown */}
+                {quote && !isQuoteLoading && buyTokenInfo && sellTokenInfo && (
+                  <QuoteDisplay
+                    quote={quote}
+                    buyTokenSymbol={buyTokenInfo.symbol}
+                    buyTokenDecimals={buyTokenInfo.decimals}
+                    sellTokenSymbol={sellTokenInfo.symbol}
+                    sellTokenDecimals={sellTokenInfo.decimals}
+                  />
+                )}
+
+                {/* Error display */}
+                {quoteError && (
+                  <Text
+                    fontSize="sm"
+                    color="bauhaus.red"
+                    fontWeight="bold"
+                    textAlign="center"
+                  >
+                    {quoteError}
+                  </Text>
+                )}
+
+                {/* Action button */}
+                {!isConnected ? (
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    w="full"
+                    onClick={openConnectModal}
+                    fontSize="md"
+                    py={6}
+                  >
+                    Connect Wallet
+                  </Button>
+                ) : isWrongChain ? (
+                  <Button
+                    size="lg"
+                    w="full"
+                    bg="orange.500"
+                    color="white"
+                    fontWeight="900"
+                    textTransform="uppercase"
+                    letterSpacing="wide"
+                    borderRadius={0}
+                    border="3px solid"
+                    borderColor="bauhaus.black"
+                    fontSize="md"
+                    py={6}
+                    _hover={{ bg: "orange.600" }}
+                    onClick={() => switchChain({ chainId: SWAP_CHAIN_ID })}
+                    leftIcon={<Image src="/images/base.svg" alt="Base" w="20px" h="20px" />}
+                  >
+                    Switch to Base
+                  </Button>
+                ) : (
+                  <SwapButton
+                    sellToken={sellToken}
+                    quote={quote}
+                    fetchFirmQuote={fetchFirmQuote}
+                    isQuoteLoading={isQuoteLoading}
+                    sellAmountValid={sellAmountValid}
+                    onTxConfirmed={handleTxConfirmed}
+                  />
+                )}
+              </>
             )}
           </VStack>
         </ModalBody>
