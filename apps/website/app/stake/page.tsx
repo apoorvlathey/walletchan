@@ -87,10 +87,9 @@ export default function StakePage() {
   // Vault data from Wasabi API
   const { vaultData, isLoading: isVaultLoading, refetchVaultData } = useVaultData();
 
-  // Token price (mcap / total supply)
+  // Token price
   const { tokenData } = useTokenData();
-  const TOTAL_SUPPLY = 100_000_000_000;
-  const tokenPrice = tokenData?.marketCapRaw ? tokenData.marketCapRaw / TOTAL_SUPPLY : 0;
+  const tokenPrice = tokenData?.priceRaw ?? 0;
 
   // BNKRW balance
   const {
