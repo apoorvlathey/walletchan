@@ -6,10 +6,10 @@ The arb bot detects price divergence between two Uniswap V4 pools on Base and ex
 
 ### The Two Pools
 
-| Pool | Pair | Fee | Tick Spacing | Hook |
-|------|------|-----|--------------|------|
-| **Direct** | WETH↔WCHAN | 0 (static) | 60 | DEV_FEE_HOOK (`0xCC3C...`) |
-| **BNKRW** | WETH↔BNKRW | 0x800000 (dynamic) | 200 | oldTokenPoolHook (`0xb429...`) |
+| Pool       | Pair       | Fee                | Tick Spacing | Hook                           |
+| ---------- | ---------- | ------------------ | ------------ | ------------------------------ |
+| **Direct** | WETH↔WCHAN | 0 (static)         | 60           | DEV_FEE_HOOK (`0xCC3C...`)     |
+| **BNKRW**  | WETH↔BNKRW | 0x800000 (dynamic) | 200          | oldTokenPoolHook (`0xb429...`) |
 
 A third pool (BNKRW↔WCHAN via WCHAN_WRAP_HOOK) provides 1:1 conversion, making the two WETH pools directly comparable.
 
@@ -82,8 +82,8 @@ Both pools have WETH as `currency0` because WETH (`0x4200...0006`) sorts before 
 
 Since BNKRW↔WCHAN is 1:1, we compare the two sqrtPriceX96 values directly:
 
-| Condition | Meaning | Arb Direction |
-|-----------|---------|---------------|
+| Condition                          | Meaning                         | Arb Direction                                 |
+| ---------------------------------- | ------------------------------- | --------------------------------------------- |
 | `directSqrtPrice > bnkrwSqrtPrice` | WCHAN costs more on direct pool | Buy cheap via BNKRW, sell expensive on direct |
 | `directSqrtPrice < bnkrwSqrtPrice` | WCHAN costs less on direct pool | Buy cheap on direct, sell expensive via BNKRW |
 
@@ -98,12 +98,14 @@ The profit curve for an arb is concave (unimodal) — small amounts have low abs
 ### Phase 1: Coarse Search
 
 Generate 10 log-spaced WETH amounts from 0.0001 to 10 ETH. The `batchSimulateArbs` function simulates all 10 in just **2 HTTP requests**:
+
 1. Batch all 10 leg1 quotes into a single JSON-RPC batch → 10 results
 2. For each successful leg1, build leg2 calldata → batch all leg2 quotes in a single request
 
 ### Phase 2: Ternary Refinement
 
 Around the most profitable coarse candidate, run up to 15 ternary search iterations. Each iteration:
+
 1. Divide the range `[lo, hi]` into thirds at `m1` and `m2`
 2. `batchSimulateArbs([m1, m2])` — both candidates batched together (2 HTTP requests)
 3. Narrow the range by discarding the less profitable third
@@ -151,11 +153,13 @@ Slippage is applied to both the intermediate output (`minLeg1Out`) and the final
 ## Gas Estimation (`gasEstimation.ts`)
 
 All three RPC calls in a single JSON-RPC batch (1 HTTP request):
+
 1. **`eth_estimateGas`**: Simulates the full tx, gets gas usage, reverts on failure
 2. **`eth_maxPriorityFeePerGas`**: Current priority fee
 3. **`eth_getBlockByNumber("latest")`**: Gets `baseFeePerGas`
 
 Buffers:
+
 - 20% on gas limit
 - 20% on priority fee
 - `maxFeePerGas = 2 * baseFee + priorityFee` (EIP-1559 standard)
@@ -178,14 +182,14 @@ Multiple layers prevent sending transactions that would fail:
 
 ## Configuration
 
-| Env Var | Required | Default | Description |
-|---------|----------|---------|-------------|
-| `PRIVATE_KEY` | Yes | — | Bot wallet private key (hex with 0x prefix) |
-| `BASE_RPC_URL` | Yes | — | Base chain RPC endpoint |
-| `POLL_INTERVAL_MS` | No | `2000` | Milliseconds between polls (matches Base block time) |
-| `MIN_PROFIT_WEI` | No | `1000000000000` | Minimum net profit in wei (0.000001 ETH) |
-| `SLIPPAGE_BPS` | No | `30` | Slippage tolerance in bps (0.3%) |
-| `DEBUG` | No | — | Set to any value to enable debug logging |
+| Env Var            | Required | Default         | Description                                          |
+| ------------------ | -------- | --------------- | ---------------------------------------------------- |
+| `PRIVATE_KEY`      | Yes      | —               | Bot wallet private key (hex with 0x prefix)          |
+| `BASE_RPC_URL`     | Yes      | —               | Base chain RPC endpoint                              |
+| `POLL_INTERVAL_MS` | No       | `2000`          | Milliseconds between polls (matches Base block time) |
+| `MIN_PROFIT_WEI`   | No       | `1000000000000` | Minimum net profit in wei (0.000001 ETH)             |
+| `SLIPPAGE_BPS`     | No       | `30`            | Slippage tolerance in bps (0.3%)                     |
+| `DEBUG`            | No       | —               | Set to any value to enable debug logging             |
 
 ---
 
@@ -202,6 +206,7 @@ pnpm dev:arb-bot
 ### Railway
 
 Uses Docker via `railway.toml`:
+
 - Dockerfile copies `packages/wchan-swap/` (workspace dependency) + `apps/arb-bot/`
 - `ON_FAILURE` restart policy with 10 retries
 - Set env vars in Railway dashboard
@@ -217,32 +222,32 @@ pnpm start:arb-bot    # Run compiled JS
 
 ## Speed Optimizations
 
-| Optimization | Impact |
-|-------------|--------|
-| **Raw JSON-RPC batch for pool state** | 1 HTTP request for both pool slot0 reads (no viem overhead) |
-| **True batch quoting** | All 10 coarse leg1 quotes in 1 HTTP request, all leg2 in 1 HTTP request (2 total vs 20) |
-| **Batch ternary refinement** | Both m1+m2 candidates batched per phase (2 HTTP per iter vs 4) |
-| **Pre-computed constants** | Pool IDs, slot0 keys, extsload calldata, quote templates computed once at startup |
-| **No redundant simulation** | estimateGas acts as simulation; removed separate eth_call sim (saves 1 RPC per execution) |
-| **Batch gas estimation** | estimateGas + priorityFee + baseFee in single JSON-RPC batch (1 HTTP vs 2) |
-| **Local nonce tracking** | Avoids extra `eth_getTransactionCount` RPC per tx |
-| **Immediate re-poll after arb** | Skips sleep after successful execution (pool state changed) |
-| **No balance on hot path** | Balance only fetched at startup, not every poll |
-| **Aggressive gas pricing** | 20% priority fee buffer, 2x baseFee headroom |
-| **Tight poll interval** | 2s default (matches Base block time) |
+| Optimization                          | Impact                                                                                    |
+| ------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **Raw JSON-RPC batch for pool state** | 1 HTTP request for both pool slot0 reads (no viem overhead)                               |
+| **True batch quoting**                | All 10 coarse leg1 quotes in 1 HTTP request, all leg2 in 1 HTTP request (2 total vs 20)   |
+| **Batch ternary refinement**          | Both m1+m2 candidates batched per phase (2 HTTP per iter vs 4)                            |
+| **Pre-computed constants**            | Pool IDs, slot0 keys, extsload calldata, quote templates computed once at startup         |
+| **No redundant simulation**           | estimateGas acts as simulation; removed separate eth_call sim (saves 1 RPC per execution) |
+| **Batch gas estimation**              | estimateGas + priorityFee + baseFee in single JSON-RPC batch (1 HTTP vs 2)                |
+| **Local nonce tracking**              | Avoids extra `eth_getTransactionCount` RPC per tx                                         |
+| **Immediate re-poll after arb**       | Skips sleep after successful execution (pool state changed)                               |
+| **No balance on hot path**            | Balance only fetched at startup, not every poll                                           |
+| **Aggressive gas pricing**            | 20% priority fee buffer, 2x baseFee headroom                                              |
+| **Tight poll interval**               | 2s default (matches Base block time)                                                      |
 
 ### RPC Call Budget (per poll cycle)
 
-| Step | HTTP Requests | Notes |
-|------|--------------|-------|
-| Read pool states | 1 | Raw JSON-RPC batch (2 extsload) |
-| Coarse search | 2 | 1 batch for all leg1s, 1 batch for all leg2s |
-| Ternary refinement | ~2 per iter | Both candidates batched per phase |
-| Gas estimation | 1 | Batch: estimateGas + priorityFee + baseFee |
-| Send tx | 1 | sendRawTransaction |
-| Wait receipt | 1+ | waitForTransactionReceipt |
-| **Total (no opportunity)** | **1** | Just pool state read |
-| **Total (with 15 ternary iters)** | **~36** | Down from ~80+ before |
+| Step                              | HTTP Requests | Notes                                        |
+| --------------------------------- | ------------- | -------------------------------------------- |
+| Read pool states                  | 1             | Raw JSON-RPC batch (2 extsload)              |
+| Coarse search                     | 2             | 1 batch for all leg1s, 1 batch for all leg2s |
+| Ternary refinement                | ~2 per iter   | Both candidates batched per phase            |
+| Gas estimation                    | 1             | Batch: estimateGas + priorityFee + baseFee   |
+| Send tx                           | 1             | sendRawTransaction                           |
+| Wait receipt                      | 1+            | waitForTransactionReceipt                    |
+| **Total (no opportunity)**        | **1**         | Just pool state read                         |
+| **Total (with 15 ternary iters)** | **~36**       | Down from ~80+ before                        |
 
 ---
 
