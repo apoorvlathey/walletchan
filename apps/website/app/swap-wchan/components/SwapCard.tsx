@@ -18,6 +18,7 @@ import { formatEther, erc20Abi } from "viem";
 import { base } from "wagmi/chains";
 import {
   type SwapDirection,
+  type RoutePreference,
   getAddresses,
   isChainLive,
   DEFAULT_SLIPPAGE_BPS,
@@ -69,6 +70,7 @@ export function SwapCard() {
   const [direction, setDirection] = useState<SwapDirection>("buy");
   const [amount, setAmount] = useState("");
   const [slippageBps, setSlippageBps] = useState(DEFAULT_SLIPPAGE_BPS);
+  const [routePreference, setRoutePreference] = useState<RoutePreference>("auto");
 
   const live = isChainLive(CHAIN_ID);
   const addrs = getAddresses(CHAIN_ID);
@@ -101,6 +103,7 @@ export function SwapCard() {
     direction,
     amount,
     enabled: amountValid && live,
+    routePreference,
   });
 
   const toggleDirection = () => {
@@ -222,6 +225,39 @@ export function SwapCard() {
               accountStatus="address"
             />
           </Box>
+        </HStack>
+
+        {/* Route toggle */}
+        <HStack spacing={0} w="full">
+          {(["auto", "direct", "via-bnkrw"] as const).map((route) => (
+            <Box
+              key={route}
+              as="button"
+              flex={1}
+              py={1.5}
+              bg={routePreference === route ? "bauhaus.black" : "white"}
+              color={routePreference === route ? "white" : "bauhaus.black"}
+              border="2px solid"
+              borderColor="bauhaus.black"
+              borderRight={route !== "via-bnkrw" ? "none" : "2px solid"}
+              fontWeight="bold"
+              fontSize="xs"
+              textTransform="uppercase"
+              letterSpacing="wider"
+              cursor="pointer"
+              onClick={() => setRoutePreference(route)}
+              _hover={{
+                bg: routePreference === route ? "bauhaus.black" : "gray.100",
+              }}
+              transition="all 0.1s"
+            >
+              {route === "auto"
+                ? "Auto"
+                : route === "direct"
+                  ? "Direct"
+                  : "Via BNKRW"}
+            </Box>
+          ))}
         </HStack>
 
         {/* Input / Output fields with flip arrow */}
@@ -372,6 +408,20 @@ export function SwapCard() {
             </HStack>
           </Box>
         </Box>
+
+        {/* Route indicator (auto mode) */}
+        {routePreference === "auto" && quote && (
+          <Text
+            fontSize="xs"
+            color="gray.500"
+            fontWeight="bold"
+            textTransform="uppercase"
+            textAlign="right"
+            mt={-4}
+          >
+            Route: {quote.route === "direct" ? "Direct" : "Via BNKRW"}
+          </Text>
+        )}
 
         {/* Error */}
         {quoteError && (

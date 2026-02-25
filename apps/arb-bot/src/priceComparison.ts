@@ -1,10 +1,12 @@
 import type { PoolSlot0 } from "./poolState.js";
+import { config } from "./config.js";
 
 export type ArbDirection = "buy-direct-sell-bnkrw" | "buy-bnkrw-sell-direct";
 
-export interface ArbOpportunity {
+export interface PriceDivergence {
   direction: ArbDirection;
-  priceDiffBps: number; // basis points of price divergence
+  priceDiffBps: number; // basis points of sqrtPrice divergence
+  aboveThreshold: boolean; // whether divergence exceeds min arb bps
 }
 
 /**
@@ -24,10 +26,10 @@ export interface ArbOpportunity {
  *   WCHAN costs less on direct pool → buy cheap on direct, sell expensive via BNKRW
  *   Direction: buy-direct-sell-bnkrw
  */
-export function detectArbDirection(
+export function detectPriceDivergence(
   direct: PoolSlot0,
   bnkrw: PoolSlot0
-): ArbOpportunity | null {
+): PriceDivergence | null {
   const d = direct.sqrtPriceX96;
   const b = bnkrw.sqrtPriceX96;
 
@@ -38,11 +40,12 @@ export function detectArbDirection(
   const base = d < b ? d : b;
   const priceDiffBps = Number((diff * 10000n) / base);
 
-  // Need at least 1 bps divergence to consider
-  if (priceDiffBps < 1) return null;
-
   const direction: ArbDirection =
     d > b ? "buy-bnkrw-sell-direct" : "buy-direct-sell-bnkrw";
 
-  return { direction, priceDiffBps };
+  return {
+    direction,
+    priceDiffBps,
+    aboveThreshold: priceDiffBps >= config.minArbBps,
+  };
 }

@@ -2,6 +2,7 @@ import type { Address } from "viem";
 
 export type SwapDirection = "buy" | "sell";
 export type SwapRoute = "direct" | "via-bnkrw";
+export type RoutePreference = "auto" | "direct" | "via-bnkrw";
 
 export interface PoolKey {
   currency0: Address;
