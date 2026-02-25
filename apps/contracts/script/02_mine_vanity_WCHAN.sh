@@ -19,7 +19,7 @@ NETWORK="${1:?Usage: $0 <base|base-sepolia|eth-sepolia>}"
 ADDRESSES_FILE="addresses.json"
 ERADICATE2="./lib/ERADICATE2/ERADICATE2.x64"
 DEPLOYER="0x4e59b44847b379578588920cA78FbF26c0B4956C"
-PATTERN="ba5ed00"
+PATTERN="ba5ed0000"
 
 # Resolve chain ID and RPC URL env var from network name
 case "$NETWORK" in
