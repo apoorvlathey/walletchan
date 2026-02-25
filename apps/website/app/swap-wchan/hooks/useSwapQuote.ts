@@ -3,7 +3,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { usePublicClient } from "wagmi";
 import { parseEther } from "viem";
-import { getBestQuote, type SwapDirection, type WchanQuote } from "../../../lib/wchan-swap";
+import {
+  getBestQuote,
+  getQuote,
+  getQuoteViaBnkrw,
+  type SwapDirection,
+  type RoutePreference,
+  type WchanQuote,
+} from "../../../lib/wchan-swap";
 
 const DEBOUNCE_MS = 500;
 
@@ -12,9 +19,33 @@ interface UseSwapQuoteParams {
   direction: SwapDirection;
   amount: string; // human-readable (e.g. "0.1")
   enabled: boolean;
+  routePreference?: RoutePreference;
 }
 
-export function useSwapQuote({ chainId, direction, amount, enabled }: UseSwapQuoteParams) {
+function fetchQuote(
+  client: unknown,
+  chainId: number,
+  direction: SwapDirection,
+  amountIn: bigint,
+  routePreference: RoutePreference
+): Promise<WchanQuote> {
+  switch (routePreference) {
+    case "direct":
+      return getQuote(client, chainId, direction, amountIn);
+    case "via-bnkrw":
+      return getQuoteViaBnkrw(client, chainId, direction, amountIn);
+    default:
+      return getBestQuote(client, chainId, direction, amountIn);
+  }
+}
+
+export function useSwapQuote({
+  chainId,
+  direction,
+  amount,
+  enabled,
+  routePreference = "auto",
+}: UseSwapQuoteParams) {
   const client = usePublicClient({ chainId });
   const [quote, setQuote] = useState<WchanQuote | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,7 +79,13 @@ export function useSwapQuote({ chainId, direction, amount, enabled }: UseSwapQuo
 
     const timer = setTimeout(async () => {
       try {
-        const result = await getBestQuote(client, chainId, direction, parsed);
+        const result = await fetchQuote(
+          client,
+          chainId,
+          direction,
+          parsed,
+          routePreference
+        );
         if (abortRef.current === id) {
           setQuote(result);
           setIsLoading(false);
@@ -68,7 +105,7 @@ export function useSwapQuote({ chainId, direction, amount, enabled }: UseSwapQuo
         setIsLoading(false);
       }
     };
-  }, [client, chainId, direction, amount, enabled]);
+  }, [client, chainId, direction, amount, enabled, routePreference]);
 
   const refetch = useCallback(async () => {
     if (!client || !amount || !enabled) return null;
@@ -83,7 +120,13 @@ export function useSwapQuote({ chainId, direction, amount, enabled }: UseSwapQuo
     setIsLoading(true);
     setError(null);
     try {
-      const result = await getBestQuote(client, chainId, direction, parsed);
+      const result = await fetchQuote(
+        client,
+        chainId,
+        direction,
+        parsed,
+        routePreference
+      );
       setQuote(result);
       setIsLoading(false);
       return result;
@@ -92,7 +135,7 @@ export function useSwapQuote({ chainId, direction, amount, enabled }: UseSwapQuo
       setIsLoading(false);
       return null;
     }
-  }, [client, chainId, direction, amount, enabled]);
+  }, [client, chainId, direction, amount, enabled, routePreference]);
 
   return { quote, isLoading, error, refetch };
 }

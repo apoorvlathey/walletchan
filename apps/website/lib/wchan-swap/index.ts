@@ -1,7 +1,7 @@
 export { getAddresses, isChainLive, ADDRESSES } from "./addresses";
 export type { SupportedChainId } from "./addresses";
 
-export type { SwapDirection, SwapRoute, PoolKey, WchanQuote, SwapConfig } from "./types";
+export type { SwapDirection, SwapRoute, RoutePreference, PoolKey, WchanQuote, SwapConfig } from "./types";
 
 export { buildPoolKey, isWethCurrency0 } from "./poolKey";
 

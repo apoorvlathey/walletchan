@@ -3,7 +3,7 @@ import { config } from "./config.js";
 import { account, publicClient, walletClient } from "./client.js";
 import { log } from "./logger.js";
 import { readPoolStates } from "./poolState.js";
-import { detectArbDirection } from "./priceComparison.js";
+import { detectPriceDivergence } from "./priceComparison.js";
 import { findOptimalArb } from "./arbSearch.js";
 import { encodeArbTx } from "./arbEncoder.js";
 import { estimateGasCost } from "./gasEstimation.js";
@@ -23,20 +23,25 @@ async function poll(): Promise<boolean> {
         `BNKRW sqrtPrice=${states.bnkrw.sqrtPriceX96} tick=${states.bnkrw.tick}`
     );
 
-    // 2. Detect arb direction
-    const opportunity = detectArbDirection(states.direct, states.bnkrw);
-    if (!opportunity) {
+    // 2. Detect price divergence
+    const divergence = detectPriceDivergence(states.direct, states.bnkrw);
+    if (!divergence || divergence.priceDiffBps < 1) {
       log.debug("No price divergence detected");
       consecutiveErrors = 0;
       return false;
     }
 
     log.info(
-      `Arb opportunity: ${opportunity.direction} (${opportunity.priceDiffBps} bps divergence)`
+      `Divergence: ${divergence.priceDiffBps} bps (${divergence.direction})${divergence.aboveThreshold ? " — searching..." : ""}`
     );
 
+    if (!divergence.aboveThreshold) {
+      consecutiveErrors = 0;
+      return false;
+    }
+
     // 3. Find optimal amount (batched quotes — 2 HTTP requests for coarse, 2 per ternary iter)
-    const arb = await findOptimalArb(opportunity.direction);
+    const arb = await findOptimalArb(divergence.direction);
     if (!arb) {
       log.info("No profitable arb found after search");
       consecutiveErrors = 0;
@@ -146,7 +151,8 @@ async function main(): Promise<void> {
   log.info(`Poll interval: ${config.pollIntervalMs}ms`);
   log.info(`Min profit: ${formatEther(config.minProfitWei)} ETH`);
   log.info(`Slippage: ${config.slippageBps} bps`);
-  log.info(`RPC: ${config.rpcUrl.replace(/\/\/.*@/, "//***@")}`);
+  log.info(`Min arb divergence: ${config.minArbBps} bps (sqrtPrice)`);
+  log.debug(`RPC: ${config.rpcUrl.replace(/\/\/.*@/, "//***@")}`);
 
   // Initial balance check
   const balance = await publicClient.getBalance({

@@ -1,4 +1,4 @@
-import { encodeFunctionData, decodeAbiParameters } from "viem";
+import { encodeFunctionData, decodeAbiParameters, formatEther } from "viem";
 import {
   getAddresses,
   buildPoolKey,
@@ -111,8 +111,13 @@ async function batchQuote(
   // Sort by id to maintain order
   results.sort((a, b) => a.id - b.id);
 
-  return results.map((r) => {
-    if (r.error || !r.result || r.result === "0x") return null;
+  return results.map((r, i) => {
+    if (r.error || !r.result || r.result === "0x") {
+      if (r.error) {
+        log.debug(`Quote ${i} reverted: ${r.error.message}`);
+      }
+      return null;
+    }
     try {
       const [amountOut] = decodeAbiParameters(
         RETURN_TYPES,
@@ -160,6 +165,11 @@ async function batchSimulateArbs(
 
   const leg1Results = await batchQuote(leg1Calls);
 
+  const leg1Successes = leg1Results.filter((r) => r !== null).length;
+  log.debug(
+    `Leg1 results: ${leg1Successes}/${amounts.length} succeeded`
+  );
+
   // Phase 2: Build leg2 calls only for successful leg1 results
   const leg2Indices: number[] = [];
   const leg2Calls: Array<{ to: string; data: string }> = [];
@@ -177,6 +187,11 @@ async function batchSimulateArbs(
 
   const leg2Results =
     leg2Calls.length > 0 ? await batchQuote(leg2Calls) : [];
+
+  const leg2Successes = leg2Results.filter((r) => r !== null).length;
+  log.debug(
+    `Leg2 results: ${leg2Successes}/${leg2Calls.length} succeeded`
+  );
 
   // Assemble results
   const results: ({ leg1Out: bigint; leg2Out: bigint; profit: bigint } | null)[] =
@@ -225,7 +240,18 @@ export async function findOptimalArb(
   }
 
   if (bestIdx === -1 || bestProfit <= 0n) {
-    log.debug("No profitable candidate found in coarse search");
+    // Log profits for diagnostics (first 3 candidates)
+    const sampleProfits = coarseResults
+      .slice(0, 3)
+      .map((r, i) =>
+        r
+          ? `${formatEther(candidates[i])}ETH→profit:${formatEther(r.profit)}`
+          : `${formatEther(candidates[i])}ETH→null`
+      )
+      .join(", ");
+    log.info(
+      `No profitable candidate in coarse search. Samples: [${sampleProfits}]`
+    );
     return null;
   }
 
