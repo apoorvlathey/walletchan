@@ -4,6 +4,7 @@ import { Box, HStack, Text, Link, useDisclosure } from "@chakra-ui/react";
 import { useTokenData } from "../contexts/TokenDataContext";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { usePathname } from "next/navigation";
 import { DEXSCREENER_URL, TOKEN_ADDRESS } from "../constants";
 import { BuyModal, type BuyToken } from "../coins/components/BuyModal";
 import { LoadingShapes } from "./ui/LoadingShapes";
@@ -21,6 +22,11 @@ const WCHAN_TOKEN: BuyToken = {
 export function TokenBanner() {
   const { tokenData, isLoading } = useTokenData();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const pathname = usePathname();
+  const isMigratePage =
+    pathname === "/migrate" ||
+    (typeof window !== "undefined" &&
+      window.location.hostname === "migrate.walletchan.com");
   const [displayValue, setDisplayValue] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [direction, setDirection] = useState<"up" | "down">("up");
@@ -69,8 +75,6 @@ export function TokenBanner() {
         px={4}
         justify="center"
         spacing={{ base: 2, md: 3 }}
-        borderBottom="3px solid"
-        borderColor="bauhaus.black"
         flexWrap="wrap"
         rowGap={2}
       >
@@ -233,7 +237,262 @@ export function TokenBanner() {
           display={{ base: "none", md: "block" }}
         />
       </HStack>
-      <BuyModal token={WCHAN_TOKEN} isOpen={isOpen} onClose={onClose} showWallet />
+      {/* Divider — yellow bg with black ellipse tapering to edges */}
+      <Box h="3px" bg="bauhaus.yellow" position="relative">
+        <Box
+          position="absolute"
+          inset={0}
+          bg="#121212"
+          sx={{
+            clipPath: "ellipse(36% 50% at 50% 50%)",
+          }}
+        />
+      </Box>
+      <BuyModal
+        token={WCHAN_TOKEN}
+        isOpen={isOpen}
+        onClose={onClose}
+        showWallet
+      />
+
+      {/* Migrate banner */}
+      {!isMigratePage && <Box
+        position="relative"
+        overflow="hidden"
+        borderBottom="3px solid"
+        borderColor="bauhaus.black"
+      >
+        {/* Left crumbling bricks — solid rect + absolute-positioned squares */}
+        <Box
+          position="absolute"
+          left={0}
+          top={0}
+          bottom={0}
+          w="300px"
+          pointerEvents="none"
+          zIndex={1}
+          display={{ base: "none", md: "block" }}
+        >
+          {/* Solid yellow block at the edge */}
+          <Box
+            position="absolute"
+            left={0}
+            top={0}
+            bottom={0}
+            w="60px"
+            bg="#F0C020"
+          />
+          {/* Brick squares that break apart — wall shatter effect */}
+          {[
+            // [x, y(%), size] — bricks get smaller and sparser going right
+            // Near-full-height columns touching the solid rect
+            // x aligned within each column to prevent bottom-edge gaps
+            [60, 0, 28],
+            [60, 52, 26],
+            // Still tall, slight gaps appearing
+            [78, 0, 24],
+            [78, 55, 22],
+            [94, 2, 20],
+            [94, 52, 20],
+            // Getting smaller, more gaps
+            [108, 0, 18],
+            [108, 55, 16],
+            [120, 5, 15],
+            [120, 50, 14],
+            // Breaking apart — 3 rows emerging
+            // x aligned within column; bottom bricks pushed lower for full coverage
+            [132, 0, 13],
+            [132, 38, 12],
+            [132, 74, 12],
+            [146, 8, 12],
+            [146, 45, 11],
+            [146, 78, 10],
+            [160, 2, 10],
+            [160, 40, 10],
+            [160, 76, 9],
+            // Medium fragments scattered
+            [174, 15, 9],
+            [176, 50, 8],
+            [172, 78, 8],
+            [188, 5, 8],
+            [186, 42, 7],
+            [190, 70, 7],
+            [200, 20, 7],
+            [202, 55, 6],
+            [198, 0, 6],
+            // Small fragments
+            [212, 22, 6],
+            [210, 55, 6],
+            [214, 0, 5],
+            [224, 10, 5],
+            [226, 42, 5],
+            [222, 72, 5],
+            [236, 28, 5],
+            [238, 60, 4],
+            [234, 0, 4],
+            // Tiny pixels
+            [248, 15, 4],
+            [250, 48, 4],
+            [246, 75, 3],
+            [258, 5, 3],
+            [260, 35, 3],
+            [256, 65, 3],
+            [268, 22, 3],
+            [270, 52, 2],
+            [266, 78, 2],
+            [278, 10, 2],
+            [280, 42, 2],
+            [276, 68, 2],
+            [288, 30, 2],
+            [290, 58, 2],
+            [296, 15, 1],
+            [295, 50, 1],
+            [297, 75, 1],
+          ].map(([x, yPct, size], i) => (
+            <Box
+              key={i}
+              position="absolute"
+              left={`${x}px`}
+              top={`${yPct}%`}
+              w={`${size}px`}
+              h={`${size}px`}
+              bg="#F0C020"
+            />
+          ))}
+        </Box>
+        {/* Right crumbling bricks (mirrored) */}
+        <Box
+          position="absolute"
+          right={0}
+          top={0}
+          bottom={0}
+          w="300px"
+          pointerEvents="none"
+          zIndex={1}
+          transform="scaleX(-1)"
+          display={{ base: "none", md: "block" }}
+        >
+          <Box
+            position="absolute"
+            left={0}
+            top={0}
+            bottom={0}
+            w="60px"
+            bg="#F0C020"
+          />
+          {[
+            [60, 0, 28],
+            [60, 52, 26],
+            [78, 0, 24],
+            [78, 55, 22],
+            [94, 2, 20],
+            [94, 52, 20],
+            [108, 0, 18],
+            [108, 55, 16],
+            [120, 5, 15],
+            [120, 50, 14],
+            [132, 0, 13],
+            [132, 38, 12],
+            [132, 74, 12],
+            [146, 8, 12],
+            [146, 45, 11],
+            [146, 78, 10],
+            [160, 2, 10],
+            [160, 40, 10],
+            [160, 76, 9],
+            [174, 15, 9],
+            [176, 50, 8],
+            [172, 78, 8],
+            [188, 5, 8],
+            [186, 42, 7],
+            [190, 70, 7],
+            [200, 20, 7],
+            [202, 55, 6],
+            [198, 0, 6],
+            [212, 22, 6],
+            [210, 55, 6],
+            [214, 0, 5],
+            [224, 10, 5],
+            [226, 42, 5],
+            [222, 72, 5],
+            [236, 28, 5],
+            [238, 60, 4],
+            [234, 0, 4],
+            [248, 15, 4],
+            [250, 48, 4],
+            [246, 75, 3],
+            [258, 5, 3],
+            [260, 35, 3],
+            [256, 65, 3],
+            [268, 22, 3],
+            [270, 52, 2],
+            [266, 78, 2],
+            [278, 10, 2],
+            [280, 42, 2],
+            [276, 68, 2],
+            [288, 30, 2],
+            [290, 58, 2],
+            [296, 15, 1],
+            [295, 50, 1],
+            [297, 75, 1],
+          ].map(([x, yPct, size], i) => (
+            <Box
+              key={i}
+              position="absolute"
+              left={`${x}px`}
+              top={`${yPct}%`}
+              w={`${size}px`}
+              h={`${size}px`}
+              bg="#F0C020"
+            />
+          ))}
+        </Box>
+        <HStack bg="white" py={{ base: 1, md: 1.5 }} px={{ base: 2, md: 4 }} justify="center" spacing={{ base: 1.5, md: 2 }}>
+          <HStack
+            flexDir={"row"}
+            fontSize={{ base: "2xs", md: "xs" }}
+            fontWeight="800"
+            color="bauhaus.black"
+            textTransform="uppercase"
+            letterSpacing={{ base: "wide", md: "wider" }}
+            flexShrink={0}
+          >
+            <Text bg="#ffdf00">New Ticker,</Text> <Text>Same Vision</Text>
+          </HStack>
+          <Link
+            href={
+              process.env.NODE_ENV === "development"
+                ? "/migrate"
+                : "https://migrate.walletchan.com"
+            }
+            bg="bauhaus.red"
+            color="white"
+            px={{ base: 2, md: 3 }}
+            py={0.5}
+            fontWeight="900"
+            fontSize={{ base: "2xs", md: "xs" }}
+            textTransform="uppercase"
+            letterSpacing="wide"
+            border="2px solid"
+            borderColor="bauhaus.black"
+            boxShadow="2px 2px 0px 0px #121212"
+            whiteSpace="nowrap"
+            _hover={{
+              opacity: 0.9,
+              textDecoration: "none",
+              transform: "translateY(-1px)",
+              boxShadow: "3px 3px 0px 0px #121212",
+            }}
+            _active={{
+              transform: "translate(2px, 2px)",
+              boxShadow: "none",
+            }}
+            transition="all 0.2s ease-out"
+          >
+            Wrap $BNKRW to $WCHAN ✨
+          </Link>
+        </HStack>
+      </Box>}
     </Box>
   );
 }

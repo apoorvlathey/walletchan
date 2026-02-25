@@ -30,6 +30,8 @@ const COINS_SUBDOMAIN = "coins.walletchan.com";
 const COINS_SUBDOMAIN_URL = "https://coins.walletchan.com";
 const STAKE_SUBDOMAIN = "stake.walletchan.com";
 const STAKE_SUBDOMAIN_URL = "https://stake.walletchan.com";
+const MIGRATE_SUBDOMAIN = "migrate.walletchan.com";
+const MIGRATE_SUBDOMAIN_URL = "https://migrate.walletchan.com";
 const MAIN_SITE = "https://walletchan.com";
 
 const revolveBorder = keyframes`
@@ -60,39 +62,54 @@ export function Navigation() {
   const { vaultData } = useVaultData();
   const [isCoinsSubdomain, setIsCoinsSubdomain] = useState(false);
   const [isStakeSubdomain, setIsStakeSubdomain] = useState(false);
+  const [isMigrateSubdomain, setIsMigrateSubdomain] = useState(false);
   const [isLocalhost, setIsLocalhost] = useState(false);
 
   useEffect(() => {
     const hostname = window.location.hostname;
     setIsCoinsSubdomain(hostname === COINS_SUBDOMAIN);
     setIsStakeSubdomain(hostname === STAKE_SUBDOMAIN);
+    setIsMigrateSubdomain(hostname === MIGRATE_SUBDOMAIN);
     setIsLocalhost(hostname === "localhost" || hostname === "127.0.0.1");
   }, []);
 
-  const isOnSubdomain = isCoinsSubdomain || isStakeSubdomain;
+  const isOnSubdomain = isCoinsSubdomain || isStakeSubdomain || isMigrateSubdomain;
   const isOnCoins = pathname === "/coins" || isCoinsSubdomain;
   const isOnStake = pathname === "/stake" || isStakeSubdomain;
+  const isOnMigrate = pathname === "/migrate" || isMigrateSubdomain;
 
   const getNavHref = (href: string) => {
     // On coins subdomain
     if (isCoinsSubdomain) {
       if (href === "/coins") return "/";
       if (href === "/stake") return STAKE_SUBDOMAIN_URL;
+      if (href === "/migrate") return MIGRATE_SUBDOMAIN_URL;
       if (href.startsWith("#")) return `${MAIN_SITE}/${href}`;
     }
     // On stake subdomain
     if (isStakeSubdomain) {
       if (href === "/stake") return "/";
       if (href === "/coins") return COINS_SUBDOMAIN_URL;
+      if (href === "/migrate") return MIGRATE_SUBDOMAIN_URL;
+      if (href.startsWith("#")) return `${MAIN_SITE}/${href}`;
+    }
+    // On migrate subdomain
+    if (isMigrateSubdomain) {
+      if (href === "/migrate") return "/";
+      if (href === "/coins") return COINS_SUBDOMAIN_URL;
+      if (href === "/stake") return STAKE_SUBDOMAIN_URL;
       if (href.startsWith("#")) return `${MAIN_SITE}/${href}`;
     }
     // On production main site, route to subdomains
     if (!isLocalhost && !isOnSubdomain) {
       if (href === "/coins") return COINS_SUBDOMAIN_URL;
       if (href === "/stake") return STAKE_SUBDOMAIN_URL;
+      if (href === "/migrate") return MIGRATE_SUBDOMAIN_URL;
+      // On sub-pages, anchor links need to go to homepage
+      if (pathname !== "/" && href.startsWith("#")) return `${MAIN_SITE}/${href}`;
     }
-    // On localhost /coins or /stake paths, anchor links need absolute path
-    if (isLocalhost && (pathname === "/coins" || pathname === "/stake") && href.startsWith("#")) {
+    // On localhost sub-pages, anchor links need absolute path to go to homepage
+    if (isLocalhost && pathname !== "/" && href.startsWith("#")) {
       return `/${href}`;
     }
     return href;

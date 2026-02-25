@@ -35,6 +35,7 @@ import {
 import { formatUnits, parseUnits } from "viem";
 import { Navigation } from "../components/Navigation";
 import { TokenBanner } from "../components/TokenBanner";
+import { Footer } from "../components/Footer";
 import { useVaultData } from "../contexts/VaultDataContext";
 import { useTokenData } from "../contexts/TokenDataContext";
 import { erc20Abi, vaultAbi } from "./abi";
@@ -1050,6 +1051,7 @@ export default function StakePage() {
           </Box>
         </VStack>
       </Container>
+      <Footer />
     </Box>
   );
 }
