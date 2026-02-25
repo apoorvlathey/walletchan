@@ -30,17 +30,20 @@ function GearIcon(props: React.ComponentProps<typeof Icon>) {
 interface SlippageSettingsProps {
   slippageBps: number;
   onSlippageChange: (bps: number) => void;
+  presets?: number[];
 }
 
 export function SlippageSettings({
   slippageBps,
   onSlippageChange,
+  presets,
 }: SlippageSettingsProps) {
   const { isOpen, onToggle, onClose } = useDisclosure();
   const [customValue, setCustomValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const isPreset = SLIPPAGE_PRESETS.includes(slippageBps);
+  const activePresets = presets ?? SLIPPAGE_PRESETS;
+  const isPreset = activePresets.includes(slippageBps);
   const displayPercent = (slippageBps / 100).toFixed(
     slippageBps % 100 === 0 ? 0 : 1
   );
@@ -95,7 +98,7 @@ export function SlippageSettings({
           <VStack spacing={2} align="stretch">
             {/* Presets */}
             <HStack spacing={1}>
-              {SLIPPAGE_PRESETS.map((bps) => {
+              {activePresets.map((bps) => {
                 const pct = bps / 100;
                 const isActive = slippageBps === bps;
                 return (

@@ -27,10 +27,10 @@ import { BuyModal, type BuyToken } from "../coins/components/BuyModal";
 
 const MotionBox = motion(Box);
 
-const BNKRW_TOKEN: BuyToken = {
+const WCHAN_TOKEN: BuyToken = {
   address: TOKEN_ADDRESS,
   name: "WalletChan",
-  symbol: "BNKRW",
+  symbol: "WCHAN",
   imageUrl: "/images/walletchan-icon-nobg.png",
 };
 
@@ -79,7 +79,7 @@ export function TokenSection() {
                 fontSize={{ base: "3xl", md: "5xl" }}
                 color="bauhaus.yellow"
               >
-                $BNKRW
+                $WCHAN
               </Heading>
             </MotionBox>
             <Box w="140px" h="4px" bg="white" />
@@ -125,6 +125,7 @@ export function TokenSection() {
                 px={4}
                 py={3}
                 align="center"
+                alignSelf="stretch"
                 borderRight="4px solid"
                 borderColor="bauhaus.border"
               >
@@ -147,7 +148,10 @@ export function TokenSection() {
                   fontWeight="medium"
                   display={{ base: "none", md: "block" }}
                 >
-                  {TOKEN_ADDRESS}
+                  <Text as="span" fontWeight="black" color="bauhaus.blue" fontSize={{ base: "sm", md: "md" }}>
+                    0xBa5ED0000
+                  </Text>
+                  {TOKEN_ADDRESS.slice(11)}
                 </Text>
                 <Text
                   color="bauhaus.foreground"
@@ -156,7 +160,10 @@ export function TokenSection() {
                   fontWeight="medium"
                   display={{ base: "block", md: "none" }}
                 >
-                  {truncatedAddress}
+                  <Text as="span" fontWeight="black" color="bauhaus.blue" fontSize={{ base: "sm", md: "md" }}>
+                    0xBa5ED0000
+                  </Text>
+                  ...{TOKEN_ADDRESS.slice(-4)}
                 </Text>
               </Flex>
               {/* Copy Button */}
@@ -236,19 +243,19 @@ export function TokenSection() {
               </VStack>
               <VStack>
                 <Text color="whiteAlpha.700" fontSize="sm" fontWeight="bold">
-                  1H CHANGE
+                  24H CHANGE
                 </Text>
                 <Text
                   color={
-                    tokenData?.change1h && tokenData.change1h >= 0
+                    tokenData?.change1d && tokenData.change1d >= 0
                       ? "green.400"
                       : "red.400"
                   }
                   fontSize="2xl"
                   fontWeight="black"
                 >
-                  {tokenData?.change1h !== undefined
-                    ? `${tokenData.change1h >= 0 ? "+" : ""}${tokenData.change1h.toFixed(2)}%`
+                  {tokenData?.change1d !== undefined
+                    ? `${tokenData.change1d >= 0 ? "+" : ""}${tokenData.change1d.toFixed(2)}%`
                     : "..."}
                 </Text>
               </VStack>
@@ -312,7 +319,7 @@ export function TokenSection() {
         </VStack>
       </Container>
 
-      <BuyModal token={BNKRW_TOKEN} isOpen={isOpen} onClose={onClose} showWallet />
+      <BuyModal token={WCHAN_TOKEN} isOpen={isOpen} onClose={onClose} showWallet />
     </Box>
   );
 }

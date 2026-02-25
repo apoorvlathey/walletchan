@@ -11,10 +11,10 @@ import { LoadingShapes } from "./ui/LoadingShapes";
 const MotionText = motion(Text);
 const MotionBox = motion(Box);
 
-const BNKRW_TOKEN: BuyToken = {
+const WCHAN_TOKEN: BuyToken = {
   address: TOKEN_ADDRESS,
   name: "WalletChan",
-  symbol: "BNKRW",
+  symbol: "WCHAN",
   imageUrl: "/images/walletchan-icon-nobg.png",
 };
 
@@ -82,7 +82,7 @@ export function TokenBanner() {
           display={{ base: "none", md: "block" }}
         />
 
-        {/* Powered by + $BNKRW group */}
+        {/* Powered by + $WCHAN group */}
         <HStack spacing={2}>
           <Text
             fontSize="xs"
@@ -121,7 +121,7 @@ export function TokenBanner() {
             }}
             transition="all 0.2s ease-out"
           >
-            $BNKRW
+            $WCHAN
           </Link>
         </HStack>
 
@@ -233,7 +233,7 @@ export function TokenBanner() {
           display={{ base: "none", md: "block" }}
         />
       </HStack>
-      <BuyModal token={BNKRW_TOKEN} isOpen={isOpen} onClose={onClose} showWallet />
+      <BuyModal token={WCHAN_TOKEN} isOpen={isOpen} onClose={onClose} showWallet />
     </Box>
   );
 }
