@@ -35,6 +35,9 @@ contract WCHAN is ERC20, ERC20Permit, ERC20Votes, ERC3009, IERC165 {
     /// @notice Address of the legacy token on Base
     address public constant OLD_TOKEN = 0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07;
 
+    /// @notice Total supply of the old token
+    uint256 public constant TOTAL_SUPPLY = 100_000_000_000 ether; // 100 Billion
+
     /// @dev Token and contract metadata URI (ERC-7572)
     string internal _tokenURI;
 
@@ -49,6 +52,7 @@ contract WCHAN is ERC20, ERC20Permit, ERC20Votes, ERC3009, IERC165 {
         string memory tokenURI_
     ) ERC20("WalletChan", "WCHAN") ERC20Permit("WalletChan") {
         _tokenURI = tokenURI_;
+        _mint(address(this), TOTAL_SUPPLY);
     }
 
     /**
@@ -58,21 +62,22 @@ contract WCHAN is ERC20, ERC20Permit, ERC20Votes, ERC3009, IERC165 {
      */
 
     /// @notice Wrap OLD_TOKEN into WCHAN at a 1:1 ratio
-    /// @dev Caller must have approved this contract to spend `amount_` of OLD_TOKEN
+    /// @dev Caller must have approved this contract to spend `amount_` of OLD_TOKEN.
+    ///      Transfers pre-minted WCHAN from the contract to the caller.
     /// @param amount_ Amount of OLD_TOKEN to wrap
     function wrap(uint256 amount_) external {
         // Effects before interactions (CEI)
-        _mint(msg.sender, amount_);
+        _transfer(address(this), msg.sender, amount_);
         emit Wrap(msg.sender, amount_);
-        // Interaction — reverts the entire tx (including mint) on failure
+        // Interaction — reverts the entire tx (including transfer) on failure
         SafeERC20.safeTransferFrom(IERC20(OLD_TOKEN), msg.sender, address(this), amount_);
     }
 
     /// @notice Unwrap WCHAN back into OLD_TOKEN at a 1:1 ratio
-    /// @dev Burns the caller's WCHAN, then transfers OLD_TOKEN back
+    /// @dev Transfers the caller's WCHAN back to the contract, then transfers OLD_TOKEN back
     /// @param amount_ Amount of WCHAN to unwrap
     function unwrap(uint256 amount_) external {
-        _burn(msg.sender, amount_);
+        _transfer(msg.sender, address(this), amount_);
         SafeERC20.safeTransfer(IERC20(OLD_TOKEN), msg.sender, amount_);
         emit UnWrap(msg.sender, amount_);
     }

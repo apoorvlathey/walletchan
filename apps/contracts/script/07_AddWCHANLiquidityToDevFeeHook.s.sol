@@ -42,7 +42,6 @@ contract AddWCHANLiquidityToDevFeeHook is GetETHUSDPrice {
 
     uint256 constant MAX_ETH_AMOUNT = 5 ether;
     uint256 constant MAX_WCHAN_AMOUNT = 2_023_660_350 ether;
-    uint256 constant HARDCODED_TOTAL_SUPPLY = 100_000_000_000 ether; // 100B tokens (OLD_TOKEN supply)
 
     uint256 constant MIN_MARKETCAP_USD6 = 100_000e6;     // $100K
     uint256 constant MAX_MARKETCAP_USD6 = 15_000_000e6;   // $15M
@@ -155,7 +154,7 @@ contract AddWCHANLiquidityToDevFeeHook is GetETHUSDPrice {
 
         // Compute tick range from market cap bounds
         (p.tickLower, p.tickUpper) = _computeTickRange(
-            HARDCODED_TOTAL_SUPPLY, MIN_MARKETCAP_USD6, MAX_MARKETCAP_USD6,
+            IERC20(p.wchan).totalSupply(), MIN_MARKETCAP_USD6, MAX_MARKETCAP_USD6,
             ethPriceUsd6, wchanIsC0, TICK_SPACING
         );
         console.log("  tickLower:");

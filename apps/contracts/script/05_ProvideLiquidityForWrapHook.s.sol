@@ -45,9 +45,7 @@ contract ProvideLiquidity is GetOldTokenPoolInfo {
     uint256 constant SEED_AMOUNT_WCHAN = 899404600 ether;
     uint256 constant SEED_AMOUNT_OLD_TOKEN = 0 ether;
 
-    // WCHAN's totalSupply() returns only the wrapped supply (small), not the full 100B.
-    // Use this constant for price/tick calculations involving WCHAN.
-    uint256 constant HARDCODED_TOTAL_SUPPLY = 100_000_000_000e18; // 100B tokens
+    // Note: WCHAN's totalSupply() now returns the full 100B (pre-minted to contract).
 
     IPoolManager poolManager;
     IPositionManager positionManager;
@@ -153,10 +151,9 @@ contract ProvideLiquidity is GetOldTokenPoolInfo {
         console.log("  Liquidity provided successfully");
     }
 
-    /// @dev Returns HARDCODED_TOTAL_SUPPLY for WCHAN (whose totalSupply is only the wrapped amount),
-    ///      or the actual on-chain totalSupply for any other token.
-    function _getEffectiveTotalSupply(address token, address wchanAddr) internal view returns (uint256) {
-        return token == wchanAddr ? HARDCODED_TOTAL_SUPPLY : IERC20(token).totalSupply();
+    /// @dev Returns the on-chain totalSupply for the given token.
+    function _getEffectiveTotalSupply(address token, address) internal view returns (uint256) {
+        return IERC20(token).totalSupply();
     }
 
     /// @dev Calculate sqrtPriceX96 from tokenMcapUsd6 and ethPriceRaw (fetched live).

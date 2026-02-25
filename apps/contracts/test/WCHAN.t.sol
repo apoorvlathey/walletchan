@@ -163,8 +163,9 @@ contract WCHANMetadataTest is WCHANBaseTest {
         assertEq(token.decimals(), 18);
     }
 
-    function test_initialSupplyIsZero() public view {
-        assertEq(token.totalSupply(), 0);
+    function test_initialSupplyIsTotalSupply() public view {
+        assertEq(token.totalSupply(), token.TOTAL_SUPPLY());
+        assertEq(token.balanceOf(address(token)), token.TOTAL_SUPPLY());
     }
 
     function test_oldTokenAddress() public view {
@@ -236,7 +237,7 @@ contract WCHANWrapUnwrapTest is WCHANBaseTest {
         assertEq(token.balanceOf(alice), amount);
         assertEq(oldToken.balanceOf(alice), 0);
         assertEq(oldToken.balanceOf(address(token)), amount);
-        assertEq(token.totalSupply(), amount);
+        assertEq(token.totalSupply(), token.TOTAL_SUPPLY());
     }
 
     function test_wrap_emitsEvent() public {
@@ -276,7 +277,7 @@ contract WCHANWrapUnwrapTest is WCHANBaseTest {
         assertEq(token.balanceOf(alice), 0);
         assertEq(oldToken.balanceOf(alice), amount);
         assertEq(oldToken.balanceOf(address(token)), 0);
-        assertEq(token.totalSupply(), 0);
+        assertEq(token.totalSupply(), token.TOTAL_SUPPLY());
     }
 
     function test_unwrap_emitsEvent() public {
@@ -323,7 +324,7 @@ contract WCHANWrapUnwrapTest is WCHANBaseTest {
 
         assertEq(oldToken.balanceOf(alice), oldBalanceBefore);
         assertEq(token.balanceOf(alice), 0);
-        assertEq(token.totalSupply(), 0);
+        assertEq(token.totalSupply(), token.TOTAL_SUPPLY());
     }
 
     function test_partialUnwrap(uint256 wrapAmount, uint256 unwrapAmount) public {
@@ -337,14 +338,14 @@ contract WCHANWrapUnwrapTest is WCHANBaseTest {
 
         assertEq(token.balanceOf(alice), wrapAmount - unwrapAmount);
         assertEq(oldToken.balanceOf(alice), unwrapAmount);
-        assertEq(token.totalSupply(), wrapAmount - unwrapAmount);
+        assertEq(token.totalSupply(), token.TOTAL_SUPPLY());
     }
 
     function test_multipleUsersWrapAndUnwrap() public {
         _wrapTokens(alice, 300e18);
         _wrapTokens(bob, 200e18);
 
-        assertEq(token.totalSupply(), 500e18);
+        assertEq(token.totalSupply(), token.TOTAL_SUPPLY());
         assertEq(oldToken.balanceOf(address(token)), 500e18);
 
         vm.prank(alice);
@@ -352,7 +353,7 @@ contract WCHANWrapUnwrapTest is WCHANBaseTest {
 
         assertEq(token.balanceOf(alice), 200e18);
         assertEq(oldToken.balanceOf(alice), 100e18);
-        assertEq(token.totalSupply(), 400e18);
+        assertEq(token.totalSupply(), token.TOTAL_SUPPLY());
         assertEq(oldToken.balanceOf(address(token)), 400e18);
     }
 
@@ -390,7 +391,7 @@ contract WCHANWrapUnwrapTest is WCHANBaseTest {
         vm.stopPrank();
 
         assertEq(token.balanceOf(alice), 0);
-        assertEq(token.totalSupply(), 0);
+        assertEq(token.totalSupply(), token.TOTAL_SUPPLY());
     }
 
     function test_unwrapZero() public {
@@ -1239,7 +1240,7 @@ contract WCHANWrapEdgeCasesTest is WCHANBaseTest {
             vm.stopPrank();
         }
 
-        assertEq(token.totalSupply(), 0);
+        assertEq(token.totalSupply(), token.TOTAL_SUPPLY());
         assertEq(oldToken.balanceOf(address(token)), 0);
     }
 
