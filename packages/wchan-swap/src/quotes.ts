@@ -151,14 +151,35 @@ export async function getBestQuote(
   const viaBnkrwQuote =
     viaBnkrwResult.status === "fulfilled" ? viaBnkrwResult.value : null;
 
+  // Log route comparison
+  console.log("[wchan-swap] Route quotes:", {
+    direct: directQuote
+      ? `${directQuote.amountOut.toString()} out`
+      : `failed${directResult.status === "rejected" ? ` (${directResult.reason})` : ""}`,
+    viaBnkrw: viaBnkrwQuote
+      ? `${viaBnkrwQuote.amountOut.toString()} out`
+      : `failed${viaBnkrwResult.status === "rejected" ? ` (${viaBnkrwResult.reason})` : ""}`,
+  });
+
+  let best: WchanQuote | null = null;
+
   if (directQuote && viaBnkrwQuote) {
-    return viaBnkrwQuote.amountOut > directQuote.amountOut
-      ? viaBnkrwQuote
-      : directQuote;
+    best =
+      viaBnkrwQuote.amountOut > directQuote.amountOut
+        ? viaBnkrwQuote
+        : directQuote;
+  } else if (directQuote) {
+    best = directQuote;
+  } else if (viaBnkrwQuote) {
+    best = viaBnkrwQuote;
   }
 
-  if (directQuote) return directQuote;
-  if (viaBnkrwQuote) return viaBnkrwQuote;
+  if (best) {
+    console.log(
+      `[wchan-swap] Selected route: ${best.route} (${best.direction} ${best.amountIn.toString()} → ${best.amountOut.toString()})`
+    );
+    return best;
+  }
 
   // Both failed — rethrow the direct route error
   throw directResult.status === "rejected"
