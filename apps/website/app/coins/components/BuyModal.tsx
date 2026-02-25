@@ -149,9 +149,31 @@ export function BuyModal({ token, isOpen, onClose, showWallet }: BuyModalProps) 
   const [sellAmount, setSellAmount] = useState("");
   const [slippageBps, setSlippageBps] = useState(DEFAULT_SLIPPAGE_BPS);
   const [copied, setCopied] = useState(false);
+  const [ethUsdPrice, setEthUsdPrice] = useState<number | null>(null);
 
   const fetchedImageUrl = useCoinImage(token?.tokenURI);
   const imageUrl = token?.imageUrl ?? fetchedImageUrl;
+
+  // Fetch ETH/USD price
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    async function fetchPrice() {
+      try {
+        const res = await fetch(
+          "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
+        );
+        const data = await res.json();
+        if (!cancelled && data?.ethereum?.usd) {
+          setEthUsdPrice(data.ethereum.usd);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    fetchPrice();
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   const sellToken = NATIVE_TOKEN_ADDRESS;
   const buyTokenAddress = token?.address ?? "";
@@ -352,21 +374,17 @@ export function BuyModal({ token, isOpen, onClose, showWallet }: BuyModalProps) 
                     p={0}
                     flex={1}
                   />
-                  <Flex
-                    bg="bauhaus.foreground"
-                    color="white"
-                    px={3}
-                    py={1}
-                    align="center"
-                  >
+                  {sellAmountValid && ethUsdPrice && (
                     <Text
-                      fontWeight="bold"
-                      fontSize="sm"
-                      textTransform="uppercase"
+                      fontSize="xs"
+                      fontWeight="700"
+                      color="gray.400"
+                      whiteSpace="nowrap"
+                      flexShrink={0}
                     >
-                      ETH
+                      ≈ ${(parseFloat(sellAmount) * ethUsdPrice).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                     </Text>
-                  </Flex>
+                  )}
                 </HStack>
                 <HStack spacing={{ base: 1, sm: 2 }} mt={2}>
                   {ETH_PRESETS.map((preset) => (
