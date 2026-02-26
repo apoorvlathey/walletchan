@@ -55,6 +55,10 @@ import {
   BNKRW_TOKEN_ADDRESS,
   WCHAN_TOKEN_ADDRESS,
 } from "./constants";
+import {
+  GECKOTERMINAL_EMBED_URL,
+  BNKRW_GECKOTERMINAL_EMBED_URL,
+} from "../constants";
 
 const MotionBox = motion(Box);
 
@@ -317,7 +321,7 @@ export default function MigrateContent() {
       <Navigation />
       <TokenBanner />
 
-      <Container maxW="7xl" pt={10} pb={40}>
+      <Container maxW="7xl" pt={1} pb={40}>
         <VStack spacing={6} align="stretch">
           {/* New Token, Same Vision Banner */}
           <Flex
@@ -830,8 +834,93 @@ export default function MigrateContent() {
             </Box>
           </Box>
 
+          {/* Charts */}
+          <Text
+            fontSize={{ base: "xl", md: "2xl" }}
+            fontWeight="900"
+            textTransform="uppercase"
+            letterSpacing="wider"
+            textAlign="left"
+            pt={{ base: 4, md: 6 }}
+          >
+            Same Marketcap across Tokens
+          </Text>
+          <Text fontSize="sm" fontWeight="500" color="gray.600" mt={-4}>
+            $WCHAN is just a 1:1 wrapped version of $BNKRW
+          </Text>
+          <SimpleGrid
+            columns={{ base: 1, md: 2 }}
+            spacing={{ base: 4, md: 6 }}
+            w="full"
+          >
+            <Box
+              bg="bauhaus.black"
+              border="4px solid"
+              borderColor="bauhaus.black"
+              p={{ base: 2, md: 4 }}
+            >
+              <Text
+                color="bauhaus.yellow"
+                fontSize="sm"
+                fontWeight="900"
+                textTransform="uppercase"
+                letterSpacing="wider"
+                mb={2}
+              >
+                $WCHAN
+              </Text>
+              <Box
+                as="iframe"
+                title="WCHAN GeckoTerminal"
+                src={GECKOTERMINAL_EMBED_URL}
+                w="full"
+                h={{ base: "300px", md: "400px" }}
+                border="none"
+                allow="clipboard-write"
+                allowFullScreen
+              />
+            </Box>
+            <Box
+              bg="bauhaus.black"
+              border="4px solid"
+              borderColor="bauhaus.black"
+              p={{ base: 2, md: 4 }}
+            >
+              <Text
+                color="bauhaus.yellow"
+                fontSize="sm"
+                fontWeight="900"
+                textTransform="uppercase"
+                letterSpacing="wider"
+                mb={2}
+              >
+                $BNKRW
+              </Text>
+              <Box
+                as="iframe"
+                title="BNKRW GeckoTerminal"
+                src={BNKRW_GECKOTERMINAL_EMBED_URL}
+                w="full"
+                h={{ base: "300px", md: "400px" }}
+                border="none"
+                allow="clipboard-write"
+                allowFullScreen
+              />
+            </Box>
+          </SimpleGrid>
+
           {/* WCHAN Benefits Section */}
-          <Box ref={infoRef} w="full" pt={{ base: 8, md: 12 }}>
+          <Text
+            fontSize={{ base: "xl", md: "2xl" }}
+            fontWeight="900"
+            textTransform="uppercase"
+            letterSpacing="wider"
+            textAlign="left"
+            pt={{ base: 4, md: 6 }}
+          >
+            $WCHAN Features
+          </Text>
+          <Box ref={infoRef} w="full">
             <MotionBox
               initial={{ opacity: 0, y: 30 }}
               animate={isInfoInView ? { opacity: 1, y: 0 } : {}}

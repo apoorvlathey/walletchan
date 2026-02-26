@@ -5,6 +5,8 @@ import {
 
 export const TOKEN_ADDRESS = WCHAN_TOKEN_ADDRESS;
 export const POOL_ADDRESS = WCHAN_POOL_ID;
+export const BNKRW_POOL_ADDRESS =
+  "0x6c8fd04c19e3c6c3efc21f6f5ae79c1453a19d971b7b7d4969df1928c380aaad";
 
 // App URLs
 export const CHROME_STORE_URL =
@@ -21,10 +23,13 @@ export const BUY_LINK =
   "https://app.uniswap.org/swap?chain=base&inputCurrency=NATIVE&outputCurrency=0xBa5ED0000e1CA9136a695f0a848012A16008B032";
 export const DEXSCREENER_URL = `https://dexscreener.com/base/${POOL_ADDRESS}`;
 export const GECKOTERMINAL_URL = `https://www.geckoterminal.com/base/pools/${POOL_ADDRESS}`;
-export const GECKOTERMINAL_EMBED_URL = `https://www.geckoterminal.com/base/pools/${POOL_ADDRESS}?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&chart_type=market_cap&resolution=1D`;
+export const GECKOTERMINAL_EMBED_URL = `https://www.geckoterminal.com/base/pools/${POOL_ADDRESS}?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&chart_type=market_cap&resolution=1d`;
 export const GECKOTERMINAL_API_URL = `https://api.geckoterminal.com/api/v2/networks/base/pools/${POOL_ADDRESS}`;
 // FIXME: update to WCHAN coingecko URL once the new coin is live there
 export const COINGECKO_URL = `https://www.coingecko.com/en/coins/bankrwallet`;
+
+// BNKRW stats for migrate page
+export const BNKRW_GECKOTERMINAL_EMBED_URL = `https://www.geckoterminal.com/base/pools/${BNKRW_POOL_ADDRESS}?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&chart_type=market_cap&resolution=1d`;
 
 // Indexer API
 export const INDEXER_API_URL =
