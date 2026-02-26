@@ -1,0 +1,7 @@
+[build]
+dockerfilePath = "apps/fee-indexer/Dockerfile"
+
+[deploy]
+startCommand = "sh -c 'pnpm ponder start --port 42071 --schema $RAILWAY_DEPLOYMENT_ID'"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
