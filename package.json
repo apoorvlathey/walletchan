@@ -16,6 +16,8 @@
     "start:indexer": "pnpm --filter @bankr-wallet/indexer start",
     "dev:staking-indexer": "pnpm --filter @bankr-wallet/staking-indexer dev",
     "start:staking-indexer": "pnpm --filter @bankr-wallet/staking-indexer start",
+    "dev:fee-indexer": "pnpm --filter @bankr-wallet/fee-indexer dev",
+    "start:fee-indexer": "pnpm --filter @bankr-wallet/fee-indexer start",
     "dev:tg-bot": "pnpm --filter @bankr-wallet/tg-bot dev",
     "start:tg-bot": "pnpm --filter @bankr-wallet/tg-bot start",
     "build:tg-bot": "pnpm --filter @bankr-wallet/tg-bot build",
