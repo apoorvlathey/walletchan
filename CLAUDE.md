@@ -303,6 +303,32 @@ When a user reports something unexpected (like a wrong value appearing):
 - Ask: "Where does this value come from? What code path could produce it?"
 - The anomaly is often a symptom of a deeper storage/migration issue
 
+### Website Pages with Wagmi/RainbowKit Hooks
+
+**CRITICAL**: Any website page (`page.tsx`) that uses wagmi hooks (`useAccount`, `useChainId`, `useReadContract`, etc.) or RainbowKit components (`ConnectButton`) will **fail on Vercel** during `next build` static prerendering with `WagmiProviderNotFoundError`.
+
+**Required pattern** for new pages that use wagmi:
+
+1. Put all page content in a separate `"use client"` file (e.g., `MyPageContent.tsx`)
+2. Make `page.tsx` a **Server Component** that imports the content and exports `force-dynamic`:
+
+```tsx
+// page.tsx (Server Component — no "use client")
+import MyPageContent from "./MyPageContent";
+
+export const dynamic = "force-dynamic";
+
+export default function MyPage() {
+  return <MyPageContent />;
+}
+```
+
+**Why**: `next build` statically prerenders pages at build time. Even though `WagmiProvider` is in the layout, wagmi's config initialization can fail during Node.js prerendering. `force-dynamic` skips prerendering entirely. These pages are inherently dynamic (wallet state) so there's no benefit to static generation.
+
+**Existing pages using this pattern**: `migrate`, `admin`, `coins`, `stake`, `verify`
+
+**Note**: Pages that only import child components using wagmi (like `swap/page.tsx` importing `SwapCard`) don't need this — only pages that directly use wagmi hooks in the page file itself.
+
 ## Railway Deployment (pnpm Monorepo)
 
 Railway's default Nixpacks builder does NOT work for this pnpm monorepo with `workspace:*` dependencies. Always use a **Dockerfile** + **`railway.toml`**.
