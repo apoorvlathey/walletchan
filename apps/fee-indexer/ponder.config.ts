@@ -15,6 +15,16 @@ export default createConfig({
       abi: ClankerFeeLockerAbi,
       address: "0xF3622742b1E446D92e45E22923Ef11C2fcD55D68",
       startBlock: 41506598,
+      filter: {
+        event: "ClaimTokens",
+        args: {
+          feeOwner: "0x74992be74bc3c3A72E97dF34A2C3A62c15f55970",
+          token: [
+            "0x4200000000000000000000000000000000000006",
+            "0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07",
+          ],
+        },
+      },
     },
     WCHANDevFeeHook: {
       chain: "base",

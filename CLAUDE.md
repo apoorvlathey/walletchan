@@ -345,6 +345,30 @@ When adding a new page that should be accessible via a subdomain (e.g., `foo.wal
 
 **Existing subdomains**: `coins`, `stake`, `migrate`
 
+## Ponder Indexer Performance
+
+**CRITICAL**: When indexing events from **shared contracts** (contracts used by many users, like ClankerFeeLocker), always use Ponder's `filter` option in `ponder.config.ts` to filter by indexed event parameters at the RPC level — do NOT rely solely on filtering inside the event handler.
+
+Without config-level filtering, Ponder fetches **all** events from the contract via `eth_getLogs` and your handler discards 99%+ of them. With `filter.args`, the RPC node uses topic filtering to only return matching events, which is orders of magnitude faster.
+
+```ts
+// BAD: fetches ALL ClaimTokens events, filters in handler
+ClankerFeeLocker: {
+  abi, address, startBlock,
+}
+
+// GOOD: RPC node filters by indexed args before returning
+ClankerFeeLocker: {
+  abi, address, startBlock,
+  filter: {
+    event: "ClaimTokens",
+    args: { feeOwner: "0x...", token: ["0x...", "0x..."] },
+  },
+}
+```
+
+**Rule of thumb**: If an event parameter is `indexed` in the ABI and you only care about specific values, put it in `filter.args`. Keep the handler-level filter as a safety net if you want.
+
 ## Railway Deployment (pnpm Monorepo)
 
 Railway's default Nixpacks builder does NOT work for this pnpm monorepo with `workspace:*` dependencies. Always use a **Dockerfile** + **`railway.toml`**.
