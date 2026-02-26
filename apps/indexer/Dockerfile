@@ -9,7 +9,7 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/indexer/ apps/indexer/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile --filter @bankr-wallet/indexer
+RUN pnpm install --frozen-lockfile --filter @walletchan/indexer
 
 WORKDIR /app/apps/indexer
 

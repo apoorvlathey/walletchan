@@ -43,7 +43,7 @@ This automatically (via `scripts/release.sh`):
 The [release workflow](/.github/workflows/release.yml) triggers on `v*` tags and:
 
 1. Runs `pnpm zip` (which builds the extension and creates the zip)
-2. Publishes `bankr-wallet-vX.Y.Z.zip` to [GitHub Releases](https://github.com/apoorvlathey/walletchan/releases)
+2. Publishes `walletchan-vX.Y.Z.zip` to [GitHub Releases](https://github.com/apoorvlathey/walletchan/releases)
 
 Users can download the zip from GitHub Releases and load it as an unpacked extension in developer mode.
 
@@ -55,7 +55,7 @@ Users can download the zip from GitHub Releases and load it as an unpacked exten
    ```
 2. Go to the [CWS Developer Dashboard](https://chrome.google.com/webstore/devconsole)
 3. Select the WalletChan extension
-4. Upload `apps/extension/cws-zip/bankr-wallet-vX.Y.Z.zip` (not the GitHub Release zip)
+4. Upload `apps/extension/cws-zip/walletchan-vX.Y.Z.zip` (not the GitHub Release zip)
 5. Fill in any release notes
 6. Submit for review
 
@@ -70,7 +70,7 @@ pnpm zip        # builds + zips with key + update_url (for GitHub Release)
 pnpm zip:cws    # builds + zips without key + update_url (for CWS upload)
 ```
 
-Then upload `apps/extension/zip/bankr-wallet-vX.Y.Z.zip` to a new GitHub release.
+Then upload `apps/extension/zip/walletchan-vX.Y.Z.zip` to a new GitHub release.
 
 ## GitHub Releases (Sideloading)
 
@@ -78,7 +78,7 @@ GitHub Releases provide a ZIP file for users who want to sideload the extension 
 
 ### How to install from GitHub Release
 
-1. Download `bankr-wallet-vX.Y.Z.zip` from [GitHub Releases](https://github.com/apoorvlathey/walletchan/releases)
+1. Download `walletchan-vX.Y.Z.zip` from [GitHub Releases](https://github.com/apoorvlathey/walletchan/releases)
 2. Extract the zip
 3. Go to `chrome://extensions` → enable Developer mode
 4. Click "Load unpacked" → select the extracted folder
@@ -120,7 +120,7 @@ Reference for if signing key or infrastructure needs to be recreated.
 ### 1. Generate signing key
 
 ```bash
-openssl genrsa -out bankr-wallet.pem 2048
+openssl genrsa -out walletchan.pem 2048
 ```
 
 ### 2. Get extension ID
@@ -131,7 +131,7 @@ Calculate the extension ID from your signing key:
 node -e "
 const crypto = require('crypto');
 const fs = require('fs');
-const pem = fs.readFileSync('bankr-wallet.pem', 'utf8');
+const pem = fs.readFileSync('walletchan.pem', 'utf8');
 const key = crypto.createPrivateKey(pem);
 const pubKey = crypto.createPublicKey(key).export({ type: 'spki', format: 'der' });
 const hash = crypto.createHash('sha256').update(pubKey).digest();
@@ -150,7 +150,7 @@ Extract the public key to set as the `key` field in `manifest.json`:
 node -e "
 const crypto = require('crypto');
 const fs = require('fs');
-const pem = fs.readFileSync('bankr-wallet.pem', 'utf8');
+const pem = fs.readFileSync('walletchan.pem', 'utf8');
 const key = crypto.createPrivateKey(pem);
 const pubKey = crypto.createPublicKey(key).export({ type: 'spki', format: 'der' });
 console.log(pubKey.toString('base64'));
@@ -163,8 +163,8 @@ In the repository settings, add:
 
 - `EXTENSION_SIGNING_KEY`: Base64 encoded .pem file
   ```bash
-  base64 -i bankr-wallet.pem | pbcopy  # macOS
-  base64 -w 0 bankr-wallet.pem         # Linux
+  base64 -i walletchan.pem | pbcopy  # macOS
+  base64 -w 0 walletchan.pem         # Linux
   ```
 
 ### 5. Add website environment variable
@@ -179,7 +179,7 @@ This is the **self-hosted** extension ID (from step 2), since only CRX-installed
 
 ### 6. Secure backup
 
-Store the `bankr-wallet.pem` file in a password manager. This key is the extension's identity for self-hosted distribution — losing it means self-hosted users won't receive updates.
+Store the `walletchan.pem` file in a password manager. This key is the extension's identity for self-hosted distribution — losing it means self-hosted users won't receive updates.
 
 ## Backward Compatibility & Storage Migrations
 

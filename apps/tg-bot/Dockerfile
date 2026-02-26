@@ -9,7 +9,7 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/tg-bot/ apps/tg-bot/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile --filter @bankr-wallet/tg-bot
+RUN pnpm install --frozen-lockfile --filter @walletchan/tg-bot
 
 WORKDIR /app/apps/tg-bot
 

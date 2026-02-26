@@ -9,7 +9,7 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/fee-indexer/ apps/fee-indexer/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile --filter @bankr-wallet/fee-indexer
+RUN pnpm install --frozen-lockfile --filter @walletchan/fee-indexer
 
 WORKDIR /app/apps/fee-indexer
 

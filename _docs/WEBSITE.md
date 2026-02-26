@@ -197,7 +197,7 @@ A funky, bold landing page that showcases WalletChan—the browser extension tha
 
 ---
 
-### 5. $BNKRW Token Section
+### 5. $WCHAN Token Section
 
 **Background**: Blue (`#1040C0`)  
 **Text**: White
@@ -205,7 +205,7 @@ A funky, bold landing page that showcases WalletChan—the browser extension tha
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                 │
-│     $BNKRW                                                      │
+│     $WCHAN                                                      │
 │     ───────                                                     │
 │                                                                 │
 │     THE COMMUNITY TOKEN                                         │
@@ -698,7 +698,7 @@ Option B: Custom styled cards with curated tweet data (requires manual updates)
 
 ### Phase 2: Dynamic Content
 
-- [ ] $BNKRW token section with live chart
+- [ ] $WCHAN token section with live chart
 - [ ] GeckoTerminal API integration
 - [ ] Tweet grid section
 - [ ] Screenshot gallery

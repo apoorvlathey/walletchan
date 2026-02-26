@@ -114,7 +114,7 @@ Timestamp: {unix_timestamp}
 
 ### Structure
 
-- **Public channel** (`@bnkrwpublic`) — announcements, anyone can view
+- **Public channel** (`@wchanpublic`) — announcements, anyone can view
 - **Private group** — token-gated, only verified holders with sufficient sBNKRW stake
 
 ### Posting a Verify Button to the Public Channel
@@ -125,7 +125,7 @@ The bot must be added as an **admin** of the public channel (with "Post Messages
 curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/sendMessage" \
 -H "Content-Type: application/json" \
 -d '{
-  "chat_id": "@bnkrwpublic",
+  "chat_id": "@wchanpublic",
   "text": "Want access to the stakers-only group?\n\nStake and hold at least 20M sBNKRW to join.\n\nhttps://stake.walletchan.com/",
   "reply_markup": {
     "inline_keyboard": [[{"text": "✅ Verify & Join", "url": "https://t.me/WalletChanBot?start=verify"}]]

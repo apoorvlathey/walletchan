@@ -12,7 +12,7 @@ COPY packages/wchan-swap/ packages/wchan-swap/
 COPY apps/arb-bot/ apps/arb-bot/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile --filter @bankr-wallet/arb-bot
+RUN pnpm install --frozen-lockfile --filter @walletchan/arb-bot
 
 WORKDIR /app/apps/arb-bot
 

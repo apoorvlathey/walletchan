@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ["@bankr-wallet/shared"],
+  transpilePackages: ["@walletchan/shared"],
   async redirects() {
     return [
       // Redirect bankrwallet.app subdomains -> walletchan.com subdomains

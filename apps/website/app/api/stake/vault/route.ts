@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   BASE_CHAIN_ID,
   BNKRW_TOKEN_ADDRESS,
-} from "@bankr-wallet/shared/contracts";
+} from "@walletchan/shared/contracts";
 
 const WASABI_API_URL = "https://api.wasabi.xyz";
 
@@ -35,7 +35,7 @@ export async function GET() {
     console.error("Wasabi API error:", error);
     return NextResponse.json(
       { error: "Failed to fetch vault data" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

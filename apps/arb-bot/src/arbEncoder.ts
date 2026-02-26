@@ -1,8 +1,4 @@
-import {
-  encodeFunctionData,
-  type Address,
-  type Hex,
-} from "viem";
+import { encodeFunctionData, type Address, type Hex } from "viem";
 import {
   getAddresses,
   buildPoolKey,
@@ -17,10 +13,10 @@ import {
   encodeV4Swap,
   encodeSweep,
   MSG_SENDER,
-} from "@bankr-wallet/wchan-swap";
+} from "@walletchan/wchan-swap";
 import type { ArbDirection } from "./priceComparison.js";
 import { config } from "./config.js";
-import { applySlippage } from "@bankr-wallet/wchan-swap";
+import { applySlippage } from "@walletchan/wchan-swap";
 
 // OLD_TOKEN pool constants (duplicated for path building)
 const OLD_TOKEN_POOL_FEE = 0x800000;
@@ -56,7 +52,7 @@ export function encodeArbTx(
   amountIn: bigint,
   expectedLeg1Out: bigint,
   expectedLeg2Out: bigint,
-  deadline: bigint
+  deadline: bigint,
 ): ArbTx {
   const addrs = getAddresses(config.chainId);
   const wethIs0Direct = isWethCurrency0(config.chainId);
@@ -76,7 +72,7 @@ export function encodeArbTx(
       config.chainId,
       wethIs0Direct, // WETH→WCHAN: zeroForOne = wethIs0
       amountIn,
-      minLeg1Out
+      minLeg1Out,
     );
 
     // Leg 2: SWAP_EXACT_IN WCHAN→BNKRW→WETH multi-hop (0x07)
@@ -100,7 +96,7 @@ export function encodeArbTx(
         },
       ],
       expectedLeg1Out, // Use expected output as input (will be exact from delta)
-      minWethOut
+      minWethOut,
     );
 
     // TAKE_ALL WETH, TAKE_ALL WCHAN (dust)
@@ -134,7 +130,7 @@ export function encodeArbTx(
         },
       ],
       amountIn,
-      minLeg1Out
+      minLeg1Out,
     );
 
     // Leg 2: SWAP_EXACT_IN_SINGLE WCHAN→WETH on direct (0x06)
@@ -142,7 +138,7 @@ export function encodeArbTx(
       config.chainId,
       !wethIs0Direct, // WCHAN→WETH: zeroForOne = !wethIs0
       expectedLeg1Out,
-      minWethOut
+      minWethOut,
     );
 
     // TAKE_ALL WETH, TAKE_ALL WCHAN (dust)

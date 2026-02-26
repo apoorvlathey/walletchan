@@ -6,7 +6,7 @@ import {
   isWethCurrency0,
   isWethCurrency0ForOldToken,
   quoterAbi,
-} from "@bankr-wallet/wchan-swap";
+} from "@walletchan/wchan-swap";
 import type { ArbDirection } from "./priceComparison.js";
 import { config } from "./config.js";
 import { log } from "./logger.js";
@@ -61,7 +61,7 @@ const templates: Record<
 function encodeQuote(
   pool: typeof directPoolKey,
   zeroForOne: boolean,
-  amount: bigint
+  amount: bigint,
 ): string {
   return encodeFunctionData({
     abi: quoterAbi,
@@ -85,7 +85,7 @@ function encodeQuote(
 
 /** Execute a batch of eth_call requests in a single HTTP request */
 async function batchQuote(
-  calls: Array<{ to: string; data: string }>
+  calls: Array<{ to: string; data: string }>,
 ): Promise<(bigint | null)[]> {
   if (calls.length === 0) return [];
 
@@ -121,7 +121,7 @@ async function batchQuote(
     try {
       const [amountOut] = decodeAbiParameters(
         RETURN_TYPES,
-        r.result as `0x${string}`
+        r.result as `0x${string}`,
       );
       return amountOut;
     } catch {
@@ -151,11 +151,10 @@ function generateCandidates(): bigint[] {
  */
 async function batchSimulateArbs(
   direction: ArbDirection,
-  amounts: bigint[]
+  amounts: bigint[],
 ): Promise<({ leg1Out: bigint; leg2Out: bigint; profit: bigint } | null)[]> {
   const tmpl = templates[direction];
-  const leg2Pool =
-    tmpl.leg2Pool === "direct" ? directPoolKey : bnkrwPoolKey;
+  const leg2Pool = tmpl.leg2Pool === "direct" ? directPoolKey : bnkrwPoolKey;
 
   // Phase 1: Batch all leg1 quotes in a single HTTP request
   const leg1Calls = amounts.map((amount) => ({
@@ -166,9 +165,7 @@ async function batchSimulateArbs(
   const leg1Results = await batchQuote(leg1Calls);
 
   const leg1Successes = leg1Results.filter((r) => r !== null).length;
-  log.debug(
-    `Leg1 results: ${leg1Successes}/${amounts.length} succeeded`
-  );
+  log.debug(`Leg1 results: ${leg1Successes}/${amounts.length} succeeded`);
 
   // Phase 2: Build leg2 calls only for successful leg1 results
   const leg2Indices: number[] = [];
@@ -185,17 +182,17 @@ async function batchSimulateArbs(
     }
   }
 
-  const leg2Results =
-    leg2Calls.length > 0 ? await batchQuote(leg2Calls) : [];
+  const leg2Results = leg2Calls.length > 0 ? await batchQuote(leg2Calls) : [];
 
   const leg2Successes = leg2Results.filter((r) => r !== null).length;
-  log.debug(
-    `Leg2 results: ${leg2Successes}/${leg2Calls.length} succeeded`
-  );
+  log.debug(`Leg2 results: ${leg2Successes}/${leg2Calls.length} succeeded`);
 
   // Assemble results
-  const results: ({ leg1Out: bigint; leg2Out: bigint; profit: bigint } | null)[] =
-    new Array(amounts.length).fill(null);
+  const results: ({
+    leg1Out: bigint;
+    leg2Out: bigint;
+    profit: bigint;
+  } | null)[] = new Array(amounts.length).fill(null);
 
   for (let j = 0; j < leg2Indices.length; j++) {
     const i = leg2Indices[j];
@@ -221,7 +218,7 @@ async function batchSimulateArbs(
  * Ternary phase: 2 HTTP requests per iteration (both candidates batched)
  */
 export async function findOptimalArb(
-  direction: ArbDirection
+  direction: ArbDirection,
 ): Promise<ArbResult | null> {
   const candidates = generateCandidates();
 
@@ -246,22 +243,21 @@ export async function findOptimalArb(
       .map((r, i) =>
         r
           ? `${formatEther(candidates[i])}ETH→profit:${formatEther(r.profit)}`
-          : `${formatEther(candidates[i])}ETH→null`
+          : `${formatEther(candidates[i])}ETH→null`,
       )
       .join(", ");
     log.info(
-      `No profitable candidate in coarse search. Samples: [${sampleProfits}]`
+      `No profitable candidate in coarse search. Samples: [${sampleProfits}]`,
     );
     return null;
   }
 
   log.debug(
-    `Coarse best: index=${bestIdx} amount=${candidates[bestIdx]} profit=${bestProfit}`
+    `Coarse best: index=${bestIdx} amount=${candidates[bestIdx]} profit=${bestProfit}`,
   );
 
   // Ternary refinement around the best candidate
-  let lo =
-    bestIdx > 0 ? candidates[bestIdx - 1] : candidates[bestIdx] / 2n;
+  let lo = bestIdx > 0 ? candidates[bestIdx - 1] : candidates[bestIdx] / 2n;
   let hi =
     bestIdx < candidates.length - 1
       ? candidates[bestIdx + 1]

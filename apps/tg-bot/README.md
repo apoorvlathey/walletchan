@@ -15,8 +15,8 @@ docker run --name bankr-tg-db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=bankr
 pnpm install
 
 # 4. Generate and run migrations
-pnpm --filter @bankr-wallet/tg-bot db:generate
-pnpm --filter @bankr-wallet/tg-bot db:migrate
+pnpm --filter @walletchan/tg-bot db:generate
+pnpm --filter @walletchan/tg-bot db:migrate
 
 # 5. Start bot
 pnpm dev:tg-bot
@@ -31,7 +31,7 @@ This is a pnpm monorepo with workspace dependencies, so Railway needs a **Docker
 ### 1. Create project
 
 - Go to [railway.app](https://railway.app) → New Project
-- Select "Deploy from GitHub repo" → pick the `bankr-wallet` monorepo
+- Select "Deploy from GitHub repo" → pick the `walletchan` monorepo
 - **Do NOT set** Root Directory, Build Command, or Start Command — `railway.toml` handles everything
 
 ### 2. Add PostgreSQL

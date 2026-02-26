@@ -1,5 +1,5 @@
 {
-  "name": "@bankr-wallet/tg-bot",
+  "name": "@walletchan/tg-bot",
   "version": "1.0.0",
   "private": true,
   "type": "module",

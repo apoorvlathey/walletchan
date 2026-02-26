@@ -5,4 +5,4 @@ export type {
   PoolKey,
   WchanQuote,
   SwapConfig,
-} from "@bankr-wallet/wchan-swap";
+} from "@walletchan/wchan-swap";

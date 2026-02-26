@@ -1,5 +1,5 @@
 {
-  "name": "@bankr-wallet/indexer",
+  "name": "@walletchan/indexer",
   "version": "1.0.0",
   "private": true,
   "type": "module",

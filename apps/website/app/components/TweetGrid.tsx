@@ -80,7 +80,7 @@ export function TweetGrid() {
             variant="outline"
             size="lg"
             as="a"
-            href="https://x.com/search?q=%24BNKRW&src=cashtag_click"
+            href="https://x.com/search?q=%24WCHAN&src=cashtag_click"
             target="_blank"
             rightIcon={<ExternalLink size={18} />}
           >

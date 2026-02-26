@@ -4,4 +4,4 @@ export {
   buildPoolKey,
   buildOldTokenPoolKey,
   buildWrapPoolKey,
-} from "@bankr-wallet/wchan-swap";
+} from "@walletchan/wchan-swap";

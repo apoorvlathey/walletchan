@@ -34,7 +34,7 @@ src/
 └── gasEstimation.ts    # Gas limit + fee estimation with buffers
 ```
 
-Shared swap logic lives in `@bankr-wallet/wchan-swap` (workspace package at `packages/wchan-swap/`).
+Shared swap logic lives in `@walletchan/wchan-swap` (workspace package at `packages/wchan-swap/`).
 
 ---
 
@@ -261,18 +261,18 @@ index.ts
 ├── logger.ts
 ├── poolState.ts                 (reads on-chain state via raw fetch)
 │   ├── config.ts
-│   └── @bankr-wallet/wchan-swap (addresses, pool keys)
+│   └── @walletchan/wchan-swap (addresses, pool keys)
 ├── priceComparison.ts           (detects arb direction)
 │   └── poolState.ts (types)
 ├── arbSearch.ts                 (finds optimal amount via batched quotes)
 │   ├── config.ts
 │   ├── logger.ts
 │   ├── priceComparison.ts (types)
-│   └── @bankr-wallet/wchan-swap (quoter, pool keys)
+│   └── @walletchan/wchan-swap (quoter, pool keys)
 ├── arbEncoder.ts                (encodes atomic swap)
 │   ├── config.ts
 │   ├── priceComparison.ts (types)
-│   └── @bankr-wallet/wchan-swap (router encoding helpers)
+│   └── @walletchan/wchan-swap (router encoding helpers)
 └── gasEstimation.ts             (estimates tx cost via raw fetch batch)
     ├── config.ts
     └── logger.ts

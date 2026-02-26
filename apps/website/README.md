@@ -43,7 +43,7 @@ The website uses the Bauhaus design system defined in [STYLING.md](../../STYLING
 - **Components**: Hard shadows, thick borders, geometric shapes
 - **No rounded corners** (except circles)
 
-Shared design tokens are imported from `@bankr-wallet/shared`.
+Shared design tokens are imported from `@walletchan/shared`.
 
 ## Deployment
 
