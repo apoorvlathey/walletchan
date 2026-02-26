@@ -1,5 +1,5 @@
 /**
- * @bankr-wallet/shared
+ * @walletchan/shared
  *
  * Shared design tokens and assets for WalletChan
  */

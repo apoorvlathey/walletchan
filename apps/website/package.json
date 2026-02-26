@@ -1,5 +1,5 @@
 {
-  "name": "@bankr-wallet/website",
+  "name": "@walletchan/website",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,8 +10,8 @@
     "fetch-dapps": "tsx scripts/fetchSafeDapps.ts"
   },
   "dependencies": {
-    "@bankr-wallet/shared": "workspace:*",
-    "@bankr-wallet/wchan-swap": "workspace:*",
+    "@walletchan/shared": "workspace:*",
+    "@walletchan/wchan-swap": "workspace:*",
     "@chakra-ui/next-js": "^2.4.2",
     "@chakra-ui/react": "^2.9.4",
     "@emotion/react": "^11.13.3",

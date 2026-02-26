@@ -4,7 +4,7 @@ import {
   bauhausShadows,
   bauhausFonts,
   bauhausFontWeights,
-} from "@bankr-wallet/shared";
+} from "@walletchan/shared";
 
 /**
  * Bauhaus Design System Theme for WalletChan Website

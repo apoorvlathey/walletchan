@@ -1,5 +1,5 @@
 import { createConfig } from "ponder";
-import { SBNKRW_VAULT_ADDRESS } from "@bankr-wallet/shared/contracts";
+import { SBNKRW_VAULT_ADDRESS } from "@walletchan/shared/contracts";
 import { ERC4626VaultAbi } from "./abis/ERC4626VaultAbi";
 
 export default createConfig({

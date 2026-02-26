@@ -55,7 +55,7 @@ Browser wallet extension + landing page website in a pnpm workspace monorepo.
 ## Monorepo Structure
 
 ```
-bankr-wallet/
+walletchan/
 ├── apps/
 │   ├── extension/        # Browser extension (Vite + React + Chakra UI)
 │   ├── website/          # Landing page (Next.js + Chakra UI)
@@ -213,7 +213,7 @@ When working on features, refer to these docs:
 - **Per-tab chain state**: Each browser tab maintains its own selected chain
 - **Transaction persistence**: Pending transactions survive popup close (stored in chrome.storage.local)
 - **EIP-6963**: Modern wallet discovery alongside legacy window.ethereum
-- **Shared contract constants**: `packages/shared/src/contracts.ts` is the single source of truth for `BASE_CHAIN_ID`, `BNKRW_TOKEN_ADDRESS`, `SBNKRW_VAULT_ADDRESS`, `BNKRW_POOL_ADDRESS`. Import via `@bankr-wallet/shared/contracts`.
+- **Shared contract constants**: `packages/shared/src/contracts.ts` is the single source of truth for `BASE_CHAIN_ID`, `BNKRW_TOKEN_ADDRESS`, `SBNKRW_VAULT_ADDRESS`, `BNKRW_POOL_ADDRESS`. Import via `@walletchan/shared/contracts`.
 - **Address display standard**: Whenever a `0x` address is shown in the UI, always include a **copy button** (CopyIcon/CheckIcon toggle) and a **view on explorer** link (ExternalLinkIcon, opens `${chainConfig.explorer}/address/${addr}`). See `TypedDataDisplay.tsx` `AddressValue` component for the reference pattern.
 
 ## Code Quality Guidelines

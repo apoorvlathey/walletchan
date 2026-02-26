@@ -3,5 +3,5 @@ export {
   getErc20AllowanceToPermit2,
   buildPermitSingle,
   getPermitTypedData,
-} from "@bankr-wallet/wchan-swap";
-export type { PermitSingleData } from "@bankr-wallet/wchan-swap";
+} from "@walletchan/wchan-swap";
+export type { PermitSingleData } from "@walletchan/wchan-swap";

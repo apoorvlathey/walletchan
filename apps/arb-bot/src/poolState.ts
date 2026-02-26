@@ -10,7 +10,7 @@ import {
   buildPoolKey,
   buildOldTokenPoolKey,
   type PoolKey,
-} from "@bankr-wallet/wchan-swap";
+} from "@walletchan/wchan-swap";
 import { config } from "./config.js";
 
 // PoolManager storage: mapping(PoolId => Pool.State) at slot 6
@@ -54,8 +54,8 @@ function encodePoolId(poolKey: PoolKey): Hex {
         poolKey.fee,
         poolKey.tickSpacing,
         poolKey.hooks,
-      ]
-    )
+      ],
+    ),
   );
 }
 
@@ -63,8 +63,8 @@ function getSlot0Key(poolId: Hex): Hex {
   return keccak256(
     encodeAbiParameters(
       [{ type: "bytes32" }, { type: "uint256" }],
-      [poolId, POOLS_SLOT]
-    )
+      [poolId, POOLS_SLOT],
+    ),
   );
 }
 
@@ -109,19 +109,13 @@ export async function readPoolStates(): Promise<PoolStates> {
       jsonrpc: "2.0",
       id: 1,
       method: "eth_call",
-      params: [
-        { to: addrs.poolManager, data: directExtsloadData },
-        "latest",
-      ],
+      params: [{ to: addrs.poolManager, data: directExtsloadData }, "latest"],
     },
     {
       jsonrpc: "2.0",
       id: 2,
       method: "eth_call",
-      params: [
-        { to: addrs.poolManager, data: bnkrwExtsloadData },
-        "latest",
-      ],
+      params: [{ to: addrs.poolManager, data: bnkrwExtsloadData }, "latest"],
     },
   ];
 

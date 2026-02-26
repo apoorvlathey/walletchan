@@ -1,5 +1,5 @@
 {
-  "name": "@bankr-wallet/arb-bot",
+  "name": "@walletchan/arb-bot",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -8,7 +8,7 @@
     "start": "tsx src/index.ts"
   },
   "dependencies": {
-    "@bankr-wallet/wchan-swap": "workspace:*",
+    "@walletchan/wchan-swap": "workspace:*",
     "tsx": "^4.19.0",
     "viem": "^2.30.4"
   },

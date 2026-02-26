@@ -1,1 +1,5 @@
-export { quoterAbi, universalRouterAbi, permit2Abi } from "@bankr-wallet/wchan-swap";
+export {
+  quoterAbi,
+  universalRouterAbi,
+  permit2Abi,
+} from "@walletchan/wchan-swap";

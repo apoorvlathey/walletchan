@@ -1,6 +1,2 @@
-export {
-  getAddresses,
-  isChainLive,
-  ADDRESSES,
-} from "@bankr-wallet/wchan-swap";
-export type { SupportedChainId } from "@bankr-wallet/wchan-swap";
+export { getAddresses, isChainLive, ADDRESSES } from "@walletchan/wchan-swap";
+export type { SupportedChainId } from "@walletchan/wchan-swap";

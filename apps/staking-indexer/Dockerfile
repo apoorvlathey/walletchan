@@ -12,7 +12,7 @@ COPY packages/shared/ packages/shared/
 COPY apps/staking-indexer/ apps/staking-indexer/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile --filter @bankr-wallet/staking-indexer
+RUN pnpm install --frozen-lockfile --filter @walletchan/staking-indexer
 
 WORKDIR /app/apps/staking-indexer
 

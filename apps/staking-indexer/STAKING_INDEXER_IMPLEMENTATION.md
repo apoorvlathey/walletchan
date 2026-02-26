@@ -18,6 +18,7 @@ Deposit/Withdraw events alone miss direct sBNKRW token transfers between users. 
 ### Separate App
 
 This is a standalone indexer (`apps/staking-indexer/`) rather than an addition to `apps/indexer/`. Reasons:
+
 - Independent reindexing without affecting coin launch indexer
 - Separate scaling and deployment
 - Different RPC usage patterns (vault events are low-volume)
@@ -44,43 +45,49 @@ apps/staking-indexer/
 ## Schema
 
 ### `vault_event`
+
 Stores every Deposit and Withdraw event with full context.
 
-| Column          | Type    | Description                              |
-| --------------- | ------- | ---------------------------------------- |
-| id              | text PK | `{txHash}-{logIndex}`                    |
-| eventType       | text    | `"deposit"` or `"withdraw"`              |
-| sender          | hex     | Address that initiated the tx            |
-| owner           | hex     | Address that owns the deposited shares   |
-| receiver        | hex     | Withdraw receiver (null for deposits)    |
-| assets          | bigint  | Underlying token amount                  |
-| shares          | bigint  | Vault share amount                       |
-| blockNumber     | bigint  |                                          |
-| timestamp       | bigint  |                                          |
-| transactionHash | hex     |                                          |
+| Column          | Type    | Description                            |
+| --------------- | ------- | -------------------------------------- |
+| id              | text PK | `{txHash}-{logIndex}`                  |
+| eventType       | text    | `"deposit"` or `"withdraw"`            |
+| sender          | hex     | Address that initiated the tx          |
+| owner           | hex     | Address that owns the deposited shares |
+| receiver        | hex     | Withdraw receiver (null for deposits)  |
+| assets          | bigint  | Underlying token amount                |
+| shares          | bigint  | Vault share amount                     |
+| blockNumber     | bigint  |                                        |
+| timestamp       | bigint  |                                        |
+| transactionHash | hex     |                                        |
 
 Indexes: `owner`, `timestamp`, `eventType`
 
 ### `user_balance`
+
 Current staked balance per user, updated on every Transfer event.
 
-| Column               | Type    | Description                        |
-| -------------------- | ------- | ---------------------------------- |
-| id                   | text PK | Lowercased address                 |
-| shares               | bigint  | Current vault share balance        |
-| lastUpdatedBlock     | bigint  | Block of last balance change       |
-| lastUpdatedTimestamp  | bigint  | Timestamp of last balance change   |
+| Column               | Type    | Description                      |
+| -------------------- | ------- | -------------------------------- |
+| id                   | text PK | Lowercased address               |
+| shares               | bigint  | Current vault share balance      |
+| lastUpdatedBlock     | bigint  | Block of last balance change     |
+| lastUpdatedTimestamp | bigint  | Timestamp of last balance change |
 
 ## Event Handlers
 
 ### `sBNKRWVault:Deposit`
+
 Inserts a `vault_event` row with `eventType: "deposit"`. Uses `onConflictDoNothing` for idempotency.
 
 ### `sBNKRWVault:Withdraw`
+
 Inserts a `vault_event` row with `eventType: "withdraw"`. Uses `onConflictDoNothing` for idempotency.
 
 ### `sBNKRWVault:Transfer`
+
 Updates `user_balance` for both sides of the transfer:
+
 - **From address** (skip if `0x0` mint): decrement shares
 - **To address** (skip if `0x0` burn): increment shares
 
@@ -90,14 +97,14 @@ Uses read-then-upsert pattern (`find` → `insert`/`onConflictDoUpdate`). Ponder
 
 Port: **42070** (coin launch indexer uses 42069)
 
-| Endpoint              | Method | Description                                           |
-| --------------------- | ------ | ----------------------------------------------------- |
-| `/balances/:address`  | GET    | Single user's staked balance (returns `shares: "0"` if unknown) |
-| `/balances`           | GET    | All users with non-zero balance, paginated, ordered by shares desc |
-| `/events/:address`    | GET    | User's deposit/withdraw history                       |
-| `/events`             | GET    | All deposit/withdraw events, optional `?type=deposit\|withdraw` filter |
-| `/stats`              | GET    | Unique stakers count, total shares, total events      |
-| `/graphql`            | POST   | Auto-generated GraphQL from schema                    |
+| Endpoint             | Method | Description                                                            |
+| -------------------- | ------ | ---------------------------------------------------------------------- |
+| `/balances/:address` | GET    | Single user's staked balance (returns `shares: "0"` if unknown)        |
+| `/balances`          | GET    | All users with non-zero balance, paginated, ordered by shares desc     |
+| `/events/:address`   | GET    | User's deposit/withdraw history                                        |
+| `/events`            | GET    | All deposit/withdraw events, optional `?type=deposit\|withdraw` filter |
+| `/stats`             | GET    | Unique stakers count, total shares, total events                       |
+| `/graphql`           | POST   | Auto-generated GraphQL from schema                                     |
 
 ### Query Parameters
 
@@ -114,7 +121,7 @@ All BigInt values are serialized as strings (via `replaceBigInts` helper).
 Contract addresses are centralized in `packages/shared/src/contracts.ts`:
 
 ```typescript
-import { SBNKRW_VAULT_ADDRESS } from "@bankr-wallet/shared/contracts";
+import { SBNKRW_VAULT_ADDRESS } from "@walletchan/shared/contracts";
 ```
 
 This is the single source of truth shared between the indexer, the website staking page, and the API routes.
@@ -133,18 +140,21 @@ pnpm start:staking-indexer
 
 Copy `.env.example` to `.env.local`:
 
-| Variable             | Required | Description                                |
-| -------------------- | -------- | ------------------------------------------ |
-| `PONDER_RPC_URL_8453`| Yes      | Base RPC URL (same as coin launch indexer)  |
-| `DATABASE_URL`       | No       | PostgreSQL URL (uses PGlite locally)       |
+| Variable              | Required | Description                                |
+| --------------------- | -------- | ------------------------------------------ |
+| `PONDER_RPC_URL_8453` | Yes      | Base RPC URL (same as coin launch indexer) |
+| `DATABASE_URL`        | No       | PostgreSQL URL (uses PGlite locally)       |
 
 ## Use Cases
 
 ### Token-Gating Bot
+
 Query `/balances` to get all stakers ordered by shares. Compare against threshold to determine eligibility. Poll periodically or build a webhook on top.
 
 ### User Staking Dashboard
+
 Query `/balances/:address` for current balance, `/events/:address` for transaction history.
 
 ### Analytics
+
 Query `/stats` for aggregate metrics.

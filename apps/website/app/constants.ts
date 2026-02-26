@@ -1,7 +1,7 @@
 import {
   WCHAN_TOKEN_ADDRESS,
   WCHAN_POOL_ID,
-} from "@bankr-wallet/shared/contracts";
+} from "@walletchan/shared/contracts";
 
 export const TOKEN_ADDRESS = WCHAN_TOKEN_ADDRESS;
 export const POOL_ADDRESS = WCHAN_POOL_ID;

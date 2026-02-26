@@ -3,4 +3,4 @@ export {
   encodeSellWchan,
   encodeBuyWchanViaBnkrw,
   encodeSellWchanViaBnkrw,
-} from "@bankr-wallet/wchan-swap";
+} from "@walletchan/wchan-swap";

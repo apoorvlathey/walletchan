@@ -32,8 +32,8 @@ walletchan/
 3. Load the extension in your browser:
    - Chrome/Brave/Arc: Go to `chrome://extensions`, enable Developer mode, click "Load unpacked", select `apps/extension/build/`
    - Or use the scripts:
-     - Chrome: `pnpm --filter @bankr-wallet/extension chrome:run`
-     - Firefox: `pnpm --filter @bankr-wallet/extension firefox:run`
+     - Chrome: `pnpm --filter @walletchan/extension chrome:run`
+     - Firefox: `pnpm --filter @walletchan/extension firefox:run`
 
 ## Running the website in development mode
 
