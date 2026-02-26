@@ -28,6 +28,7 @@ import { formatUnits } from "viem";
 import { Navigation } from "../components/Navigation";
 import { ADDRESSES } from "@/lib/wchan-swap/addresses";
 import { useTokenData } from "../contexts/TokenDataContext";
+import ClaimHistory from "./ClaimHistory";
 
 const BASE_CHAIN_ID = 8453;
 const HOOK_ADDRESS = ADDRESSES[BASE_CHAIN_ID].hook as `0x${string}`;
@@ -83,6 +84,7 @@ const CLANKER_FEE_ABI = [
 const ETH_PRICE_POLL_MS = 30_000; // 30s
 const FEES_POLL_MS = 5_000; // 5s
 
+
 function formatEth(wei: bigint | undefined): string {
   if (!wei) return "0";
   const eth = formatUnits(wei, 18);
@@ -108,6 +110,9 @@ export default function AdminContent() {
   const [ethPriceLoading, setEthPriceLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { tokenData } = useTokenData();
+
+  // refreshKey incremented after claims confirm to trigger ClaimHistory refetch
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   // Chain detection
   const { isConnected: isWalletConnected } = useAccount();
@@ -176,6 +181,7 @@ export default function AdminContent() {
       const timeout = setTimeout(() => {
         refetchFees();
         fetchEthPrice();
+        setHistoryRefreshKey((k) => k + 1);
       }, 2000);
       return () => clearTimeout(timeout);
     }
@@ -254,7 +260,10 @@ export default function AdminContent() {
         isClosable: true,
         position: "bottom-right",
       });
-      const timeout = setTimeout(() => refetchClankerWeth(), 2000);
+      const timeout = setTimeout(() => {
+        refetchClankerWeth();
+        setHistoryRefreshKey((k) => k + 1);
+      }, 2000);
       return () => clearTimeout(timeout);
     }
   }, [isClankerWethConfirmed, clankerWethTxHash, refetchClankerWeth, toast]);
@@ -277,7 +286,10 @@ export default function AdminContent() {
         isClosable: true,
         position: "bottom-right",
       });
-      const timeout = setTimeout(() => refetchClankerBnkrw(), 2000);
+      const timeout = setTimeout(() => {
+        refetchClankerBnkrw();
+        setHistoryRefreshKey((k) => k + 1);
+      }, 2000);
       return () => clearTimeout(timeout);
     }
   }, [isClankerBnkrwConfirmed, clankerBnkrwTxHash, refetchClankerBnkrw, toast]);
@@ -755,6 +767,12 @@ export default function AdminContent() {
               </HStack>
             </Box>
           </Box>
+          {/* Historical Claims */}
+          <ClaimHistory
+            ethPrice={ethPrice}
+            bnkrwPrice={bnkrwPrice}
+            refreshKey={historyRefreshKey}
+          />
         </VStack>
       </Container>
     </Box>
