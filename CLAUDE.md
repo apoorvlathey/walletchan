@@ -329,6 +329,22 @@ export default function MyPage() {
 
 **Note**: Pages that only import child components using wagmi (like `swap/page.tsx` importing `SwapCard`) don't need this — only pages that directly use wagmi hooks in the page file itself.
 
+### Adding New Website Subdomains
+
+When adding a new page that should be accessible via a subdomain (e.g., `foo.walletchan.com`), you must update **three things** in `apps/website/next.config.js`:
+
+1. **Add a `beforeFiles` rewrite** to map the subdomain to the route:
+   ```js
+   { source: "/:path((?!_next|api|images|og|screenshots).*)", has: [{ type: "host", value: "foo.walletchan.com" }], destination: "/foo/:path*" }
+   ```
+2. **Add a redirect** from the old `bankrwallet.app` subdomain:
+   ```js
+   { source: "/:path*", has: [{ type: "host", value: "foo.bankrwallet.app" }], destination: "https://foo.walletchan.com/:path*", permanent: true }
+   ```
+3. **Add the subdomain in Vercel** project domain settings.
+
+**Existing subdomains**: `coins`, `stake`, `migrate`
+
 ## Railway Deployment (pnpm Monorepo)
 
 Railway's default Nixpacks builder does NOT work for this pnpm monorepo with `workspace:*` dependencies. Always use a **Dockerfile** + **`railway.toml`**.
