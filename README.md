@@ -38,7 +38,7 @@
 ### Download
 
 1. Go to the [latest release](https://github.com/apoorvlathey/walletchan/releases/latest) on GitHub
-2. Download the `walletchan-vX.Y.Z.zip` file from the release assets (e.g., `walletchan-v1.4.0.zip`)
+2. Download the `walletchan-vX.Y.Z.zip` file from the release assets (e.g., `walletchan-v2.0.0.zip`)
 3. Extract the zip file to a folder on your computer
 
 ### Chrome / Brave / Arc
