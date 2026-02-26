@@ -20,7 +20,13 @@ import type { Account, SeedGroup } from "@/chrome/types";
 import { useEnsIdentities } from "@/hooks/useEnsIdentities";
 
 // Blockies avatar for PK accounts using blo
-function BlockieAvatar({ address, size = 20 }: { address: string; size?: number }) {
+function BlockieAvatar({
+  address,
+  size = 20,
+}: {
+  address: string;
+  size?: number;
+}) {
   const bloAvatar = blo(address as `0x${string}`);
   return (
     <Image
@@ -35,11 +41,11 @@ function BlockieAvatar({ address, size = 20 }: { address: string; size?: number 
   );
 }
 
-// BankrWallet icon for Bankr API accounts
+// Bankr icon for Bankr API accounts
 function BankrAvatar({ size = 20 }: { size?: number }) {
   return (
     <Image
-      src="/bankrwallet-icon.png"
+      src="/bankr-icon.png"
       alt="Bankr account"
       w={`${size}px`}
       h={`${size}px`}
@@ -96,7 +102,10 @@ function truncateAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-function getSeedLabel(account: Account, seedGroupMap: Map<string, string>): string | null {
+function getSeedLabel(
+  account: Account,
+  seedGroupMap: Map<string, string>,
+): string | null {
   if (account.type !== "seedPhrase") return null;
   const groupName = seedGroupMap.get(account.seedGroupId) || "Seed";
   return `${groupName} · #${account.derivationIndex}`;
@@ -109,19 +118,27 @@ function AccountSwitcher({
   onAddAccount,
   onAccountSettings,
 }: AccountSwitcherProps) {
-  const [seedGroupMap, setSeedGroupMap] = useState<Map<string, string>>(new Map());
+  const [seedGroupMap, setSeedGroupMap] = useState<Map<string, string>>(
+    new Map(),
+  );
 
-  const accountAddresses = useMemo(() => accounts.map((a) => a.address), [accounts]);
+  const accountAddresses = useMemo(
+    () => accounts.map((a) => a.address),
+    [accounts],
+  );
   const { identities } = useEnsIdentities(accountAddresses);
 
   useEffect(() => {
     const hasSeedAccounts = accounts.some((a) => a.type === "seedPhrase");
     if (!hasSeedAccounts) return;
-    chrome.runtime.sendMessage({ type: "getSeedGroups" }, (groups: SeedGroup[] | null) => {
-      if (groups) {
-        setSeedGroupMap(new Map(groups.map((g) => [g.id, g.name])));
-      }
-    });
+    chrome.runtime.sendMessage(
+      { type: "getSeedGroups" },
+      (groups: SeedGroup[] | null) => {
+        if (groups) {
+          setSeedGroupMap(new Map(groups.map((g) => [g.id, g.name])));
+        }
+      },
+    );
   }, [accounts]);
 
   // Get display name with priority: displayName > ENS name > truncated address
@@ -184,42 +201,134 @@ function AccountSwitcher({
         />
         {activeAccount ? (
           <HStack spacing={2} minW={0} flex={1}>
-            <AccountAvatar account={activeAccount} ensAvatar={getEnsAvatar(activeAccount)} size={24} />
+            <AccountAvatar
+              account={activeAccount}
+              ensAvatar={getEnsAvatar(activeAccount)}
+              size={24}
+            />
             <VStack align="start" spacing={0} minW={0} flex={1}>
-              <Text fontSize="sm" color="text.primary" fontWeight="700" noOfLines={1}>
+              <Text
+                fontSize="sm"
+                color="text.primary"
+                fontWeight="700"
+                noOfLines={1}
+              >
                 {getAccountDisplayName(activeAccount)}
               </Text>
               {hasResolvedName(activeAccount) && (
-                <Text fontSize="xs" color="text.tertiary" fontFamily="mono" noOfLines={1}>
+                <Text
+                  fontSize="xs"
+                  color="text.tertiary"
+                  fontFamily="mono"
+                  noOfLines={1}
+                >
                   {truncateAddress(activeAccount.address)}
                 </Text>
               )}
               <HStack spacing={1} flexWrap="wrap">
                 {activeAccount.displayName && getEnsName(activeAccount) && (
-                  <Box bg="gray.600" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                    <Text fontSize="8px" color="white" fontWeight="800" letterSpacing="wide" noOfLines={1}>{getEnsName(activeAccount)}</Text>
+                  <Box
+                    bg="gray.600"
+                    px={1.5}
+                    py={0}
+                    borderRadius="sm"
+                    border="1px solid"
+                    borderColor="bauhaus.black"
+                    mt={0.5}
+                  >
+                    <Text
+                      fontSize="8px"
+                      color="white"
+                      fontWeight="800"
+                      letterSpacing="wide"
+                      noOfLines={1}
+                    >
+                      {getEnsName(activeAccount)}
+                    </Text>
                   </Box>
                 )}
                 {activeAccount.type === "bankr" && (
-                  <Box bg="bauhaus.blue" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Bankr</Text>
+                  <Box
+                    bg="bauhaus.blue"
+                    px={1.5}
+                    py={0}
+                    borderRadius="sm"
+                    border="1px solid"
+                    borderColor="bauhaus.black"
+                    mt={0.5}
+                  >
+                    <Text
+                      fontSize="8px"
+                      color="white"
+                      fontWeight="800"
+                      textTransform="uppercase"
+                      letterSpacing="wide"
+                    >
+                      Bankr
+                    </Text>
                   </Box>
                 )}
                 {activeAccount.type === "privateKey" && (
-                  <Box bg="bauhaus.yellow" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                    <Text fontSize="8px" color="bauhaus.black" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Private Key</Text>
+                  <Box
+                    bg="bauhaus.yellow"
+                    px={1.5}
+                    py={0}
+                    borderRadius="sm"
+                    border="1px solid"
+                    borderColor="bauhaus.black"
+                    mt={0.5}
+                  >
+                    <Text
+                      fontSize="8px"
+                      color="bauhaus.black"
+                      fontWeight="800"
+                      textTransform="uppercase"
+                      letterSpacing="wide"
+                    >
+                      Private Key
+                    </Text>
                   </Box>
                 )}
                 {activeAccount.type === "seedPhrase" && (
-                  <Box bg="bauhaus.red" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
+                  <Box
+                    bg="bauhaus.red"
+                    px={1.5}
+                    py={0}
+                    borderRadius="sm"
+                    border="1px solid"
+                    borderColor="bauhaus.black"
+                    mt={0.5}
+                  >
+                    <Text
+                      fontSize="8px"
+                      color="white"
+                      fontWeight="800"
+                      textTransform="uppercase"
+                      letterSpacing="wide"
+                    >
                       {getSeedLabel(activeAccount, seedGroupMap) || "Seed"}
                     </Text>
                   </Box>
                 )}
                 {activeAccount.type === "impersonator" && (
-                  <Box bg="bauhaus.green" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                    <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">View Only</Text>
+                  <Box
+                    bg="bauhaus.green"
+                    px={1.5}
+                    py={0}
+                    borderRadius="sm"
+                    border="1px solid"
+                    borderColor="bauhaus.black"
+                    mt={0.5}
+                  >
+                    <Text
+                      fontSize="8px"
+                      color="white"
+                      fontWeight="800"
+                      textTransform="uppercase"
+                      letterSpacing="wide"
+                    >
+                      View Only
+                    </Text>
                   </Box>
                 )}
               </HStack>
@@ -250,9 +359,18 @@ function AccountSwitcher({
             onClick={() => onAccountSelect(account)}
           >
             <HStack spacing={3} w="full">
-              <AccountAvatar account={account} ensAvatar={getEnsAvatar(account)} size={24} />
+              <AccountAvatar
+                account={account}
+                ensAvatar={getEnsAvatar(account)}
+                size={24}
+              />
               <VStack align="start" spacing={0} flex={1} minW={0}>
-                <Text fontSize="sm" color="text.primary" fontWeight="700" noOfLines={1}>
+                <Text
+                  fontSize="sm"
+                  color="text.primary"
+                  fontWeight="700"
+                  noOfLines={1}
+                >
                   {getAccountDisplayName(account)}
                 </Text>
                 {hasResolvedName(account) && (
@@ -262,30 +380,108 @@ function AccountSwitcher({
                 )}
                 <HStack spacing={1} flexWrap="wrap">
                   {account.displayName && getEnsName(account) && (
-                    <Box bg="gray.600" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                      <Text fontSize="8px" color="white" fontWeight="800" letterSpacing="wide" noOfLines={1}>{getEnsName(account)}</Text>
+                    <Box
+                      bg="gray.600"
+                      px={1.5}
+                      py={0}
+                      borderRadius="sm"
+                      border="1px solid"
+                      borderColor="bauhaus.black"
+                      mt={0.5}
+                    >
+                      <Text
+                        fontSize="8px"
+                        color="white"
+                        fontWeight="800"
+                        letterSpacing="wide"
+                        noOfLines={1}
+                      >
+                        {getEnsName(account)}
+                      </Text>
                     </Box>
                   )}
                   {account.type === "bankr" && (
-                    <Box bg="bauhaus.blue" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                      <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Bankr</Text>
+                    <Box
+                      bg="bauhaus.blue"
+                      px={1.5}
+                      py={0}
+                      borderRadius="sm"
+                      border="1px solid"
+                      borderColor="bauhaus.black"
+                      mt={0.5}
+                    >
+                      <Text
+                        fontSize="8px"
+                        color="white"
+                        fontWeight="800"
+                        textTransform="uppercase"
+                        letterSpacing="wide"
+                      >
+                        Bankr
+                      </Text>
                     </Box>
                   )}
                   {account.type === "privateKey" && (
-                    <Box bg="bauhaus.yellow" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                      <Text fontSize="8px" color="bauhaus.black" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Private Key</Text>
+                    <Box
+                      bg="bauhaus.yellow"
+                      px={1.5}
+                      py={0}
+                      borderRadius="sm"
+                      border="1px solid"
+                      borderColor="bauhaus.black"
+                      mt={0.5}
+                    >
+                      <Text
+                        fontSize="8px"
+                        color="bauhaus.black"
+                        fontWeight="800"
+                        textTransform="uppercase"
+                        letterSpacing="wide"
+                      >
+                        Private Key
+                      </Text>
                     </Box>
                   )}
                   {account.type === "seedPhrase" && (
-                    <Box bg="bauhaus.red" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                      <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
+                    <Box
+                      bg="bauhaus.red"
+                      px={1.5}
+                      py={0}
+                      borderRadius="sm"
+                      border="1px solid"
+                      borderColor="bauhaus.black"
+                      mt={0.5}
+                    >
+                      <Text
+                        fontSize="8px"
+                        color="white"
+                        fontWeight="800"
+                        textTransform="uppercase"
+                        letterSpacing="wide"
+                      >
                         {getSeedLabel(account, seedGroupMap) || "Seed"}
                       </Text>
                     </Box>
                   )}
                   {account.type === "impersonator" && (
-                    <Box bg="bauhaus.green" px={1.5} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                      <Text fontSize="8px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">View Only</Text>
+                    <Box
+                      bg="bauhaus.green"
+                      px={1.5}
+                      py={0}
+                      borderRadius="sm"
+                      border="1px solid"
+                      borderColor="bauhaus.black"
+                      mt={0.5}
+                    >
+                      <Text
+                        fontSize="8px"
+                        color="white"
+                        fontWeight="800"
+                        textTransform="uppercase"
+                        letterSpacing="wide"
+                      >
+                        View Only
+                      </Text>
                     </Box>
                   )}
                 </HStack>
@@ -293,7 +489,11 @@ function AccountSwitcher({
               <Box
                 w="8px"
                 h="8px"
-                bg={account.id === activeAccount?.id ? "bauhaus.green" : "transparent"}
+                bg={
+                  account.id === activeAccount?.id
+                    ? "bauhaus.green"
+                    : "transparent"
+                }
                 borderRadius="full"
                 border={account.id === activeAccount?.id ? "2px solid" : "none"}
                 borderColor="bauhaus.black"
