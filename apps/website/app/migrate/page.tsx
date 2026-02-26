@@ -1,8 +1,6 @@
-import dynamic from "next/dynamic";
+import MigrateContent from "./MigrateContent";
 
-const MigrateContent = dynamic(() => import("./MigrateContent"), {
-  ssr: false,
-});
+export const dynamic = "force-dynamic";
 
 export default function MigratePage() {
   return <MigrateContent />;
