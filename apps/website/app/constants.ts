@@ -24,6 +24,7 @@ export const BUY_LINK =
 export const DEXSCREENER_URL = `https://dexscreener.com/base/${POOL_ADDRESS}`;
 export const GECKOTERMINAL_URL = `https://www.geckoterminal.com/base/pools/${POOL_ADDRESS}`;
 export const GECKOTERMINAL_EMBED_URL = `https://www.geckoterminal.com/base/pools/${POOL_ADDRESS}?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&chart_type=market_cap&resolution=1d`;
+export const GECKOTERMINAL_EMBED_URL_30s = `https://www.geckoterminal.com/base/pools/${POOL_ADDRESS}?embed=1&info=0&swaps=0&grayscale=0&light_chart=0&chart_type=market_cap&resolution=30s`;
 export const GECKOTERMINAL_API_URL = `https://api.geckoterminal.com/api/v2/networks/base/pools/${POOL_ADDRESS}`;
 // FIXME: update to WCHAN coingecko URL once the new coin is live there
 export const COINGECKO_URL = `https://www.coingecko.com/en/coins/bankrwallet`;

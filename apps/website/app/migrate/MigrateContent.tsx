@@ -56,7 +56,7 @@ import {
   WCHAN_TOKEN_ADDRESS,
 } from "./constants";
 import {
-  GECKOTERMINAL_EMBED_URL,
+  GECKOTERMINAL_EMBED_URL_30s,
   BNKRW_GECKOTERMINAL_EMBED_URL,
 } from "../constants";
 
@@ -872,7 +872,7 @@ export default function MigrateContent() {
               <Box
                 as="iframe"
                 title="WCHAN GeckoTerminal"
-                src={GECKOTERMINAL_EMBED_URL}
+                src={GECKOTERMINAL_EMBED_URL_30s}
                 w="full"
                 h={{ base: "300px", md: "400px" }}
                 border="none"
