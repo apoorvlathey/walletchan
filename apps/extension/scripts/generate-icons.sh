@@ -30,22 +30,17 @@ echo "Done! Icons generated in $ICONS_DIR"
 ls -la "$ICONS_DIR"
 
 # Generate base64 for WALLET_ICON in walletIcon.ts
-NO_BG_ICON="$PROJECT_ROOT/public/walletchan-icon.png"
+GIF_ICON="$PROJECT_ROOT/public/walletchan-animated.gif"
 WALLET_ICON_FILE="$PROJECT_ROOT/src/chrome/walletIcon.ts"
-TEMP_RESIZED_ICON="$ICONS_DIR/wallet-icon-128.png"
 
-if [ -f "$NO_BG_ICON" ]; then
+if [ -f "$GIF_ICON" ]; then
     echo ""
     echo "Generating wallet icon for EIP-6963..."
 
-    # Resize to 128x128 first
-    echo "Resizing to 128x128..."
-    sips -z 128 128 "$NO_BG_ICON" --out "$TEMP_RESIZED_ICON" > /dev/null
-
-    # Generate base64 string from resized icon
+    # Generate base64 string from animated gif
     echo "Generating base64..."
-    BASE64_ICON=$(base64 -i "$TEMP_RESIZED_ICON" | tr -d '\n')
-    DATA_URI="data:image/png;base64,$BASE64_ICON"
+    BASE64_ICON=$(base64 -i "$GIF_ICON" | tr -d '\n')
+    DATA_URI="data:image/gif;base64,$BASE64_ICON"
 
     # Write to walletIcon.ts
     cat > "$WALLET_ICON_FILE" << EOF
@@ -55,10 +50,7 @@ if [ -f "$NO_BG_ICON" ]; then
 export const WALLET_ICON = "$DATA_URI";
 EOF
 
-    # Clean up temp file
-    rm -f "$TEMP_RESIZED_ICON"
-
     echo "Updated WALLET_ICON in $WALLET_ICON_FILE"
 else
-    echo "Warning: $NO_BG_ICON not found, skipping base64 generation"
+    echo "Warning: $GIF_ICON not found, skipping base64 generation"
 fi
