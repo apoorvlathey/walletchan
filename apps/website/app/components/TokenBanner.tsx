@@ -4,7 +4,7 @@ import { Box, HStack, Text, Link, useDisclosure } from "@chakra-ui/react";
 import { useTokenData } from "../contexts/TokenDataContext";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { DEXSCREENER_URL, TOKEN_ADDRESS } from "../constants";
 import { BuyModal, type BuyToken } from "../coins/components/BuyModal";
 import { LoadingShapes } from "./ui/LoadingShapes";
@@ -23,6 +23,14 @@ export function TokenBanner() {
   const { tokenData, isLoading } = useTokenData();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Auto-open BuyModal when ?buyWCHAN=true is in the URL
+  useEffect(() => {
+    if (searchParams.get("buyWCHAN") === "true") {
+      onOpen();
+    }
+  }, [searchParams, onOpen]);
   const isMigratePage =
     pathname === "/migrate" ||
     (typeof window !== "undefined" &&
