@@ -15,7 +15,7 @@ export const GITHUB_URL = "https://github.com/apoorvlathey/walletchan";
 export const GITHUB_RELEASES_URL =
   "https://github.com/apoorvlathey/walletchan/releases/latest";
 export const TWITTER_URL = "https://x.com/walletchan_";
-export const TELEGRAM_URL = "https://t.me/bnkrwpublic";
+export const TELEGRAM_URL = "https://t.me/wchanpublic";
 export const BANKR_API_URL = "https://bankr.bot/api";
 
 // External URLs
