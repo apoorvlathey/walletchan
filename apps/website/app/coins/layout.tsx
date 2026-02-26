@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    site: "@apoorveth",
+    site: "@walletchan_",
     title: "Bankr Coins | WalletChan",
     description:
       "Real-time coin launches from the Bankr Ecosystem. Buy tokens instantly on Base.",

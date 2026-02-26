@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    site: "@apoorveth",
+    site: "@walletchan_",
     title: "Stake BNKRW | WalletChan",
     description:
       "Stake your BNKRW tokens to earn yield. Powered by Wasabi on Base.",

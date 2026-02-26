@@ -120,22 +120,6 @@ export function Hero() {
                   Works on: Chrome · Brave · Arc
                 </Text>
               </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.8 }}
-              >
-                <Text
-                  fontSize="xs"
-                  color="text.tertiary"
-                  opacity={0.7}
-                  maxW="md"
-                >
-                  *Not affiliated with Bankr. An open-source project built on
-                  top of the Bankr API.
-                </Text>
-              </motion.div>
             </VStack>
           </Container>
         </Box>

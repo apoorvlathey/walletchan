@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "https://walletchan.com/images/og-image.png",
+        url: "https://walletchan.com/og/home-og.png",
         width: 1200,
         height: 630,
         alt: "WalletChan - The Wallet for AI Era",
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     site: "@walletchan_",
     title: "WalletChan",
     description: "The Wallet for AI Era",
-    images: ["https://walletchan.com/images/og-image.png"],
+    images: ["https://walletchan.com/og/home-og.png"],
   },
 };
 
