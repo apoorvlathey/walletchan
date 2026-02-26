@@ -1,5 +1,5 @@
 #!/bin/bash
-# Release script for BankrWallet extension
+# Release script for WalletChan extension
 # Usage: bash scripts/release.sh <patch|minor|major>
 #
 # Handles the monorepo correctly: bumps version in package.json,

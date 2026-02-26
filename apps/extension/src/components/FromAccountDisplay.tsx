@@ -9,7 +9,10 @@ function truncateAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-function getSeedLabel(account: Account, seedGroupMap: Map<string, string>): string | null {
+function getSeedLabel(
+  account: Account,
+  seedGroupMap: Map<string, string>,
+): string | null {
   if (account.type !== "seedPhrase") return null;
   const groupName = seedGroupMap.get(account.seedGroupId) || "Seed";
   return `${groupName} · #${account.derivationIndex}`;
@@ -21,27 +24,37 @@ interface FromAccountDisplayProps {
 
 export function FromAccountDisplay({ address }: FromAccountDisplayProps) {
   const [fromAccount, setFromAccount] = useState<Account | null>(null);
-  const [seedGroupMap, setSeedGroupMap] = useState<Map<string, string>>(new Map());
+  const [seedGroupMap, setSeedGroupMap] = useState<Map<string, string>>(
+    new Map(),
+  );
   const addresses = useMemo(() => [address], [address]);
   const { identities } = useEnsIdentities(addresses);
 
   useEffect(() => {
-    chrome.runtime.sendMessage({ type: "getAccounts" }, (accounts: Account[] | null) => {
-      if (!accounts) return;
-      const match = accounts.find(
-        (a) => a.address.toLowerCase() === address.toLowerCase()
-      );
-      setFromAccount(match || null);
-      if (match?.type === "seedPhrase") {
-        chrome.runtime.sendMessage({ type: "getSeedGroups" }, (groups: SeedGroup[] | null) => {
-          if (groups) setSeedGroupMap(new Map(groups.map((g) => [g.id, g.name])));
-        });
-      }
-    });
+    chrome.runtime.sendMessage(
+      { type: "getAccounts" },
+      (accounts: Account[] | null) => {
+        if (!accounts) return;
+        const match = accounts.find(
+          (a) => a.address.toLowerCase() === address.toLowerCase(),
+        );
+        setFromAccount(match || null);
+        if (match?.type === "seedPhrase") {
+          chrome.runtime.sendMessage(
+            { type: "getSeedGroups" },
+            (groups: SeedGroup[] | null) => {
+              if (groups)
+                setSeedGroupMap(new Map(groups.map((g) => [g.id, g.name])));
+            },
+          );
+        }
+      },
+    );
   }, [address]);
 
   const ens = identities.get(address.toLowerCase());
-  const displayName = fromAccount?.displayName || ens?.name || truncateAddress(address);
+  const displayName =
+    fromAccount?.displayName || ens?.name || truncateAddress(address);
   const hasResolvedName = !!(fromAccount?.displayName || ens?.name);
 
   return (
@@ -61,7 +74,7 @@ export function FromAccountDisplay({ address }: FromAccountDisplayProps) {
         />
       ) : fromAccount?.type === "bankr" ? (
         <Image
-          src="/bankrwallet-icon.png"
+          src="/bankr-icon.png"
           alt="Bankr account"
           w="20px"
           h="20px"
@@ -87,37 +100,120 @@ export function FromAccountDisplay({ address }: FromAccountDisplayProps) {
           {displayName}
         </Text>
         {hasResolvedName && (
-          <Text fontSize="2xs" color="text.tertiary" fontFamily="mono" noOfLines={1}>
+          <Text
+            fontSize="2xs"
+            color="text.tertiary"
+            fontFamily="mono"
+            noOfLines={1}
+          >
             {truncateAddress(address)}
           </Text>
         )}
         {fromAccount && (
           <HStack spacing={1} flexWrap="wrap">
             {fromAccount.displayName && ens?.name && (
-              <Box bg="gray.600" px={1} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                <Text fontSize="7px" color="white" fontWeight="800" letterSpacing="wide" noOfLines={1}>{ens.name}</Text>
+              <Box
+                bg="gray.600"
+                px={1}
+                py={0}
+                borderRadius="sm"
+                border="1px solid"
+                borderColor="bauhaus.black"
+                mt={0.5}
+              >
+                <Text
+                  fontSize="7px"
+                  color="white"
+                  fontWeight="800"
+                  letterSpacing="wide"
+                  noOfLines={1}
+                >
+                  {ens.name}
+                </Text>
               </Box>
             )}
             {fromAccount.type === "bankr" && (
-              <Box bg="bauhaus.blue" px={1} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                <Text fontSize="7px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Bankr</Text>
+              <Box
+                bg="bauhaus.blue"
+                px={1}
+                py={0}
+                borderRadius="sm"
+                border="1px solid"
+                borderColor="bauhaus.black"
+                mt={0.5}
+              >
+                <Text
+                  fontSize="7px"
+                  color="white"
+                  fontWeight="800"
+                  textTransform="uppercase"
+                  letterSpacing="wide"
+                >
+                  Bankr
+                </Text>
               </Box>
             )}
             {fromAccount.type === "privateKey" && (
-              <Box bg="bauhaus.yellow" px={1} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                <Text fontSize="7px" color="bauhaus.black" fontWeight="800" textTransform="uppercase" letterSpacing="wide">Private Key</Text>
+              <Box
+                bg="bauhaus.yellow"
+                px={1}
+                py={0}
+                borderRadius="sm"
+                border="1px solid"
+                borderColor="bauhaus.black"
+                mt={0.5}
+              >
+                <Text
+                  fontSize="7px"
+                  color="bauhaus.black"
+                  fontWeight="800"
+                  textTransform="uppercase"
+                  letterSpacing="wide"
+                >
+                  Private Key
+                </Text>
               </Box>
             )}
             {fromAccount.type === "seedPhrase" && (
-              <Box bg="bauhaus.red" px={1} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                <Text fontSize="7px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">
+              <Box
+                bg="bauhaus.red"
+                px={1}
+                py={0}
+                borderRadius="sm"
+                border="1px solid"
+                borderColor="bauhaus.black"
+                mt={0.5}
+              >
+                <Text
+                  fontSize="7px"
+                  color="white"
+                  fontWeight="800"
+                  textTransform="uppercase"
+                  letterSpacing="wide"
+                >
                   {getSeedLabel(fromAccount, seedGroupMap) || "Seed"}
                 </Text>
               </Box>
             )}
             {fromAccount.type === "impersonator" && (
-              <Box bg="bauhaus.green" px={1} py={0} borderRadius="sm" border="1px solid" borderColor="bauhaus.black" mt={0.5}>
-                <Text fontSize="7px" color="white" fontWeight="800" textTransform="uppercase" letterSpacing="wide">View Only</Text>
+              <Box
+                bg="bauhaus.green"
+                px={1}
+                py={0}
+                borderRadius="sm"
+                border="1px solid"
+                borderColor="bauhaus.black"
+                mt={0.5}
+              >
+                <Text
+                  fontSize="7px"
+                  color="white"
+                  fontWeight="800"
+                  textTransform="uppercase"
+                  letterSpacing="wide"
+                >
+                  View Only
+                </Text>
               </Box>
             )}
           </HStack>

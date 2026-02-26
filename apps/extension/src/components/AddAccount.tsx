@@ -21,10 +21,23 @@ import {
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import SeedPhraseSetup from "@/components/SeedPhraseSetup";
-import { ViewIcon, ViewOffIcon, ArrowBackIcon, AddIcon, CopyIcon, CheckIcon, ExternalLinkIcon } from "@chakra-ui/icons";
+import {
+  ViewIcon,
+  ViewOffIcon,
+  ArrowBackIcon,
+  AddIcon,
+  CopyIcon,
+  CheckIcon,
+  ExternalLinkIcon,
+} from "@chakra-ui/icons";
 import { isAddress } from "@ethersproject/address";
 import { validateAndDeriveAddress } from "@/utils/privateKeyUtils";
-import { RobotIcon, KeyIcon, SeedIcon, EyeIcon } from "@/components/shared/AccountTypeIcons";
+import {
+  RobotIcon,
+  KeyIcon,
+  SeedIcon,
+  EyeIcon,
+} from "@/components/shared/AccountTypeIcons";
 import PrivateKeyInput from "@/components/shared/PrivateKeyInput";
 import { useAddressResolver } from "@/hooks/useAddressResolver";
 import { isResolvableName } from "@/lib/ensUtils";
@@ -65,7 +78,9 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
   const [showSeedSetup, setShowSeedSetup] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [derivingGroupId, setDerivingGroupId] = useState<string | null>(null);
-  const [deriveDisplayNames, setDeriveDisplayNames] = useState<Record<string, string>>({});
+  const [deriveDisplayNames, setDeriveDisplayNames] = useState<
+    Record<string, string>
+  >({});
   const [impersonatorCopied, setImpersonatorCopied] = useState(false);
   const [errors, setErrors] = useState<{
     privateKey?: string;
@@ -86,13 +101,19 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
 
   // Check existing accounts and seed groups on mount
   useEffect(() => {
-    chrome.runtime.sendMessage({ type: "getAccounts" }, (accounts: Account[]) => {
-      const bankrExists = accounts?.some((a) => a.type === "bankr");
-      setHasBankrAccount(bankrExists);
-    });
-    chrome.runtime.sendMessage({ type: "getSeedGroups" }, (groups: SeedGroup[]) => {
-      setSeedGroups(groups || []);
-    });
+    chrome.runtime.sendMessage(
+      { type: "getAccounts" },
+      (accounts: Account[]) => {
+        const bankrExists = accounts?.some((a) => a.type === "bankr");
+        setHasBankrAccount(bankrExists);
+      },
+    );
+    chrome.runtime.sendMessage(
+      { type: "getSeedGroups" },
+      (groups: SeedGroup[]) => {
+        setSeedGroups(groups || []);
+      },
+    );
   }, []);
 
   // Derive address when private key changes
@@ -132,7 +153,9 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
         const normalizedKey = result.normalizedKey;
 
         // Get cached password
-        const { hasCachedPassword } = await new Promise<{ hasCachedPassword: boolean }>((resolve) => {
+        const { hasCachedPassword } = await new Promise<{
+          hasCachedPassword: boolean;
+        }>((resolve) => {
           chrome.runtime.sendMessage({ type: "getCachedPassword" }, resolve);
         });
 
@@ -148,14 +171,17 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
         }
 
         // Add the private key account (background will encrypt with cached password)
-        const response = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+        const response = await new Promise<{
+          success: boolean;
+          error?: string;
+        }>((resolve) => {
           chrome.runtime.sendMessage(
             {
               type: "addPrivateKeyAccount",
               privateKey: normalizedKey,
               displayName: displayName.trim() || undefined,
             },
-            resolve
+            resolve,
           );
         });
 
@@ -188,22 +214,28 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
         }
 
         // Use the original input as display name if it was a name that resolved
-        const autoDisplayName =
-          isResolvableName(impersonatorAddress.trim()) ? impersonatorAddress.trim() : undefined;
+        const autoDisplayName = isResolvableName(impersonatorAddress.trim())
+          ? impersonatorAddress.trim()
+          : undefined;
 
-        const response = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+        const response = await new Promise<{
+          success: boolean;
+          error?: string;
+        }>((resolve) => {
           chrome.runtime.sendMessage(
             {
               type: "addImpersonatorAccount",
               address: impersonatorResolvedAddress,
               displayName: displayName.trim() || autoDisplayName || undefined,
             },
-            resolve
+            resolve,
           );
         });
 
         if (!response.success) {
-          setErrors({ impersonatorAddress: response.error || "Failed to add account" });
+          setErrors({
+            impersonatorAddress: response.error || "Failed to add account",
+          });
           setIsSubmitting(false);
           return;
         }
@@ -237,7 +269,9 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
         }
 
         // Check if wallet is unlocked (required to encrypt API key)
-        const { hasCachedPassword } = await new Promise<{ hasCachedPassword: boolean }>((resolve) => {
+        const { hasCachedPassword } = await new Promise<{
+          hasCachedPassword: boolean;
+        }>((resolve) => {
           chrome.runtime.sendMessage({ type: "getCachedPassword" }, resolve);
         });
 
@@ -253,7 +287,10 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
         }
 
         // Add bankr account (background will save the API key)
-        const response = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+        const response = await new Promise<{
+          success: boolean;
+          error?: string;
+        }>((resolve) => {
           chrome.runtime.sendMessage(
             {
               type: "addBankrAccount",
@@ -261,12 +298,14 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
               displayName: displayName.trim() || undefined,
               apiKey: bankrApiKey.trim(),
             },
-            resolve
+            resolve,
           );
         });
 
         if (!response.success) {
-          setErrors({ bankrAddress: response.error || "Failed to add account" });
+          setErrors({
+            bankrAddress: response.error || "Failed to add account",
+          });
           setIsSubmitting(false);
           return;
         }
@@ -283,7 +322,8 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
     } catch (error) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add account",
+        description:
+          error instanceof Error ? error.message : "Failed to add account",
         status: "error",
         duration: 3000,
       });
@@ -296,9 +336,14 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
     setDerivingGroupId(seedGroupId);
     try {
       const name = deriveDisplayNames[seedGroupId]?.trim() || undefined;
-      const response = await new Promise<{ success: boolean; error?: string }>((resolve) => {
-        chrome.runtime.sendMessage({ type: "deriveSeedAccount", seedGroupId, displayName: name }, resolve);
-      });
+      const response = await new Promise<{ success: boolean; error?: string }>(
+        (resolve) => {
+          chrome.runtime.sendMessage(
+            { type: "deriveSeedAccount", seedGroupId, displayName: name },
+            resolve,
+          );
+        },
+      );
 
       if (!response.success) {
         toast({
@@ -320,7 +365,8 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
     } catch (error) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to derive account",
+        description:
+          error instanceof Error ? error.message : "Failed to derive account",
         status: "error",
         duration: 3000,
       });
@@ -351,7 +397,13 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
             size="sm"
             onClick={onBack}
           />
-          <Text fontWeight="900" fontSize="lg" color="text.primary" textTransform="uppercase" letterSpacing="wide">
+          <Text
+            fontWeight="900"
+            fontSize="lg"
+            color="text.primary"
+            textTransform="uppercase"
+            letterSpacing="wide"
+          >
             Add Account
           </Text>
         </HStack>
@@ -364,10 +416,19 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
           boxShadow="4px 4px 0px 0px #121212"
           p={4}
         >
-          <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase" mb={3}>
+          <Text
+            fontSize="xs"
+            color="text.secondary"
+            fontWeight="700"
+            textTransform="uppercase"
+            mb={3}
+          >
             Account Type
           </Text>
-          <RadioGroup value={accountType} onChange={(val) => setAccountType(val as AccountType)}>
+          <RadioGroup
+            value={accountType}
+            onChange={(val) => setAccountType(val as AccountType)}
+          >
             <VStack spacing={3} align="stretch">
               <Box
                 as="label"
@@ -446,7 +507,11 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                 }}
               >
                 <HStack spacing={3}>
-                  <Radio value="bankr" colorScheme="blue" isDisabled={hasBankrAccount} />
+                  <Radio
+                    value="bankr"
+                    colorScheme="blue"
+                    isDisabled={hasBankrAccount}
+                  />
                   <Box
                     bg="bauhaus.blue"
                     border="2px solid"
@@ -457,14 +522,14 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                   </Box>
                   <VStack align="start" spacing={0}>
                     <Text fontSize="sm" fontWeight="700" color="text.primary">
-                      Bankr Wallet
+                      BankrAPI
                     </Text>
                     <Text fontSize="xs" color="text.secondary">
                       Use Bankr API for transactions
                     </Text>
                     {hasBankrAccount && (
                       <Text fontSize="xs" color="bauhaus.red" fontWeight="700">
-                        Bankr wallet already added
+                        BankrAPI already added
                       </Text>
                     )}
                   </VStack>
@@ -517,7 +582,9 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
               onPrivateKeyChange={setPrivateKey}
               derivedAddress={derivedAddress}
               error={errors.privateKey}
-              onClearError={() => setErrors((prev) => ({ ...prev, privateKey: undefined }))}
+              onClearError={() =>
+                setErrors((prev) => ({ ...prev, privateKey: undefined }))
+              }
             />
           </Box>
         )}
@@ -531,7 +598,13 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
             boxShadow="4px 4px 0px 0px #121212"
             p={4}
           >
-            <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase" mb={3}>
+            <Text
+              fontSize="xs"
+              color="text.secondary"
+              fontWeight="700"
+              textTransform="uppercase"
+              mb={3}
+            >
               Existing Seed Phrases
             </Text>
             <VStack spacing={3} align="stretch">
@@ -564,7 +637,8 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                         px={2}
                         borderRadius={0}
                       >
-                        {group.accountCount} {group.accountCount === 1 ? "account" : "accounts"}
+                        {group.accountCount}{" "}
+                        {group.accountCount === 1 ? "account" : "accounts"}
                       </Badge>
                     </HStack>
                   </HStack>
@@ -574,7 +648,10 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                     placeholder={`Display Name for Account #${group.accountCount} (Optional)`}
                     value={deriveDisplayNames[group.id] || ""}
                     onChange={(e) =>
-                      setDeriveDisplayNames((prev) => ({ ...prev, [group.id]: e.target.value }))
+                      setDeriveDisplayNames((prev) => ({
+                        ...prev,
+                        [group.id]: e.target.value,
+                      }))
                     }
                   />
                   <Button
@@ -596,7 +673,13 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
 
             <HStack my={4} align="center">
               <Divider borderColor="bauhaus.black" />
-              <Text fontSize="xs" color="text.secondary" fontWeight="700" whiteSpace="nowrap" px={2}>
+              <Text
+                fontSize="xs"
+                color="text.secondary"
+                fontWeight="700"
+                whiteSpace="nowrap"
+                px={2}
+              >
                 OR
               </Text>
               <Divider borderColor="bauhaus.black" />
@@ -627,107 +710,178 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
           >
             <FormControl isInvalid={!!errors.impersonatorAddress}>
               <HStack justify="space-between" align="center" mb={1}>
-                <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase" mb={0}>
+                <FormLabel
+                  fontSize="xs"
+                  color="text.secondary"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                  mb={0}
+                >
                   Address to Impersonate
                 </FormLabel>
                 {/* Resolution status */}
-                {impersonatorAddress && (impersonatorIsResolving || impersonatorIsLoadingExtras) && (
-                  <HStack spacing={1}>
-                    <Spinner size="xs" color="bauhaus.blue" />
-                    <Text fontSize="xs" color="text.tertiary" fontWeight="700">
-                      Resolving...
-                    </Text>
-                  </HStack>
-                )}
-                {impersonatorAddress && !impersonatorIsResolving && impersonatorIsValid && isResolvableName(impersonatorAddress) && impersonatorResolvedAddress && (
-                  <HStack spacing={0.5}>
-                    {impersonatorAvatar && (
-                      <Image
-                        src={impersonatorAvatar}
-                        alt="avatar"
-                        boxSize="14px"
-                        borderRadius="full"
-                        border="1px solid"
-                        borderColor="bauhaus.black"
+                {impersonatorAddress &&
+                  (impersonatorIsResolving || impersonatorIsLoadingExtras) && (
+                    <HStack spacing={1}>
+                      <Spinner size="xs" color="bauhaus.blue" />
+                      <Text
+                        fontSize="xs"
+                        color="text.tertiary"
+                        fontWeight="700"
+                      >
+                        Resolving...
+                      </Text>
+                    </HStack>
+                  )}
+                {impersonatorAddress &&
+                  !impersonatorIsResolving &&
+                  impersonatorIsValid &&
+                  isResolvableName(impersonatorAddress) &&
+                  impersonatorResolvedAddress && (
+                    <HStack spacing={0.5}>
+                      {impersonatorAvatar && (
+                        <Image
+                          src={impersonatorAvatar}
+                          alt="avatar"
+                          boxSize="14px"
+                          borderRadius="full"
+                          border="1px solid"
+                          borderColor="bauhaus.black"
+                        />
+                      )}
+                      <Text
+                        fontSize="xs"
+                        color="text.tertiary"
+                        fontFamily="mono"
+                        fontWeight="700"
+                      >
+                        {impersonatorResolvedAddress.slice(0, 6)}...
+                        {impersonatorResolvedAddress.slice(-4)}
+                      </Text>
+                      <IconButton
+                        aria-label="Copy address"
+                        icon={
+                          impersonatorCopied ? (
+                            <CheckIcon boxSize="10px" />
+                          ) : (
+                            <CopyIcon boxSize="10px" />
+                          )
+                        }
+                        size="xs"
+                        variant="ghost"
+                        minW="18px"
+                        h="18px"
+                        color={
+                          impersonatorCopied
+                            ? "bauhaus.yellow"
+                            : "text.tertiary"
+                        }
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(
+                            impersonatorResolvedAddress,
+                          );
+                          setImpersonatorCopied(true);
+                          toast({
+                            title: "Copied!",
+                            status: "success",
+                            duration: 1500,
+                          });
+                          setTimeout(() => setImpersonatorCopied(false), 2000);
+                        }}
+                        _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
                       />
-                    )}
-                    <Text fontSize="xs" color="text.tertiary" fontFamily="mono" fontWeight="700">
-                      {impersonatorResolvedAddress.slice(0, 6)}...{impersonatorResolvedAddress.slice(-4)}
-                    </Text>
-                    <IconButton
-                      aria-label="Copy address"
-                      icon={impersonatorCopied ? <CheckIcon boxSize="10px" /> : <CopyIcon boxSize="10px" />}
-                      size="xs"
-                      variant="ghost"
-                      minW="18px"
-                      h="18px"
-                      color={impersonatorCopied ? "bauhaus.yellow" : "text.tertiary"}
-                      onClick={async () => {
-                        await navigator.clipboard.writeText(impersonatorResolvedAddress);
-                        setImpersonatorCopied(true);
-                        toast({ title: "Copied!", status: "success", duration: 1500 });
-                        setTimeout(() => setImpersonatorCopied(false), 2000);
-                      }}
-                      _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
-                    />
-                    <IconButton
-                      aria-label="View on explorer"
-                      icon={<ExternalLinkIcon boxSize="10px" />}
-                      size="xs"
-                      variant="ghost"
-                      minW="18px"
-                      h="18px"
-                      color="text.tertiary"
-                      onClick={() => window.open(`https://etherscan.io/address/${impersonatorResolvedAddress}`, "_blank")}
-                      _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
-                    />
-                  </HStack>
-                )}
-                {impersonatorAddress && !impersonatorIsResolving && impersonatorIsValid && !isResolvableName(impersonatorAddress) && impersonatorResolvedName && (
-                  <HStack spacing={0.5}>
-                    {impersonatorAvatar && (
-                      <Image
-                        src={impersonatorAvatar}
-                        alt="avatar"
-                        boxSize="14px"
-                        borderRadius="full"
-                        border="1px solid"
-                        borderColor="bauhaus.black"
+                      <IconButton
+                        aria-label="View on explorer"
+                        icon={<ExternalLinkIcon boxSize="10px" />}
+                        size="xs"
+                        variant="ghost"
+                        minW="18px"
+                        h="18px"
+                        color="text.tertiary"
+                        onClick={() =>
+                          window.open(
+                            `https://etherscan.io/address/${impersonatorResolvedAddress}`,
+                            "_blank",
+                          )
+                        }
+                        _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
                       />
-                    )}
-                    <Text fontSize="xs" color="text.tertiary" fontWeight="700">
-                      {impersonatorResolvedName}
-                    </Text>
-                  </HStack>
-                )}
+                    </HStack>
+                  )}
+                {impersonatorAddress &&
+                  !impersonatorIsResolving &&
+                  impersonatorIsValid &&
+                  !isResolvableName(impersonatorAddress) &&
+                  impersonatorResolvedName && (
+                    <HStack spacing={0.5}>
+                      {impersonatorAvatar && (
+                        <Image
+                          src={impersonatorAvatar}
+                          alt="avatar"
+                          boxSize="14px"
+                          borderRadius="full"
+                          border="1px solid"
+                          borderColor="bauhaus.black"
+                        />
+                      )}
+                      <Text
+                        fontSize="xs"
+                        color="text.tertiary"
+                        fontWeight="700"
+                      >
+                        {impersonatorResolvedName}
+                      </Text>
+                    </HStack>
+                  )}
               </HStack>
               <Input
                 placeholder="0x..., ENS, Basename, .wei, or .mega"
                 value={impersonatorAddress}
                 onChange={(e) => {
                   setImpersonatorAddress(e.target.value);
-                  if (errors.impersonatorAddress) setErrors((prev) => ({ ...prev, impersonatorAddress: undefined }));
+                  if (errors.impersonatorAddress)
+                    setErrors((prev) => ({
+                      ...prev,
+                      impersonatorAddress: undefined,
+                    }));
                 }}
                 fontFamily="mono"
                 border="3px solid"
                 borderColor={
-                  impersonatorAddress && !impersonatorIsResolving && !impersonatorIsValid
+                  impersonatorAddress &&
+                  !impersonatorIsResolving &&
+                  !impersonatorIsValid
                     ? "bauhaus.red"
                     : undefined
                 }
               />
-              {impersonatorAddress && !impersonatorIsResolving && !impersonatorIsValid && !errors.impersonatorAddress && (
-                <Text fontSize="xs" color="bauhaus.red" fontWeight="700" mt={1}>
-                  Invalid address or name
-                </Text>
-              )}
+              {impersonatorAddress &&
+                !impersonatorIsResolving &&
+                !impersonatorIsValid &&
+                !errors.impersonatorAddress && (
+                  <Text
+                    fontSize="xs"
+                    color="bauhaus.red"
+                    fontWeight="700"
+                    mt={1}
+                  >
+                    Invalid address or name
+                  </Text>
+                )}
               <FormErrorMessage color="bauhaus.red" fontWeight="700">
                 {errors.impersonatorAddress}
               </FormErrorMessage>
             </FormControl>
-            <Box mt={3} p={2} bg="bauhaus.yellow" border="2px solid" borderColor="bauhaus.black">
+            <Box
+              mt={3}
+              p={2}
+              bg="bauhaus.yellow"
+              border="2px solid"
+              borderColor="bauhaus.black"
+            >
               <Text fontSize="xs" color="bauhaus.black" fontWeight="700">
-                View-only mode: You can view transactions and signatures but cannot sign or send.
+                View-only mode: You can view transactions and signatures but
+                cannot sign or send.
               </Text>
             </Box>
           </Box>
@@ -744,7 +898,12 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
           >
             <VStack spacing={4} align="stretch">
               <FormControl isInvalid={!!errors.bankrApiKey}>
-                <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
+                <FormLabel
+                  fontSize="xs"
+                  color="text.secondary"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                >
                   Bankr API Key
                 </FormLabel>
                 <InputGroup>
@@ -754,13 +913,19 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
                     value={bankrApiKey}
                     onChange={(e) => {
                       setBankrApiKey(e.target.value);
-                      if (errors.bankrApiKey) setErrors((prev) => ({ ...prev, bankrApiKey: undefined }));
+                      if (errors.bankrApiKey)
+                        setErrors((prev) => ({
+                          ...prev,
+                          bankrApiKey: undefined,
+                        }));
                     }}
                     pr="3rem"
                   />
                   <InputRightElement>
                     <IconButton
-                      aria-label={showBankrApiKey ? "Hide API key" : "Show API key"}
+                      aria-label={
+                        showBankrApiKey ? "Hide API key" : "Show API key"
+                      }
                       icon={showBankrApiKey ? <ViewOffIcon /> : <ViewIcon />}
                       size="sm"
                       variant="ghost"
@@ -776,15 +941,24 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
               </FormControl>
 
               <FormControl isInvalid={!!errors.bankrAddress}>
-                <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                  Bankr Wallet Address
+                <FormLabel
+                  fontSize="xs"
+                  color="text.secondary"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                >
+                  BankrAPI Address
                 </FormLabel>
                 <Input
                   placeholder="0x..."
                   value={bankrAddress}
                   onChange={(e) => {
                     setBankrAddress(e.target.value);
-                    if (errors.bankrAddress) setErrors((prev) => ({ ...prev, bankrAddress: undefined }));
+                    if (errors.bankrAddress)
+                      setErrors((prev) => ({
+                        ...prev,
+                        bankrAddress: undefined,
+                      }));
                   }}
                   fontFamily="mono"
                 />
@@ -806,7 +980,12 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
             p={4}
           >
             <FormControl>
-              <FormLabel fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
+              <FormLabel
+                fontSize="xs"
+                color="text.secondary"
+                fontWeight="700"
+                textTransform="uppercase"
+              >
                 Display Name (Optional)
               </FormLabel>
               <Input
@@ -828,7 +1007,8 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
             p={3}
           >
             <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
-              Your private key will be encrypted and stored locally. Never share it with anyone.
+              Your private key will be encrypted and stored locally. Never share
+              it with anyone.
             </Text>
           </Box>
         )}
@@ -838,16 +1018,24 @@ function AddAccount({ onBack, onAccountAdded }: AddAccountProps) {
           <Button
             variant="primary"
             w="full"
-            onClick={accountType === "seedPhrase" ? () => setShowSeedSetup(true) : handleSubmit}
+            onClick={
+              accountType === "seedPhrase"
+                ? () => setShowSeedSetup(true)
+                : handleSubmit
+            }
             isLoading={isSubmitting}
             loadingText="Adding..."
             isDisabled={
               (accountType === "privateKey" && !derivedAddress) ||
-              (accountType === "bankr" && (!bankrAddress.trim() || !bankrApiKey.trim())) ||
-              (accountType === "impersonator" && (!impersonatorIsValid || impersonatorIsResolving))
+              (accountType === "bankr" &&
+                (!bankrAddress.trim() || !bankrApiKey.trim())) ||
+              (accountType === "impersonator" &&
+                (!impersonatorIsValid || impersonatorIsResolving))
             }
           >
-            {accountType === "seedPhrase" ? "Set Up Seed Phrase" : "Add Account"}
+            {accountType === "seedPhrase"
+              ? "Set Up Seed Phrase"
+              : "Add Account"}
           </Button>
         )}
       </VStack>

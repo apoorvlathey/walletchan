@@ -282,8 +282,12 @@ class ImpersonatorProvider extends EventEmitter {
                 chainId: this.chainId,
                 ...(txParams.gas ? { gas: txParams.gas } : {}),
                 ...(txParams.gasPrice ? { gasPrice: txParams.gasPrice } : {}),
-                ...(txParams.maxFeePerGas ? { maxFeePerGas: txParams.maxFeePerGas } : {}),
-                ...(txParams.maxPriorityFeePerGas ? { maxPriorityFeePerGas: txParams.maxPriorityFeePerGas } : {}),
+                ...(txParams.maxFeePerGas
+                  ? { maxFeePerGas: txParams.maxFeePerGas }
+                  : {}),
+                ...(txParams.maxPriorityFeePerGas
+                  ? { maxPriorityFeePerGas: txParams.maxPriorityFeePerGas }
+                  : {}),
               },
             },
             "*",
@@ -338,9 +342,9 @@ let providerInstance: ImpersonatorProvider | null = null;
 // EIP-6963 provider info
 const providerInfo: EIP6963ProviderInfo = {
   uuid: SESSION_UUID,
-  name: "Bankr Wallet",
+  name: "WalletChan",
   icon: WALLET_ICON,
-  rdns: "app.bankrwallet",
+  rdns: "com.walletchan",
 };
 
 // Announce provider via EIP-6963
@@ -391,8 +395,8 @@ function setWindowEthereum(provider: ImpersonatorProvider): boolean {
     return (window as Window).ethereum === provider;
   } catch (e) {
     console.warn(
-      "Bankr Wallet: Could not set window.ethereum (another wallet may have claimed it).",
-      "Dapps supporting EIP-6963 will still be able to discover Bankr Wallet.",
+      "WalletChan: Could not set window.ethereum (another wallet may have claimed it).",
+      "Dapps supporting EIP-6963 will still be able to discover WalletChan.",
     );
     return false;
   }
@@ -501,8 +505,8 @@ window.addEventListener("message", (e: any) => {
           // Check if this is an EIP-712 schema validation error (JSON-RPC error code -32603)
           const isSchemaError = errorMessage.includes("EIP-712 schema");
 
-          // Prefix error message with "BankrWallet - " for clarity
-          const prefixedMessage = `BankrWallet - ${errorMessage}`;
+          // Prefix error message with "WalletChan - " for clarity
+          const prefixedMessage = `WalletChan - ${errorMessage}`;
           const error = new Error(prefixedMessage) as Error & { code: number };
 
           if (isUserRejection) {
