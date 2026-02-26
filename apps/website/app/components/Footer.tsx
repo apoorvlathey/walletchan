@@ -52,7 +52,11 @@ export function Footer() {
 
   useEffect(() => {
     const hostname = window.location.hostname;
-    setIsSubdomain(hostname !== "walletchan.com" && hostname !== "localhost" && hostname !== "127.0.0.1");
+    setIsSubdomain(
+      hostname !== "walletchan.com" &&
+        hostname !== "localhost" &&
+        hostname !== "127.0.0.1",
+    );
     setIsLocalhost(hostname === "localhost" || hostname === "127.0.0.1");
   }, []);
 
@@ -83,8 +87,7 @@ export function Footer() {
                 <Image
                   border="4px solid"
                   borderColor="white"
-                  // src="/images/walletchan-animated.gif" // FIXME: use animated gif
-                  src="/images/walletchan-icon.png"
+                  src="/images/walletchan-animated.gif"
                   alt="WalletChan"
                   w="32px"
                   h="32px"

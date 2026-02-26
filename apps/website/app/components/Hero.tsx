@@ -281,8 +281,7 @@ export function Hero() {
             }}
           >
             <Image
-              // src="/images/walletchan-animated.gif" // FIXME: use animated gif
-              src="/images/walletchan-icon.png"
+              src="/images/walletchan-animated.gif"
               alt="WalletChan Mascot"
               w={{ base: "130px", md: "160px", lg: "200px" }}
               h={{ base: "130px", md: "160px", lg: "200px" }}
