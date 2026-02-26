@@ -22,7 +22,16 @@ import {
   AlertIcon,
   Tooltip,
 } from "@chakra-ui/react";
-import { SettingsIcon, DeleteIcon, ViewIcon, WarningTwoIcon, EditIcon, ViewOffIcon, ArrowBackIcon, RepeatIcon } from "@chakra-ui/icons";
+import {
+  SettingsIcon,
+  DeleteIcon,
+  ViewIcon,
+  WarningTwoIcon,
+  EditIcon,
+  ViewOffIcon,
+  ArrowBackIcon,
+  RepeatIcon,
+} from "@chakra-ui/icons";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
 import type { Account, PasswordType, SeedGroup } from "@/chrome/types";
 import { resolveNameToAddress, isResolvableName } from "@/lib/ensUtils";
@@ -98,13 +107,16 @@ function AccountSettingsModal({
 
       // Fetch seed group name for seed phrase accounts
       if (account.type === "seedPhrase") {
-        chrome.runtime.sendMessage({ type: "getSeedGroups" }, (groups: SeedGroup[] | null) => {
-          const group = groups?.find((g) => g.id === account.seedGroupId);
-          if (group) {
-            setSeedGroupName(group.name);
-            setOriginalSeedGroupName(group.name);
-          }
-        });
+        chrome.runtime.sendMessage(
+          { type: "getSeedGroups" },
+          (groups: SeedGroup[] | null) => {
+            const group = groups?.find((g) => g.id === account.seedGroupId);
+            if (group) {
+              setSeedGroupName(group.name);
+              setOriginalSeedGroupName(group.name);
+            }
+          },
+        );
       }
     }
   }, [isOpen, account]);
@@ -118,9 +130,12 @@ function AccountSettingsModal({
       });
 
       // Check password type
-      chrome.runtime.sendMessage({ type: "getPasswordType" }, (response: { passwordType: PasswordType | null }) => {
-        setPasswordType(response.passwordType);
-      });
+      chrome.runtime.sendMessage(
+        { type: "getPasswordType" },
+        (response: { passwordType: PasswordType | null }) => {
+          setPasswordType(response.passwordType);
+        },
+      );
 
       // Load existing API key if cached
       chrome.runtime.sendMessage({ type: "getCachedApiKey" }, (response) => {
@@ -129,7 +144,7 @@ function AccountSettingsModal({
         }
       });
 
-      // Load existing Bankr wallet address from the account object
+      // Load existing WalletChan address from the account object
       setWalletAddress(account.address);
     }
   }, [view, account]);
@@ -211,12 +226,14 @@ function AccountSettingsModal({
 
       if (hasCachedPassword) {
         // Use cached password to save new API key
-        const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
-          chrome.runtime.sendMessage(
-            { type: "saveApiKeyWithCachedPassword", apiKey: apiKey.trim() },
-            resolve
-          );
-        });
+        const result = await new Promise<{ success: boolean; error?: string }>(
+          (resolve) => {
+            chrome.runtime.sendMessage(
+              { type: "saveApiKeyWithCachedPassword", apiKey: apiKey.trim() },
+              resolve,
+            );
+          },
+        );
 
         if (!result.success) {
           toast({
@@ -231,8 +248,14 @@ function AccountSettingsModal({
         }
       } else {
         // Unlock first to establish the session
-        const unlockResult = await new Promise<{ success: boolean; error?: string }>((resolve) => {
-          chrome.runtime.sendMessage({ type: "unlockWallet", password }, resolve);
+        const unlockResult = await new Promise<{
+          success: boolean;
+          error?: string;
+        }>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: "unlockWallet", password },
+            resolve,
+          );
         });
         if (!unlockResult.success) {
           toast({
@@ -246,10 +269,13 @@ function AccountSettingsModal({
           return;
         }
         // Now save API key using the background handler (handles vault key vs legacy)
-        const saveResult = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+        const saveResult = await new Promise<{
+          success: boolean;
+          error?: string;
+        }>((resolve) => {
           chrome.runtime.sendMessage(
             { type: "saveApiKeyWithCachedPassword", apiKey: apiKey.trim() },
-            resolve
+            resolve,
           );
         });
         if (!saveResult.success) {
@@ -309,7 +335,7 @@ function AccountSettingsModal({
       {
         type: "updateAccountDisplayName",
         accountId: account.id,
-        displayName: trimmedName || undefined
+        displayName: trimmedName || undefined,
       },
       (result: { success: boolean; error?: string }) => {
         setIsSaving(false);
@@ -328,7 +354,7 @@ function AccountSettingsModal({
             duration: 3000,
           });
         }
-      }
+      },
     );
   };
 
@@ -364,7 +390,7 @@ function AccountSettingsModal({
             duration: 3000,
           });
         }
-      }
+      },
     );
   };
 
@@ -439,7 +465,7 @@ function AccountSettingsModal({
             duration: 3000,
           });
         }
-      }
+      },
     );
   };
 
@@ -460,7 +486,13 @@ function AccountSettingsModal({
           boxShadow="8px 8px 0px 0px #121212"
           mx={4}
         >
-          <ModalHeader color="text.primary" fontSize="md" pb={2} textTransform="uppercase" letterSpacing="wider">
+          <ModalHeader
+            color="text.primary"
+            fontSize="md"
+            pb={2}
+            textTransform="uppercase"
+            letterSpacing="wider"
+          >
             <HStack>
               <IconButton
                 aria-label="Back"
@@ -491,7 +523,8 @@ function AccountSettingsModal({
                   </HStack>
                 </Box>
                 <Text color="text.secondary" fontSize="sm" fontWeight="500">
-                  API key changes are only available when unlocked with your master password.
+                  API key changes are only available when unlocked with your
+                  master password.
                 </Text>
               </VStack>
             ) : (
@@ -521,10 +554,14 @@ function AccountSettingsModal({
                       pr="3rem"
                       bg="white"
                       border="3px solid"
-                      borderColor={apiKeyErrors.apiKey ? "bauhaus.red" : "bauhaus.black"}
+                      borderColor={
+                        apiKeyErrors.apiKey ? "bauhaus.red" : "bauhaus.black"
+                      }
                       borderRadius="0"
                       _focus={{
-                        borderColor: apiKeyErrors.apiKey ? "bauhaus.red" : "bauhaus.blue",
+                        borderColor: apiKeyErrors.apiKey
+                          ? "bauhaus.red"
+                          : "bauhaus.blue",
                         boxShadow: "none",
                       }}
                     />
@@ -563,10 +600,16 @@ function AccountSettingsModal({
                     }}
                     bg="white"
                     border="3px solid"
-                    borderColor={apiKeyErrors.walletAddress ? "bauhaus.red" : "bauhaus.black"}
+                    borderColor={
+                      apiKeyErrors.walletAddress
+                        ? "bauhaus.red"
+                        : "bauhaus.black"
+                    }
                     borderRadius="0"
                     _focus={{
-                      borderColor: apiKeyErrors.walletAddress ? "bauhaus.red" : "bauhaus.blue",
+                      borderColor: apiKeyErrors.walletAddress
+                        ? "bauhaus.red"
+                        : "bauhaus.blue",
                       boxShadow: "none",
                     }}
                   />
@@ -598,10 +641,16 @@ function AccountSettingsModal({
                           pr="3rem"
                           bg="white"
                           border="3px solid"
-                          borderColor={apiKeyErrors.password ? "bauhaus.red" : "bauhaus.black"}
+                          borderColor={
+                            apiKeyErrors.password
+                              ? "bauhaus.red"
+                              : "bauhaus.black"
+                          }
                           borderRadius="0"
                           _focus={{
-                            borderColor: apiKeyErrors.password ? "bauhaus.red" : "bauhaus.blue",
+                            borderColor: apiKeyErrors.password
+                              ? "bauhaus.red"
+                              : "bauhaus.blue",
                             boxShadow: "none",
                           }}
                         />
@@ -642,7 +691,11 @@ function AccountSettingsModal({
           </ModalBody>
 
           <ModalFooter gap={2}>
-            <Button variant="secondary" size="sm" onClick={() => setView("settings")}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setView("settings")}
+            >
               Cancel
             </Button>
             {!isAgentSession && (
@@ -675,9 +728,20 @@ function AccountSettingsModal({
           boxShadow="8px 8px 0px 0px #121212"
           mx={4}
         >
-          <ModalHeader color="text.primary" fontSize="md" pb={2} textTransform="uppercase" letterSpacing="wider">
+          <ModalHeader
+            color="text.primary"
+            fontSize="md"
+            pb={2}
+            textTransform="uppercase"
+            letterSpacing="wider"
+          >
             <Box display="flex" alignItems="center" gap={2}>
-              <Box p={1} bg="bauhaus.red" border="2px solid" borderColor="bauhaus.black">
+              <Box
+                p={1}
+                bg="bauhaus.red"
+                border="2px solid"
+                borderColor="bauhaus.black"
+              >
                 <WarningTwoIcon color="white" />
               </Box>
               Remove Account?
@@ -704,7 +768,8 @@ function AccountSettingsModal({
                 </Text>
               </Box>
 
-              {(account.type === "privateKey" || account.type === "seedPhrase") && (
+              {(account.type === "privateKey" ||
+                account.type === "seedPhrase") && (
                 <Box
                   w="full"
                   p={3}
@@ -758,9 +823,20 @@ function AccountSettingsModal({
         boxShadow="8px 8px 0px 0px #121212"
         mx={4}
       >
-        <ModalHeader color="text.primary" fontSize="md" pb={2} textTransform="uppercase" letterSpacing="wider">
+        <ModalHeader
+          color="text.primary"
+          fontSize="md"
+          pb={2}
+          textTransform="uppercase"
+          letterSpacing="wider"
+        >
           <Box display="flex" alignItems="center" gap={2}>
-            <Box p={1} bg="bauhaus.blue" border="2px solid" borderColor="bauhaus.black">
+            <Box
+              p={1}
+              bg="bauhaus.blue"
+              border="2px solid"
+              borderColor="bauhaus.black"
+            >
               <SettingsIcon color="white" />
             </Box>
             Account Settings
@@ -783,13 +859,37 @@ function AccountSettingsModal({
                 <Box
                   w={2}
                   h={2}
-                  bg={account.type === "privateKey" ? "bauhaus.yellow" : account.type === "seedPhrase" ? "bauhaus.red" : account.type === "impersonator" ? "bauhaus.green" : "bauhaus.blue"}
+                  bg={
+                    account.type === "privateKey"
+                      ? "bauhaus.yellow"
+                      : account.type === "seedPhrase"
+                        ? "bauhaus.red"
+                        : account.type === "impersonator"
+                          ? "bauhaus.green"
+                          : "bauhaus.blue"
+                  }
                   border="1px solid"
                   borderColor="bauhaus.black"
-                  borderRadius={account.type === "privateKey" || account.type === "seedPhrase" ? "none" : "full"}
+                  borderRadius={
+                    account.type === "privateKey" ||
+                    account.type === "seedPhrase"
+                      ? "none"
+                      : "full"
+                  }
                 />
-                <Text fontSize="xs" color="text.tertiary" fontWeight="600" textTransform="uppercase">
-                  {account.type === "privateKey" ? "Private Key Account" : account.type === "seedPhrase" ? `Seed Phrase Account · #${account.derivationIndex}` : account.type === "impersonator" ? "View-Only Account" : "Bankr Account"}
+                <Text
+                  fontSize="xs"
+                  color="text.tertiary"
+                  fontWeight="600"
+                  textTransform="uppercase"
+                >
+                  {account.type === "privateKey"
+                    ? "Private Key Account"
+                    : account.type === "seedPhrase"
+                      ? `Seed Phrase Account · #${account.derivationIndex}`
+                      : account.type === "impersonator"
+                        ? "View-Only Account"
+                        : "Bankr Account"}
                 </Text>
               </HStack>
             </Box>
@@ -828,7 +928,9 @@ function AccountSettingsModal({
                   size="md"
                   onClick={handleSaveDisplayName}
                   isLoading={isSaving}
-                  isDisabled={displayName.trim() === (account.displayName || "")}
+                  isDisabled={
+                    displayName.trim() === (account.displayName || "")
+                  }
                   minW="70px"
                 >
                   Save
@@ -871,7 +973,10 @@ function AccountSettingsModal({
                     size="md"
                     onClick={handleSaveSeedGroupName}
                     isLoading={isSavingSeedGroup}
-                    isDisabled={!seedGroupName.trim() || seedGroupName.trim() === originalSeedGroupName}
+                    isDisabled={
+                      !seedGroupName.trim() ||
+                      seedGroupName.trim() === originalSeedGroupName
+                    }
                     minW="70px"
                   >
                     Save
@@ -882,7 +987,8 @@ function AccountSettingsModal({
 
             {/* Actions */}
             <VStack spacing={3} align="stretch" pt={2}>
-              {(account.type === "privateKey" || account.type === "seedPhrase") && (
+              {(account.type === "privateKey" ||
+                account.type === "seedPhrase") && (
                 <Button
                   variant="yellow"
                   size="sm"
@@ -943,16 +1049,24 @@ function AccountSettingsModal({
                 <Button
                   variant="ghost"
                   size="sm"
-                  leftIcon={<DeleteIcon color={totalAccounts <= 1 ? "gray.400" : "bauhaus.red"} />}
+                  leftIcon={
+                    <DeleteIcon
+                      color={totalAccounts <= 1 ? "gray.400" : "bauhaus.red"}
+                    />
+                  }
                   onClick={() => setView("confirmDelete")}
                   justifyContent="flex-start"
                   color={totalAccounts <= 1 ? "gray.400" : "bauhaus.red"}
                   fontWeight="700"
                   border="2px solid transparent"
-                  _hover={totalAccounts > 1 ? {
-                    bg: "red.50",
-                    borderColor: "bauhaus.red",
-                  } : undefined}
+                  _hover={
+                    totalAccounts > 1
+                      ? {
+                          bg: "red.50",
+                          borderColor: "bauhaus.red",
+                        }
+                      : undefined
+                  }
                   w="full"
                   isDisabled={totalAccounts <= 1}
                 >

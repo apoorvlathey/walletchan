@@ -1,4 +1,11 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  lazy,
+  Suspense,
+} from "react";
 import {
   useUpdateEffect,
   Flex,
@@ -23,7 +30,17 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
-import { SettingsIcon, ChevronDownIcon, CopyIcon, CheckIcon, ExternalLinkIcon, LockIcon, WarningIcon, InfoIcon, ChatIcon } from "@chakra-ui/icons";
+import {
+  SettingsIcon,
+  ChevronDownIcon,
+  CopyIcon,
+  CheckIcon,
+  ExternalLinkIcon,
+  LockIcon,
+  WarningIcon,
+  InfoIcon,
+  ChatIcon,
+} from "@chakra-ui/icons";
 
 // Fullscreen icon (two diagonal arrows pointing outward)
 const FullscreenIcon = (props: any) => (
@@ -42,7 +59,9 @@ const FullscreenIcon = (props: any) => (
  */
 function isArcBrowser(): boolean {
   try {
-    const arcPaletteTitle = getComputedStyle(document.documentElement).getPropertyValue('--arc-palette-title');
+    const arcPaletteTitle = getComputedStyle(
+      document.documentElement,
+    ).getPropertyValue("--arc-palette-title");
     return !!arcPaletteTitle && arcPaletteTitle.trim().length > 0;
   } catch {
     return false;
@@ -51,15 +70,25 @@ function isArcBrowser(): boolean {
 
 // Lazy load heavy components
 const Settings = lazy(() => import("@/components/Settings"));
-const TransactionConfirmation = lazy(() => import("@/components/TransactionConfirmation"));
-const SignatureRequestConfirmation = lazy(() => import("@/components/SignatureRequestConfirmation"));
+const TransactionConfirmation = lazy(
+  () => import("@/components/TransactionConfirmation"),
+);
+const SignatureRequestConfirmation = lazy(
+  () => import("@/components/SignatureRequestConfirmation"),
+);
 const PendingTxList = lazy(() => import("@/components/PendingTxList"));
 const ChatView = lazy(() => import("@/components/Chat/ChatView"));
 const AccountSwitcher = lazy(() => import("@/components/AccountSwitcher"));
 const AddAccount = lazy(() => import("@/components/AddAccount"));
-const RevealPrivateKeyModal = lazy(() => import("@/components/RevealPrivateKeyModal"));
-const RevealSeedPhraseModal = lazy(() => import("@/components/RevealSeedPhraseModal"));
-const AccountSettingsModal = lazy(() => import("@/components/AccountSettingsModal"));
+const RevealPrivateKeyModal = lazy(
+  () => import("@/components/RevealPrivateKeyModal"),
+);
+const RevealSeedPhraseModal = lazy(
+  () => import("@/components/RevealSeedPhraseModal"),
+);
+const AccountSettingsModal = lazy(
+  () => import("@/components/AccountSettingsModal"),
+);
 const TokenTransfer = lazy(() => import("@/components/TokenTransfer"));
 
 // Eager load components needed immediately
@@ -83,7 +112,7 @@ export type CombinedRequest =
 // Helper to combine and sort requests by timestamp
 export function getCombinedRequests(
   txRequests: PendingTxRequest[],
-  sigRequests: PendingSignatureRequest[]
+  sigRequests: PendingSignatureRequest[],
 ): CombinedRequest[] {
   const combined: CombinedRequest[] = [
     ...txRequests.map((r) => ({ type: "tx" as const, request: r })),
@@ -106,7 +135,17 @@ const LoadingFallback = () => (
   </Box>
 );
 
-type AppView = "main" | "unlock" | "settings" | "pendingTxList" | "txConfirm" | "signatureConfirm" | "waitingForOnboarding" | "chat" | "addAccount" | "transfer";
+type AppView =
+  | "main"
+  | "unlock"
+  | "settings"
+  | "pendingTxList"
+  | "txConfirm"
+  | "signatureConfirm"
+  | "waitingForOnboarding"
+  | "chat"
+  | "addAccount"
+  | "transfer";
 
 function App() {
   const { networksInfo, reloadRequired, setReloadRequired } = useNetworks();
@@ -118,10 +157,16 @@ function App() {
   const [displayAddress, setDisplayAddress] = useState<string>("");
   const [chainName, setChainName] = useState<string>();
   const [hasApiKey, setHasApiKey] = useState(false);
-  const [pendingRequests, setPendingRequests] = useState<PendingTxRequest[]>([]);
-  const [selectedTxRequest, setSelectedTxRequest] = useState<PendingTxRequest | null>(null);
-  const [pendingSignatureRequests, setPendingSignatureRequests] = useState<PendingSignatureRequest[]>([]);
-  const [selectedSignatureRequest, setSelectedSignatureRequest] = useState<PendingSignatureRequest | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<PendingTxRequest[]>(
+    [],
+  );
+  const [selectedTxRequest, setSelectedTxRequest] =
+    useState<PendingTxRequest | null>(null);
+  const [pendingSignatureRequests, setPendingSignatureRequests] = useState<
+    PendingSignatureRequest[]
+  >([]);
+  const [selectedSignatureRequest, setSelectedSignatureRequest] =
+    useState<PendingSignatureRequest | null>(null);
   const [activityTabTrigger, setActivityTabTrigger] = useState(0);
 
   const [copied, setCopied] = useState(false);
@@ -129,21 +174,42 @@ function App() {
   const [sidePanelMode, setSidePanelMode] = useState(false);
   const [isInSidePanel, setIsInSidePanel] = useState(false);
   const [isFullscreenTab, setIsFullscreenTab] = useState(false);
-  const [failedTxError, setFailedTxError] = useState<{ error: string; origin: string } | null>(null);
+  const [failedTxError, setFailedTxError] = useState<{
+    error: string;
+    origin: string;
+  } | null>(null);
   const [onboardingTabId, setOnboardingTabId] = useState<number | null>(null);
   const [startChatWithNew, setStartChatWithNew] = useState(false);
   const [returnToChatAfterUnlock, setReturnToChatAfterUnlock] = useState(false);
-  const [returnToConversationId, setReturnToConversationId] = useState<string | null>(null);
+  const [returnToConversationId, setReturnToConversationId] = useState<
+    string | null
+  >(null);
   const [isWalletUnlocked, setIsWalletUnlocked] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [activeAccount, setActiveAccount] = useState<Account | null>(null);
   const [revealAccount, setRevealAccount] = useState<Account | null>(null);
-  const [revealSeedAccount, setRevealSeedAccount] = useState<Account | null>(null);
+  const [revealSeedAccount, setRevealSeedAccount] = useState<Account | null>(
+    null,
+  );
   const [settingsAccount, setSettingsAccount] = useState<Account | null>(null);
-  const { isOpen: isRevealKeyOpen, onOpen: onRevealKeyOpen, onClose: onRevealKeyClose } = useDisclosure();
-  const { isOpen: isRevealSeedOpen, onOpen: onRevealSeedOpen, onClose: onRevealSeedClose } = useDisclosure();
-  const { isOpen: isAccountSettingsOpen, onOpen: onAccountSettingsOpen, onClose: onAccountSettingsClose } = useDisclosure();
-  const [transferToken, setTransferToken] = useState<PortfolioToken | null>(null);
+  const {
+    isOpen: isRevealKeyOpen,
+    onOpen: onRevealKeyOpen,
+    onClose: onRevealKeyClose,
+  } = useDisclosure();
+  const {
+    isOpen: isRevealSeedOpen,
+    onOpen: onRevealSeedOpen,
+    onClose: onRevealSeedClose,
+  } = useDisclosure();
+  const {
+    isOpen: isAccountSettingsOpen,
+    onOpen: onAccountSettingsOpen,
+    onClose: onAccountSettingsClose,
+  } = useDisclosure();
+  const [transferToken, setTransferToken] = useState<PortfolioToken | null>(
+    null,
+  );
   const keepAlivePortRef = useRef<chrome.runtime.Port | null>(null);
   const reconnectingRef = useRef(false);
 
@@ -190,7 +256,7 @@ function App() {
   const sendMessageWithRetry = async <T,>(
     message: { type: string; [key: string]: any },
     maxRetries = 5,
-    delay = 200
+    delay = 200,
   ): Promise<T | null> => {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
@@ -255,27 +321,37 @@ function App() {
   }, []);
 
   const loadPendingRequests = async () => {
-    const requests = await sendMessageWithRetry<PendingTxRequest[]>({ type: "getPendingTxRequests" });
+    const requests = await sendMessageWithRetry<PendingTxRequest[]>({
+      type: "getPendingTxRequests",
+    });
     setPendingRequests(requests || []);
     return requests || [];
   };
 
   const loadPendingSignatureRequests = async () => {
-    const requests = await sendMessageWithRetry<PendingSignatureRequest[]>({ type: "getPendingSignatureRequests" });
+    const requests = await sendMessageWithRetry<PendingSignatureRequest[]>({
+      type: "getPendingSignatureRequests",
+    });
     setPendingSignatureRequests(requests || []);
     return requests || [];
   };
 
   const checkLockState = async (): Promise<boolean> => {
-    const cached = await sendMessageWithRetry<boolean>({ type: "isWalletUnlocked" });
+    const cached = await sendMessageWithRetry<boolean>({
+      type: "isWalletUnlocked",
+    });
     return cached || false;
   };
 
   const loadAccounts = async (syncAddress = false) => {
-    const accountList = await sendMessageWithRetry<Account[]>({ type: "getAccounts" });
+    const accountList = await sendMessageWithRetry<Account[]>({
+      type: "getAccounts",
+    });
     setAccounts(accountList || []);
 
-    const active = await sendMessageWithRetry<Account | null>({ type: "getActiveAccount" });
+    const active = await sendMessageWithRetry<Account | null>({
+      type: "getActiveAccount",
+    });
     setActiveAccount(active);
 
     // Sync address/displayAddress to match active account
@@ -290,15 +366,17 @@ function App() {
       // Notify content script about the account change
       const tab = await currentTab();
       if (tab?.id) {
-        chrome.tabs.sendMessage(tab.id, {
-          type: "setAccount",
-          msg: {
-            address: active.address,
-            displayAddress: active.displayName || active.address,
-            accountId: active.id,
-            accountType: active.type,
-          },
-        }).catch(() => {});
+        chrome.tabs
+          .sendMessage(tab.id, {
+            type: "setAccount",
+            msg: {
+              address: active.address,
+              displayAddress: active.displayName || active.address,
+              accountId: active.id,
+              accountType: active.type,
+            },
+          })
+          .catch(() => {});
       }
     }
 
@@ -307,7 +385,10 @@ function App() {
 
   const handleAccountSwitch = async (account: Account) => {
     // Set as active account
-    await sendMessageWithRetry({ type: "setActiveAccount", accountId: account.id });
+    await sendMessageWithRetry({
+      type: "setActiveAccount",
+      accountId: account.id,
+    });
     setActiveAccount(account);
 
     // Update address and displayAddress
@@ -324,8 +405,8 @@ function App() {
     if (account.type === "bankr" && chainName && networksInfo) {
       const currentChainId = networksInfo[chainName]?.chainId;
       if (currentChainId && !BANKR_SUPPORTED_CHAIN_IDS.has(currentChainId)) {
-        const firstSupported = Object.keys(networksInfo).find(name =>
-          BANKR_SUPPORTED_CHAIN_IDS.has(networksInfo[name].chainId)
+        const firstSupported = Object.keys(networksInfo).find((name) =>
+          BANKR_SUPPORTED_CHAIN_IDS.has(networksInfo[name].chainId),
         );
         if (firstSupported) setChainName(firstSupported);
       }
@@ -334,17 +415,19 @@ function App() {
     // Notify content script about the account change
     const tab = await currentTab();
     if (tab?.id) {
-      chrome.tabs.sendMessage(tab.id, {
-        type: "setAccount",
-        msg: {
-          address: account.address,
-          displayAddress: account.displayName || account.address,
-          accountId: account.id,
-          accountType: account.type,
-        },
-      }).catch(() => {
-        // Ignore errors if content script not injected
-      });
+      chrome.tabs
+        .sendMessage(tab.id, {
+          type: "setAccount",
+          msg: {
+            address: account.address,
+            displayAddress: account.displayName || account.address,
+            accountId: account.id,
+            accountType: account.type,
+          },
+        })
+        .catch(() => {
+          // Ignore errors if content script not injected
+        });
     }
   };
 
@@ -354,10 +437,16 @@ function App() {
     const checkSidePanelSupport = async () => {
       // First check if we're in Arc browser - sidepanel doesn't work there
       if (isArcBrowser()) {
-        console.log("Arc browser detected via CSS variable - disabling sidepanel");
+        console.log(
+          "Arc browser detected via CSS variable - disabling sidepanel",
+        );
         // Notify background that we're in Arc - this must happen before anything else
         // Use direct chrome.storage.sync.set for immediate effect (no message needed)
-        await chrome.storage.sync.set({ isArcBrowser: true, sidePanelVerified: false, sidePanelMode: false });
+        await chrome.storage.sync.set({
+          isArcBrowser: true,
+          sidePanelVerified: false,
+          sidePanelMode: false,
+        });
         // Also notify background via message (for any runtime state it needs to update)
         try {
           chrome.runtime.sendMessage({ type: "setArcBrowser", isArc: true });
@@ -368,12 +457,16 @@ function App() {
       }
 
       // Not Arc - check if sidepanel is supported
-      const response = await sendMessageWithRetry<{ supported: boolean }>({ type: "isSidePanelSupported" });
+      const response = await sendMessageWithRetry<{ supported: boolean }>({
+        type: "isSidePanelSupported",
+      });
       return response?.supported || false;
     };
 
     const checkSidePanelMode = async () => {
-      const response = await sendMessageWithRetry<{ enabled: boolean }>({ type: "getSidePanelMode" });
+      const response = await sendMessageWithRetry<{ enabled: boolean }>({
+        type: "getSidePanelMode",
+      });
       return response?.enabled || false;
     };
 
@@ -401,12 +494,17 @@ function App() {
 
       if (supported) {
         // Check if sidepanel mode has been explicitly set
-        const { sidePanelMode: storedMode } = await chrome.storage.sync.get(["sidePanelMode"]);
+        const { sidePanelMode: storedMode } = await chrome.storage.sync.get([
+          "sidePanelMode",
+        ]);
 
         if (storedMode === undefined) {
           // First time after onboarding or upgrade - enable sidepanel by default for non-Arc
           try {
-            const response = await sendMessageWithRetry<{ success: boolean }>({ type: "setSidePanelMode", enabled: true });
+            const response = await sendMessageWithRetry<{ success: boolean }>({
+              type: "setSidePanelMode",
+              enabled: true,
+            });
             if (response?.success) {
               setSidePanelMode(true);
               console.log("Sidepanel mode enabled by default");
@@ -479,7 +577,7 @@ function App() {
           }
           // Clear the URL param
           window.history.replaceState({}, "", window.location.pathname);
-        }
+        },
       );
     }
   }, []);
@@ -509,7 +607,9 @@ function App() {
         if (existingTabs.length > 0 && existingTabs[0].id) {
           // Focus existing onboarding tab
           await chrome.tabs.update(existingTabs[0].id, { active: true });
-          await chrome.windows.update(existingTabs[0].windowId!, { focused: true });
+          await chrome.windows.update(existingTabs[0].windowId!, {
+            focused: true,
+          });
           setOnboardingTabId(existingTabs[0].id);
         } else {
           // Create new onboarding tab
@@ -526,8 +626,11 @@ function App() {
 
       // API key is configured - close any open onboarding tabs
       // Use pattern matching to ensure we find the tab regardless of URL variations
-      const onboardingUrlPattern = chrome.runtime.getURL("onboarding.html") + "*";
-      const onboardingTabs = await chrome.tabs.query({ url: onboardingUrlPattern });
+      const onboardingUrlPattern =
+        chrome.runtime.getURL("onboarding.html") + "*";
+      const onboardingTabs = await chrome.tabs.query({
+        url: onboardingUrlPattern,
+      });
       for (const tab of onboardingTabs) {
         if (tab.id) {
           chrome.tabs.remove(tab.id).catch(() => {
@@ -548,14 +651,17 @@ function App() {
       const sigRequests = await loadPendingSignatureRequests();
 
       // Load accounts
-      let { accounts: loadedAccounts, activeAccount: loadedActive } = await loadAccounts();
+      let { accounts: loadedAccounts, activeAccount: loadedActive } =
+        await loadAccounts();
 
       // Migration fallback: if API key exists but no accounts, the user is
       // upgrading from v0.1.1/v0.2.0 and the onInstalled migration may not
       // have run yet (e.g. service worker was inactive). Ask background to
       // create the account entry from legacy storage.
       if (loadedAccounts.length === 0) {
-        const migrationResult = await sendMessageWithRetry<{ migrated: boolean }>({
+        const migrationResult = await sendMessageWithRetry<{
+          migrated: boolean;
+        }>({
           type: "migrateFromLegacy",
         });
         if (migrationResult?.migrated) {
@@ -572,7 +678,9 @@ function App() {
         const existingTabs = await chrome.tabs.query({ url: onboardingUrl });
         if (existingTabs.length > 0 && existingTabs[0].id) {
           await chrome.tabs.update(existingTabs[0].id, { active: true });
-          await chrome.windows.update(existingTabs[0].windowId!, { focused: true });
+          await chrome.windows.update(existingTabs[0].windowId!, {
+            focused: true,
+          });
         } else {
           await chrome.tabs.create({ url: onboardingUrl });
         }
@@ -617,7 +725,11 @@ function App() {
       chrome.tabs.sendMessage(
         tab.id!,
         { type: "getInfo" },
-        (store: { address: string; displayAddress: string; chainName: string }) => {
+        (store: {
+          address: string;
+          displayAddress: string;
+          chainName: string;
+        }) => {
           // Ignore errors (tab might not have content script, e.g. chrome:// pages)
           if (chrome.runtime.lastError) return;
           if (store?.chainName && store.chainName.length > 0) {
@@ -625,7 +737,7 @@ function App() {
             if (store.displayAddress) setDisplayAddress(store.displayAddress);
             if (store.chainName) setChainName(store.chainName);
           }
-        }
+        },
       );
 
       // Set wallet unlock state
@@ -657,9 +769,13 @@ function App() {
   // Also listen for onboarding completion
   useEffect(() => {
     const handleMessage = async (
-      message: { type: string; txRequest?: PendingTxRequest; sigRequest?: PendingSignatureRequest },
+      message: {
+        type: string;
+        txRequest?: PendingTxRequest;
+        sigRequest?: PendingSignatureRequest;
+      },
       _sender: chrome.runtime.MessageSender,
-      sendResponse: (response?: any) => void
+      sendResponse: (response?: any) => void,
     ) => {
       if (message.type === "ping") {
         // Respond to ping so background knows we're open
@@ -714,7 +830,7 @@ function App() {
   useEffect(() => {
     const handleStorageChange = (
       changes: { [key: string]: chrome.storage.StorageChange },
-      areaName: string
+      areaName: string,
     ) => {
       if (areaName === "sync") {
         if (changes.chainName) {
@@ -749,7 +865,11 @@ function App() {
       chrome.tabs.sendMessage(
         activeInfo.tabId,
         { type: "getInfo" },
-        (store: { address: string; displayAddress: string; chainName: string }) => {
+        (store: {
+          address: string;
+          displayAddress: string;
+          chainName: string;
+        }) => {
           // Ignore errors (tab might not have content script injected)
           if (chrome.runtime.lastError) {
             return;
@@ -757,7 +877,7 @@ function App() {
           if (store?.chainName && store.chainName.length > 0) {
             setChainName(store.chainName);
           }
-        }
+        },
       );
     };
 
@@ -771,12 +891,14 @@ function App() {
         const tab = await currentTab();
         const chainId = networksInfo[chainName].chainId;
 
-        chrome.tabs.sendMessage(tab.id!, {
-          type: "setChainId",
-          msg: { chainName, chainId, rpcUrl: networksInfo[chainName].rpcUrl },
-        }).catch(() => {
-          // Ignore errors if content script not injected (e.g. chrome:// pages)
-        });
+        chrome.tabs
+          .sendMessage(tab.id!, {
+            type: "setChainId",
+            msg: { chainName, chainId, rpcUrl: networksInfo[chainName].rpcUrl },
+          })
+          .catch(() => {
+            // Ignore errors if content script not injected (e.g. chrome:// pages)
+          });
 
         await chrome.storage.sync.set({ chainName });
       }
@@ -884,7 +1006,7 @@ function App() {
       await new Promise<void>((resolve) => {
         chrome.runtime.sendMessage(
           { type: "rejectTransaction", txId: request.id },
-          () => resolve()
+          () => resolve(),
         );
       });
     }
@@ -893,7 +1015,7 @@ function App() {
       await new Promise<void>((resolve) => {
         chrome.runtime.sendMessage(
           { type: "rejectSignatureRequest", sigId: request.id },
-          () => resolve()
+          () => resolve(),
         );
       });
     }
@@ -907,7 +1029,12 @@ function App() {
     } else {
       window.close();
     }
-  }, [pendingRequests, pendingSignatureRequests, isInSidePanel, isFullscreenTab]);
+  }, [
+    pendingRequests,
+    pendingSignatureRequests,
+    isInSidePanel,
+    isFullscreenTab,
+  ]);
 
   const handleSignatureCancelled = useCallback(async () => {
     const currentSigId = selectedSignatureRequest?.id;
@@ -939,7 +1066,7 @@ function App() {
       await new Promise<void>((resolve) => {
         chrome.runtime.sendMessage(
           { type: "rejectSignatureRequest", sigId: request.id },
-          () => resolve()
+          () => resolve(),
         );
       });
     }
@@ -973,7 +1100,12 @@ function App() {
         alignItems="center"
         justifyContent="center"
       >
-        <Text color="text.secondary" fontWeight="700" textTransform="uppercase" letterSpacing="wider">
+        <Text
+          color="text.secondary"
+          fontWeight="700"
+          textTransform="uppercase"
+          letterSpacing="wider"
+        >
           Loading...
         </Text>
       </Box>
@@ -1014,105 +1146,118 @@ function App() {
           display="flex"
           flexDirection="column"
         >
-      <Box
-        minH="300px"
-        bg="bg.base"
-        display="flex"
-        flexDirection="column"
-        alignItems="center"
-        justifyContent="center"
-        p={6}
-        textAlign="center"
-        position="relative"
-        flex="1"
-      >
-        {/* Geometric decorations */}
-        <Box
-          position="absolute"
-          top={4}
-          left={4}
-          w="12px"
-          h="12px"
-          bg="bauhaus.red"
-          border="2px solid"
-          borderColor="bauhaus.black"
-        />
-        <Box
-          position="absolute"
-          top={4}
-          right={4}
-          w="12px"
-          h="12px"
-          bg="bauhaus.blue"
-          border="2px solid"
-          borderColor="bauhaus.black"
-          borderRadius="full"
-        />
-
-        <VStack spacing={4}>
           <Box
-            bg="bauhaus.yellow"
-            border="3px solid"
-            borderColor="bauhaus.black"
-            boxShadow="4px 4px 0px 0px #121212"
-            p={3}
+            minH="300px"
+            bg="bg.base"
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            p={6}
+            textAlign="center"
+            position="relative"
+            flex="1"
           >
-            <Image src="bankrwallet-icon.png" w="3rem" />
-          </Box>
-          <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
-            Complete Setup
-          </Text>
-          <Text fontSize="sm" color="text.secondary" fontWeight="500">
-            Please complete the setup in the new tab that just opened.
-          </Text>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={async () => {
-              // Re-open or focus onboarding tab
-              const onboardingUrl = chrome.runtime.getURL("onboarding.html");
-              const existingTabs = await chrome.tabs.query({ url: onboardingUrl });
-              if (existingTabs.length > 0 && existingTabs[0].id) {
-                await chrome.tabs.update(existingTabs[0].id, { active: true });
-                await chrome.windows.update(existingTabs[0].windowId!, { focused: true });
-              } else {
-                await chrome.tabs.create({ url: onboardingUrl });
-              }
-            }}
-          >
-            Open Setup Tab
-          </Button>
-          <HStack spacing={1} justify="center" mt={4}>
-            <Text fontSize="sm" color="text.tertiary" fontWeight="500">
-              Built by
-            </Text>
-            <Link
-              display="flex"
-              alignItems="center"
-              gap={1}
-              color="bauhaus.blue"
-              fontWeight="700"
-              _hover={{ color: "bauhaus.red" }}
-              onClick={() => {
-                chrome.tabs.create({ url: "https://x.com/apoorveth" });
-              }}
-            >
+            {/* Geometric decorations */}
+            <Box
+              position="absolute"
+              top={4}
+              left={4}
+              w="12px"
+              h="12px"
+              bg="bauhaus.red"
+              border="2px solid"
+              borderColor="bauhaus.black"
+            />
+            <Box
+              position="absolute"
+              top={4}
+              right={4}
+              w="12px"
+              h="12px"
+              bg="bauhaus.blue"
+              border="2px solid"
+              borderColor="bauhaus.black"
+              borderRadius="full"
+            />
+
+            <VStack spacing={4}>
               <Box
-                as="svg"
-                viewBox="0 0 24 24"
-                w="14px"
-                h="14px"
-                fill="currentColor"
+                bg="bauhaus.yellow"
+                border="3px solid"
+                borderColor="bauhaus.black"
+                boxShadow="4px 4px 0px 0px #121212"
+                p={3}
               >
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                <Image src="walletchan-icon.png" w="3rem" />
               </Box>
-              <Text fontSize="sm" textDecor="underline">
-                @apoorveth
+              <Text
+                fontSize="lg"
+                fontWeight="900"
+                color="text.primary"
+                textTransform="uppercase"
+                letterSpacing="wider"
+              >
+                Complete Setup
               </Text>
-            </Link>
-          </HStack>
-        </VStack>
-      </Box>
+              <Text fontSize="sm" color="text.secondary" fontWeight="500">
+                Please complete the setup in the new tab that just opened.
+              </Text>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={async () => {
+                  // Re-open or focus onboarding tab
+                  const onboardingUrl =
+                    chrome.runtime.getURL("onboarding.html");
+                  const existingTabs = await chrome.tabs.query({
+                    url: onboardingUrl,
+                  });
+                  if (existingTabs.length > 0 && existingTabs[0].id) {
+                    await chrome.tabs.update(existingTabs[0].id, {
+                      active: true,
+                    });
+                    await chrome.windows.update(existingTabs[0].windowId!, {
+                      focused: true,
+                    });
+                  } else {
+                    await chrome.tabs.create({ url: onboardingUrl });
+                  }
+                }}
+              >
+                Open Setup Tab
+              </Button>
+              <HStack spacing={1} justify="center" mt={4}>
+                <Text fontSize="sm" color="text.tertiary" fontWeight="500">
+                  Built by
+                </Text>
+                <Link
+                  display="flex"
+                  alignItems="center"
+                  gap={1}
+                  color="bauhaus.blue"
+                  fontWeight="700"
+                  _hover={{ color: "bauhaus.red" }}
+                  onClick={() => {
+                    chrome.tabs.create({ url: "https://x.com/apoorveth" });
+                  }}
+                >
+                  <Box
+                    as="svg"
+                    viewBox="0 0 24 24"
+                    w="14px"
+                    h="14px"
+                    fill="currentColor"
+                  >
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                  </Box>
+                  <Text fontSize="sm" textDecor="underline">
+                    @apoorveth
+                  </Text>
+                </Link>
+              </HStack>
+            </VStack>
+          </Box>
         </Box>
       </Box>
     );
@@ -1130,53 +1275,65 @@ function App() {
           display="flex"
           flexDirection="column"
         >
-        <Container pt={4} pb={4} flex="1" display="flex" flexDirection="column">
-          <Suspense fallback={<LoadingFallback />}>
-            <Settings
-              close={async () => {
-                // After settings, check if now have API key
-                const has = await hasEncryptedApiKey();
-                setHasApiKey(has);
+          <Container
+            pt={4}
+            pb={4}
+            flex="1"
+            display="flex"
+            flexDirection="column"
+          >
+            <Suspense fallback={<LoadingFallback />}>
+              <Settings
+                close={async () => {
+                  // After settings, check if now have API key
+                  const has = await hasEncryptedApiKey();
+                  setHasApiKey(has);
 
-                if (has) {
-                  // Ensure keepalive port is connected before checking lock state
-                  // (service worker may have restarted while we were in settings)
-                  establishKeepalivePort();
-                  await new Promise((r) => setTimeout(r, 50));
+                  if (has) {
+                    // Ensure keepalive port is connected before checking lock state
+                    // (service worker may have restarted while we were in settings)
+                    establishKeepalivePort();
+                    await new Promise((r) => setTimeout(r, 50));
 
-                  const unlocked = await checkLockState();
+                    const unlocked = await checkLockState();
 
-                  if (unlocked) {
-                    setIsWalletUnlocked(true);
-                    setView("main");
-                  } else {
-                    // Check if this was unexpected (auto-lock is "Never")
-                    // If so, try to restore the session
-                    const { autoLockTimeout } = await chrome.storage.sync.get("autoLockTimeout");
+                    if (unlocked) {
+                      setIsWalletUnlocked(true);
+                      setView("main");
+                    } else {
+                      // Check if this was unexpected (auto-lock is "Never")
+                      // If so, try to restore the session
+                      const { autoLockTimeout } =
+                        await chrome.storage.sync.get("autoLockTimeout");
 
-                    if (autoLockTimeout === 0 || autoLockTimeout === undefined) {
-                      // Auto-lock is "Never" - try session restoration
-                      const restored = await sendMessageWithRetry<boolean>({ type: "tryRestoreSession" });
-                      if (restored) {
-                        setIsWalletUnlocked(true);
-                        setView("main");
-                        return;
+                      if (
+                        autoLockTimeout === 0 ||
+                        autoLockTimeout === undefined
+                      ) {
+                        // Auto-lock is "Never" - try session restoration
+                        const restored = await sendMessageWithRetry<boolean>({
+                          type: "tryRestoreSession",
+                        });
+                        if (restored) {
+                          setIsWalletUnlocked(true);
+                          setView("main");
+                          return;
+                        }
                       }
-                    }
 
-                    setIsWalletUnlocked(false);
-                    setView("unlock");
+                      setIsWalletUnlocked(false);
+                      setView("unlock");
+                    }
                   }
-                }
-              }}
-              showBackButton={hasApiKey}
-              onSessionExpired={() => {
-                setIsWalletUnlocked(false);
-                setView("unlock");
-              }}
-            />
-          </Suspense>
-        </Container>
+                }}
+                showBackButton={hasApiKey}
+                onSessionExpired={() => {
+                  setIsWalletUnlocked(false);
+                  setView("unlock");
+                }}
+              />
+            </Suspense>
+          </Container>
         </Box>
       </Box>
     );
@@ -1194,26 +1351,26 @@ function App() {
           display="flex"
           flexDirection="column"
         >
-      <Suspense fallback={<LoadingFallback />}>
-        <ChatView
-          onBack={() => {
-            setStartChatWithNew(false);
-            setReturnToConversationId(null);
-            setView("main");
-          }}
-          startWithNewChat={startChatWithNew}
-          returnToConversationId={returnToConversationId}
-          isWalletUnlocked={isWalletUnlocked}
-          onUnlock={(conversationId) => {
-            setReturnToChatAfterUnlock(true);
-            setReturnToConversationId(conversationId || null);
-            setView("unlock");
-          }}
-          onWalletLocked={() => {
-            setIsWalletUnlocked(false);
-          }}
-        />
-      </Suspense>
+          <Suspense fallback={<LoadingFallback />}>
+            <ChatView
+              onBack={() => {
+                setStartChatWithNew(false);
+                setReturnToConversationId(null);
+                setView("main");
+              }}
+              startWithNewChat={startChatWithNew}
+              returnToConversationId={returnToConversationId}
+              isWalletUnlocked={isWalletUnlocked}
+              onUnlock={(conversationId) => {
+                setReturnToChatAfterUnlock(true);
+                setReturnToConversationId(conversationId || null);
+                setView("unlock");
+              }}
+              onWalletLocked={() => {
+                setIsWalletUnlocked(false);
+              }}
+            />
+          </Suspense>
         </Box>
       </Box>
     );
@@ -1312,9 +1469,12 @@ function App() {
 
   // Transaction confirmation view
   if (view === "txConfirm" && selectedTxRequest) {
-    const combinedRequests = getCombinedRequests(pendingRequests, pendingSignatureRequests);
+    const combinedRequests = getCombinedRequests(
+      pendingRequests,
+      pendingSignatureRequests,
+    );
     const currentIndex = combinedRequests.findIndex(
-      (r) => r.type === "tx" && r.request.id === selectedTxRequest.id
+      (r) => r.type === "tx" && r.request.id === selectedTxRequest.id,
     );
     const totalCount = combinedRequests.length;
     return (
@@ -1347,9 +1507,11 @@ function App() {
               onRejectAll={handleRejectAll}
               onNavigate={(direction) => {
                 const currentIdx = combinedRequests.findIndex(
-                  (r) => r.type === "tx" && r.request.id === selectedTxRequest.id
+                  (r) =>
+                    r.type === "tx" && r.request.id === selectedTxRequest.id,
                 );
-                const newIdx = direction === "prev" ? currentIdx - 1 : currentIdx + 1;
+                const newIdx =
+                  direction === "prev" ? currentIdx - 1 : currentIdx + 1;
                 if (newIdx >= 0 && newIdx < combinedRequests.length) {
                   const nextRequest = combinedRequests[newIdx];
                   if (nextRequest.type === "tx") {
@@ -1370,9 +1532,12 @@ function App() {
 
   // Signature request confirmation view
   if (view === "signatureConfirm" && selectedSignatureRequest) {
-    const combinedRequests = getCombinedRequests(pendingRequests, pendingSignatureRequests);
+    const combinedRequests = getCombinedRequests(
+      pendingRequests,
+      pendingSignatureRequests,
+    );
     const currentIndex = combinedRequests.findIndex(
-      (r) => r.type === "sig" && r.request.id === selectedSignatureRequest.id
+      (r) => r.type === "sig" && r.request.id === selectedSignatureRequest.id,
     );
     const totalCount = combinedRequests.length;
     return (
@@ -1406,9 +1571,12 @@ function App() {
               onConfirmed={handleSignatureCancelled}
               onNavigate={(direction) => {
                 const currentIdx = combinedRequests.findIndex(
-                  (r) => r.type === "sig" && r.request.id === selectedSignatureRequest.id
+                  (r) =>
+                    r.type === "sig" &&
+                    r.request.id === selectedSignatureRequest.id,
                 );
-                const newIdx = direction === "prev" ? currentIdx - 1 : currentIdx + 1;
+                const newIdx =
+                  direction === "prev" ? currentIdx - 1 : currentIdx + 1;
                 if (newIdx >= 0 && newIdx < combinedRequests.length) {
                   const nextRequest = combinedRequests[newIdx];
                   if (nextRequest.type === "sig") {
@@ -1439,227 +1607,647 @@ function App() {
         display="flex"
         flexDirection="column"
       >
-      {/* Header */}
-      <Flex
-        py={3}
-        px={4}
-        bg="bauhaus.black"
-        alignItems="center"
-        position="relative"
-      >
-        {/* Decorative stripe */}
-        <Box
-          position="absolute"
-          bottom="0"
-          left="0"
-          right="0"
-          h="3px"
-          bg="bauhaus.red"
-        />
+        {/* Header */}
+        <Flex
+          py={3}
+          px={4}
+          bg="bauhaus.black"
+          alignItems="center"
+          position="relative"
+        >
+          {/* Decorative stripe */}
+          <Box
+            position="absolute"
+            bottom="0"
+            left="0"
+            right="0"
+            h="3px"
+            bg="bauhaus.red"
+          />
 
-        <HStack spacing={2}>
-          <Box bg="bauhaus.white" p={0.5}>
-            <Image src="bankrwallet-icon-white-bg.png" h="1.75rem" />
-          </Box>
-          <Text fontWeight="900" color="bauhaus.white" textTransform="uppercase" letterSpacing="wider">
-            BankrWallet
-          </Text>
-        </HStack>
-        <Spacer />
-        <HStack spacing={1}>
-          {activeAccount?.type === "bankr" && (
-            <Tooltip label="Chat History" placement="bottom">
+          <HStack spacing={2}>
+            <Box bg="bauhaus.white" p={0.5}>
+              <Image src="walletchan-icon-white-bg.png" h="1.75rem" />
+            </Box>
+            <Text
+              fontWeight="900"
+              color="bauhaus.white"
+              textTransform="uppercase"
+              letterSpacing="wider"
+            >
+              WalletChan
+            </Text>
+          </HStack>
+          <Spacer />
+          <HStack spacing={1}>
+            {activeAccount?.type === "bankr" && (
+              <Tooltip label="Chat History" placement="bottom">
+                <IconButton
+                  aria-label="Chat History"
+                  icon={<ChatIcon />}
+                  variant="ghost"
+                  size="sm"
+                  color="bauhaus.white"
+                  _hover={{ bg: "whiteAlpha.200" }}
+                  onClick={() => {
+                    setStartChatWithNew(false);
+                    setView("chat");
+                  }}
+                />
+              </Tooltip>
+            )}
+            <Tooltip label="Lock wallet" placement="bottom">
               <IconButton
-                aria-label="Chat History"
-                icon={<ChatIcon />}
+                aria-label="Lock wallet"
+                icon={<LockIcon />}
                 variant="ghost"
                 size="sm"
                 color="bauhaus.white"
                 _hover={{ bg: "whiteAlpha.200" }}
                 onClick={() => {
-                  setStartChatWithNew(false);
-                  setView("chat");
+                  chrome.runtime.sendMessage({ type: "lockWallet" }, () => {
+                    setView("unlock");
+                  });
                 }}
               />
             </Tooltip>
-          )}
-          <Tooltip label="Lock wallet" placement="bottom">
+            {!isFullscreenTab && (
+              <Tooltip label="Open in new tab" placement="bottom">
+                <IconButton
+                  aria-label="Open in new tab"
+                  icon={<FullscreenIcon />}
+                  variant="ghost"
+                  size="sm"
+                  color="bauhaus.white"
+                  _hover={{ bg: "whiteAlpha.200" }}
+                  onClick={openInFullscreenTab}
+                />
+              </Tooltip>
+            )}
             <IconButton
-              aria-label="Lock wallet"
-              icon={<LockIcon />}
+              aria-label="Settings"
+              icon={<SettingsIcon />}
               variant="ghost"
               size="sm"
               color="bauhaus.white"
               _hover={{ bg: "whiteAlpha.200" }}
-              onClick={() => {
-                chrome.runtime.sendMessage({ type: "lockWallet" }, () => {
-                  setView("unlock");
-                });
-              }}
+              onClick={() => setView("settings")}
             />
-          </Tooltip>
-          {!isFullscreenTab && (
-            <Tooltip label="Open in new tab" placement="bottom">
-              <IconButton
-                aria-label="Open in new tab"
-                icon={<FullscreenIcon />}
-                variant="ghost"
-                size="sm"
-                color="bauhaus.white"
-                _hover={{ bg: "whiteAlpha.200" }}
-                onClick={openInFullscreenTab}
-              />
-            </Tooltip>
-          )}
-          <IconButton
-            aria-label="Settings"
-            icon={<SettingsIcon />}
-            variant="ghost"
-            size="sm"
-            color="bauhaus.white"
-            _hover={{ bg: "whiteAlpha.200" }}
-            onClick={() => setView("settings")}
-          />
-        </HStack>
-      </Flex>
+          </HStack>
+        </Flex>
 
-      {/* Powered by Banner */}
-      <HStack
-        bg="bauhaus.yellow"
-        py={1}
-        px={4}
-        justify="center"
-        spacing={2}
-        borderBottom="3px solid"
-        borderColor="bauhaus.black"
-        mb={4}
-      >
-        <Box w="6px" h="6px" bg="bauhaus.black" />
-        <Text
-          fontSize="xs"
-          fontWeight="700"
-          color="bauhaus.black"
-          textTransform="uppercase"
-          letterSpacing="wider"
-        >
-          Powered by
-        </Text>
-        <Link
-          bg="bauhaus.blue"
-          color="bauhaus.white"
-          px={2}
-          py={0.5}
-          fontWeight="900"
-          fontSize="xs"
-          textTransform="uppercase"
-          letterSpacing="wide"
-          border="2px solid"
+        {/* Powered by Banner */}
+        <HStack
+          bg="bauhaus.yellow"
+          py={1}
+          px={4}
+          justify="center"
+          spacing={2}
+          borderBottom="3px solid"
           borderColor="bauhaus.black"
-          _hover={{
-            bg: "#F97316",
-            color: "bauhaus.white",
-          }}
-          transition="all 0.2s ease-out"
-          onClick={() => {
-            chrome.tabs.create({
-              url: "https://clanker.world/clanker/0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07",
-            });
-          }}
+          mb={4}
         >
-          $BNKRW
-        </Link>
-        <Box w="6px" h="6px" bg="bauhaus.black" />
-      </HStack>
-
-      <Container pt={6} pb={4} flex="1" display="flex" flexDirection="column" overflowY="auto">
-        <VStack spacing={4} align="stretch">
-          {/* Failed Transaction Error */}
-          {failedTxError && (
-            <Box
-              bg="bauhaus.red"
-              border="3px solid"
-              borderColor="bauhaus.black"
-              boxShadow="4px 4px 0px 0px #121212"
-              p={3}
-              position="relative"
-            >
-              <HStack w="full" justify="space-between" mb={2}>
-                <HStack>
-                  <Box p={1} bg="bauhaus.black">
-                    <WarningIcon color="bauhaus.red" boxSize={4} />
-                  </Box>
-                  <Text fontSize="sm" color="white" fontWeight="700">
-                    Transaction Failed
-                  </Text>
-                </HStack>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  color="white"
-                  _hover={{ bg: "whiteAlpha.200" }}
-                  onClick={() => setFailedTxError(null)}
-                >
-                  Dismiss
-                </Button>
-              </HStack>
-              <Text fontSize="xs" color="whiteAlpha.800" mb={1} fontWeight="500">
-                {failedTxError.origin}
-              </Text>
-              <Text fontSize="sm" color="white" fontWeight="500">
-                {failedTxError.error}
-              </Text>
-            </Box>
-          )}
-
-          {/* Pending Requests Banner */}
-          <PendingTxBanner
-            txCount={pendingRequests.length}
-            signatureCount={pendingSignatureRequests.length}
-            onClickTx={() => {
-              if (pendingRequests.length === 1) {
-                setSelectedTxRequest(pendingRequests[0]);
-                setView("txConfirm");
-              } else {
-                setView("pendingTxList");
-              }
+          <Box w="6px" h="6px" bg="bauhaus.black" />
+          <Text
+            fontSize="xs"
+            fontWeight="700"
+            color="bauhaus.black"
+            textTransform="uppercase"
+            letterSpacing="wider"
+          >
+            Powered by
+          </Text>
+          <Link
+            bg="bauhaus.blue"
+            color="bauhaus.white"
+            px={2}
+            py={0.5}
+            fontWeight="900"
+            fontSize="xs"
+            textTransform="uppercase"
+            letterSpacing="wide"
+            border="2px solid"
+            borderColor="bauhaus.black"
+            _hover={{
+              bg: "#F97316",
+              color: "bauhaus.white",
             }}
-            onClickSignature={() => {
-              if (pendingSignatureRequests.length > 0) {
-                setSelectedSignatureRequest(pendingSignatureRequests[0]);
-                setView("signatureConfirm");
-              }
+            transition="all 0.2s ease-out"
+            onClick={() => {
+              chrome.tabs.create({
+                url: "http://walletchan.com/?buyWCHAN=true",
+              });
             }}
-          />
+          >
+            $WCHAN
+          </Link>
+          <Box w="6px" h="6px" bg="bauhaus.black" />
+        </HStack>
 
-          {/* Account Switcher + Chain Selector Row */}
-          <HStack spacing={3} align="stretch">
-            {accounts.length > 0 && (
-              <Box flex={1} minW={0}>
-                <Suspense fallback={null}>
-                  <AccountSwitcher
-                    accounts={accounts}
-                    activeAccount={activeAccount}
-                    onAccountSelect={handleAccountSwitch}
-                    onAddAccount={() => setView("addAccount")}
-                    onAccountSettings={(account) => {
-                      setSettingsAccount(account);
-                      onAccountSettingsOpen();
-                    }}
-                  />
-                </Suspense>
-              </Box>
-            )}
-
-            {/* Chain Selector */}
-            <Menu isLazy lazyBehavior="unmount">
-              <MenuButton
-                as={Button}
-                variant="ghost"
-                bg="bauhaus.white"
+        <Container
+          pt={6}
+          pb={4}
+          flex="1"
+          display="flex"
+          flexDirection="column"
+          overflowY="auto"
+        >
+          <VStack spacing={4} align="stretch">
+            {/* Failed Transaction Error */}
+            {failedTxError && (
+              <Box
+                bg="bauhaus.red"
                 border="3px solid"
                 borderColor="bauhaus.black"
                 boxShadow="4px 4px 0px 0px #121212"
+                p={3}
+                position="relative"
+              >
+                <HStack w="full" justify="space-between" mb={2}>
+                  <HStack>
+                    <Box p={1} bg="bauhaus.black">
+                      <WarningIcon color="bauhaus.red" boxSize={4} />
+                    </Box>
+                    <Text fontSize="sm" color="white" fontWeight="700">
+                      Transaction Failed
+                    </Text>
+                  </HStack>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    color="white"
+                    _hover={{ bg: "whiteAlpha.200" }}
+                    onClick={() => setFailedTxError(null)}
+                  >
+                    Dismiss
+                  </Button>
+                </HStack>
+                <Text
+                  fontSize="xs"
+                  color="whiteAlpha.800"
+                  mb={1}
+                  fontWeight="500"
+                >
+                  {failedTxError.origin}
+                </Text>
+                <Text fontSize="sm" color="white" fontWeight="500">
+                  {failedTxError.error}
+                </Text>
+              </Box>
+            )}
+
+            {/* Pending Requests Banner */}
+            <PendingTxBanner
+              txCount={pendingRequests.length}
+              signatureCount={pendingSignatureRequests.length}
+              onClickTx={() => {
+                if (pendingRequests.length === 1) {
+                  setSelectedTxRequest(pendingRequests[0]);
+                  setView("txConfirm");
+                } else {
+                  setView("pendingTxList");
+                }
+              }}
+              onClickSignature={() => {
+                if (pendingSignatureRequests.length > 0) {
+                  setSelectedSignatureRequest(pendingSignatureRequests[0]);
+                  setView("signatureConfirm");
+                }
+              }}
+            />
+
+            {/* Account Switcher + Chain Selector Row */}
+            <HStack spacing={3} align="stretch">
+              {accounts.length > 0 && (
+                <Box flex={1} minW={0}>
+                  <Suspense fallback={null}>
+                    <AccountSwitcher
+                      accounts={accounts}
+                      activeAccount={activeAccount}
+                      onAccountSelect={handleAccountSwitch}
+                      onAddAccount={() => setView("addAccount")}
+                      onAccountSettings={(account) => {
+                        setSettingsAccount(account);
+                        onAccountSettingsOpen();
+                      }}
+                    />
+                  </Suspense>
+                </Box>
+              )}
+
+              {/* Chain Selector */}
+              <Menu isLazy lazyBehavior="unmount">
+                <MenuButton
+                  as={Button}
+                  variant="ghost"
+                  bg="bauhaus.white"
+                  border="3px solid"
+                  borderColor="bauhaus.black"
+                  boxShadow="4px 4px 0px 0px #121212"
+                  _hover={{
+                    transform: "translateY(-2px)",
+                    boxShadow: "6px 6px 0px 0px #121212",
+                  }}
+                  _active={{
+                    transform: "translate(2px, 2px)",
+                    boxShadow: "none",
+                  }}
+                  rightIcon={<ChevronDownIcon />}
+                  fontWeight="700"
+                  h="full"
+                  py={3}
+                  px={3}
+                  borderRadius="0"
+                  transition="all 0.2s ease-out"
+                  flexShrink={0}
+                >
+                  {chainName && networksInfo ? (
+                    <HStack spacing={1.5}>
+                      <Image
+                        src={
+                          getChainConfig(networksInfo[chainName].chainId).icon
+                        }
+                        alt={chainName}
+                        boxSize="18px"
+                      />
+                      <Text fontSize="xs" fontWeight="700" noOfLines={1}>
+                        {chainName}
+                      </Text>
+                    </HStack>
+                  ) : (
+                    <Text color="text.tertiary" fontSize="sm">
+                      Net
+                    </Text>
+                  )}
+                </MenuButton>
+                <MenuList
+                  bg="bauhaus.white"
+                  border="3px solid"
+                  borderColor="bauhaus.black"
+                  boxShadow="4px 4px 0px 0px #121212"
+                  borderRadius="0"
+                  py={0}
+                  minW="160px"
+                >
+                  {networksInfo &&
+                    Object.keys(networksInfo)
+                      .filter((_chainName) => {
+                        if (activeAccount?.type === "bankr") {
+                          return BANKR_SUPPORTED_CHAIN_IDS.has(
+                            networksInfo[_chainName].chainId,
+                          );
+                        }
+                        return true;
+                      })
+                      .map((_chainName, i, filteredChains) => {
+                        const config = getChainConfig(
+                          networksInfo[_chainName].chainId,
+                        );
+                        return (
+                          <MenuItem
+                            key={_chainName}
+                            bg="bauhaus.white"
+                            _hover={{ bg: "bg.muted" }}
+                            borderBottom={
+                              i < filteredChains.length - 1
+                                ? "2px solid"
+                                : "none"
+                            }
+                            borderColor="bauhaus.black"
+                            py={3}
+                            onClick={() => {
+                              if (!chainName) {
+                                setReloadRequired(true);
+                              }
+                              setChainName(_chainName);
+                            }}
+                          >
+                            <HStack spacing={2}>
+                              {config.icon && (
+                                <Box
+                                  bg="bauhaus.white"
+                                  border="2px solid"
+                                  borderColor="bauhaus.black"
+                                  p={0.5}
+                                >
+                                  <Image
+                                    src={config.icon}
+                                    alt={_chainName}
+                                    boxSize="18px"
+                                  />
+                                </Box>
+                              )}
+                              <Text color="text.primary" fontWeight="700">
+                                {_chainName}
+                              </Text>
+                            </HStack>
+                          </MenuItem>
+                        );
+                      })}
+                </MenuList>
+              </Menu>
+            </HStack>
+
+            {/* Address Display */}
+            <Box
+              bg="bauhaus.white"
+              border="3px solid"
+              borderColor="bauhaus.black"
+              boxShadow="4px 4px 0px 0px #121212"
+              px={4}
+              py={3}
+              position="relative"
+            >
+              {/* Corner decoration */}
+              <Box
+                position="absolute"
+                top="-3px"
+                right="-3px"
+                w="10px"
+                h="10px"
+                bg="bauhaus.blue"
+                border="2px solid"
+                borderColor="bauhaus.black"
+              />
+
+              {address ? (
+                <VStack align="stretch" spacing={2}>
+                  <Text
+                    fontSize="xs"
+                    color="text.secondary"
+                    fontWeight="700"
+                    textTransform="uppercase"
+                  >
+                    {activeAccount?.type === "impersonator"
+                      ? "Impersonated Address"
+                      : "Wallet Address"}
+                  </Text>
+                  {/* Two columns: address pill | explorer icons (2x2 when narrow, 1x4 when wide) */}
+                  <HStack spacing={2} align="center">
+                    {/* Column 1: Address pill */}
+                    <HStack
+                      bg="bauhaus.black"
+                      px={2}
+                      py={1}
+                      spacing={2}
+                      flexShrink={0}
+                    >
+                      <Code
+                        fontSize="md"
+                        fontFamily="mono"
+                        bg="transparent"
+                        color="bauhaus.white"
+                        p={0}
+                        fontWeight="700"
+                        whiteSpace="nowrap"
+                      >
+                        {truncateAddress(address)}
+                      </Code>
+                      <IconButton
+                        aria-label="Copy address"
+                        icon={copied ? <CheckIcon /> : <CopyIcon />}
+                        size="xs"
+                        variant="ghost"
+                        color={copied ? "bauhaus.yellow" : "bauhaus.white"}
+                        onClick={handleCopyAddress}
+                        _hover={{ color: "bauhaus.yellow" }}
+                        minW="auto"
+                        h="auto"
+                        p={0}
+                      />
+                      {chainName && networksInfo && (
+                        <IconButton
+                          aria-label="View on explorer"
+                          icon={<ExternalLinkIcon />}
+                          size="xs"
+                          variant="ghost"
+                          color="bauhaus.white"
+                          onClick={() => {
+                            const config = getChainConfig(
+                              networksInfo[chainName].chainId,
+                            );
+                            if (config.explorer) {
+                              chrome.tabs.create({
+                                url: `${config.explorer}/address/${address}`,
+                              });
+                            }
+                          }}
+                          _hover={{ color: "bauhaus.yellow" }}
+                          minW="auto"
+                          h="auto"
+                          p={0}
+                        />
+                      )}
+                    </HStack>
+                    {/* Column 2: Explorer icons - 2x2 grid (<390px, centered) or 1x4 row (>=390px, right-aligned) */}
+                    <Box
+                      display="grid"
+                      gridTemplateColumns="repeat(2, 32px)"
+                      justifyContent="center"
+                      gap={1}
+                      flex={1}
+                      sx={{
+                        "@media (min-width: 390px)": {
+                          gridTemplateColumns: "repeat(4, 32px)",
+                          justifyContent: "flex-end",
+                        },
+                      }}
+                    >
+                      {[
+                        {
+                          name: "Octav",
+                          icon: "octav-icon.png",
+                          url: `https://pro.octav.fi/?addresses=${address}`,
+                          bg: "#FFFFFF",
+                        },
+                        {
+                          name: "DeBank",
+                          icon: "debank-icon.ico",
+                          url: `https://debank.com/profile/${address}`,
+                          bg: "#FFFFFF",
+                        },
+                        {
+                          name: "Zapper",
+                          icon: "zapper-icon.png",
+                          url: `https://zapper.xyz/account/${address}`,
+                          bg: "#FFFFFF",
+                        },
+                        {
+                          name: "Nansen",
+                          icon: "nansen-icon.png",
+                          url: `https://app.nansen.ai/address/${address}`,
+                          bg: "#FFFFFF",
+                        },
+                      ].map((site) => (
+                        <Box
+                          key={site.name}
+                          as="button"
+                          bg={site.bg}
+                          border="2px solid"
+                          borderColor="bauhaus.black"
+                          boxShadow="2px 2px 0px 0px #121212"
+                          p={1}
+                          cursor="pointer"
+                          transition="all 0.2s ease-out"
+                          _hover={{
+                            transform: "translateY(-1px)",
+                            boxShadow: "3px 3px 0px 0px #121212",
+                          }}
+                          _active={{
+                            transform: "translate(2px, 2px)",
+                            boxShadow: "none",
+                          }}
+                          onClick={() => {
+                            chrome.tabs.create({ url: site.url });
+                          }}
+                          title={`View on ${site.name}`}
+                        >
+                          <Image src={site.icon} boxSize="20px" />
+                        </Box>
+                      ))}
+                    </Box>
+                  </HStack>
+                </VStack>
+              ) : (
+                <Text
+                  color="text.tertiary"
+                  fontSize="sm"
+                  textAlign="center"
+                  fontWeight="500"
+                >
+                  No address configured
+                </Text>
+              )}
+            </Box>
+
+            {/* Portfolio Tabs (Holdings + Activity) */}
+            {address && (
+              <PortfolioTabs
+                address={address}
+                activityTabTrigger={activityTabTrigger}
+                onTokenClick={(token) => {
+                  setTransferToken(token);
+                  setView("transfer");
+                }}
+              />
+            )}
+
+            {/* Reload Required Alert */}
+            {reloadRequired && (
+              <Box
+                bg="bauhaus.yellow"
+                border="3px solid"
+                borderColor="bauhaus.black"
+                boxShadow="4px 4px 0px 0px #121212"
+                p={3}
+              >
+                <HStack justify="space-between">
+                  <HStack spacing={2}>
+                    <Box p={1} bg="bauhaus.black">
+                      <InfoIcon color="bauhaus.yellow" boxSize={4} />
+                    </Box>
+                    <Box>
+                      <Text
+                        fontSize="sm"
+                        color="bauhaus.black"
+                        fontWeight="700"
+                      >
+                        Reload page required
+                      </Text>
+                      <Text
+                        fontSize="xs"
+                        color="bauhaus.black"
+                        opacity={0.8}
+                        fontWeight="500"
+                      >
+                        To apply changes on the current site
+                      </Text>
+                    </Box>
+                  </HStack>
+                  <Button
+                    size="sm"
+                    bg="bauhaus.black"
+                    color="bauhaus.yellow"
+                    _hover={{ opacity: 0.9 }}
+                    _active={{ transform: "translate(2px, 2px)" }}
+                    onClick={async () => {
+                      const tab = await currentTab();
+                      const url = tab.url!;
+                      chrome.tabs.create({ url });
+                      chrome.tabs.remove(tab.id!);
+                      setReloadRequired(false);
+                    }}
+                  >
+                    Reload
+                  </Button>
+                </HStack>
+              </Box>
+            )}
+          </VStack>
+        </Container>
+
+        {/* Sticky Footer - only show for Bankr accounts */}
+        {activeAccount?.type === "bankr" && (
+          <Box
+            position="sticky"
+            bottom={0}
+            bg="bg.base"
+            borderTop="3px solid"
+            borderColor="bauhaus.black"
+            p={3}
+          >
+            <Box position="relative">
+              {/* Geometric decorations */}
+              <Box
+                position="absolute"
+                top="-8px"
+                left="10px"
+                w="12px"
+                h="12px"
+                bg="bauhaus.red"
+                borderRadius="full"
+                border="2px solid"
+                borderColor="bauhaus.black"
+                zIndex={1}
+              />
+              <Box
+                position="absolute"
+                top="-6px"
+                right="12px"
+                w="10px"
+                h="10px"
+                bg="bauhaus.blue"
+                transform="rotate(45deg)"
+                border="2px solid"
+                borderColor="bauhaus.black"
+                zIndex={1}
+              />
+              <Box
+                position="absolute"
+                bottom="-8px"
+                right="40px"
+                w={0}
+                h={0}
+                borderLeft="7px solid transparent"
+                borderRight="7px solid transparent"
+                borderBottom="12px solid"
+                borderBottomColor="bauhaus.green"
+                zIndex={1}
+              />
+
+              <Button
+                w="full"
+                bg="bauhaus.yellow"
+                color="bauhaus.black"
+                border="3px solid"
+                borderColor="bauhaus.black"
+                boxShadow="4px 4px 0px 0px #121212"
+                fontWeight="900"
+                textTransform="uppercase"
+                letterSpacing="wider"
+                py={6}
                 _hover={{
+                  bg: "bauhaus.yellow",
                   transform: "translateY(-2px)",
                   boxShadow: "6px 6px 0px 0px #121212",
                 }}
@@ -1667,364 +2255,17 @@ function App() {
                   transform: "translate(2px, 2px)",
                   boxShadow: "none",
                 }}
-                rightIcon={<ChevronDownIcon />}
-                fontWeight="700"
-                h="full"
-                py={3}
-                px={3}
-                borderRadius="0"
-                transition="all 0.2s ease-out"
-                flexShrink={0}
+                onClick={() => {
+                  setStartChatWithNew(true);
+                  setView("chat");
+                }}
+                leftIcon={<ChatIcon />}
               >
-                {chainName && networksInfo ? (
-                  <HStack spacing={1.5}>
-                    <Image
-                      src={getChainConfig(networksInfo[chainName].chainId).icon}
-                      alt={chainName}
-                      boxSize="18px"
-                    />
-                    <Text fontSize="xs" fontWeight="700" noOfLines={1}>
-                      {chainName}
-                    </Text>
-                  </HStack>
-                ) : (
-                  <Text color="text.tertiary" fontSize="sm">Net</Text>
-                )}
-              </MenuButton>
-              <MenuList
-                bg="bauhaus.white"
-                border="3px solid"
-                borderColor="bauhaus.black"
-                boxShadow="4px 4px 0px 0px #121212"
-                borderRadius="0"
-                py={0}
-                minW="160px"
-              >
-                {networksInfo &&
-                  Object.keys(networksInfo)
-                    .filter((_chainName) => {
-                      if (activeAccount?.type === "bankr") {
-                        return BANKR_SUPPORTED_CHAIN_IDS.has(networksInfo[_chainName].chainId);
-                      }
-                      return true;
-                    })
-                    .map((_chainName, i, filteredChains) => {
-                    const config = getChainConfig(networksInfo[_chainName].chainId);
-                    return (
-                      <MenuItem
-                        key={_chainName}
-                        bg="bauhaus.white"
-                        _hover={{ bg: "bg.muted" }}
-                        borderBottom={i < filteredChains.length - 1 ? "2px solid" : "none"}
-                        borderColor="bauhaus.black"
-                        py={3}
-                        onClick={() => {
-                          if (!chainName) {
-                            setReloadRequired(true);
-                          }
-                          setChainName(_chainName);
-                        }}
-                      >
-                        <HStack spacing={2}>
-                          {config.icon && (
-                            <Box
-                              bg="bauhaus.white"
-                              border="2px solid"
-                              borderColor="bauhaus.black"
-                              p={0.5}
-                            >
-                              <Image
-                                src={config.icon}
-                                alt={_chainName}
-                                boxSize="18px"
-                              />
-                            </Box>
-                          )}
-                          <Text color="text.primary" fontWeight="700">{_chainName}</Text>
-                        </HStack>
-                      </MenuItem>
-                    );
-                  })}
-              </MenuList>
-            </Menu>
-          </HStack>
-
-          {/* Address Display */}
-          <Box
-            bg="bauhaus.white"
-            border="3px solid"
-            borderColor="bauhaus.black"
-            boxShadow="4px 4px 0px 0px #121212"
-            px={4}
-            py={3}
-            position="relative"
-          >
-            {/* Corner decoration */}
-            <Box
-              position="absolute"
-              top="-3px"
-              right="-3px"
-              w="10px"
-              h="10px"
-              bg="bauhaus.blue"
-              border="2px solid"
-              borderColor="bauhaus.black"
-            />
-
-            {address ? (
-              <VStack align="stretch" spacing={2}>
-                <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="uppercase">
-                  {activeAccount?.type === "impersonator" ? "Impersonated Address" : "Wallet Address"}
-                </Text>
-                {/* Two columns: address pill | explorer icons (2x2 when narrow, 1x4 when wide) */}
-                <HStack spacing={2} align="center">
-                  {/* Column 1: Address pill */}
-                  <HStack
-                    bg="bauhaus.black"
-                    px={2}
-                    py={1}
-                    spacing={2}
-                    flexShrink={0}
-                  >
-                    <Code
-                      fontSize="md"
-                      fontFamily="mono"
-                      bg="transparent"
-                      color="bauhaus.white"
-                      p={0}
-                      fontWeight="700"
-                      whiteSpace="nowrap"
-                    >
-                      {truncateAddress(address)}
-                    </Code>
-                    <IconButton
-                      aria-label="Copy address"
-                      icon={copied ? <CheckIcon /> : <CopyIcon />}
-                      size="xs"
-                      variant="ghost"
-                      color={copied ? "bauhaus.yellow" : "bauhaus.white"}
-                      onClick={handleCopyAddress}
-                      _hover={{ color: "bauhaus.yellow" }}
-                      minW="auto"
-                      h="auto"
-                      p={0}
-                    />
-                    {chainName && networksInfo && (
-                      <IconButton
-                        aria-label="View on explorer"
-                        icon={<ExternalLinkIcon />}
-                        size="xs"
-                        variant="ghost"
-                        color="bauhaus.white"
-                        onClick={() => {
-                          const config = getChainConfig(networksInfo[chainName].chainId);
-                          if (config.explorer) {
-                            chrome.tabs.create({
-                              url: `${config.explorer}/address/${address}`,
-                            });
-                          }
-                        }}
-                        _hover={{ color: "bauhaus.yellow" }}
-                        minW="auto"
-                        h="auto"
-                        p={0}
-                      />
-                    )}
-                  </HStack>
-                  {/* Column 2: Explorer icons - 2x2 grid (<390px, centered) or 1x4 row (>=390px, right-aligned) */}
-                  <Box
-                    display="grid"
-                    gridTemplateColumns="repeat(2, 32px)"
-                    justifyContent="center"
-                    gap={1}
-                    flex={1}
-                    sx={{
-                      '@media (min-width: 390px)': {
-                        gridTemplateColumns: 'repeat(4, 32px)',
-                        justifyContent: 'flex-end',
-                      },
-                    }}
-                  >
-                    {[
-                      { name: "Octav", icon: "octav-icon.png", url: `https://pro.octav.fi/?addresses=${address}`, bg: "#FFFFFF" },
-                      { name: "DeBank", icon: "debank-icon.ico", url: `https://debank.com/profile/${address}`, bg: "#FFFFFF" },
-                      { name: "Zapper", icon: "zapper-icon.png", url: `https://zapper.xyz/account/${address}`, bg: "#FFFFFF" },
-                      { name: "Nansen", icon: "nansen-icon.png", url: `https://app.nansen.ai/address/${address}`, bg: "#FFFFFF" },
-                    ].map((site) => (
-                      <Box
-                        key={site.name}
-                        as="button"
-                        bg={site.bg}
-                        border="2px solid"
-                        borderColor="bauhaus.black"
-                        boxShadow="2px 2px 0px 0px #121212"
-                        p={1}
-                        cursor="pointer"
-                        transition="all 0.2s ease-out"
-                        _hover={{
-                          transform: "translateY(-1px)",
-                          boxShadow: "3px 3px 0px 0px #121212",
-                        }}
-                        _active={{
-                          transform: "translate(2px, 2px)",
-                          boxShadow: "none",
-                        }}
-                        onClick={() => {
-                          chrome.tabs.create({ url: site.url });
-                        }}
-                        title={`View on ${site.name}`}
-                      >
-                        <Image src={site.icon} boxSize="20px" />
-                      </Box>
-                    ))}
-                  </Box>
-                </HStack>
-              </VStack>
-            ) : (
-              <Text color="text.tertiary" fontSize="sm" textAlign="center" fontWeight="500">
-                No address configured
-              </Text>
-            )}
-          </Box>
-
-          {/* Portfolio Tabs (Holdings + Activity) */}
-          {address && (
-            <PortfolioTabs
-              address={address}
-              activityTabTrigger={activityTabTrigger}
-              onTokenClick={(token) => {
-                setTransferToken(token);
-                setView("transfer");
-              }}
-            />
-          )}
-
-          {/* Reload Required Alert */}
-          {reloadRequired && (
-            <Box
-              bg="bauhaus.yellow"
-              border="3px solid"
-              borderColor="bauhaus.black"
-              boxShadow="4px 4px 0px 0px #121212"
-              p={3}
-            >
-              <HStack justify="space-between">
-                <HStack spacing={2}>
-                  <Box p={1} bg="bauhaus.black">
-                    <InfoIcon color="bauhaus.yellow" boxSize={4} />
-                  </Box>
-                  <Box>
-                    <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
-                      Reload page required
-                    </Text>
-                    <Text fontSize="xs" color="bauhaus.black" opacity={0.8} fontWeight="500">
-                      To apply changes on the current site
-                    </Text>
-                  </Box>
-                </HStack>
-                <Button
-                  size="sm"
-                  bg="bauhaus.black"
-                  color="bauhaus.yellow"
-                  _hover={{ opacity: 0.9 }}
-                  _active={{ transform: "translate(2px, 2px)" }}
-                  onClick={async () => {
-                    const tab = await currentTab();
-                    const url = tab.url!;
-                    chrome.tabs.create({ url });
-                    chrome.tabs.remove(tab.id!);
-                    setReloadRequired(false);
-                  }}
-                >
-                  Reload
-                </Button>
-              </HStack>
+                Chat with Bankr
+              </Button>
             </Box>
-          )}
-
-        </VStack>
-      </Container>
-
-      {/* Sticky Footer - only show for Bankr accounts */}
-      {activeAccount?.type === "bankr" && (
-        <Box
-          position="sticky"
-          bottom={0}
-          bg="bg.base"
-          borderTop="3px solid"
-          borderColor="bauhaus.black"
-          p={3}
-        >
-          <Box position="relative">
-            {/* Geometric decorations */}
-            <Box
-              position="absolute"
-              top="-8px"
-              left="10px"
-              w="12px"
-              h="12px"
-              bg="bauhaus.red"
-              borderRadius="full"
-              border="2px solid"
-              borderColor="bauhaus.black"
-              zIndex={1}
-            />
-            <Box
-              position="absolute"
-              top="-6px"
-              right="12px"
-              w="10px"
-              h="10px"
-              bg="bauhaus.blue"
-              transform="rotate(45deg)"
-              border="2px solid"
-              borderColor="bauhaus.black"
-              zIndex={1}
-            />
-            <Box
-              position="absolute"
-              bottom="-8px"
-              right="40px"
-              w={0}
-              h={0}
-              borderLeft="7px solid transparent"
-              borderRight="7px solid transparent"
-              borderBottom="12px solid"
-              borderBottomColor="bauhaus.green"
-              zIndex={1}
-            />
-
-            <Button
-              w="full"
-              bg="bauhaus.yellow"
-              color="bauhaus.black"
-              border="3px solid"
-              borderColor="bauhaus.black"
-              boxShadow="4px 4px 0px 0px #121212"
-              fontWeight="900"
-              textTransform="uppercase"
-              letterSpacing="wider"
-              py={6}
-              _hover={{
-                bg: "bauhaus.yellow",
-                transform: "translateY(-2px)",
-                boxShadow: "6px 6px 0px 0px #121212",
-              }}
-              _active={{
-                transform: "translate(2px, 2px)",
-                boxShadow: "none",
-              }}
-              onClick={() => {
-                setStartChatWithNew(true);
-                setView("chat");
-              }}
-              leftIcon={<ChatIcon />}
-            >
-              Chat with Bankr
-            </Button>
           </Box>
-        </Box>
-      )}
+        )}
       </Box>
       {/* End fullscreen centered wrapper */}
 

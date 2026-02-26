@@ -30,10 +30,17 @@ interface TxStatusListProps {
   hideCard?: boolean;
 }
 
-function TxStatusList({ maxItems = 5, address, hideHeader, hideCard }: TxStatusListProps) {
+function TxStatusList({
+  maxItems = 5,
+  address,
+  hideHeader,
+  hideCard,
+}: TxStatusListProps) {
   const [allHistory, setAllHistory] = useState<CompletedTransaction[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [selectedTx, setSelectedTx] = useState<CompletedTransaction | null>(null);
+  const [selectedTx, setSelectedTx] = useState<CompletedTransaction | null>(
+    null,
+  );
 
   // Load and listen for updates
   useEffect(() => {
@@ -57,25 +64,28 @@ function TxStatusList({ maxItems = 5, address, hideHeader, hideCard }: TxStatusL
 
   // Filter history by address (case-insensitive comparison)
   const history = address
-    ? allHistory.filter((tx) => tx.tx.from.toLowerCase() === address.toLowerCase())
+    ? allHistory.filter(
+        (tx) => tx.tx.from.toLowerCase() === address.toLowerCase(),
+      )
     : allHistory;
 
   const displayItems = isExpanded ? history : history.slice(0, maxItems);
   const hasMore = history.length > maxItems;
 
-  const txContent = history.length === 0 ? (
-    <Box p={4} textAlign="center">
-      <Text fontSize="sm" color="text.tertiary" fontWeight="500">
-        No recent transactions
-      </Text>
-    </Box>
-  ) : (
-    <VStack spacing={hideCard ? 3 : 3} align="stretch" p={hideCard ? 0 : 0}>
-      {displayItems.map((tx) => (
-        <TxStatusItem key={tx.id} tx={tx} onClick={() => setSelectedTx(tx)} />
-      ))}
-    </VStack>
-  );
+  const txContent =
+    history.length === 0 ? (
+      <Box p={4} textAlign="center">
+        <Text fontSize="sm" color="text.tertiary" fontWeight="500">
+          No recent transactions
+        </Text>
+      </Box>
+    ) : (
+      <VStack spacing={hideCard ? 3 : 3} align="stretch" p={hideCard ? 0 : 0}>
+        {displayItems.map((tx) => (
+          <TxStatusItem key={tx.id} tx={tx} onClick={() => setSelectedTx(tx)} />
+        ))}
+      </VStack>
+    );
 
   const modal = selectedTx && (
     <TxDetailModal
@@ -90,7 +100,13 @@ function TxStatusList({ maxItems = 5, address, hideHeader, hideCard }: TxStatusL
       <Box>
         {!hideHeader && (
           <HStack justify="space-between" mb={3}>
-            <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
+            <Text
+              fontSize="sm"
+              fontWeight="900"
+              color="text.primary"
+              textTransform="uppercase"
+              letterSpacing="wider"
+            >
               Recent Transactions
             </Text>
             {hasMore && (
@@ -114,7 +130,13 @@ function TxStatusList({ maxItems = 5, address, hideHeader, hideCard }: TxStatusL
     <Box pt={4}>
       {!hideHeader ? (
         <HStack justify="space-between" mb={3}>
-          <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
+          <Text
+            fontSize="sm"
+            fontWeight="900"
+            color="text.primary"
+            textTransform="uppercase"
+            letterSpacing="wider"
+          >
             Recent Transactions
           </Text>
           {hasMore && (
@@ -145,7 +167,11 @@ function TxStatusList({ maxItems = 5, address, hideHeader, hideCard }: TxStatusL
       ) : (
         <VStack spacing={3} align="stretch">
           {displayItems.map((tx) => (
-            <TxStatusItem key={tx.id} tx={tx} onClick={() => setSelectedTx(tx)} />
+            <TxStatusItem
+              key={tx.id}
+              tx={tx}
+              onClick={() => setSelectedTx(tx)}
+            />
           ))}
         </VStack>
       )}
@@ -162,7 +188,13 @@ function getOriginHostname(origin: string): string | null {
   }
 }
 
-function TxStatusItem({ tx, onClick }: { tx: CompletedTransaction; onClick: () => void }) {
+function TxStatusItem({
+  tx,
+  onClick,
+}: {
+  tx: CompletedTransaction;
+  onClick: () => void;
+}) {
   const config = getChainConfig(tx.chainId);
   const toast = useBauhausToast();
   const [cancelling, setCancelling] = useState(false);
@@ -171,16 +203,26 @@ function TxStatusItem({ tx, onClick }: { tx: CompletedTransaction; onClick: () =
   const handleCancel = async () => {
     setCancelling(true);
     try {
-      const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: "cancelProcessingTx", txId: tx.id },
-          resolve
-        );
-      });
+      const result = await new Promise<{ success: boolean; error?: string }>(
+        (resolve) => {
+          chrome.runtime.sendMessage(
+            { type: "cancelProcessingTx", txId: tx.id },
+            resolve,
+          );
+        },
+      );
       if (result.success) {
-        toast({ title: "Transaction cancelled", status: "info", duration: 2000 });
+        toast({
+          title: "Transaction cancelled",
+          status: "info",
+          duration: 2000,
+        });
       } else {
-        toast({ title: result.error || "Cancel failed", status: "error", duration: 2000 });
+        toast({
+          title: result.error || "Cancel failed",
+          status: "error",
+          duration: 2000,
+        });
       }
     } catch {
       toast({ title: "Cancel failed", status: "error", duration: 2000 });
@@ -291,7 +333,13 @@ function TxStatusItem({ tx, onClick }: { tx: CompletedTransaction; onClick: () =
         right="-3px"
         w="8px"
         h="8px"
-        bg={tx.status === "success" ? "bauhaus.yellow" : tx.status === "failed" ? "bauhaus.red" : "bauhaus.blue"}
+        bg={
+          tx.status === "success"
+            ? "bauhaus.yellow"
+            : tx.status === "failed"
+              ? "bauhaus.red"
+              : "bauhaus.blue"
+        }
         border="2px solid"
         borderColor="bauhaus.black"
         borderRadius={tx.status === "success" ? "full" : "0"}
@@ -300,25 +348,28 @@ function TxStatusItem({ tx, onClick }: { tx: CompletedTransaction; onClick: () =
       <HStack justify="space-between">
         <HStack spacing={3} flex={1}>
           <Box
-            bg={tx.origin === "BankrWallet" ? "transparent" : "bauhaus.white"}
+            bg={tx.origin === "WalletChan" ? "transparent" : "bauhaus.white"}
             border="2px solid"
-            borderColor={tx.origin === "BankrWallet" ? "transparent" : "bauhaus.black"}
-            p={tx.origin === "BankrWallet" ? 0 : 1}
+            borderColor={
+              tx.origin === "WalletChan" ? "transparent" : "bauhaus.black"
+            }
+            p={tx.origin === "WalletChan" ? 0 : 1}
             display="flex"
             alignItems="center"
             justifyContent="center"
           >
             <Image
               src={
-                tx.origin === "BankrWallet"
-                  ? "/bankrwallet-icon.png"
+                // keeping BankrWallet for backwards compatibility so the activity isn't messed up
+                tx.origin === "WalletChan" || tx.origin === "BankrWallet"
+                  ? "/walletchan-icon.png"
                   : tx.favicon ||
                     (originHostname
                       ? `https://www.google.com/s2/favicons?domain=${originHostname}&sz=32`
                       : undefined)
               }
               alt="favicon"
-              boxSize={tx.origin === "BankrWallet" ? "24px" : "18px"}
+              boxSize={tx.origin === "WalletChan" ? "24px" : "18px"}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 if (originHostname) {
@@ -355,7 +406,12 @@ function TxStatusItem({ tx, onClick }: { tx: CompletedTransaction; onClick: () =
                   </Badge>
                 )}
               </HStack>
-              <Text fontSize="xs" color="text.tertiary" fontWeight="500" flexShrink={0}>
+              <Text
+                fontSize="xs"
+                color="text.tertiary"
+                fontWeight="500"
+                flexShrink={0}
+              >
                 {formatTimeAgo(tx.createdAt)}
               </Text>
             </HStack>
@@ -389,7 +445,10 @@ function TxStatusItem({ tx, onClick }: { tx: CompletedTransaction; onClick: () =
             size="sm"
             variant="ghost"
             color="text.secondary"
-            onClick={(e) => { e.stopPropagation(); handleViewTx(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleViewTx();
+            }}
             _hover={{ color: "bauhaus.blue", bg: "bg.muted" }}
           />
         )}

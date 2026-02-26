@@ -67,7 +67,7 @@ function ApiKeySetup({
         }
       });
 
-      // Load existing Bankr wallet address
+      // Load existing WalletChan address
       // Always use the resolved address, not displayAddress which could be a PK account's display name
       chrome.storage.sync.get(["address"]).then((data) => {
         if (data.address) {
@@ -146,12 +146,14 @@ function ApiKeySetup({
 
       if (isChangingKey && hasCachedPassword) {
         // Use cached password to save new API key
-        const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
-          chrome.runtime.sendMessage(
-            { type: "saveApiKeyWithCachedPassword", apiKey: apiKey.trim() },
-            resolve
-          );
-        });
+        const result = await new Promise<{ success: boolean; error?: string }>(
+          (resolve) => {
+            chrome.runtime.sendMessage(
+              { type: "saveApiKeyWithCachedPassword", apiKey: apiKey.trim() },
+              resolve,
+            );
+          },
+        );
 
         if (!result.success) {
           toast({
@@ -282,7 +284,9 @@ function ApiKeySetup({
             <InputGroup>
               <Input
                 type={showPassword ? "text" : "password"}
-                placeholder={isChangingKey ? "Enter your password" : "Create a password"}
+                placeholder={
+                  isChangingKey ? "Enter your password" : "Create a password"
+                }
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 pr="3rem"

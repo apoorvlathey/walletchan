@@ -22,7 +22,13 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import { useBauhausToast } from "@/hooks/useBauhausToast";
-import { ViewIcon, ViewOffIcon, LockIcon, WarningTwoIcon, BellIcon } from "@chakra-ui/icons";
+import {
+  ViewIcon,
+  ViewOffIcon,
+  LockIcon,
+  WarningTwoIcon,
+  BellIcon,
+} from "@chakra-ui/icons";
 
 // Sidepanel icon
 const SidePanelIcon = (props: any) => (
@@ -50,7 +56,11 @@ interface UnlockScreenProps {
   pendingSignatureCount: number;
 }
 
-function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: UnlockScreenProps) {
+function UnlockScreen({
+  onUnlock,
+  pendingTxCount,
+  pendingSignatureCount,
+}: UnlockScreenProps) {
   const toast = useBauhausToast();
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -62,14 +72,21 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
   const [isResetting, setIsResetting] = useState(false);
   const [isAgentPasswordEnabled, setIsAgentPasswordEnabled] = useState(false);
   const passwordInputRef = useRef<HTMLInputElement>(null);
-  const { isOpen: isResetModalOpen, onOpen: onResetModalOpen, onClose: onResetModalClose } = useDisclosure();
+  const {
+    isOpen: isResetModalOpen,
+    onOpen: onResetModalOpen,
+    onClose: onResetModalClose,
+  } = useDisclosure();
 
   useEffect(() => {
     const checkSidePanelSupport = async () => {
       return new Promise<boolean>((resolve) => {
-        chrome.runtime.sendMessage({ type: "isSidePanelSupported" }, (response) => {
-          resolve(response?.supported || false);
-        });
+        chrome.runtime.sendMessage(
+          { type: "isSidePanelSupported" },
+          (response) => {
+            resolve(response?.supported || false);
+          },
+        );
       });
     };
 
@@ -83,9 +100,12 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
 
     const checkAgentPasswordEnabled = async () => {
       return new Promise<boolean>((resolve) => {
-        chrome.runtime.sendMessage({ type: "isAgentPasswordEnabled" }, (response) => {
-          resolve(response?.enabled || false);
-        });
+        chrome.runtime.sendMessage(
+          { type: "isAgentPasswordEnabled" },
+          (response) => {
+            resolve(response?.enabled || false);
+          },
+        );
       });
     };
 
@@ -113,9 +133,12 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
     const newMode = !sidePanelMode;
 
     await new Promise<void>((resolve) => {
-      chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: newMode }, () => {
-        resolve();
-      });
+      chrome.runtime.sendMessage(
+        { type: "setSidePanelMode", enabled: newMode },
+        () => {
+          resolve();
+        },
+      );
     });
     setSidePanelMode(newMode);
 
@@ -126,7 +149,8 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
     } else if (newMode && !isInSidePanel) {
       toast({
         title: "Sidepanel mode enabled",
-        description: "Close popup and click the extension icon to open in sidepanel",
+        description:
+          "Close popup and click the extension icon to open in sidepanel",
         status: "info",
         duration: null,
         isClosable: true,
@@ -159,7 +183,7 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
           setIsUnlocking(false);
           passwordInputRef.current?.focus();
         }
-      }
+      },
     );
   };
 
@@ -241,11 +265,19 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
         </Tooltip>
         {sidePanelSupported && (
           <Tooltip
-            label={sidePanelMode ? "Switch to popup mode" : "Switch to sidepanel mode"}
+            label={
+              sidePanelMode
+                ? "Switch to popup mode"
+                : "Switch to sidepanel mode"
+            }
             placement="bottom"
           >
             <IconButton
-              aria-label={sidePanelMode ? "Switch to popup mode" : "Switch to sidepanel mode"}
+              aria-label={
+                sidePanelMode
+                  ? "Switch to popup mode"
+                  : "Switch to sidepanel mode"
+              }
               icon={<SidePanelIcon />}
               variant="ghost"
               size="sm"
@@ -280,12 +312,19 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
             >
               <BellIcon boxSize={3.5} color="bauhaus.yellow" />
             </Box>
-            <Text flex="1" textAlign="center" fontSize="xs" fontWeight="700" color="bauhaus.black" textTransform="uppercase">
+            <Text
+              flex="1"
+              textAlign="center"
+              fontSize="xs"
+              fontWeight="700"
+              color="bauhaus.black"
+              textTransform="uppercase"
+            >
               {pendingTxCount > 0 && pendingSignatureCount > 0
                 ? `${pendingTxCount} tx, ${pendingSignatureCount} sig pending`
                 : pendingTxCount > 0
-                ? `${pendingTxCount} pending request${pendingTxCount > 1 ? "s" : ""}`
-                : `${pendingSignatureCount} signature${pendingSignatureCount > 1 ? "s" : ""}`}
+                  ? `${pendingTxCount} pending request${pendingTxCount > 1 ? "s" : ""}`
+                  : `${pendingSignatureCount} signature${pendingSignatureCount > 1 ? "s" : ""}`}
             </Text>
           </HStack>
         </Box>
@@ -302,7 +341,7 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
           transform="rotate(-3deg)"
           position="relative"
         >
-          <Image src="bankrwallet-animated.gif" w="4.5rem" />
+          <Image src="walletchan-animated.gif" w="4.5rem" />
           {/* Lock badge */}
           <Box
             position="absolute"
@@ -319,10 +358,21 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
         </Box>
 
         <VStack spacing={1}>
-          <Text fontSize="xl" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="tight">
-            BankrWallet
+          <Text
+            fontSize="xl"
+            fontWeight="900"
+            color="text.primary"
+            textTransform="uppercase"
+            letterSpacing="tight"
+          >
+            WalletChan
           </Text>
-          <Text fontSize="sm" color="text.secondary" textAlign="center" fontWeight="500">
+          <Text
+            fontSize="sm"
+            color="text.secondary"
+            textAlign="center"
+            fontWeight="500"
+          >
             Enter your password to unlock
           </Text>
         </VStack>
@@ -369,10 +419,14 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
                 border="2px solid"
                 borderColor={error ? "bauhaus.red" : "bauhaus.black"}
                 borderRadius="0"
-                _hover={{ borderColor: error ? "bauhaus.red" : "bauhaus.black" }}
+                _hover={{
+                  borderColor: error ? "bauhaus.red" : "bauhaus.black",
+                }}
                 _focus={{
                   borderColor: error ? "bauhaus.red" : "bauhaus.blue",
-                  boxShadow: error ? "3px 3px 0px 0px #D02020" : "3px 3px 0px 0px #1040C0",
+                  boxShadow: error
+                    ? "3px 3px 0px 0px #D02020"
+                    : "3px 3px 0px 0px #1040C0",
                 }}
               />
               <InputRightElement>
@@ -407,7 +461,10 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
                   fontSize="sm"
                   color="text.secondary"
                   fontWeight="500"
-                  _hover={{ color: "bauhaus.blue", textDecoration: "underline" }}
+                  _hover={{
+                    color: "bauhaus.blue",
+                    textDecoration: "underline",
+                  }}
                   onClick={onResetModalOpen}
                   cursor="pointer"
                 >
@@ -429,7 +486,12 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
         </Box>
 
         {isAgentPasswordEnabled && (
-          <Text fontSize="xs" color="text.tertiary" fontWeight="500" textAlign="center">
+          <Text
+            fontSize="xs"
+            color="text.tertiary"
+            fontWeight="500"
+            textAlign="center"
+          >
             Master or Agent password accepted
           </Text>
         )}
@@ -446,9 +508,20 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
           boxShadow="8px 8px 0px 0px #121212"
           mx={4}
         >
-          <ModalHeader color="text.primary" fontSize="md" pb={2} textTransform="uppercase" letterSpacing="wider">
+          <ModalHeader
+            color="text.primary"
+            fontSize="md"
+            pb={2}
+            textTransform="uppercase"
+            letterSpacing="wider"
+          >
             <Box display="flex" alignItems="center" gap={2}>
-              <Box p={1} bg="bauhaus.yellow" border="2px solid" borderColor="bauhaus.black">
+              <Box
+                p={1}
+                bg="bauhaus.yellow"
+                border="2px solid"
+                borderColor="bauhaus.black"
+              >
                 <WarningTwoIcon color="bauhaus.black" />
               </Box>
               Reset Extension?
@@ -460,9 +533,15 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
                 This will clear all your stored data including:
               </Text>
               <Box pl={4} borderLeft="4px solid" borderColor="bauhaus.red">
-                <Text color="text.secondary" fontSize="sm">Your encrypted API key</Text>
-                <Text color="text.secondary" fontSize="sm">Your wallet address</Text>
-                <Text color="text.secondary" fontSize="sm">Transaction history</Text>
+                <Text color="text.secondary" fontSize="sm">
+                  Your encrypted API key
+                </Text>
+                <Text color="text.secondary" fontSize="sm">
+                  Your wallet address
+                </Text>
+                <Text color="text.secondary" fontSize="sm">
+                  Transaction history
+                </Text>
               </Box>
               <Box
                 w="full"
@@ -472,13 +551,19 @@ function UnlockScreen({ onUnlock, pendingTxCount, pendingSignatureCount }: Unloc
                 borderColor="bauhaus.black"
               >
                 <Text color="bauhaus.black" fontSize="sm" fontWeight="700">
-                  You will need to enter your Bankr API key and set up a new password again.
+                  You will need to enter your Bankr API key and set up a new
+                  password again.
                 </Text>
               </Box>
             </VStack>
           </ModalBody>
           <ModalFooter gap={2}>
-            <Button variant="secondary" size="sm" onClick={onResetModalClose} isDisabled={isResetting}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onResetModalClose}
+              isDisabled={isResetting}
+            >
               Cancel
             </Button>
             <Button

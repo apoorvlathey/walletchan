@@ -26,11 +26,22 @@ import { saveEncryptedApiKey, hasEncryptedApiKey } from "@/chrome/crypto";
 import { resolveNameToAddress, isResolvableName } from "@/lib/ensUtils";
 import { isAddress } from "@ethersproject/address";
 import { validateAndDeriveAddress } from "@/utils/privateKeyUtils";
-import { RobotIcon, KeyIcon, SeedIcon } from "@/components/shared/AccountTypeIcons";
+import {
+  RobotIcon,
+  KeyIcon,
+  SeedIcon,
+} from "@/components/shared/AccountTypeIcons";
 import PrivateKeyInput from "@/components/shared/PrivateKeyInput";
 import SeedPhraseSetup from "@/components/SeedPhraseSetup";
 
-type OnboardingStep = "welcome" | "accountType" | "bankrSetup" | "privateKey" | "seedPhrase" | "password" | "success";
+type OnboardingStep =
+  | "welcome"
+  | "accountType"
+  | "bankrSetup"
+  | "privateKey"
+  | "seedPhrase"
+  | "password"
+  | "success";
 type AccountTypeChoice = "bankr" | "privateKey" | "seedPhrase";
 
 interface OnboardingProps {
@@ -43,7 +54,9 @@ interface OnboardingProps {
  */
 function isArcBrowser(): boolean {
   try {
-    const arcPaletteTitle = getComputedStyle(document.documentElement).getPropertyValue('--arc-palette-title');
+    const arcPaletteTitle = getComputedStyle(
+      document.documentElement,
+    ).getPropertyValue("--arc-palette-title");
     return !!arcPaletteTitle && arcPaletteTitle.trim().length > 0;
   } catch {
     return false;
@@ -75,7 +88,12 @@ function StepIndicator({
           />
         ))}
       </HStack>
-      <Text fontSize="xs" color="text.tertiary" fontWeight="700" textTransform="uppercase">
+      <Text
+        fontSize="xs"
+        color="text.tertiary"
+        fontWeight="700"
+        textTransform="uppercase"
+      >
         Step {currentStep + 1} of {totalSteps}
       </Text>
     </VStack>
@@ -95,11 +113,11 @@ const bounceArrow = keyframes`
   50% { transform: translateY(-10px); }
 `;
 
-
 function Onboarding({ onComplete }: OnboardingProps) {
   const [step, setStep] = useState<OnboardingStep>("welcome");
   const [isCheckingSetup, setIsCheckingSetup] = useState(true);
-  const [accountTypeChoice, setAccountTypeChoice] = useState<AccountTypeChoice>("bankr");
+  const [accountTypeChoice, setAccountTypeChoice] =
+    useState<AccountTypeChoice>("bankr");
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [privateKey, setPrivateKey] = useState("");
@@ -131,8 +149,14 @@ function Onboarding({ onComplete }: OnboardingProps) {
     const checkExistingSetup = async () => {
       // Detect Arc browser early and set flags
       if (isArcBrowser()) {
-        console.log("Arc browser detected during onboarding - disabling sidepanel");
-        await chrome.storage.sync.set({ isArcBrowser: true, sidePanelVerified: false, sidePanelMode: false });
+        console.log(
+          "Arc browser detected during onboarding - disabling sidepanel",
+        );
+        await chrome.storage.sync.set({
+          isArcBrowser: true,
+          sidePanelVerified: false,
+          sidePanelMode: false,
+        });
       }
 
       const hasApiKey = await hasEncryptedApiKey();
@@ -145,7 +169,9 @@ function Onboarding({ onComplete }: OnboardingProps) {
       // Establish keepalive connection to pause auto-lock while onboarding is open
       if (!keepAlivePortRef.current) {
         try {
-          keepAlivePortRef.current = chrome.runtime.connect({ name: "ui-keepalive" });
+          keepAlivePortRef.current = chrome.runtime.connect({
+            name: "ui-keepalive",
+          });
         } catch {
           // Ignore connection errors
         }
@@ -309,12 +335,15 @@ function Onboarding({ onComplete }: OnboardingProps) {
               name: seedGroupName || undefined,
               accountDisplayName: seedAccountDisplayName || undefined,
             },
-            resolve
+            resolve,
           );
         });
 
         if (!seedResponse.success) {
-          setErrors({ password: seedResponse.error || "Failed to create seed phrase account" });
+          setErrors({
+            password:
+              seedResponse.error || "Failed to create seed phrase account",
+          });
           setIsSubmitting(false);
           return;
         }
@@ -352,19 +381,24 @@ function Onboarding({ onComplete }: OnboardingProps) {
         await chrome.runtime.sendMessage({ type: "unlockWallet", password });
 
         // Add the private key account
-        const pkResponse = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+        const pkResponse = await new Promise<{
+          success: boolean;
+          error?: string;
+        }>((resolve) => {
           chrome.runtime.sendMessage(
             {
               type: "addPrivateKeyAccount",
               privateKey: normalizedKey,
               displayName: pkDisplayName.trim() || undefined,
             },
-            resolve
+            resolve,
           );
         });
 
         if (!pkResponse.success) {
-          setErrors({ privateKey: pkResponse.error || "Failed to add private key account" });
+          setErrors({
+            privateKey: pkResponse.error || "Failed to add private key account",
+          });
           setIsSubmitting(false);
           return;
         }
@@ -387,21 +421,29 @@ function Onboarding({ onComplete }: OnboardingProps) {
         await chrome.runtime.sendMessage({ type: "unlockWallet", password });
 
         // Add the Bankr account
-        const bankrAccountDisplayName = bankrDisplayName.trim()
-          || (walletAddress.trim() !== resolvedAddress ? walletAddress.trim() : undefined);
-        const bankrResponse = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+        const bankrAccountDisplayName =
+          bankrDisplayName.trim() ||
+          (walletAddress.trim() !== resolvedAddress
+            ? walletAddress.trim()
+            : undefined);
+        const bankrResponse = await new Promise<{
+          success: boolean;
+          error?: string;
+        }>((resolve) => {
           chrome.runtime.sendMessage(
             {
               type: "addBankrAccount",
               address: resolvedAddress,
               displayName: bankrAccountDisplayName,
             },
-            resolve
+            resolve,
           );
         });
 
         if (!bankrResponse.success) {
-          setErrors({ walletAddress: bankrResponse.error || "Failed to add Bankr account" });
+          setErrors({
+            walletAddress: bankrResponse.error || "Failed to add Bankr account",
+          });
           setIsSubmitting(false);
           return;
         }
@@ -418,10 +460,15 @@ function Onboarding({ onComplete }: OnboardingProps) {
       });
 
       // Enable sidepanel mode by default for non-Arc browsers
-      const { isArcBrowser: storedIsArc } = await chrome.storage.sync.get(["isArcBrowser"]);
+      const { isArcBrowser: storedIsArc } = await chrome.storage.sync.get([
+        "isArcBrowser",
+      ]);
       if (!storedIsArc) {
         try {
-          const response = await chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: true });
+          const response = await chrome.runtime.sendMessage({
+            type: "setSidePanelMode",
+            enabled: true,
+          });
           if (response?.success) {
             console.log("Sidepanel mode enabled by default");
           }
@@ -485,7 +532,12 @@ function Onboarding({ onComplete }: OnboardingProps) {
         alignItems="center"
         justifyContent="center"
       >
-        <Text color="text.secondary" fontWeight="700" textTransform="uppercase" letterSpacing="wider">
+        <Text
+          color="text.secondary"
+          fontWeight="700"
+          textTransform="uppercase"
+          letterSpacing="wider"
+        >
           Loading...
         </Text>
       </Box>
@@ -547,16 +599,18 @@ function Onboarding({ onComplete }: OnboardingProps) {
             boxShadow="6px 6px 0px 0px #121212"
             p={4}
           >
-            <Image src="/bankrwallet-icon.png" w="60px" />
+            <Image src="/walletchan-icon.png" w="60px" />
           </Box>
 
           <VStack spacing={3}>
-            <Text fontSize="2xl" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
-              Welcome to Bankr Wallet
-            </Text>
-            <Text fontSize="md" color="text.secondary" lineHeight="tall" fontWeight="500">
-              Bring your Bankr Wallet out of the terminal and use it with ALL
-              the dApps like a regular wallet!
+            <Text
+              fontSize="2xl"
+              fontWeight="900"
+              color="text.primary"
+              textTransform="uppercase"
+              letterSpacing="wider"
+            >
+              Welcome to WalletChan
             </Text>
           </VStack>
 
@@ -684,9 +738,9 @@ function Onboarding({ onComplete }: OnboardingProps) {
             borderColor="bauhaus.black"
             boxShadow="3px 3px 0px 0px #121212"
           >
-            <Image src="/bankrwallet-icon.png" w="20px" h="20px" />
+            <Image src="/walletchan-icon.png" w="20px" h="20px" />
             <Text fontSize="sm" color="bauhaus.black" fontWeight="700">
-              BankrWallet
+              WalletChan
             </Text>
           </HStack>
           <Text
@@ -720,11 +774,22 @@ function Onboarding({ onComplete }: OnboardingProps) {
           </Box>
 
           <VStack spacing={2}>
-            <Text fontSize="xl" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wider">
+            <Text
+              fontSize="xl"
+              fontWeight="900"
+              color="text.primary"
+              textTransform="uppercase"
+              letterSpacing="wider"
+            >
               You're all set!
             </Text>
-            <Text fontSize="sm" color="text.secondary" maxW="300px" fontWeight="500">
-              Pin the Bankr Wallet extension to your browser toolbar, then click
+            <Text
+              fontSize="sm"
+              color="text.secondary"
+              maxW="300px"
+              fontWeight="500"
+            >
+              Pin the WalletChan extension to your browser toolbar, then click
               on it to start using your wallet.
             </Text>
           </VStack>
@@ -842,7 +907,10 @@ function Onboarding({ onComplete }: OnboardingProps) {
             size="sm"
             onClick={handleBack}
           />
-          <StepIndicator currentStep={getStepNumber()} totalSteps={getTotalSteps()} />
+          <StepIndicator
+            currentStep={getStepNumber()}
+            totalSteps={getTotalSteps()}
+          />
           <Box w="32px" /> {/* Spacer for alignment */}
         </HStack>
 
@@ -850,23 +918,35 @@ function Onboarding({ onComplete }: OnboardingProps) {
         {step === "accountType" && (
           <VStack spacing={5} w="full">
             <VStack spacing={2} textAlign="center">
-              <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wide">
+              <Text
+                fontSize="lg"
+                fontWeight="900"
+                color="text.primary"
+                textTransform="uppercase"
+                letterSpacing="wide"
+              >
                 Choose Account Type
               </Text>
               <Text fontSize="sm" color="text.secondary" fontWeight="500">
-                Select how you want to use BankrWallet
+                Select how you want to use WalletChan
               </Text>
             </VStack>
 
             <HStack spacing={3} w="full" align="stretch">
-              {/* Left column - Bankr Wallet */}
+              {/* Left column - WalletChan */}
               <Box
                 as="button"
                 flex={1}
                 p={4}
-                bg={accountTypeChoice === "bankr" ? "bg.muted" : "bauhaus.white"}
+                bg={
+                  accountTypeChoice === "bankr" ? "bg.muted" : "bauhaus.white"
+                }
                 border="3px solid"
-                borderColor={accountTypeChoice === "bankr" ? "bauhaus.blue" : "bauhaus.black"}
+                borderColor={
+                  accountTypeChoice === "bankr"
+                    ? "bauhaus.blue"
+                    : "bauhaus.black"
+                }
                 boxShadow="4px 4px 0px 0px #121212"
                 textAlign="left"
                 onClick={() => setAccountTypeChoice("bankr")}
@@ -886,22 +966,45 @@ function Onboarding({ onComplete }: OnboardingProps) {
                     <RobotIcon boxSize="20px" color="white" />
                   </Box>
                   <VStack spacing={0}>
-                    <Text fontSize="sm" fontWeight="900" color="text.primary" textTransform="uppercase" textAlign="center">
-                      Bankr Wallet
+                    <Text
+                      fontSize="sm"
+                      fontWeight="900"
+                      color="text.primary"
+                      textTransform="uppercase"
+                      textAlign="center"
+                    >
+                      Bankr API
                     </Text>
-                    <Text fontSize="xs" color="text.secondary" fontWeight="500" textAlign="center">
+                    <Text
+                      fontSize="xs"
+                      color="text.secondary"
+                      fontWeight="500"
+                      textAlign="center"
+                    >
                       AI-powered, no seed phrases.
                     </Text>
                   </VStack>
                   {accountTypeChoice === "bankr" && (
-                    <Box w="12px" h="12px" bg="bauhaus.blue" border="2px solid" borderColor="bauhaus.black" borderRadius="full" />
+                    <Box
+                      w="12px"
+                      h="12px"
+                      bg="bauhaus.blue"
+                      border="2px solid"
+                      borderColor="bauhaus.black"
+                      borderRadius="full"
+                    />
                   )}
                 </VStack>
               </Box>
 
               {/* "or" separator */}
               <VStack justify="center" spacing={0} flexShrink={0}>
-                <Text fontSize="xs" color="text.secondary" fontWeight="700" textTransform="lowercase">
+                <Text
+                  fontSize="xs"
+                  color="text.secondary"
+                  fontWeight="700"
+                  textTransform="lowercase"
+                >
                   or
                 </Text>
               </VStack>
@@ -913,9 +1016,17 @@ function Onboarding({ onComplete }: OnboardingProps) {
                   as="button"
                   w="full"
                   p={3}
-                  bg={accountTypeChoice === "privateKey" ? "bg.muted" : "bauhaus.white"}
+                  bg={
+                    accountTypeChoice === "privateKey"
+                      ? "bg.muted"
+                      : "bauhaus.white"
+                  }
                   border="3px solid"
-                  borderColor={accountTypeChoice === "privateKey" ? "bauhaus.yellow" : "bauhaus.black"}
+                  borderColor={
+                    accountTypeChoice === "privateKey"
+                      ? "bauhaus.yellow"
+                      : "bauhaus.black"
+                  }
                   boxShadow="4px 4px 0px 0px #121212"
                   textAlign="left"
                   onClick={() => setAccountTypeChoice("privateKey")}
@@ -931,15 +1042,30 @@ function Onboarding({ onComplete }: OnboardingProps) {
                       <KeyIcon boxSize="16px" color="bauhaus.black" />
                     </Box>
                     <VStack align="start" spacing={0} flex={1}>
-                      <Text fontSize="xs" fontWeight="900" color="text.primary" textTransform="uppercase">
+                      <Text
+                        fontSize="xs"
+                        fontWeight="900"
+                        color="text.primary"
+                        textTransform="uppercase"
+                      >
                         Private Key
                       </Text>
-                      <Text fontSize="2xs" color="text.secondary" fontWeight="500">
+                      <Text
+                        fontSize="2xs"
+                        color="text.secondary"
+                        fontWeight="500"
+                      >
                         Import key, sign locally.
                       </Text>
                     </VStack>
                     {accountTypeChoice === "privateKey" && (
-                      <Box w="10px" h="10px" bg="bauhaus.yellow" border="2px solid" borderColor="bauhaus.black" />
+                      <Box
+                        w="10px"
+                        h="10px"
+                        bg="bauhaus.yellow"
+                        border="2px solid"
+                        borderColor="bauhaus.black"
+                      />
                     )}
                   </HStack>
                 </Box>
@@ -949,9 +1075,17 @@ function Onboarding({ onComplete }: OnboardingProps) {
                   as="button"
                   w="full"
                   p={3}
-                  bg={accountTypeChoice === "seedPhrase" ? "bg.muted" : "bauhaus.white"}
+                  bg={
+                    accountTypeChoice === "seedPhrase"
+                      ? "bg.muted"
+                      : "bauhaus.white"
+                  }
                   border="3px solid"
-                  borderColor={accountTypeChoice === "seedPhrase" ? "bauhaus.red" : "bauhaus.black"}
+                  borderColor={
+                    accountTypeChoice === "seedPhrase"
+                      ? "bauhaus.red"
+                      : "bauhaus.black"
+                  }
                   boxShadow="4px 4px 0px 0px #121212"
                   textAlign="left"
                   onClick={() => setAccountTypeChoice("seedPhrase")}
@@ -967,22 +1101,43 @@ function Onboarding({ onComplete }: OnboardingProps) {
                       <SeedIcon boxSize="16px" color="white" />
                     </Box>
                     <VStack align="start" spacing={0} flex={1}>
-                      <Text fontSize="xs" fontWeight="900" color="text.primary" textTransform="uppercase">
+                      <Text
+                        fontSize="xs"
+                        fontWeight="900"
+                        color="text.primary"
+                        textTransform="uppercase"
+                      >
                         Seed Phrase
                       </Text>
-                      <Text fontSize="2xs" color="text.secondary" fontWeight="500">
+                      <Text
+                        fontSize="2xs"
+                        color="text.secondary"
+                        fontWeight="500"
+                      >
                         BIP39 mnemonic, multi-account.
                       </Text>
                     </VStack>
                     {accountTypeChoice === "seedPhrase" && (
-                      <Box w="10px" h="10px" bg="bauhaus.red" border="2px solid" borderColor="bauhaus.black" transform="rotate(45deg)" />
+                      <Box
+                        w="10px"
+                        h="10px"
+                        bg="bauhaus.red"
+                        border="2px solid"
+                        borderColor="bauhaus.black"
+                        transform="rotate(45deg)"
+                      />
                     )}
                   </HStack>
                 </Box>
               </VStack>
             </HStack>
 
-            <Text fontSize="xs" color="text.secondary" fontWeight="500" textAlign="center">
+            <Text
+              fontSize="xs"
+              color="text.secondary"
+              fontWeight="500"
+              textAlign="center"
+            >
               You can add other account types later from the extension settings.
             </Text>
 
@@ -996,8 +1151,14 @@ function Onboarding({ onComplete }: OnboardingProps) {
         {step === "bankrSetup" && (
           <VStack spacing={6} w="full">
             <VStack spacing={2} textAlign="center">
-              <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wide">
-                Setup Bankr Wallet
+              <Text
+                fontSize="lg"
+                fontWeight="900"
+                color="text.primary"
+                textTransform="uppercase"
+                letterSpacing="wide"
+              >
+                Setup WalletChan
               </Text>
               <Text fontSize="sm" color="text.secondary" fontWeight="500">
                 Enter your Bankr API key and linked wallet address.
@@ -1028,7 +1189,12 @@ function Onboarding({ onComplete }: OnboardingProps) {
 
               <VStack spacing={4}>
                 <FormControl isInvalid={!!errors.apiKey}>
-                  <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
+                  <FormLabel
+                    color="text.secondary"
+                    fontSize="xs"
+                    fontWeight="700"
+                    textTransform="uppercase"
+                  >
                     Bankr API Key
                   </FormLabel>
                   <InputGroup>
@@ -1039,7 +1205,8 @@ function Onboarding({ onComplete }: OnboardingProps) {
                       autoFocus
                       onChange={(e) => {
                         setApiKey(e.target.value);
-                        if (errors.apiKey) setErrors((prev) => ({ ...prev, apiKey: undefined }));
+                        if (errors.apiKey)
+                          setErrors((prev) => ({ ...prev, apiKey: undefined }));
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handleContinue();
@@ -1048,7 +1215,9 @@ function Onboarding({ onComplete }: OnboardingProps) {
                     />
                     <InputRightElement>
                       <IconButton
-                        aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                        aria-label={
+                          showApiKey ? "Hide API key" : "Show API key"
+                        }
                         icon={showApiKey ? <ViewOffIcon /> : <ViewIcon />}
                         size="sm"
                         variant="ghost"
@@ -1064,7 +1233,12 @@ function Onboarding({ onComplete }: OnboardingProps) {
                 </FormControl>
 
                 <FormControl isInvalid={!!errors.walletAddress}>
-                  <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
+                  <FormLabel
+                    color="text.secondary"
+                    fontSize="xs"
+                    fontWeight="700"
+                    textTransform="uppercase"
+                  >
                     Wallet Address
                   </FormLabel>
                   <Input
@@ -1072,7 +1246,11 @@ function Onboarding({ onComplete }: OnboardingProps) {
                     value={walletAddress}
                     onChange={(e) => {
                       setWalletAddress(e.target.value);
-                      if (errors.walletAddress) setErrors((prev) => ({ ...prev, walletAddress: undefined }));
+                      if (errors.walletAddress)
+                        setErrors((prev) => ({
+                          ...prev,
+                          walletAddress: undefined,
+                        }));
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleContinue();
@@ -1084,11 +1262,16 @@ function Onboarding({ onComplete }: OnboardingProps) {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
+                  <FormLabel
+                    color="text.secondary"
+                    fontSize="xs"
+                    fontWeight="700"
+                    textTransform="uppercase"
+                  >
                     Display Name (Optional)
                   </FormLabel>
                   <Input
-                    placeholder="e.g., My Bankr Wallet"
+                    placeholder="e.g., Main Wallet"
                     value={bankrDisplayName}
                     onChange={(e) => setBankrDisplayName(e.target.value)}
                     onKeyDown={(e) => {
@@ -1138,7 +1321,13 @@ function Onboarding({ onComplete }: OnboardingProps) {
         {step === "privateKey" && (
           <VStack spacing={6} w="full">
             <VStack spacing={2} textAlign="center">
-              <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wide">
+              <Text
+                fontSize="lg"
+                fontWeight="900"
+                color="text.primary"
+                textTransform="uppercase"
+                letterSpacing="wide"
+              >
                 Enter your Private Key
               </Text>
               <Text fontSize="sm" color="text.secondary" fontWeight="500">
@@ -1178,7 +1367,12 @@ function Onboarding({ onComplete }: OnboardingProps) {
               />
 
               <FormControl mt={4}>
-                <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
+                <FormLabel
+                  color="text.secondary"
+                  fontSize="xs"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                >
                   Display Name (Optional)
                 </FormLabel>
                 <Input
@@ -1204,7 +1398,8 @@ function Onboarding({ onComplete }: OnboardingProps) {
             >
               <Box w="8px" h="8px" minW="8px" bg="bauhaus.black" />
               <Text fontSize="xs" color="bauhaus.black" fontWeight="700">
-                Never share your private key with anyone. It will be encrypted and stored only on this device.
+                Never share your private key with anyone. It will be encrypted
+                and stored only on this device.
               </Text>
             </HStack>
 
@@ -1223,7 +1418,13 @@ function Onboarding({ onComplete }: OnboardingProps) {
         {step === "password" && (
           <VStack spacing={6} w="full">
             <VStack spacing={2} textAlign="center">
-              <Text fontSize="lg" fontWeight="900" color="text.primary" textTransform="uppercase" letterSpacing="wide">
+              <Text
+                fontSize="lg"
+                fontWeight="900"
+                color="text.primary"
+                textTransform="uppercase"
+                letterSpacing="wide"
+              >
                 Create a Password
               </Text>
               <Text fontSize="sm" color="text.secondary" fontWeight="500">
@@ -1256,7 +1457,12 @@ function Onboarding({ onComplete }: OnboardingProps) {
 
               <VStack spacing={4}>
                 <FormControl isInvalid={!!errors.password}>
-                  <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
+                  <FormLabel
+                    color="text.secondary"
+                    fontSize="xs"
+                    fontWeight="700"
+                    textTransform="uppercase"
+                  >
                     Password
                   </FormLabel>
                   <InputGroup>
@@ -1294,7 +1500,12 @@ function Onboarding({ onComplete }: OnboardingProps) {
                 </FormControl>
 
                 <FormControl isInvalid={!!errors.confirmPassword}>
-                  <FormLabel color="text.secondary" fontSize="xs" fontWeight="700" textTransform="uppercase">
+                  <FormLabel
+                    color="text.secondary"
+                    fontSize="xs"
+                    fontWeight="700"
+                    textTransform="uppercase"
+                  >
                     Confirm Password
                   </FormLabel>
                   <Input

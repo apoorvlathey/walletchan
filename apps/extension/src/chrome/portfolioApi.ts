@@ -1,4 +1,4 @@
-const PORTFOLIO_API_URL = "https://bankrwallet.app/api/portfolio";
+const PORTFOLIO_API_URL = "https://walletchan.com/api/portfolio";
 
 export interface PortfolioToken {
   symbol: string;
@@ -20,7 +20,7 @@ export interface PortfolioResponse {
 
 export async function fetchPortfolio(
   address: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<PortfolioResponse> {
   const url = `${PORTFOLIO_API_URL}?address=${encodeURIComponent(address)}`;
 

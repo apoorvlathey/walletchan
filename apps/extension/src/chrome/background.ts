@@ -9,9 +9,7 @@
  * - sidepanelManager.ts: Side panel detection and mode management
  */
 
-import {
-  encryptWithVaultKey,
-} from "./crypto";
+import { encryptWithVaultKey } from "./crypto";
 import {
   getAccounts,
   getAccountById,
@@ -31,19 +29,13 @@ import {
   convertToSeedPhraseAccount,
 } from "./accountStorage";
 import type { SeedPhraseAccount } from "./types";
-import {
-  decryptAllKeys,
-  addKeyToVault,
-} from "./vaultCrypto";
+import { decryptAllKeys, addKeyToVault } from "./vaultCrypto";
 import {
   generateNewMnemonic,
   isValidMnemonic,
   derivePrivateKey as deriveSeedPrivateKey,
 } from "./seedPhraseUtils";
-import {
-  storeMnemonic,
-  getMnemonic,
-} from "./mnemonicStorage";
+import { storeMnemonic, getMnemonic } from "./mnemonicStorage";
 import { deriveAddress } from "./localSigner";
 import { validateEIP712TypedData } from "./eip712Validator";
 import {
@@ -145,7 +137,7 @@ import {
 async function handleRpcRequest(
   rpcUrl: string,
   method: string,
-  params: any[]
+  params: any[],
 ): Promise<any> {
   // Validate URL protocol to prevent SSRF
   try {
@@ -154,7 +146,8 @@ async function handleRpcRequest(
       throw new Error("Only HTTP(S) RPC URLs allowed");
     }
   } catch (e) {
-    if (e instanceof Error && e.message === "Only HTTP(S) RPC URLs allowed") throw e;
+    if (e instanceof Error && e.message === "Only HTTP(S) RPC URLs allowed")
+      throw e;
     throw new Error("Invalid RPC URL");
   }
 
@@ -214,13 +207,20 @@ chrome.storage.onChanged.addListener(async (changes, areaName) => {
         // Get all tabs and send setAddress message
         const tabs = await chrome.tabs.query({});
         for (const tab of tabs) {
-          if (tab.id && tab.url && !tab.url.startsWith("chrome://") && !tab.url.startsWith("chrome-extension://")) {
-            chrome.tabs.sendMessage(tab.id, {
-              type: "setAddress",
-              msg: { address: newAddress, displayAddress: newDisplayAddress },
-            }).catch(() => {
-              // Ignore errors for tabs without content script
-            });
+          if (
+            tab.id &&
+            tab.url &&
+            !tab.url.startsWith("chrome://") &&
+            !tab.url.startsWith("chrome-extension://")
+          ) {
+            chrome.tabs
+              .sendMessage(tab.id, {
+                type: "setAddress",
+                msg: { address: newAddress, displayAddress: newDisplayAddress },
+              })
+              .catch(() => {
+                // Ignore errors for tabs without content script
+              });
           }
         }
       }
@@ -264,7 +264,8 @@ async function migrateFromLegacyStorage(): Promise<boolean> {
     }
 
     // Must have legacy encrypted data to be a real returning user
-    const { encryptedApiKey } = await chrome.storage.local.get("encryptedApiKey");
+    const { encryptedApiKey } =
+      await chrome.storage.local.get("encryptedApiKey");
     if (!encryptedApiKey) {
       return false; // Fresh install — nothing to migrate
     }
@@ -294,10 +295,13 @@ async function migrateFromLegacyStorage(): Promise<boolean> {
     await chrome.storage.local.set({ accounts: [newAccount] });
     await chrome.storage.sync.set({ activeAccountId: newAccount.id });
 
-    console.log("[BankrWallet] Legacy storage migration complete:", newAccount.address);
+    console.log(
+      "[WalletChan] Legacy storage migration complete:",
+      newAccount.address,
+    );
     return true;
   } catch (error) {
-    console.error("[BankrWallet] Legacy storage migration failed:", error);
+    console.error("[WalletChan] Legacy storage migration failed:", error);
     return false;
   }
 }
@@ -331,7 +335,9 @@ chrome.action.onClicked.addListener(async (tab) => {
 
     let sidePanelActuallyOpen = false;
     if (chrome.runtime.getContexts) {
-      const contexts = await chrome.runtime.getContexts({ contextTypes: [("SIDE_PANEL" as chrome.runtime.ContextType)] });
+      const contexts = await chrome.runtime.getContexts({
+        contextTypes: ["SIDE_PANEL" as chrome.runtime.ContextType],
+      });
       sidePanelActuallyOpen = contexts.length > 0;
     } else {
       try {
@@ -387,13 +393,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       ) {
         const validationResult = validateEIP712TypedData(
           signature.method,
-          signature.params[1]
+          signature.params[1],
         );
 
         if (!validationResult.valid) {
           console.warn(
-            `[BankrWallet] EIP-712 validation failed for ${message.origin}:`,
-            validationResult.error
+            `[WalletChan] EIP-712 validation failed for ${message.origin}:`,
+            validationResult.error,
           );
           sendResponse({
             success: false,
@@ -417,7 +423,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "rejectSignatureRequest": {
-      const result: SignatureResult = { success: false, error: "Signature request cancelled by user" };
+      const result: SignatureResult = {
+        success: false,
+        error: "Signature request cancelled by user",
+      };
       removePendingSignatureRequest(message.sigId).then(() => {
         const resolver = pendingSignatureResolvers.get(message.sigId);
         if (resolver) {
@@ -469,7 +478,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             pendingResolvers.delete(message.txId);
           }
           sendResponse(result);
-        }
+        },
       );
       return true;
     }
@@ -589,7 +598,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         try {
           // SECURITY: Block API key changes when unlocked with agent password
           if (message.apiKey && getPasswordType() === "agent") {
-            sendResponse({ success: false, error: "Adding accounts with API keys requires master password" });
+            sendResponse({
+              success: false,
+              error: "Adding accounts with API keys requires master password",
+            });
             return;
           }
 
@@ -611,8 +623,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             if (password) {
               const vaultKey = getCachedVaultKey();
               if (vaultKey) {
-                const encrypted = await encryptWithVaultKey(vaultKey, message.apiKey);
-                await chrome.storage.local.set({ encryptedApiKeyVault: encrypted });
+                const encrypted = await encryptWithVaultKey(
+                  vaultKey,
+                  message.apiKey,
+                );
+                await chrome.storage.local.set({
+                  encryptedApiKeyVault: encrypted,
+                });
               } else {
                 const { saveEncryptedApiKey } = await import("./crypto");
                 await saveEncryptedApiKey(message.apiKey, password);
@@ -621,11 +638,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
           }
 
-          const account = await addBankrAccount(message.address, message.displayName);
-          chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+          const account = await addBankrAccount(
+            message.address,
+            message.displayName,
+          );
+          chrome.runtime
+            .sendMessage({ type: "accountsUpdated" })
+            .catch(() => {});
           sendResponse({ success: true, account });
         } catch (error) {
-          sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to add account" });
+          sendResponse({
+            success: false,
+            error:
+              error instanceof Error ? error.message : "Failed to add account",
+          });
         }
       })();
       return true;
@@ -634,16 +660,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "addImpersonatorAccount": {
       // SECURITY: Block when unlocked with agent password
       if (getPasswordType() === "agent") {
-        sendResponse({ success: false, error: "Adding accounts requires master password" });
+        sendResponse({
+          success: false,
+          error: "Adding accounts requires master password",
+        });
         return false;
       }
       (async () => {
         try {
-          const account = await addImpersonatorAccount(message.address, message.displayName);
-          chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+          const account = await addImpersonatorAccount(
+            message.address,
+            message.displayName,
+          );
+          chrome.runtime
+            .sendMessage({ type: "accountsUpdated" })
+            .catch(() => {});
           sendResponse({ success: true, account });
         } catch (error) {
-          sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to add account" });
+          sendResponse({
+            success: false,
+            error:
+              error instanceof Error ? error.message : "Failed to add account",
+          });
         }
       })();
       return true;
@@ -663,7 +701,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "addSeedPhraseGroup": {
       // SECURITY: Block when unlocked with agent password
       if (getPasswordType() === "agent") {
-        sendResponse({ success: false, error: "Adding seed phrases requires master password" });
+        sendResponse({
+          success: false,
+          error: "Adding seed phrases requires master password",
+        });
         return false;
       }
       (async () => {
@@ -690,7 +731,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           let mnemonic: string;
           if (message.mnemonic) {
             if (!isValidMnemonic(message.mnemonic)) {
-              sendResponse({ success: false, error: "Invalid seed phrase (must be 12 words)" });
+              sendResponse({
+                success: false,
+                error: "Invalid seed phrase (must be 12 words)",
+              });
               return;
             }
             mnemonic = message.mnemonic.trim();
@@ -715,7 +759,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           if (existingAccount) {
             if (existingAccount.type === "privateKey") {
               // Convert PK account to seed phrase in-place (preserves ID, display name, vault entry)
-              const converted = await convertToSeedPhraseAccount(existingAccount.id, group.id, 0);
+              const converted = await convertToSeedPhraseAccount(
+                existingAccount.id,
+                group.id,
+                0,
+              );
               if (!converted) throw new Error("Failed to convert account");
               account = converted;
               // Skip addKeyToVault — vault already has the key under this account ID
@@ -723,7 +771,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               throw new Error("An account with this address already exists");
             }
           } else {
-            account = await addSeedPhraseAccount(address, group.id, 0, message.accountDisplayName || undefined);
+            account = await addSeedPhraseAccount(
+              address,
+              group.id,
+              0,
+              message.accountDisplayName || undefined,
+            );
             // Store derived PK in vault using account UUID (matches vault lookup)
             await addKeyToVault(account.id, privateKey, password);
           }
@@ -734,7 +787,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const vault = await decryptAllKeys(password);
           if (vault) setCachedVault(vault);
 
-          chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+          chrome.runtime
+            .sendMessage({ type: "accountsUpdated" })
+            .catch(() => {});
           sendResponse({
             success: true,
             account,
@@ -742,7 +797,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             mnemonic: message.mnemonic ? undefined : mnemonic, // Only return if generated
           });
         } catch (error) {
-          sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to create seed phrase" });
+          sendResponse({
+            success: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to create seed phrase",
+          });
         }
       })();
       return true;
@@ -751,7 +812,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "deriveSeedAccount": {
       // SECURITY: Block when unlocked with agent password
       if (getPasswordType() === "agent") {
-        sendResponse({ success: false, error: "Deriving accounts requires master password" });
+        sendResponse({
+          success: false,
+          error: "Deriving accounts requires master password",
+        });
         return false;
       }
       (async () => {
@@ -777,18 +841,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const { seedGroupId } = message;
           const mnemonic = await getMnemonic(seedGroupId, password);
           if (!mnemonic) {
-            sendResponse({ success: false, error: "Seed phrase not found or wrong password" });
+            sendResponse({
+              success: false,
+              error: "Seed phrase not found or wrong password",
+            });
             return;
           }
 
           // Find next index
           const accounts = await getAccounts();
           const groupAccounts = accounts.filter(
-            (a) => a.type === "seedPhrase" && (a as any).seedGroupId === seedGroupId
+            (a) =>
+              a.type === "seedPhrase" && (a as any).seedGroupId === seedGroupId,
           );
-          const nextIndex = groupAccounts.length > 0
-            ? Math.max(...groupAccounts.map((a) => (a as any).derivationIndex)) + 1
-            : 0;
+          const nextIndex =
+            groupAccounts.length > 0
+              ? Math.max(
+                  ...groupAccounts.map((a) => (a as any).derivationIndex),
+                ) + 1
+              : 0;
 
           // Derive key
           const privateKey = deriveSeedPrivateKey(mnemonic, nextIndex);
@@ -801,7 +872,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           if (existingAccount) {
             if (existingAccount.type === "privateKey") {
               // Convert PK account to seed phrase in-place (preserves ID, display name, vault entry)
-              const converted = await convertToSeedPhraseAccount(existingAccount.id, seedGroupId, nextIndex);
+              const converted = await convertToSeedPhraseAccount(
+                existingAccount.id,
+                seedGroupId,
+                nextIndex,
+              );
               if (!converted) throw new Error("Failed to convert account");
               account = converted;
               // Skip addKeyToVault — vault already has the key under this account ID
@@ -809,7 +884,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               throw new Error("An account with this address already exists");
             }
           } else {
-            account = await addSeedPhraseAccount(address, seedGroupId, nextIndex, message.displayName || undefined);
+            account = await addSeedPhraseAccount(
+              address,
+              seedGroupId,
+              nextIndex,
+              message.displayName || undefined,
+            );
             // Store in vault using account UUID (matches vault lookup)
             await addKeyToVault(account.id, privateKey, password);
           }
@@ -820,10 +900,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const vault = await decryptAllKeys(password);
           if (vault) setCachedVault(vault);
 
-          chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
+          chrome.runtime
+            .sendMessage({ type: "accountsUpdated" })
+            .catch(() => {});
           sendResponse({ success: true, account });
         } catch (error) {
-          sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to derive account" });
+          sendResponse({
+            success: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to derive account",
+          });
         }
       })();
       return true;
@@ -875,7 +963,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
           sendResponse({ success: true, mnemonic });
         } catch (error) {
-          sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to reveal seed phrase" });
+          sendResponse({
+            success: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to reveal seed phrase",
+          });
         }
       })();
       return true;
@@ -889,28 +983,47 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "renameSeedGroup": {
-      const newName = (typeof message.name === "string" ? message.name : "").trim().slice(0, 100);
+      const newName = (typeof message.name === "string" ? message.name : "")
+        .trim()
+        .slice(0, 100);
       if (!message.seedGroupId || !newName) {
         sendResponse({ success: false, error: "Missing seedGroupId or name" });
         return true;
       }
-      renameSeedGroup(message.seedGroupId, newName).then(() => {
-        chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
-        sendResponse({ success: true });
-      }).catch((error) => {
-        sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to rename" });
-      });
+      renameSeedGroup(message.seedGroupId, newName)
+        .then(() => {
+          chrome.runtime
+            .sendMessage({ type: "accountsUpdated" })
+            .catch(() => {});
+          sendResponse({ success: true });
+        })
+        .catch((error) => {
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to rename",
+          });
+        });
       return true;
     }
 
     case "updateAccountDisplayName": {
-      const displayName = typeof message.displayName === "string" ? message.displayName.slice(0, 100) : "";
-      updateAccountDisplayName(message.accountId, displayName).then(() => {
-        chrome.runtime.sendMessage({ type: "accountsUpdated" }).catch(() => {});
-        sendResponse({ success: true });
-      }).catch((error) => {
-        sendResponse({ success: false, error: error instanceof Error ? error.message : "Failed to update" });
-      });
+      const displayName =
+        typeof message.displayName === "string"
+          ? message.displayName.slice(0, 100)
+          : "";
+      updateAccountDisplayName(message.accountId, displayName)
+        .then(() => {
+          chrome.runtime
+            .sendMessage({ type: "accountsUpdated" })
+            .catch(() => {});
+          sendResponse({ success: true });
+        })
+        .catch((error) => {
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to update",
+          });
+        });
       return true;
     }
 
@@ -918,7 +1031,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       (async () => {
         // SECURITY: Block adding accounts when unlocked with agent password
         if (getPasswordType() === "agent") {
-          sendResponse({ success: false, error: "Adding accounts requires master password" });
+          sendResponse({
+            success: false,
+            error: "Adding accounts requires master password",
+          });
           return;
         }
 
@@ -942,7 +1058,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const result = await handleAddPrivateKeyAccount(
           message.privateKey,
           password,
-          message.displayName
+          message.displayName,
         );
         sendResponse(result);
       })();
@@ -952,7 +1068,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "removeAccount": {
       // SECURITY: Block account removal when unlocked with agent password
       if (getPasswordType() === "agent") {
-        sendResponse({ success: false, error: "Account removal requires master password" });
+        sendResponse({
+          success: false,
+          error: "Account removal requires master password",
+        });
         return false;
       }
       handleRemoveAccount(message.accountId).then((result) => {
@@ -1004,21 +1123,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           if (!privateKey) {
             const vault = await decryptAllKeys(cachedPwd);
             if (!vault) {
-              sendResponse({ success: false, error: "Failed to decrypt vault" });
+              sendResponse({
+                success: false,
+                error: "Failed to decrypt vault",
+              });
               return;
             }
             setCachedVault(vault);
             privateKey = getPrivateKeyFromCache(accountId);
           }
           if (!privateKey) {
-            sendResponse({ success: false, error: "Private key not found for this account" });
+            sendResponse({
+              success: false,
+              error: "Private key not found for this account",
+            });
             return;
           }
           sendResponse({ success: true, privateKey });
         } catch (error) {
           sendResponse({
             success: false,
-            error: error instanceof Error ? error.message : "Failed to reveal private key",
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to reveal private key",
           });
         }
       })();
@@ -1029,12 +1157,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const tabId = message.tabId || sender.tab?.id;
       (async () => {
         // Determine account type to route to correct handler
-        const account = tabId ? await getTabAccount(tabId) : await getActiveAccount();
+        const account = tabId
+          ? await getTabAccount(tabId)
+          : await getActiveAccount();
         let result: SignatureResult;
         if (account?.type === "bankr") {
-          result = await handleConfirmSignatureRequestBankr(message.sigId, message.password);
+          result = await handleConfirmSignatureRequestBankr(
+            message.sigId,
+            message.password,
+          );
         } else {
-          result = await handleConfirmSignatureRequest(message.sigId, message.password, tabId);
+          result = await handleConfirmSignatureRequest(
+            message.sigId,
+            message.password,
+            tabId,
+          );
         }
         const resolver = pendingSignatureResolvers.get(message.sigId);
         if (resolver) {
@@ -1053,11 +1190,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "confirmTransactionAsyncPK": {
       const tabId = message.tabId || sender.tab?.id;
-      handleConfirmTransactionAsyncPK(message.txId, message.password, tabId, message.functionName, message.gasOverrides).then(
-        (result) => {
-          sendResponse(result);
-        }
-      );
+      handleConfirmTransactionAsyncPK(
+        message.txId,
+        message.password,
+        tabId,
+        message.functionName,
+        message.gasOverrides,
+      ).then((result) => {
+        sendResponse(result);
+      });
       return true;
     }
 
@@ -1121,9 +1262,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "changePasswordWithCachedPassword": {
-      handleChangePasswordWithCachedPassword(message.newPassword).then((result) => {
-        sendResponse(result);
-      });
+      handleChangePasswordWithCachedPassword(message.newPassword).then(
+        (result) => {
+          sendResponse(result);
+        },
+      );
       return true;
     }
 
@@ -1165,7 +1308,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "isAgentPasswordEnabled": {
       (async () => {
-        const { agentPasswordEnabled } = await chrome.storage.local.get("agentPasswordEnabled");
+        const { agentPasswordEnabled } = await chrome.storage.local.get(
+          "agentPasswordEnabled",
+        );
         sendResponse({ enabled: !!agentPasswordEnabled });
       })();
       return true;
@@ -1185,7 +1330,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "setArcBrowser": {
       if (message.isArc) {
-        chrome.storage.sync.set({ sidePanelVerified: false, sidePanelMode: false, isArcBrowser: true });
+        chrome.storage.sync.set({
+          sidePanelVerified: false,
+          sidePanelMode: false,
+          isArcBrowser: true,
+        });
         // Restore native popup so clicks work on Arc
         chrome.action.setPopup({ popup: "popup-init.html" }).catch(() => {});
       }
@@ -1199,7 +1348,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ supported: false });
           return;
         }
-        const { sidePanelVerified } = await chrome.storage.sync.get(["sidePanelVerified"]);
+        const { sidePanelVerified } = await chrome.storage.sync.get([
+          "sidePanelVerified",
+        ]);
         sendResponse({ supported: sidePanelVerified !== false });
       })();
       return true;
@@ -1241,11 +1392,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "confirmTransactionAsync": {
-      handleConfirmTransactionAsync(message.txId, message.password, message.functionName).then(
-        (result) => {
-          sendResponse(result);
-        }
-      );
+      handleConfirmTransactionAsync(
+        message.txId,
+        message.password,
+        message.functionName,
+      ).then((result) => {
+        sendResponse(result);
+      });
       return true;
     }
 
@@ -1281,7 +1434,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "onboardingComplete": {
-      chrome.runtime.sendMessage({ type: "onboardingComplete" }).catch(() => {});
+      chrome.runtime
+        .sendMessage({ type: "onboardingComplete" })
+        .catch(() => {});
       sendResponse({ success: true });
       return false;
     }
@@ -1310,7 +1465,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "resetExtension": {
       // SECURITY: Block extension reset when unlocked with agent password
       if (getPasswordType() === "agent") {
-        sendResponse({ success: false, error: "Extension reset requires master password" });
+        sendResponse({
+          success: false,
+          error: "Extension reset requires master password",
+        });
         return false;
       }
 
@@ -1322,8 +1480,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       (async () => {
         try {
           const allLocalStorage = await chrome.storage.local.get(null);
-          const notificationKeys = Object.keys(allLocalStorage).filter(
-            (key) => key.startsWith("notification-")
+          const notificationKeys = Object.keys(allLocalStorage).filter((key) =>
+            key.startsWith("notification-"),
           );
 
           await Promise.all([
@@ -1382,7 +1540,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       handleSubmitChatPrompt(
         message.conversationId,
         message.messageId,
-        message.prompt
+        message.prompt,
       ).then((result) => {
         sendResponse(result);
       });
@@ -1421,7 +1579,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       addMessageToConversation(message.conversationId, message.message).then(
         (conversation) => {
           sendResponse(conversation);
-        }
+        },
       );
       return true;
     }
@@ -1430,7 +1588,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       updateMessageInConversation(
         message.conversationId,
         message.messageId,
-        message.updates
+        message.updates,
       ).then((conversation) => {
         sendResponse(conversation);
       });
@@ -1439,7 +1597,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     default: {
       if (message.type && typeof message.type === "string") {
-        console.warn(`[BankrWallet] Unknown message type: ${message.type}`);
+        console.warn(`[WalletChan] Unknown message type: ${message.type}`);
       }
       break;
     }
@@ -1462,7 +1620,9 @@ chrome.notifications.onClicked.addListener(async (notificationId) => {
       const useSidePanel = await getSidePanelMode();
 
       if (useSidePanel && isSidePanelSupported()) {
-        const popupUrl = chrome.runtime.getURL(`index.html?showError=${notificationData.txId}`);
+        const popupUrl = chrome.runtime.getURL(
+          `index.html?showError=${notificationData.txId}`,
+        );
         await chrome.windows.create({
           url: popupUrl,
           type: "popup",
@@ -1471,7 +1631,9 @@ chrome.notifications.onClicked.addListener(async (notificationId) => {
           focused: true,
         });
       } else {
-        const popupUrl = chrome.runtime.getURL(`index.html?showError=${notificationData.txId}`);
+        const popupUrl = chrome.runtime.getURL(
+          `index.html?showError=${notificationData.txId}`,
+        );
         await chrome.windows.create({
           url: popupUrl,
           type: "popup",
