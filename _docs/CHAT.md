@@ -1,4 +1,4 @@
-# BankrWallet Chat Feature Implementation
+# WalletChan Chat Feature Implementation
 
 ## Overview
 
@@ -68,13 +68,13 @@ The chat feature allows users to converse with the Bankr AI agent directly from 
 
 ```typescript
 interface Message {
-  id: string;                              // UUID
-  role: "user" | "assistant";              // Message author
-  content: string;                         // Message text
-  timestamp: number;                       // Unix timestamp (ms)
+  id: string; // UUID
+  role: "user" | "assistant"; // Message author
+  content: string; // Message text
+  timestamp: number; // Unix timestamp (ms)
   status?: "pending" | "complete" | "error"; // Assistant message status
-  jobId?: string;                          // Bankr API job ID (for polling)
-  isWalletLockedError?: boolean;           // True if error was due to wallet being locked
+  jobId?: string; // Bankr API job ID (for polling)
+  isWalletLockedError?: boolean; // True if error was due to wallet being locked
 }
 ```
 
@@ -82,11 +82,11 @@ interface Message {
 
 ```typescript
 interface Conversation {
-  id: string;         // UUID
-  title: string;      // Auto-generated from first user message
+  id: string; // UUID
+  title: string; // Auto-generated from first user message
   messages: Message[];
-  createdAt: number;  // Unix timestamp (ms)
-  updatedAt: number;  // Unix timestamp (ms)
+  createdAt: number; // Unix timestamp (ms)
+  updatedAt: number; // Unix timestamp (ms)
   favorite?: boolean; // Whether conversation is favorited
 }
 ```
@@ -95,45 +95,48 @@ interface Conversation {
 
 ### Configuration
 
-| Setting | Value |
-| ------- | ----- |
-| Storage Key | `chatHistory` |
-| Storage Type | `chrome.storage.local` |
-| Max Conversations | 50 |
-| Max Messages per Conversation | 100 |
+| Setting                       | Value                  |
+| ----------------------------- | ---------------------- |
+| Storage Key                   | `chatHistory`          |
+| Storage Type                  | `chrome.storage.local` |
+| Max Conversations             | 50                     |
+| Max Messages per Conversation | 100                    |
 
 ### Storage Functions
 
 `src/chrome/chatStorage.ts`:
 
-| Function | Description |
-| -------- | ----------- |
-| `getConversations()` | Get all conversations (favorites first, then by updatedAt) |
-| `getConversation(id)` | Get a specific conversation by ID |
-| `saveConversation(conversation)` | Save/update a conversation |
-| `createConversation(title?)` | Create a new conversation |
-| `deleteConversation(id)` | Delete a conversation by ID |
-| `addMessageToConversation(convId, message)` | Add a message to a conversation |
-| `updateMessageInConversation(convId, msgId, updates)` | Update a message |
-| `toggleConversationFavorite(id)` | Toggle favorite status for a conversation |
-| `deleteMessageFromConversation(convId, msgId)` | Delete a specific message from a conversation |
-| `clearChatHistory()` | Clear all chat history |
+| Function                                              | Description                                                |
+| ----------------------------------------------------- | ---------------------------------------------------------- |
+| `getConversations()`                                  | Get all conversations (favorites first, then by updatedAt) |
+| `getConversation(id)`                                 | Get a specific conversation by ID                          |
+| `saveConversation(conversation)`                      | Save/update a conversation                                 |
+| `createConversation(title?)`                          | Create a new conversation                                  |
+| `deleteConversation(id)`                              | Delete a conversation by ID                                |
+| `addMessageToConversation(convId, message)`           | Add a message to a conversation                            |
+| `updateMessageInConversation(convId, msgId, updates)` | Update a message                                           |
+| `toggleConversationFavorite(id)`                      | Toggle favorite status for a conversation                  |
+| `deleteMessageFromConversation(convId, msgId)`        | Delete a specific message from a conversation              |
+| `clearChatHistory()`                                  | Clear all chat history                                     |
 
 ### Sorting
 
 Conversations are sorted by:
+
 1. **Favorites first**: Favorited conversations appear at the top
 2. **Then by updatedAt**: Newest conversations appear first within each group
 
 ### Auto Title Generation
 
 When the first user message is added to a conversation with the default title "New Chat":
+
 - Title is updated to the message content
 - Truncated to 50 characters with "..." if longer
 
 ### Empty Chat Handling
 
 Conversations are NOT saved to storage until the first message is sent:
+
 - `createNewChat()` creates a temporary in-memory conversation
 - Conversation is only persisted when `sendMessage()` is called
 - This prevents "New Chat" entries from cluttering the history
@@ -150,20 +153,20 @@ async function submitChatPrompt(
   apiKey: string,
   prompt: string,
   history?: ChatMessage[],
-  signal?: AbortSignal
-): Promise<{ jobId: string }>
+  signal?: AbortSignal,
+): Promise<{ jobId: string }>;
 
 // Poll until job completes
 async function pollChatJobUntilComplete(
   apiKey: string,
   jobId: string,
   options?: {
-    pollInterval?: number;    // Default: 2000ms
-    maxDuration?: number;     // Default: 300000ms (5 min)
+    pollInterval?: number; // Default: 2000ms
+    maxDuration?: number; // Default: 300000ms (5 min)
     onStatusUpdate?: (status) => void;
     signal?: AbortSignal;
-  }
-): Promise<{ success: boolean; response: string; error?: string }>
+  },
+): Promise<{ success: boolean; response: string; error?: string }>;
 ```
 
 ### API Flow
@@ -184,13 +187,20 @@ During polling, the API response includes a `statusUpdates` array that grows ove
 ```json
 {
   "statusUpdates": [
-    { "message": "viewing clanker fees", "timestamp": "2026-02-07T23:39:10.846Z" },
-    { "message": "validating response accuracy", "timestamp": "2026-02-07T23:39:31.040Z" }
+    {
+      "message": "viewing clanker fees",
+      "timestamp": "2026-02-07T23:39:10.846Z"
+    },
+    {
+      "message": "validating response accuracy",
+      "timestamp": "2026-02-07T23:39:31.040Z"
+    }
   ]
 }
 ```
 
 **Flow**:
+
 1. Background sends `chatJobUpdate` message to UI with `statusUpdates` array on each poll
 2. `useChat` hook extracts the **last element** of the array (latest status)
 3. `statusUpdateText` state is set and passed through `ChatView` → `MessageList` → `MessageBubble`
@@ -219,20 +229,22 @@ If the prompt exceeds 10,000 characters, older messages are progressively remove
 
 ## Error Handling
 
-| Error | Handling |
-| ----- | -------- |
-| Wallet locked | Shows "Unlock" button in error message |
-| API error | Message status set to "error", content shows error |
-| Network error | Message status set to "error", content shows error |
-| Timeout (5 min) | Message status set to "error" |
-| Abort/Cancel | Message status set to "error", "Request cancelled" |
+| Error           | Handling                                           |
+| --------------- | -------------------------------------------------- |
+| Wallet locked   | Shows "Unlock" button in error message             |
+| API error       | Message status set to "error", content shows error |
+| Network error   | Message status set to "error", content shows error |
+| Timeout (5 min) | Message status set to "error"                      |
+| Abort/Cancel    | Message status set to "error", "Request cancelled" |
 
 ## Reset Behavior
 
 When the extension is reset (Settings → Reset Extension):
+
 - `chatHistory` storage key is cleared
 - All conversations and messages are deleted
 
 When clearing chat history (Settings → Clear Chat History):
+
 - All conversations are deleted
 - Current chat view returns to empty state

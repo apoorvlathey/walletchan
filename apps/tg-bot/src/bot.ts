@@ -54,7 +54,7 @@ export function createBot(): Bot {
           `2. Have at least ${formatThreshold()} sBNKRW staked\n` +
           `3. Sign a verification message\n\n` +
           `This link expires in 10 minutes.`,
-        { reply_markup: keyboard }
+        { reply_markup: keyboard },
       );
       return;
     }
@@ -63,7 +63,7 @@ export function createBot(): Bot {
       `Welcome to the BankrWallet Token Gate Bot!\n\n` +
         `This bot manages access to the private BankrWallet holders group.\n\n` +
         `You need at least ${formatThreshold()} sBNKRW staked to join.\n\n` +
-        `Use /help to see available commands.`
+        `Use /help to see available commands.`,
     );
   });
 
@@ -72,7 +72,7 @@ export function createBot(): Bot {
       `Available commands:\n\n` +
         `/verify — Link your wallet and get a group invite\n` +
         `/status — Check your wallet, balance, and eligibility\n` +
-        `/help — Show this message`
+        `/help — Show this message`,
     );
   });
 
@@ -92,7 +92,7 @@ export function createBot(): Bot {
         `2. Have at least ${formatThreshold()} sBNKRW staked\n` +
         `3. Sign a verification message\n\n` +
         `This link expires in 10 minutes.`,
-      { reply_markup: keyboard }
+      { reply_markup: keyboard },
     );
   });
 
@@ -105,7 +105,7 @@ export function createBot(): Bot {
 
     if (!user || !user.walletAddress) {
       await ctx.reply(
-        `You haven't verified a wallet yet.\n\nUse /verify to get started.`
+        `You haven't verified a wallet yet.\n\nUse /verify to get started.`,
       );
       return;
     }
@@ -121,14 +121,18 @@ export function createBot(): Bot {
         `Threshold: ${threshold} sBNKRW\n` +
         `Eligible: ${eligible ? "Yes" : "No"}\n` +
         `Group Member: ${user.isMember ? "Yes" : "No"}`,
-      { parse_mode: "Markdown" }
+      { parse_mode: "Markdown" },
     );
   });
 
   // Track when users join/leave the private group
   // Kick unverified users who join directly (e.g. via leaked invite link)
   bot.on("chat_member", async (ctx) => {
-    if (!config.PRIVATE_GROUP_ID || ctx.chatMember.chat.id !== config.PRIVATE_GROUP_ID) return;
+    if (
+      !config.PRIVATE_GROUP_ID ||
+      ctx.chatMember.chat.id !== config.PRIVATE_GROUP_ID
+    )
+      return;
 
     const userId = BigInt(ctx.chatMember.new_chat_member.user.id);
     const status = ctx.chatMember.new_chat_member.status;
@@ -145,21 +149,32 @@ export function createBot(): Bot {
 
       if (!user || !user.walletAddress) {
         // Unverified — kick immediately
-        console.log(`[ChatMember] Unverified user ${userId} joined, kicking...`);
+        console.log(
+          `[ChatMember] Unverified user ${userId} joined, kicking...`,
+        );
         await kickUser(bot, Number(userId));
         await sendKickDM(bot, Number(userId));
         return;
       }
 
-      await db.update(users).set({ isMember: true }).where(eq(users.tgId, userId));
+      await db
+        .update(users)
+        .set({ isMember: true })
+        .where(eq(users.tgId, userId));
     } else {
-      await db.update(users).set({ isMember: false }).where(eq(users.tgId, userId));
+      await db
+        .update(users)
+        .set({ isMember: false })
+        .where(eq(users.tgId, userId));
     }
   });
 
   // Register slash commands menu with Telegram
   bot.api.setMyCommands([
-    { command: "verify", description: "Link your wallet and get a group invite" },
+    {
+      command: "verify",
+      description: "Link your wallet and get a group invite",
+    },
     { command: "status", description: "Check your verification status" },
     { command: "help", description: "Show available commands" },
   ]);

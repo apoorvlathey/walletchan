@@ -6,7 +6,7 @@ import { startBalanceChecker } from "./jobs/balanceChecker.js";
 import { startCoinAnnouncer } from "./jobs/coinAnnouncer.js";
 
 async function main() {
-  console.log("Starting BankrWallet TG Bot...");
+  console.log("Starting WalletChan TG Bot...");
 
   // Create bot
   const bot = createBot();
@@ -31,7 +31,7 @@ async function main() {
     },
     (info) => {
       console.log(`API server running on http://localhost:${info.port}`);
-    }
+    },
   );
 }
 

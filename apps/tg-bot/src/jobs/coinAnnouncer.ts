@@ -18,7 +18,7 @@ const MAX_ANNOUNCED_IDS = 500;
 
 async function fetchLatestCoins(): Promise<Coin[]> {
   const res = await fetch(
-    `${config.COINS_INDEXER_API_URL}/coins?limit=50&offset=0`
+    `${config.COINS_INDEXER_API_URL}/coins?limit=50&offset=0`,
   );
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
@@ -26,7 +26,7 @@ async function fetchLatestCoins(): Promise<Coin[]> {
 
 export function startCoinAnnouncer(
   bot: Bot,
-  intervalSeconds: number = 2
+  intervalSeconds: number = 2,
 ): NodeJS.Timeout {
   const maybeChatId = config.COIN_ANNOUNCE_CHAT_ID;
   if (!maybeChatId) {
@@ -54,14 +54,16 @@ export function startCoinAnnouncer(
         }
         initialized = true;
         console.log(
-          `[CoinAnnouncer] Initialized with latest timestamp: ${latestTimestamp}, ${announcedIds.size} existing coins`
+          `[CoinAnnouncer] Initialized with latest timestamp: ${latestTimestamp}, ${announcedIds.size} existing coins`,
         );
         return;
       }
 
       // Find new coins (timestamp >= latestTimestamp and not already announced)
       const newCoins = coins
-        .filter((c) => c.timestamp >= latestTimestamp && !announcedIds.has(c.id))
+        .filter(
+          (c) => c.timestamp >= latestTimestamp && !announcedIds.has(c.id),
+        )
         .reverse(); // oldest first
 
       for (const coin of newCoins) {
@@ -85,7 +87,7 @@ export function startCoinAnnouncer(
 
           const keyboard = new InlineKeyboard().url(
             "\u26A1 Buy",
-            `https://coins.bankrwallet.app?buy=${coin.coinAddress}`
+            `https://coins.walletchan.com?buy=${coin.coinAddress}`,
           );
 
           await bot.api.sendMessage(chatId, text, {
@@ -101,7 +103,7 @@ export function startCoinAnnouncer(
         } catch (err) {
           console.error(
             `[CoinAnnouncer] Failed to announce coin ${coin.id}:`,
-            err
+            err,
           );
           // Continue with next coin
         }

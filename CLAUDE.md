@@ -1,22 +1,23 @@
-# BankrWallet
+# WalletChan
 
 Browser wallet extension + landing page website in a pnpm workspace monorepo.
 
 ## Project Overview
 
-**What it does**: BankrWallet is a Chrome extension that impersonates blockchain accounts and executes transactions through the Bankr API. Like MetaMask, but AI-powered with no seed phrases.
+**What it does**: WalletChan is a Wallet Chrome extension that enables and executing transactions through the Bankr API on all the dapps. Like MetaMask, but AI-powered. Supports Private Keys and Seed phrases as well.
 
-**Supported chains**: Base (8453), Ethereum (1), Polygon (137), Unichain (130)
+**Supported chains**: Base (8453), Ethereum (1), MegaETH, Polygon (137), Unichain (130)
 
 ## Critical: Test ALL Wallet Types
 
-**IMPORTANT**: BankrWallet supports THREE wallet types:
+**IMPORTANT**: WalletChan supports THREE wallet types:
 
 1. **Bankr API accounts** (`type: "impersonator"`) - API-based impersonation, transactions via Bankr API
 2. **Private Key accounts** (`type: "privateKey"`) - Local signing with imported private keys
 3. **Seed Phrase accounts** (`type: "seedPhrase"`) - Local signing with HD wallet derivation
 
 **When implementing ANY feature that touches transactions, signatures, or authentication:**
+
 - **Test with ALL THREE wallet types** before considering it done
 - Different wallet types use different code paths (e.g., `confirmTransactionAsync` vs `confirmTransactionAsyncPK`)
 - Agent password must work for signing transactions/messages for ALL types (not just Bankr API accounts)
@@ -81,11 +82,11 @@ bankr-wallet/
 | --------------- | ----------------------- | ---------- | ---------- |
 | Extension       | React 18                | Chakra UI  | Vite       |
 | Website         | Next.js 14 (App Router) | Chakra UI  | Next.js    |
-| Indexer          | Ponder                  | Hono       | Ponder     |
-| Staking Indexer  | Ponder                  | Hono       | Ponder     |
-| TG Bot           | Grammy + Hono           | —          | tsc        |
-| Arb Bot          | Node.js + viem          | —          | tsc        |
-| Contracts        | Solidity                | —          | Foundry    |
+| Indexer         | Ponder                  | Hono       | Ponder     |
+| Staking Indexer | Ponder                  | Hono       | Ponder     |
+| TG Bot          | Grammy + Hono           | —          | tsc        |
+| Arb Bot         | Node.js + viem          | —          | tsc        |
+| Contracts       | Solidity                | —          | Foundry    |
 
 **Design System**: Bauhaus - geometric, primary colors (Red #D02020, Blue #1040C0, Yellow #F0C020), hard shadows, thick borders. See `_docs/STYLING.md`.
 
@@ -184,26 +185,26 @@ apps/website/
 
 When working on features, refer to these docs:
 
-| Doc                              | When to read                                          |
-| -------------------------------- | ----------------------------------------------------- |
-| `_docs/IMPLEMENTATION.md`        | Extension internals, message types, tx flow           |
-| `_docs/SECURITY.md`             | Threat model, access control, pre-commit checklists   |
-| `_docs/CHAT.md`                 | Chat interface to directly chat & prompt to bankr api |
-| `_docs/STYLING.md`              | UI components, design tokens, Bauhaus system          |
-| `_docs/WEBSITE.md`              | Website sections, layout specs, animations            |
-| `_docs/APPS.md`                 | Apps page data source, fetch script, adding chains     |
-| `_docs/SWAP.md`                 | Swap page: 0x API integration, fees, slippage, UI      |
-| `_docs/COINS.md`                | Coins page: SSE streaming, indexer API, pagination     |
-| `_docs/CALLDATA.md`             | Calldata decoder UI, param components, type routing   |
-| `apps/staking-indexer/STAKING_INDEXER_IMPLEMENTATION.md` | Staking indexer: vault events, balance tracking, API |
-| `_docs/DEVELOPMENT.md`          | Build process, dev environment setup                  |
-| `_docs/PUBLISHING.md`           | Release workflow, CWS upload, auto-update, signing    |
-| `_docs/STORAGE.md`              | Every chrome.storage key, shapes, version history     |
-| `_docs/ADD_CHAIN.md`           | How to add a new chain (single registry entry)        |
-| `apps/tg-bot/IMPLEMENTATION.md`  | TG bot: verification flow, commands, API, balance checker |
-| `apps/arb-bot/IMPLEMENTATION.md` | Arb bot: cross-pool arb strategy, batched RPC, encoding   |
-| `_docs/TOKEN_GATED_TG.md`       | Token-gated TG system: architecture, DB schema, security |
-| `openclaw-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling     |
+| Doc                                                      | When to read                                              |
+| -------------------------------------------------------- | --------------------------------------------------------- |
+| `_docs/IMPLEMENTATION.md`                                | Extension internals, message types, tx flow               |
+| `_docs/SECURITY.md`                                      | Threat model, access control, pre-commit checklists       |
+| `_docs/CHAT.md`                                          | Chat interface to directly chat & prompt to bankr api     |
+| `_docs/STYLING.md`                                       | UI components, design tokens, Bauhaus system              |
+| `_docs/WEBSITE.md`                                       | Website sections, layout specs, animations                |
+| `_docs/APPS.md`                                          | Apps page data source, fetch script, adding chains        |
+| `_docs/SWAP.md`                                          | Swap page: 0x API integration, fees, slippage, UI         |
+| `_docs/COINS.md`                                         | Coins page: SSE streaming, indexer API, pagination        |
+| `_docs/CALLDATA.md`                                      | Calldata decoder UI, param components, type routing       |
+| `apps/staking-indexer/STAKING_INDEXER_IMPLEMENTATION.md` | Staking indexer: vault events, balance tracking, API      |
+| `_docs/DEVELOPMENT.md`                                   | Build process, dev environment setup                      |
+| `_docs/PUBLISHING.md`                                    | Release workflow, CWS upload, auto-update, signing        |
+| `_docs/STORAGE.md`                                       | Every chrome.storage key, shapes, version history         |
+| `_docs/ADD_CHAIN.md`                                     | How to add a new chain (single registry entry)            |
+| `apps/tg-bot/IMPLEMENTATION.md`                          | TG bot: verification flow, commands, API, balance checker |
+| `apps/arb-bot/IMPLEMENTATION.md`                         | Arb bot: cross-pool arb strategy, batched RPC, encoding   |
+| `_docs/TOKEN_GATED_TG.md`                                | Token-gated TG system: architecture, DB schema, security  |
+| `openclaw-skills/bankr/SKILL.md`                         | Bankr API interactions, workflows, error handling         |
 
 ## Important Patterns
 
@@ -218,22 +219,26 @@ When working on features, refer to these docs:
 ## Code Quality Guidelines
 
 ### File Size & Modularity
+
 - **Keep files under ~400 lines.** If a file grows beyond that, split it into focused modules by responsibility.
 - **One concern per file.** Each module should have a clear, single purpose (e.g., `sessionCache.ts` owns all credential caching, `authHandlers.ts` owns all unlock/password logic).
 - **background.ts is a message router only.** It registers Chrome event listeners and delegates to handler modules. Never add business logic directly to it.
 
 ### Reuse Over Duplication
+
 - **Extract shared utilities** when the same logic appears in 2+ files. See `cryptoUtils.ts` for the pattern (shared constants + functions used by both `crypto.ts` and `vaultCrypto.ts`).
 - **Reuse existing React components** before creating new ones. Check `components/` for existing UI patterns.
 - **Use dependency injection** to avoid circular imports (e.g., `tryRestoreSession(unlockFn)` in `sessionCache.ts` takes a callback instead of importing `authHandlers.ts` directly).
 
 ### Naming & Organization
+
 - **Handler files**: `*Handlers.ts` (e.g., `authHandlers.ts`, `txHandlers.ts`, `chatHandlers.ts`)
 - **State/cache files**: descriptive names (e.g., `sessionCache.ts`, `pendingTxStorage.ts`)
 - **Utility files**: `*Utils.ts` (e.g., `cryptoUtils.ts`)
 - **Keep related functions together** - if functions share state (like in-memory Maps), they belong in the same module.
 
 ### When Adding New Features
+
 - Place new message handlers in the appropriate `*Handlers.ts` file, not in `background.ts`.
 - Add the message routing case to the switch in `background.ts` (just a 1-3 line delegation).
 - If a feature doesn't fit existing modules, create a new focused module rather than growing an existing one.
@@ -288,17 +293,18 @@ Additional checks when modifying storage:
 
 ### Key Storage Locations
 
-| Key | Purpose |
-| --- | ------- |
-| `encryptedApiKeyVault` | API key encrypted with vault key (current format) |
-| `encryptedApiKey` | API key encrypted with password (legacy format) |
-| `encryptedVaultKeyMaster` | Vault key encrypted with master password |
+| Key                       | Purpose                                           |
+| ------------------------- | ------------------------------------------------- |
+| `encryptedApiKeyVault`    | API key encrypted with vault key (current format) |
+| `encryptedApiKey`         | API key encrypted with password (legacy format)   |
+| `encryptedVaultKeyMaster` | Vault key encrypted with master password          |
 
 **Rule**: Check `cachedVaultKey` to determine which system is active before saving API keys.
 
 ### User-Reported Anomalies
 
 When a user reports something unexpected (like a wrong value appearing):
+
 - Don't dismiss it - trace the full data flow
 - Ask: "Where does this value come from? What code path could produce it?"
 - The anomaly is often a symptom of a deeper storage/migration issue
@@ -374,6 +380,7 @@ ClankerFeeLocker: {
 Railway's default Nixpacks builder does NOT work for this pnpm monorepo with `workspace:*` dependencies. Always use a **Dockerfile** + **`railway.toml`**.
 
 **Pattern** (see `apps/indexer/` for reference):
+
 - `Dockerfile`: `node:20-slim`, enable corepack/pnpm, copy workspace root files + the app + any `packages/*` workspace deps, `pnpm install --frozen-lockfile --filter <pkg>`
 - `railway.toml`: sets `dockerfilePath` (from repo root), deploy config
 - Do NOT set Root Directory, Build Command, or Start Command in Railway UI — `railway.toml` handles it
@@ -383,5 +390,5 @@ Railway's default Nixpacks builder does NOT work for this pnpm monorepo with `wo
 
 1. `pnpm build:extension`
 2. Go to `chrome://extensions`
-3. Click refresh icon on BankrWallet card
+3. Click refresh icon on WalletChan card
 4. Test in a dapp (e.g., app.aave.com)

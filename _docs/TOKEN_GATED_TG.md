@@ -8,7 +8,7 @@ A Telegram bot that gates access to a private TG group based on sBNKRW staking b
 
 ```
 User DMs Bot → /verify → Bot generates UUID token
-  → User opens bankrwallet.app/verify?token=xxx
+  → User opens walletchan.com/verify?token=xxx
   → Connects wallet (RainbowKit)
   → Sees staked balance (from staking indexer)
   → Signs verification message (EIP-191)
@@ -24,50 +24,53 @@ Background job (every 5min):
 
 ## Components
 
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| TG Bot + API | `apps/tg-bot` | Grammy bot + Hono API server |
-| Verify Page | `apps/website/app/verify/` | Wallet connection + signature UI |
-| Staking Indexer | `apps/staking-indexer` | Provides `GET /balances/:address` |
+| Component       | Location                   | Purpose                           |
+| --------------- | -------------------------- | --------------------------------- |
+| TG Bot + API    | `apps/tg-bot`              | Grammy bot + Hono API server      |
+| Verify Page     | `apps/website/app/verify/` | Wallet connection + signature UI  |
+| Staking Indexer | `apps/staking-indexer`     | Provides `GET /balances/:address` |
 
 ## Database Schema (PostgreSQL + Drizzle)
 
 ### `users` table
-| Column | Type | Notes |
-|--------|------|-------|
-| tg_id | bigint | Primary key |
-| tg_username | text | Nullable, updated on verify |
-| wallet_address | text | UNIQUE — one wallet per TG account |
-| verified_at | timestamp | When wallet was linked |
-| is_member | boolean | Whether currently in private group |
+
+| Column         | Type      | Notes                              |
+| -------------- | --------- | ---------------------------------- |
+| tg_id          | bigint    | Primary key                        |
+| tg_username    | text      | Nullable, updated on verify        |
+| wallet_address | text      | UNIQUE — one wallet per TG account |
+| verified_at    | timestamp | When wallet was linked             |
+| is_member      | boolean   | Whether currently in private group |
 
 ### `verification_tokens` table
-| Column | Type | Notes |
-|--------|------|-------|
-| token | text | Primary key (UUID) |
-| tg_id | bigint | Who requested verification |
-| tg_username | text | Nullable |
-| expires_at | timestamp | 10 minutes from creation |
-| used | boolean | Marked true after successful verify |
+
+| Column      | Type      | Notes                               |
+| ----------- | --------- | ----------------------------------- |
+| token       | text      | Primary key (UUID)                  |
+| tg_id       | bigint    | Who requested verification          |
+| tg_username | text      | Nullable                            |
+| expires_at  | timestamp | 10 minutes from creation            |
+| used        | boolean   | Marked true after successful verify |
 
 ## Bot Commands
 
-| Command | Description |
-|---------|-------------|
-| `/start` | Welcome message + available commands |
+| Command   | Description                            |
+| --------- | -------------------------------------- |
+| `/start`  | Welcome message + available commands   |
 | `/verify` | Generate verification token, send link |
-| `/status` | Show wallet, balance, eligibility |
+| `/status` | Show wallet, balance, eligibility      |
 
 ## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/verify-info?token=xxx` | Validate token, return threshold info |
-| POST | `/api/verify` | Complete verification (signature + balance check) |
-| GET | `/api/users?limit=&offset=` | List verified users with balances |
-| GET | `/api/health` | Health check |
+| Method | Path                         | Description                                       |
+| ------ | ---------------------------- | ------------------------------------------------- |
+| GET    | `/api/verify-info?token=xxx` | Validate token, return threshold info             |
+| POST   | `/api/verify`                | Complete verification (signature + balance check) |
+| GET    | `/api/users?limit=&offset=`  | List verified users with balances                 |
+| GET    | `/api/health`                | Health check                                      |
 
 ### POST /api/verify — Request Body
+
 ```json
 {
   "token": "uuid-string",
@@ -78,24 +81,25 @@ Background job (every 5min):
 ```
 
 ### Verification Message Format
+
 ```
-Verify Telegram account for BankrWallet
+Verify Telegram account for WalletChan
 Token: {token}
 Timestamp: {unix_timestamp}
 ```
 
 ## Environment Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `BOT_TOKEN` | Telegram Bot API token | From @BotFather |
-| `DATABASE_URL` | PostgreSQL connection string | `postgres://...` |
-| `INDEXER_API_URL` | Staking indexer URL | `http://localhost:42070` |
-| `PRIVATE_GROUP_ID` | TG group chat ID (negative) | `-1001234567890` |
+| Variable              | Description                     | Example                         |
+| --------------------- | ------------------------------- | ------------------------------- |
+| `BOT_TOKEN`           | Telegram Bot API token          | From @BotFather                 |
+| `DATABASE_URL`        | PostgreSQL connection string    | `postgres://...`                |
+| `INDEXER_API_URL`     | Staking indexer URL             | `http://localhost:42070`        |
+| `PRIVATE_GROUP_ID`    | TG group chat ID (negative)     | `-1001234567890`                |
 | `MIN_STAKE_THRESHOLD` | Min sBNKRW in wei (18 decimals) | `1000000000000000000000` (1000) |
-| `VERIFY_URL` | Website verify page base URL | `https://bankrwallet.app/verify` |
-| `STAKE_URL` | Staking page URL | `https://stake.bankrwallet.app` |
-| `PORT` | Hono API port | `3001` |
+| `VERIFY_URL`          | Website verify page base URL    | `https://walletchan.com/verify` |
+| `STAKE_URL`           | Staking page URL                | `https://stake.walletchan.com`  |
+| `PORT`                | Hono API port                   | `3001`                          |
 
 ## Security Considerations
 
@@ -109,6 +113,7 @@ Timestamp: {unix_timestamp}
 ## Telegram Channel Setup
 
 ### Structure
+
 - **Public channel** (`@bnkrwpublic`) — announcements, anyone can view
 - **Private group** — token-gated, only verified holders with sufficient sBNKRW stake
 
@@ -121,7 +126,7 @@ curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/sendMessage" \
 -H "Content-Type: application/json" \
 -d '{
   "chat_id": "@bnkrwpublic",
-  "text": "Want access to the stakers-only group?\n\nStake and hold at least 20M sBNKRW to join.\n\nhttps://stake.bankrwallet.app/",
+  "text": "Want access to the stakers-only group?\n\nStake and hold at least 20M sBNKRW to join.\n\nhttps://stake.walletchan.com/",
   "reply_markup": {
     "inline_keyboard": [[{"text": "✅ Verify & Join", "url": "https://t.me/WalletChanBot?start=verify"}]]
   }
@@ -137,6 +142,7 @@ Pin this message in the channel. The button opens the bot DM and auto-triggers t
 ## Deployment (Railway)
 
 Single service running Grammy long polling + Hono HTTP server:
+
 - Grammy: long polling (no webhooks needed)
 - Hono: HTTP server on `PORT`
 - PostgreSQL: Railway managed database

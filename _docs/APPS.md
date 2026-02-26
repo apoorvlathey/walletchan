@@ -1,6 +1,6 @@
 # Apps Page
 
-The `/apps` page lets users browse and interact with dApps in an iframe via BankrWallet.
+The `/apps` page lets users browse and interact with dApps in an iframe via WalletChan.
 
 ## Data Source
 
@@ -25,37 +25,37 @@ This regenerates `app/apps/data/dapps.json` (~62 dapps). The JSON is committed t
 
 ## Supported Chains
 
-| Chain | ID | RPC |
-|-------|----|-----|
-| Ethereum | 1 | `https://eth.llamarpc.com` |
-| Base | 8453 | `https://base.llamarpc.com` |
-| Polygon | 137 | `https://polygon.llamarpc.com` |
-| Unichain | 130 | `https://mainnet.unichain.org` |
-| Arbitrum | 42161 | `https://arb1.arbitrum.io/rpc` |
-| Optimism | 10 | `https://mainnet.optimism.io` |
-| BSC | 56 | `https://bsc-dataseed.binance.org` |
-| Avalanche | 43114 | `https://api.avax.network/ext/bc/C/rpc` |
-| Zora | 7777777 | `https://rpc.zora.energy` |
-| Celo | 42220 | `https://forno.celo.org` |
-| Gnosis | 100 | `https://rpc.gnosischain.com` |
-| Ink | 57073 | `https://rpc-gel.inkonchain.com` |
-| PulseChain | 369 | `https://rpc.pulsechain.com` |
-| Soneium | 1868 | `https://rpc.soneium.org` |
-| Sonic | 146 | `https://rpc.soniclabs.com` |
+| Chain      | ID      | RPC                                     |
+| ---------- | ------- | --------------------------------------- |
+| Ethereum   | 1       | `https://eth.llamarpc.com`              |
+| Base       | 8453    | `https://base.llamarpc.com`             |
+| Polygon    | 137     | `https://polygon.llamarpc.com`          |
+| Unichain   | 130     | `https://mainnet.unichain.org`          |
+| Arbitrum   | 42161   | `https://arb1.arbitrum.io/rpc`          |
+| Optimism   | 10      | `https://mainnet.optimism.io`           |
+| BSC        | 56      | `https://bsc-dataseed.binance.org`      |
+| Avalanche  | 43114   | `https://api.avax.network/ext/bc/C/rpc` |
+| Zora       | 7777777 | `https://rpc.zora.energy`               |
+| Celo       | 42220   | `https://forno.celo.org`                |
+| Gnosis     | 100     | `https://rpc.gnosischain.com`           |
+| Ink        | 57073   | `https://rpc-gel.inkonchain.com`        |
+| PulseChain | 369     | `https://rpc.pulsechain.com`            |
+| Soneium    | 1868    | `https://rpc.soneium.org`               |
+| Sonic      | 146     | `https://rpc.soniclabs.com`             |
 
 Chain filters on the page are derived dynamically from the dapp data.
 
 ## Key Files
 
-| File | Purpose |
-|------|---------|
-| `apps/website/scripts/fetchSafeDapps.ts` | Fetch script — pulls from Safe API, filters, adds custom dapps |
-| `apps/website/app/apps/data/dapps.json` | Generated dapp data (committed) |
-| `apps/website/app/apps/data/dapps.ts` | TypeScript exports: `DAPPS`, `DappEntry`, `CHAIN_NAMES` |
-| `apps/website/app/wagmiConfig.ts` | Wagmi config — chains, RainbowKit connectors, `CHAIN_RPC_URLS` map |
-| `apps/website/app/apps/page.tsx` | Apps page — search, chain filters, grid, ConnectButton, IframeApp integration |
-| `apps/website/app/apps/components/IframeApp.tsx` | Iframe wrapper — wagmi hooks, chain selector, tx forwarding via walletClient |
-| `apps/website/app/apps/components/AppCard.tsx` | Dapp card component — icon, name, description, chain badges |
+| File                                             | Purpose                                                                       |
+| ------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `apps/website/scripts/fetchSafeDapps.ts`         | Fetch script — pulls from Safe API, filters, adds custom dapps                |
+| `apps/website/app/apps/data/dapps.json`          | Generated dapp data (committed)                                               |
+| `apps/website/app/apps/data/dapps.ts`            | TypeScript exports: `DAPPS`, `DappEntry`, `CHAIN_NAMES`                       |
+| `apps/website/app/wagmiConfig.ts`                | Wagmi config — chains, RainbowKit connectors, `CHAIN_RPC_URLS` map            |
+| `apps/website/app/apps/page.tsx`                 | Apps page — search, chain filters, grid, ConnectButton, IframeApp integration |
+| `apps/website/app/apps/components/IframeApp.tsx` | Iframe wrapper — wagmi hooks, chain selector, tx forwarding via walletClient  |
+| `apps/website/app/apps/components/AppCard.tsx`   | Dapp card component — icon, name, description, chain badges                   |
 
 ## Adding a New Chain
 

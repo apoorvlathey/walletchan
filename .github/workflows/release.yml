@@ -38,5 +38,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            apps/extension/zip/bankr-wallet-v${{ steps.version.outputs.version }}.zip
+            apps/extension/zip/walletchan-v${{ steps.version.outputs.version }}.zip
           generate_release_notes: true

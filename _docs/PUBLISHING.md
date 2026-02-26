@@ -1,6 +1,6 @@
 # Publishing & Distribution
 
-BankrWallet is distributed through two channels.
+WalletChan is distributed through two channels.
 
 ## Distribution Channels
 
@@ -54,7 +54,7 @@ Users can download the zip from GitHub Releases and load it as an unpacked exten
    pnpm zip:cws
    ```
 2. Go to the [CWS Developer Dashboard](https://chrome.google.com/webstore/devconsole)
-3. Select the BankrWallet extension
+3. Select the WalletChan extension
 4. Upload `apps/extension/cws-zip/bankr-wallet-vX.Y.Z.zip` (not the GitHub Release zip)
 5. Fill in any release notes
 6. Submit for review
@@ -105,10 +105,10 @@ GitHub Actions (.github/workflows/release.yml)
 
 ### Update XML Endpoint
 
-The website still serves `update_url` XML at `https://bankrwallet.app/api/extension/update.xml` for any enterprise installs using the CRX + policy approach. This endpoint fetches the latest GitHub Release version dynamically.
+The website still serves `update_url` XML at `https://walletchan.com/api/extension/update.xml` for any enterprise installs using the CRX + policy approach. This endpoint fetches the latest GitHub Release version dynamically.
 
 ```bash
-curl https://bankrwallet.app/api/extension/update.xml
+curl https://walletchan.com/api/extension/update.xml
 ```
 
 Should return XML with `appid='gmfimlibjdfoeoiohiaipblfklgammci'` and the latest version.
@@ -239,7 +239,7 @@ Chrome extensions auto-update silently. Users cannot choose to stay on an old ve
 4. Click **Reload** on `chrome://extensions` (fires `onInstalled` with `reason === "update"`)
 5. Open the popup — should show unlock screen, not onboarding
 6. Enter password — vault key migration runs on unlock
-7. Verify the service worker console shows: `[BankrWallet] Legacy storage migration complete: 0x...`
+7. Verify the service worker console shows: `[WalletChan] Legacy storage migration complete: 0x...`
 
 ### Pre-release checklist (storage)
 
