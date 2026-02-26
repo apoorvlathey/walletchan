@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "WalletChan - The Wallet for AI Era",
   description:
-    "Browser extension that brings your Bankr terminal wallet to any dapp. AI-powered transactions, multi-chain support, no seed phrases needed.",
+    "The Wallet for AI Era. Use your Bankr Address across all the dapps via this Browser Wallet extension",
   icons: {
     icon: "/images/walletchan-icon.png",
     apple: "/images/walletchan-icon.png",
