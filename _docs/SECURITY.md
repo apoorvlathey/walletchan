@@ -1,6 +1,6 @@
-# BankrWallet Security Guide
+# WalletChan Security Guide
 
-This document is the security reference for the BankrWallet Chrome extension. It defines the threat model, lists every security-sensitive code path, and provides checklists for verifying that changes do not introduce vulnerabilities.
+This document is the security reference for the WalletChan Chrome extension. It defines the threat model, lists every security-sensitive code path, and provides checklists for verifying that changes do not introduce vulnerabilities.
 
 **When to read this**: Before every commit that touches extension code. Claude (or any reviewer) should verify changes against the relevant checklists below.
 
@@ -10,15 +10,15 @@ This document is the security reference for the BankrWallet Chrome extension. It
 
 ### What We Protect
 
-| Secret | Storage | In-Memory Cache |
-|--------|---------|-----------------|
-| Master password | Never stored (except encrypted session restore for "Never" auto-lock) | `cachedPassword` in `sessionCache.ts` |
-| Agent password | Never stored directly (encrypts vault key) | Not cached separately (same `cachedPassword` slot) |
-| Password type | `chrome.storage.session` (for session restoration) | `cachedPasswordType` in `sessionCache.ts` |
-| Bankr API key | `encryptedApiKeyVault` (AES-256-GCM via vault key) or `encryptedApiKey` (legacy, password-based) | `cachedApiKey` in `sessionCache.ts` |
-| Private keys | `pkVault` entries (AES-256-GCM via vault key or password, indicated by `salt` field) | `cachedVault` array in `sessionCache.ts` |
-| Seed phrases | `mnemonicVault` entries (AES-256-GCM via vault key or password) | Not cached (retrieved on-demand for signing) |
-| Vault key | `encryptedVaultKeyMaster` / `encryptedVaultKeyAgent` (PBKDF2-wrapped) | `cachedVaultKey` as CryptoKey in `sessionCache.ts` |
+| Secret          | Storage                                                                                          | In-Memory Cache                                    |
+| --------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| Master password | Never stored (except encrypted session restore for "Never" auto-lock)                            | `cachedPassword` in `sessionCache.ts`              |
+| Agent password  | Never stored directly (encrypts vault key)                                                       | Not cached separately (same `cachedPassword` slot) |
+| Password type   | `chrome.storage.session` (for session restoration)                                               | `cachedPasswordType` in `sessionCache.ts`          |
+| Bankr API key   | `encryptedApiKeyVault` (AES-256-GCM via vault key) or `encryptedApiKey` (legacy, password-based) | `cachedApiKey` in `sessionCache.ts`                |
+| Private keys    | `pkVault` entries (AES-256-GCM via vault key or password, indicated by `salt` field)             | `cachedVault` array in `sessionCache.ts`           |
+| Seed phrases    | `mnemonicVault` entries (AES-256-GCM via vault key or password)                                  | Not cached (retrieved on-demand for signing)       |
+| Vault key       | `encryptedVaultKeyMaster` / `encryptedVaultKeyAgent` (PBKDF2-wrapped)                            | `cachedVaultKey` as CryptoKey in `sessionCache.ts` |
 
 ### Trust Boundaries
 
@@ -43,14 +43,14 @@ background.ts (message router)
 
 ## Encryption Specifications
 
-| Parameter | Value |
-|-----------|-------|
-| Algorithm | AES-256-GCM (authenticated encryption) |
-| Key derivation | PBKDF2-SHA256 |
-| Iterations | 600,000 |
-| Salt | 16 bytes (random per encryption) |
-| IV | 12 bytes (random per encryption) |
-| Vault key | 256-bit random (generated once, encrypted per-password) |
+| Parameter      | Value                                                   |
+| -------------- | ------------------------------------------------------- |
+| Algorithm      | AES-256-GCM (authenticated encryption)                  |
+| Key derivation | PBKDF2-SHA256                                           |
+| Iterations     | 600,000                                                 |
+| Salt           | 16 bytes (random per encryption)                        |
+| IV             | 12 bytes (random per encryption)                        |
+| Vault key      | 256-bit random (generated once, encrypted per-password) |
 
 **Files**: `cryptoUtils.ts` (shared constants), `crypto.ts` (API key + vault key ops), `vaultCrypto.ts` (private key vault)
 
@@ -58,7 +58,7 @@ background.ts (message router)
 
 ## Vault Key System Architecture
 
-BankrWallet uses a **two-tier encryption** system (vault key wrapping) to enable multiple passwords to decrypt the same data without key duplication:
+WalletChan uses a **two-tier encryption** system (vault key wrapping) to enable multiple passwords to decrypt the same data without key duplication:
 
 ```
 Master Password → PBKDF2 (600k) → Decrypt encryptedVaultKeyMaster → Vault Key (256-bit)
@@ -73,11 +73,13 @@ Agent Password  → PBKDF2 (600k) → Decrypt encryptedVaultKeyAgent  → Same V
 ### Storage Format Detection
 
 **Vault-key encrypted** (current, v1.3.0+):
+
 - `salt === ""` in keystore object
 - Encrypted directly with vault key (no PBKDF2 derivation)
 - Both master and agent passwords can decrypt (via vault key)
 
 **Password encrypted** (legacy, pre-v1.3.0):
+
 - `salt !== ""` (16-byte base64 salt)
 - Encrypted with PBKDF2-derived key from password
 - Only the specific password that encrypted it can decrypt
@@ -86,6 +88,7 @@ Agent Password  → PBKDF2 (600k) → Decrypt encryptedVaultKeyAgent  → Same V
 ### Migration Strategy
 
 **Automatic migration** on first unlock after v1.3.0 upgrade:
+
 1. User unlocks with master password → triggers `migrateToVaultKeySystem()`
 2. Generate 256-bit random vault key
 3. Encrypt vault key with master password → save to `encryptedVaultKeyMaster`
@@ -113,30 +116,31 @@ The agent password model restricts what operations are available when the wallet
 
 ### Access Matrix
 
-| Operation | Master | Agent | Guard Location |
-|-----------|--------|-------|----------------|
-| Unlock wallet | Yes | Yes | `authHandlers.ts` - `unlockWithVaultKeySystem()` |
-| Sign/send transactions | Yes | Yes | `txHandlers.ts` |
-| Sign messages | Yes | Yes | `txHandlers.ts` |
-| Reveal private key | Yes | **BLOCKED** | `background.ts` - `revealPrivateKey` case |
-| Change API key | Yes | **BLOCKED** | `authHandlers.ts` - `handleSaveApiKeyWithCachedPassword()` |
-| Change master password | Yes | **BLOCKED** | `authHandlers.ts` - `handleChangePasswordWithCachedPassword()` |
-| Add Bankr account (with API key) | Yes | **BLOCKED** | `background.ts` - `addBankrAccount` case |
-| Add private key account | Yes | **BLOCKED** | `background.ts` - `addPrivateKeyAccount` case |
-| Add impersonator account | Yes | **BLOCKED** | `background.ts` - `addImpersonatorAccount` case |
-| Add seed phrase group | Yes | **BLOCKED** | `background.ts` - `addSeedPhraseGroup` case |
-| Derive seed account | Yes | **BLOCKED** | `background.ts` - `deriveSeedAccount` case |
-| Reveal seed phrase | Yes | **BLOCKED** | `background.ts` - `revealSeedPhrase` case |
-| Remove account | Yes | **BLOCKED** | `background.ts` - `removeAccount` case |
-| Initiate token transfer | Yes | Yes | `txHandlers.ts` - creates PendingTxRequest |
-| Reset extension | Yes | **BLOCKED** | `background.ts` - `resetExtension` case |
-| Set/remove agent password | Yes | **BLOCKED** | `authHandlers.ts` - `handleSetAgentPassword()` / `handleRemoveAgentPassword()` |
+| Operation                        | Master | Agent       | Guard Location                                                                 |
+| -------------------------------- | ------ | ----------- | ------------------------------------------------------------------------------ |
+| Unlock wallet                    | Yes    | Yes         | `authHandlers.ts` - `unlockWithVaultKeySystem()`                               |
+| Sign/send transactions           | Yes    | Yes         | `txHandlers.ts`                                                                |
+| Sign messages                    | Yes    | Yes         | `txHandlers.ts`                                                                |
+| Reveal private key               | Yes    | **BLOCKED** | `background.ts` - `revealPrivateKey` case                                      |
+| Change API key                   | Yes    | **BLOCKED** | `authHandlers.ts` - `handleSaveApiKeyWithCachedPassword()`                     |
+| Change master password           | Yes    | **BLOCKED** | `authHandlers.ts` - `handleChangePasswordWithCachedPassword()`                 |
+| Add Bankr account (with API key) | Yes    | **BLOCKED** | `background.ts` - `addBankrAccount` case                                       |
+| Add private key account          | Yes    | **BLOCKED** | `background.ts` - `addPrivateKeyAccount` case                                  |
+| Add impersonator account         | Yes    | **BLOCKED** | `background.ts` - `addImpersonatorAccount` case                                |
+| Add seed phrase group            | Yes    | **BLOCKED** | `background.ts` - `addSeedPhraseGroup` case                                    |
+| Derive seed account              | Yes    | **BLOCKED** | `background.ts` - `deriveSeedAccount` case                                     |
+| Reveal seed phrase               | Yes    | **BLOCKED** | `background.ts` - `revealSeedPhrase` case                                      |
+| Remove account                   | Yes    | **BLOCKED** | `background.ts` - `removeAccount` case                                         |
+| Initiate token transfer          | Yes    | Yes         | `txHandlers.ts` - creates PendingTxRequest                                     |
+| Reset extension                  | Yes    | **BLOCKED** | `background.ts` - `resetExtension` case                                        |
+| Set/remove agent password        | Yes    | **BLOCKED** | `authHandlers.ts` - `handleSetAgentPassword()` / `handleRemoveAgentPassword()` |
 
 ### How Guards Work
 
 Every blocked operation checks `getPasswordType() === "agent"` from `sessionCache.ts` and returns an error before executing any logic. These guards are **backend-enforced** (defense-in-depth), independent of UI-level hiding/disabling.
 
 **Pattern**:
+
 ```typescript
 // At the TOP of the handler, before any logic
 if (getPasswordType() === "agent") {
@@ -152,44 +156,44 @@ These are the message handlers in `background.ts` that touch secrets, modify acc
 
 ### Secret-Exposing Handlers
 
-| Handler | What It Exposes | Guard |
-|---------|----------------|-------|
-| `getCachedApiKey` | Returns plaintext API key to caller | Session must be unlocked; auto-lock timeout checked |
-| `revealPrivateKey` | Returns plaintext private key | Requires password verification + blocks agent password |
-| `getCachedPassword` | Returns `hasCachedPassword` boolean (not the password itself) | None needed (boolean only) |
+| Handler             | What It Exposes                                               | Guard                                                  |
+| ------------------- | ------------------------------------------------------------- | ------------------------------------------------------ |
+| `getCachedApiKey`   | Returns plaintext API key to caller                           | Session must be unlocked; auto-lock timeout checked    |
+| `revealPrivateKey`  | Returns plaintext private key                                 | Requires password verification + blocks agent password |
+| `getCachedPassword` | Returns `hasCachedPassword` boolean (not the password itself) | None needed (boolean only)                             |
 
 ### Secret-Modifying Handlers
 
-| Handler | What It Modifies | Guard |
-|---------|-----------------|-------|
-| `saveApiKeyWithCachedPassword` | Overwrites encrypted API key | Agent password blocked |
-| `changePasswordWithCachedPassword` | Atomically re-encrypts vault key, pkVault entries, and mnemonicVault entries with new master password (single storage write) | Agent password blocked |
-| `addBankrAccount` | Can overwrite encrypted API key (when `message.apiKey` provided) | Agent password blocked when apiKey present |
-| `addPrivateKeyAccount` | Adds new entry to encrypted private key vault | Agent password blocked |
+| Handler                            | What It Modifies                                                                                                             | Guard                                      |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `saveApiKeyWithCachedPassword`     | Overwrites encrypted API key                                                                                                 | Agent password blocked                     |
+| `changePasswordWithCachedPassword` | Atomically re-encrypts vault key, pkVault entries, and mnemonicVault entries with new master password (single storage write) | Agent password blocked                     |
+| `addBankrAccount`                  | Can overwrite encrypted API key (when `message.apiKey` provided)                                                             | Agent password blocked when apiKey present |
+| `addPrivateKeyAccount`             | Adds new entry to encrypted private key vault                                                                                | Agent password blocked                     |
 
 ### Account-Modifying Handlers
 
-| Handler | Effect | Guard |
-|---------|--------|-------|
-| `removeAccount` | Deletes account reference | Agent password blocked |
-| `setActiveAccount` | Changes active account + updates storage address | None (non-destructive, no secrets) |
-| `updateAccountDisplayName` | Changes display name | None (non-destructive) |
+| Handler                    | Effect                                           | Guard                              |
+| -------------------------- | ------------------------------------------------ | ---------------------------------- |
+| `removeAccount`            | Deletes account reference                        | Agent password blocked             |
+| `setActiveAccount`         | Changes active account + updates storage address | None (non-destructive, no secrets) |
+| `updateAccountDisplayName` | Changes display name                             | None (non-destructive)             |
 
 ### Destructive Handlers
 
-| Handler | Effect | Guard |
-|---------|--------|-------|
-| `resetExtension` | Wipes ALL extension data | Agent password blocked |
-| `lockWallet` | Clears all in-memory caches | None needed (user-initiated, non-destructive) |
-| `clearTxHistory` | Deletes transaction history | None (no secrets involved) |
+| Handler          | Effect                      | Guard                                         |
+| ---------------- | --------------------------- | --------------------------------------------- |
+| `resetExtension` | Wipes ALL extension data    | Agent password blocked                        |
+| `lockWallet`     | Clears all in-memory caches | None needed (user-initiated, non-destructive) |
+| `clearTxHistory` | Deletes transaction history | None (no secrets involved)                    |
 
 ### Authentication Handlers
 
-| Handler | Notes |
-|---------|-------|
-| `unlockWallet` | Tries master password first, then agent. Sets `passwordType` accordingly |
-| `setAgentPassword` | Requires `getPasswordType() === "master"` |
-| `removeAgentPassword` | Requires explicit master password verification (not just cached) |
+| Handler               | Notes                                                                    |
+| --------------------- | ------------------------------------------------------------------------ |
+| `unlockWallet`        | Tries master password first, then agent. Sets `passwordType` accordingly |
+| `setAgentPassword`    | Requires `getPasswordType() === "master"`                                |
+| `removeAgentPassword` | Requires explicit master password verification (not just cached)         |
 
 ---
 
@@ -202,12 +206,12 @@ All `eth_signTypedData_v3` and `eth_signTypedData_v4` requests are validated bef
 
 ### Validation Rules
 
-| Check | Limit | Purpose |
-|-------|-------|---------|
-| Nesting depth | 50 levels | Prevent stack overflow and DoS from deeply nested types |
-| Circular references | None allowed | Prevent infinite recursion in type resolution |
-| Schema structure | Must have domain, types, primaryType, message | EIP-712 conformance |
-| Type definitions | All referenced types must exist | Prevent undefined type errors |
+| Check               | Limit                                         | Purpose                                                 |
+| ------------------- | --------------------------------------------- | ------------------------------------------------------- |
+| Nesting depth       | 50 levels                                     | Prevent stack overflow and DoS from deeply nested types |
+| Circular references | None allowed                                  | Prevent infinite recursion in type resolution           |
+| Schema structure    | Must have domain, types, primaryType, message | EIP-712 conformance                                     |
+| Type definitions    | All referenced types must exist               | Prevent undefined type errors                           |
 
 ### Attack Scenarios Blocked
 
@@ -235,7 +239,7 @@ if valid: continue to normal flow
 Failed validations log to console for debugging:
 
 ```
-[BankrWallet] EIP-712 validation failed for https://malicious.site:
+[WalletChan] EIP-712 validation failed for https://malicious.site:
   Type 'Attack' exceeds maximum nesting depth of 50 (found 60825)
 ```
 
@@ -249,12 +253,12 @@ This helps developers identify malicious sites attempting attacks.
 
 Only these message types are forwarded from webpage to background:
 
-| Message Type | Purpose |
-|-------------|---------|
-| `i_sendTransaction` | Transaction request (from, to, data, value, chainId) |
-| `i_signatureRequest` | Signature request (method, params, chainId) |
-| `i_rpcRequest` | RPC proxy call (rpcUrl, method, params) |
-| `i_switchEthereumChain` | Chain switch request (chainId) |
+| Message Type            | Purpose                                              |
+| ----------------------- | ---------------------------------------------------- |
+| `i_sendTransaction`     | Transaction request (from, to, data, value, chainId) |
+| `i_signatureRequest`    | Signature request (method, params, chainId)          |
+| `i_rpcRequest`          | RPC proxy call (rpcUrl, method, params)              |
+| `i_switchEthereumChain` | Chain switch request (chainId)                       |
 
 **Source validation**: `inject.ts` checks `e.source === window` before forwarding.
 
@@ -262,10 +266,10 @@ Only these message types are forwarded from webpage to background:
 
 Only these types are sent to content scripts (and thus forwarded to the webpage):
 
-| Message Type | Data Sent |
-|-------------|-----------|
-| `setAddress` | address, displayAddress |
-| `setChainId` | chainId |
+| Message Type | Data Sent                                    |
+| ------------ | -------------------------------------------- |
+| `setAddress` | address, displayAddress                      |
+| `setChainId` | chainId                                      |
 | `setAccount` | address, displayName, accountId, accountType |
 
 **Rule**: Never send secrets (passwords, API keys, private keys) to content scripts. Any new background-to-content-script message type must be reviewed for data sensitivity.
@@ -276,9 +280,9 @@ Only these types are sent to content scripts (and thus forwarded to the webpage)
 
 Handlers that return secrets or generate sensitive material verify that the sender is an extension page (popup, sidepanel, onboarding) and not a content script running on a web page:
 
-| Handler | Check |
-|---------|-------|
-| `getCachedApiKey` | `isExtensionPage(sender)` |
+| Handler            | Check                     |
+| ------------------ | ------------------------- |
+| `getCachedApiKey`  | `isExtensionPage(sender)` |
 | `revealPrivateKey` | `isExtensionPage(sender)` |
 | `revealSeedPhrase` | `isExtensionPage(sender)` |
 | `generateMnemonic` | `isExtensionPage(sender)` |
@@ -291,57 +295,57 @@ The `isExtensionPage()` helper verifies `sender.url` starts with `chrome-extensi
 
 ### chrome.storage.local (encrypted secrets)
 
-| Key | Contains Secrets | Description |
-|-----|-----------------|-------------|
-| `encryptedApiKeyVault` | Yes (encrypted) | API key encrypted with vault key |
-| `encryptedApiKey` | Yes (encrypted) | Legacy API key encrypted with password |
-| `encryptedVaultKeyMaster` | Yes (encrypted) | Vault key encrypted with master password |
-| `encryptedVaultKeyAgent` | Yes (encrypted) | Vault key encrypted with agent password |
-| `pkVault` | Yes (encrypted) | Private key vault with encrypted entries |
-| `agentPasswordEnabled` | No | Boolean flag |
-| `mnemonicVault` | Yes (encrypted) | Seed phrase mnemonics encrypted with PBKDF2+AES-256-GCM |
-| `seedGroups` | No | Seed group metadata (names, counts) |
-| `accounts` | No | Account metadata (addresses, names, types) |
-| `pendingTxRequests` | No | Pending transaction queue |
-| `pendingSignatureRequests` | No | Pending signature queue |
-| `txHistory` | No | Completed transaction log |
-| `chatHistory` | No | Chat conversation history |
+| Key                        | Contains Secrets | Description                                             |
+| -------------------------- | ---------------- | ------------------------------------------------------- |
+| `encryptedApiKeyVault`     | Yes (encrypted)  | API key encrypted with vault key                        |
+| `encryptedApiKey`          | Yes (encrypted)  | Legacy API key encrypted with password                  |
+| `encryptedVaultKeyMaster`  | Yes (encrypted)  | Vault key encrypted with master password                |
+| `encryptedVaultKeyAgent`   | Yes (encrypted)  | Vault key encrypted with agent password                 |
+| `pkVault`                  | Yes (encrypted)  | Private key vault with encrypted entries                |
+| `agentPasswordEnabled`     | No               | Boolean flag                                            |
+| `mnemonicVault`            | Yes (encrypted)  | Seed phrase mnemonics encrypted with PBKDF2+AES-256-GCM |
+| `seedGroups`               | No               | Seed group metadata (names, counts)                     |
+| `accounts`                 | No               | Account metadata (addresses, names, types)              |
+| `pendingTxRequests`        | No               | Pending transaction queue                               |
+| `pendingSignatureRequests` | No               | Pending signature queue                                 |
+| `txHistory`                | No               | Completed transaction log                               |
+| `chatHistory`              | No               | Chat conversation history                               |
 
 ### chrome.storage.session (session-scoped, cleared on browser close)
 
-| Key | Contains Secrets | Description |
-|-----|-----------------|-------------|
-| `encryptedSessionPassword` | Yes (encrypted) | Password for "Never" auto-lock restore (AES-GCM with random key) |
-| `sessionId` | No | Session identifier (UUID) |
-| `sessionStartedAt` | No | Session timestamp (milliseconds since epoch) |
-| `autoLockNever` | No | Boolean flag indicating "Never" auto-lock mode |
-| `passwordType` | No | `"master" | "agent"` - Which password was used to unlock. Restored to maintain agent password access control guards after service worker restart (v1.3.0+) |
+| Key                        | Contains Secrets | Description                                                      |
+| -------------------------- | ---------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `encryptedSessionPassword` | Yes (encrypted)  | Password for "Never" auto-lock restore (AES-GCM with random key) |
+| `sessionId`                | No               | Session identifier (UUID)                                        |
+| `sessionStartedAt`         | No               | Session timestamp (milliseconds since epoch)                     |
+| `autoLockNever`            | No               | Boolean flag indicating "Never" auto-lock mode                   |
+| `passwordType`             | No               | `"master"                                                        | "agent"` - Which password was used to unlock. Restored to maintain agent password access control guards after service worker restart (v1.3.0+) |
 
 ### chrome.storage.sync (synced, no secrets)
 
-| Key | Description |
-|-----|-------------|
-| `address` | Current wallet address |
-| `displayAddress` | Display-friendly address |
-| `activeAccountId` | Active account ID |
-| `autoLockTimeout` | Auto-lock timeout (ms) |
-| `tabAccounts` | Per-tab account overrides |
-| `sidePanelMode` / `sidePanelVerified` / `isArcBrowser` | UI settings |
-| `hidePortfolioValue` | Boolean - hide/show token USD values |
+| Key                                                    | Description                          |
+| ------------------------------------------------------ | ------------------------------------ |
+| `address`                                              | Current wallet address               |
+| `displayAddress`                                       | Display-friendly address             |
+| `activeAccountId`                                      | Active account ID                    |
+| `autoLockTimeout`                                      | Auto-lock timeout (ms)               |
+| `tabAccounts`                                          | Per-tab account overrides            |
+| `sidePanelMode` / `sidePanelVerified` / `isArcBrowser` | UI settings                          |
+| `hidePortfolioValue`                                   | Boolean - hide/show token USD values |
 
 ---
 
 ## Manifest Security Surface
 
-| Setting | Value | Security Note |
-|---------|-------|---------------|
-| `manifest_version` | 3 | MV3 enforces CSP, no `eval()`, no remote code |
-| `permissions` | `activeTab`, `storage`, `sidePanel`, `notifications`, `tabs` | No `webRequest`, no `debugger` |
-| `host_permissions` | `https://*/*`, `http://*/*` | Broad, needed for RPC proxy (protocol-validated, 15s timeout) + content script |
-| `content_scripts.matches` | All URLs | Wallet must inject on all pages for dapp detection |
-| `externally_connectable` | Not defined | External websites cannot send messages to background |
-| `web_accessible_resources` | `inpage.js` only | Only the provider script is exposed to pages |
-| `content_security_policy` | MV3 default | No inline scripts, no `eval()`, no remote code |
+| Setting                    | Value                                                        | Security Note                                                                  |
+| -------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `manifest_version`         | 3                                                            | MV3 enforces CSP, no `eval()`, no remote code                                  |
+| `permissions`              | `activeTab`, `storage`, `sidePanel`, `notifications`, `tabs` | No `webRequest`, no `debugger`                                                 |
+| `host_permissions`         | `https://*/*`, `http://*/*`                                  | Broad, needed for RPC proxy (protocol-validated, 15s timeout) + content script |
+| `content_scripts.matches`  | All URLs                                                     | Wallet must inject on all pages for dapp detection                             |
+| `externally_connectable`   | Not defined                                                  | External websites cannot send messages to background                           |
+| `web_accessible_resources` | `inpage.js` only                                             | Only the provider script is exposed to pages                                   |
+| `content_security_policy`  | MV3 default                                                  | No inline scripts, no `eval()`, no remote code                                 |
 
 ---
 
@@ -437,28 +441,33 @@ When reviewing or making changes to extension code, verify the following:
 Quick reference for which files to examine based on what area of security you're reviewing.
 
 ### Credential lifecycle (storage, caching, expiry)
+
 - `sessionCache.ts` - All in-memory credential caching and auto-lock
 - `crypto.ts` - API key encryption/decryption, vault key operations
 - `cryptoUtils.ts` - Shared crypto constants (iterations, lengths)
 - `vaultCrypto.ts` - Private key vault encryption/decryption
 
 ### Access control (agent vs master password)
+
 - `authHandlers.ts` - Password verification, agent guards on save/change
 - `background.ts` - Agent guards on account/destructive handlers
 - `sessionCache.ts` - `getPasswordType()`, `setCachedPasswordType()`
 
 ### Message passing (what crosses trust boundaries)
+
 - `inject.ts` - Content script bridge (message whitelist)
 - `impersonator.ts` - Inpage provider (what the webpage can call)
 - `background.ts` - Message router (what handlers exist)
 
 ### Transaction security
+
 - `txHandlers.ts` - Transaction confirmation, signing, API key usage
 - `localSigner.ts` - Private key signing (viem)
 - `bankrApi.ts` - API key sent to Bankr backend
 - `pendingTxStorage.ts` - Pending transaction persistence
 
 ### Extension permissions
+
 - `manifest.json` - Permissions, host permissions, CSP, externally_connectable
 
 ---

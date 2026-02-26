@@ -10,7 +10,7 @@ This is a pnpm workspaces monorepo containing the browser extension (`apps/exten
 ## Project Structure
 
 ```
-bankr-wallet/
+walletchan/
 ├── apps/
 │   ├── extension/    # Browser extension (Vite + React + Chakra UI)
 │   └── website/      # Landing page (Next.js + Chakra UI)
@@ -47,17 +47,17 @@ This starts the Next.js dev server at `http://localhost:3000`.
 
 From the root directory:
 
-| Command                | Description                           |
-| ---------------------- | ------------------------------------- |
-| `pnpm install`         | Install all dependencies              |
-| `pnpm build:extension` | Build the browser extension           |
-| `pnpm build:website`   | Build the website                     |
-| `pnpm build`           | Build both extension and website      |
-| `pnpm dev:extension`   | Run extension in dev mode             |
-| `pnpm dev:website`     | Run website in dev mode               |
+| Command                | Description                                                       |
+| ---------------------- | ----------------------------------------------------------------- |
+| `pnpm install`         | Install all dependencies                                          |
+| `pnpm build:extension` | Build the browser extension                                       |
+| `pnpm build:website`   | Build the website                                                 |
+| `pnpm build`           | Build both extension and website                                  |
+| `pnpm dev:extension`   | Run extension in dev mode                                         |
+| `pnpm dev:website`     | Run website in dev mode                                           |
 | `pnpm zip`             | Create extension zip for distribution (keeps all manifest fields) |
-| `pnpm zip:cws`         | Create CWS-ready zip (strips `key` + `update_url`) |
-| `pnpm lint`            | Lint the extension code               |
+| `pnpm zip:cws`         | Create CWS-ready zip (strips `key` + `update_url`)                |
+| `pnpm lint`            | Lint the extension code                                           |
 
 ## Releasing & Publishing
 

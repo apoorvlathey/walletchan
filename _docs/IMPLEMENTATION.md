@@ -1,8 +1,8 @@
-# BankrWallet Transaction Handling Implementation
+# WalletChan Transaction Handling Implementation
 
 ## Overview
 
-BankrWallet is a Chrome extension that supports two types of accounts:
+WalletChan is a Chrome extension that supports two types of accounts:
 
 1. **Bankr API Accounts** - AI-powered wallets that execute transactions through the Bankr API
 2. **Private Key Accounts** - Standard wallets with local key storage for transaction signing
@@ -20,13 +20,13 @@ This document describes the core architecture and transaction handling implement
 
 The extension supports four distinct account types that can be used simultaneously:
 
-| Feature               | Bankr API Account         | Private Key Account                 | Seed Phrase Account                  | Impersonator Account      |
-| --------------------- | ------------------------- | ----------------------------------- | ------------------------------------ | ------------------------- |
-| Transaction Execution | Via Bankr API             | Local signing + RPC broadcast       | Local signing + RPC broadcast        | ❌ Disabled (view-only)  |
-| Message Signing       | ✅ Via API (`/agent/sign`) | ✅ Full support                     | ✅ Full support                      | ❌ Disabled (view-only)  |
-| Key Storage           | API key encrypted locally | Private key encrypted locally       | Mnemonic + derived keys encrypted    | No secrets stored         |
-| Setup                 | API key + wallet address  | Private key import or generate      | 12-word BIP39 import or generate     | Address only              |
-| Use Case              | AI-powered transactions   | Agent wallets, bots, standard usage | HD wallets, multiple derived accounts | Viewing portfolio/dApps   |
+| Feature               | Bankr API Account          | Private Key Account                 | Seed Phrase Account                   | Impersonator Account    |
+| --------------------- | -------------------------- | ----------------------------------- | ------------------------------------- | ----------------------- |
+| Transaction Execution | Via Bankr API              | Local signing + RPC broadcast       | Local signing + RPC broadcast         | ❌ Disabled (view-only) |
+| Message Signing       | ✅ Via API (`/agent/sign`) | ✅ Full support                     | ✅ Full support                       | ❌ Disabled (view-only) |
+| Key Storage           | API key encrypted locally  | Private key encrypted locally       | Mnemonic + derived keys encrypted     | No secrets stored       |
+| Setup                 | API key + wallet address   | Private key import or generate      | 12-word BIP39 import or generate      | Address only            |
+| Use Case              | AI-powered transactions    | Agent wallets, bots, standard usage | HD wallets, multiple derived accounts | Viewing portfolio/dApps |
 
 ### Seed Phrase Architecture
 
@@ -139,13 +139,13 @@ For detailed implementation of private key accounts, see [PK_ACCOUNTS.md](./PK_A
 
 The following chains are supported for transaction signing (listed in dropdown order):
 
-| Chain    | Chain ID | Default RPC                      | Bankr API | PK/Seed/Impersonator | OP Stack |
-| -------- | -------- | -------------------------------- | --------- | -------------------- | -------- |
-| Base     | 8453     | https://mainnet.base.org         | ✅        | ✅                   | ✅       |
-| Ethereum | 1        | https://eth.llamarpc.com         | ✅        | ✅                   |          |
-| MegaETH  | 4326     | https://mainnet.megaeth.com/rpc  |           | ✅                   | ✅       |
-| Polygon  | 137      | https://polygon-rpc.com          | ✅        | ✅                   |          |
-| Unichain | 130      | https://mainnet.unichain.org     | ✅        | ✅                   | ✅       |
+| Chain    | Chain ID | Default RPC                     | Bankr API | PK/Seed/Impersonator | OP Stack |
+| -------- | -------- | ------------------------------- | --------- | -------------------- | -------- |
+| Base     | 8453     | https://mainnet.base.org        | ✅        | ✅                   | ✅       |
+| Ethereum | 1        | https://eth.llamarpc.com        | ✅        | ✅                   |          |
+| MegaETH  | 4326     | https://mainnet.megaeth.com/rpc |           | ✅                   | ✅       |
+| Polygon  | 137      | https://polygon-rpc.com         | ✅        | ✅                   |          |
+| Unichain | 130      | https://mainnet.unichain.org    | ✅        | ✅                   | ✅       |
 
 These are configured in `src/constants/chainRegistry.ts` (the single source of truth for all chain data) and pre-populated on first install.
 
@@ -157,11 +157,11 @@ Not all chains are supported by all account types. The Bankr API only supports t
 
 **Constants** (derived from `src/constants/chainRegistry.ts`, re-exported via `src/constants/networks.ts`):
 
-| Constant | Purpose |
-| --- | --- |
-| `ALLOWED_CHAIN_IDS` | All supported chain IDs (superset, used for global validation) |
-| `BANKR_SUPPORTED_CHAIN_IDS` | Chain IDs supported by Bankr API accounts only |
-| `OP_STACK_CHAIN_IDS` | OP Stack L2 chains (for L1 fee breakdown in gas display) |
+| Constant                    | Purpose                                                        |
+| --------------------------- | -------------------------------------------------------------- |
+| `ALLOWED_CHAIN_IDS`         | All supported chain IDs (superset, used for global validation) |
+| `BANKR_SUPPORTED_CHAIN_IDS` | Chain IDs supported by Bankr API accounts only                 |
+| `OP_STACK_CHAIN_IDS`        | OP Stack L2 chains (for L1 fee breakdown in gas display)       |
 
 **Enforcement points:**
 
@@ -174,7 +174,7 @@ Not all chains are supported by all account types. The Bankr API only supports t
 
 ## Provider Discovery (EIP-6963)
 
-BankrWallet implements [EIP-6963](https://eips.ethereum.org/EIPS/eip-6963) for multi-wallet discovery, allowing dapps to detect and display the wallet alongside other installed wallets.
+WalletChan implements [EIP-6963](https://eips.ethereum.org/EIPS/eip-6963) for multi-wallet discovery, allowing dapps to detect and display the wallet alongside other installed wallets.
 
 ### How It Works
 
@@ -208,7 +208,7 @@ The wallet announces itself with the following EIP-6963 provider info:
 | uuid     | Random UUIDv4 (generated per page session) |
 | name     | "Bankr Wallet"                             |
 | icon     | Data URI of wallet icon (128x128 PNG)      |
-| rdns     | "app.bankrwallet"                          |
+| rdns     | "com.walletchan"                           |
 
 ### Implementation Details
 
@@ -225,7 +225,7 @@ Dapps that support EIP-6963 will show Bankr Wallet in their wallet selection UI.
 
 ### Multi-Wallet Conflict Handling
 
-Some wallets (like Rabby) aggressively claim `window.ethereum` using `Object.defineProperty` with a getter-only descriptor, which prevents other wallets from setting it via direct assignment. BankrWallet handles this gracefully:
+Some wallets (like Rabby) aggressively claim `window.ethereum` using `Object.defineProperty` with a getter-only descriptor, which prevents other wallets from setting it via direct assignment. WalletChan handles this gracefully:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -610,6 +610,7 @@ Each transaction maintains its own response callback - rejecting/confirming one 
 Pre-confirmation gas estimation shown on the transaction confirmation screen. Fetches gas limit, EIP-1559 fees, sender balance, and native token USD price.
 
 **Background estimation (`gasEstimation.ts`):**
+
 - Uses viem `createPublicClient` with cached clients (keyed by chainId), reuses `getRpcUrl()` from `txHandlers.ts`
 - Parallel RPC calls: `estimateGas` (gas limit + 20% buffer), `estimateFeesPerGas` (EIP-1559 fees), `getBalance` (sender balance)
 - CoinGecko price fetch with 60s in-memory cache for USD display
@@ -617,6 +618,7 @@ Pre-confirmation gas estimation shown on the transaction confirmation screen. Fe
 - Returns `GasEstimate` with `dappProvidedGas` flag
 
 **UI component (`GasEstimateDisplay.tsx`):**
+
 - Collapsible box showing estimated gas fee in ETH + USD (collapsed) with detailed breakdown (expanded)
 - **PK/Seed accounts**: Gas Limit, Max Priority Fee, Max Fee are editable inputs. Overrides sent back via `onGasOverrides` callback
 - **Bankr accounts**: All read-only with "Gas managed by Bankr API" note
@@ -633,6 +635,7 @@ Pre-confirmation gas estimation shown on the transaction confirmation screen. Fe
 | Invalid user gas input | Red border on field, overrides nullified |
 
 **Gas overrides flow (PK/Seed accounts only):**
+
 ```
 GasEstimateDisplay → onGasOverrides(overrides) → TransactionConfirmation state
   → confirmTransactionAsyncPK message includes gasOverrides
@@ -646,12 +649,12 @@ GasEstimateDisplay → onGasOverrides(overrides) → TransactionConfirmation sta
 
 Signature support differs by account type:
 
-| Account Type  | Signature Support                                 |
-| ------------- | ------------------------------------------------- |
-| Bankr API     | ✅ Via `/agent/sign` API                           |
-| Private Key   | ✅ Full support (sign locally with viem)           |
-| Seed Phrase   | ✅ Full support (sign locally with viem)           |
-| Impersonator  | ❌ Disabled (view-only)                            |
+| Account Type | Signature Support                        |
+| ------------ | ---------------------------------------- |
+| Bankr API    | ✅ Via `/agent/sign` API                 |
+| Private Key  | ✅ Full support (sign locally with viem) |
+| Seed Phrase  | ✅ Full support (sign locally with viem) |
+| Impersonator | ❌ Disabled (view-only)                  |
 
 When dapps request signatures, the extension displays the request details. For Bankr accounts, signing is handled via the `/agent/sign` API endpoint. For Private Key and Seed Phrase accounts, signing is done locally with viem. Impersonator accounts can only reject.
 
@@ -730,12 +733,14 @@ Before storing or displaying EIP-712 signature requests, typed data is validated
 **Location**: `txHandlers.ts:handleSignatureRequest()` line ~197
 
 **Checks performed**:
+
 1. Schema structure (domain, types, primaryType, message fields exist)
 2. Circular reference detection (DFS traversal)
 3. Nesting depth limit (50 levels maximum)
 4. Type definition conformance (all referenced types exist and are valid)
 
 **On validation failure**:
+
 - Console error with details logged
 - Dapp receives: `{ success: false, error: "Data must conform to EIP-712 schema" }`
 - No popup shown
@@ -837,13 +842,13 @@ Additional fields populated after transaction submission:
 
 ```typescript
 interface GasData {
-  gasUsed: string;           // decimal string
-  gasLimit: string;          // decimal string
+  gasUsed: string; // decimal string
+  gasLimit: string; // decimal string
   effectiveGasPrice: string; // decimal string (wei)
   // OP Stack L2 only (Base 8453, Unichain 130)
-  l1Fee?: string;            // decimal string (wei)
-  l1GasUsed?: string;        // decimal string
-  l1GasPrice?: string;       // decimal string (wei)
+  l1Fee?: string; // decimal string (wei)
+  l1GasUsed?: string; // decimal string
+  l1GasPrice?: string; // decimal string (wei)
 }
 ```
 
@@ -854,6 +859,7 @@ Function names are resolved via a two-phase approach:
 **Phase 1 (UI-driven)**: `TransactionConfirmation` decodes calldata locally via `CalldataDecoder`. If decoded, the `functionName` is passed in the confirmation message to background.
 
 **Phase 2 (Background fallback)**: If the UI didn't provide a function name, `lookupFunctionName()` runs after tx submission and queries:
+
 1. Sourcify 4byte API (`https://api.4byte.sourcify.dev/signature-database/v1/lookup`)
 2. 4byte.directory (`https://www.4byte.directory/api/v1/signatures/`) as fallback
 
@@ -942,7 +948,7 @@ Users can clear transaction history via Settings:
 Token holdings are fetched via a website API route that wraps the Octav API:
 
 - **Website route**: `apps/website/app/api/portfolio/route.ts` (GET `/api/portfolio?address=0x...`)
-- **Extension client**: `portfolioApi.ts` fetches from `https://bankrwallet.app/api/portfolio`
+- **Extension client**: `portfolioApi.ts` fetches from `https://walletchan.com/api/portfolio`
 - **Response format**: Provider-agnostic `PortfolioResponse` with `tokens[]` and `totalValueUsd`
 
 ### On-Chain Balance Verification
@@ -968,22 +974,26 @@ API portfolio data is shown immediately, while on-chain balances are verified in
 `portfolioSnapshotStorage.ts` silently records `totalValueUsd` snapshots per address over time in `chrome.storage.local` under the key `portfolioSnapshots`.
 
 **How it works:**
+
 - `recordSnapshot(address, totalValueUsd)` is called fire-and-forget from `TokenHoldings.tsx` after each portfolio load (preferring on-chain enhanced value, falling back to API-only)
 - Snapshots are deduplicated: skipped if the last snapshot for the address is <1 hour old
 - Entries older than 8 days are pruned on each write
 - Addresses are normalized to lowercase
 
 **Storage shape:**
+
 ```typescript
 // chrome.storage.local key: "portfolioSnapshots"
 { [address: string]: { timestamp: number; totalValueUsd: number }[] }
 ```
 
 **Exports:**
+
 - `recordSnapshot(address, totalValueUsd)` — append snapshot (with dedup + prune)
 - `getSnapshots(address)` — read all snapshots for an address
 
 **Future expansion:**
+
 - **7-day holdings chart**: Use `getSnapshots()` to render a sparkline or area chart on the portfolio view showing value over the past week
 - **Per-token snapshots**: Extend the snapshot shape to include per-token breakdowns (`{ symbol, valueUsd }[]`) for individual token performance charts
 - **Snapshot on background alarm**: Register a `chrome.alarms` periodic task (e.g., every 4 hours) that fetches portfolio in the background service worker and records a snapshot, so data is captured even when the popup isn't opened
@@ -998,7 +1008,7 @@ API portfolio data is shown immediately, while on-chain balances are verified in
    - **Native**: `{ to, value: parseEther(amount), data: "0x" }`
    - **ERC20**: `{ to: contractAddress, data: encodeFunctionData("transfer", [to, amount]), value: "0x0" }`
 5. Sends `initiateTransfer` message to background
-6. Background creates a `PendingTxRequest` with origin "BankrWallet"
+6. Background creates a `PendingTxRequest` with origin "WalletChan"
 7. Normal TransactionConfirmation flow takes over
 
 ### Calldata Decoder
@@ -1043,12 +1053,12 @@ All name services are resolved in parallel for speed via `resolveEnsIdentity()` 
 
 ### Display Priority in AccountSwitcher
 
-| Condition | Primary Name | Secondary | Tag |
-|-----------|-------------|-----------|-----|
-| User-set displayName + ENS name | displayName | truncated address | ENS name (gray tag) + account type |
-| User-set displayName, no ENS | displayName | truncated address | account type only |
-| No displayName, ENS name exists | ENS name | truncated address | account type only |
-| No displayName, no ENS | truncated address | (none) | account type only |
+| Condition                       | Primary Name      | Secondary         | Tag                                |
+| ------------------------------- | ----------------- | ----------------- | ---------------------------------- |
+| User-set displayName + ENS name | displayName       | truncated address | ENS name (gray tag) + account type |
+| User-set displayName, no ENS    | displayName       | truncated address | account type only                  |
+| No displayName, ENS name exists | ENS name          | truncated address | account type only                  |
+| No displayName, no ENS          | truncated address | (none)            | account type only                  |
 
 ### Architecture
 
@@ -1079,15 +1089,15 @@ AccountSwitcher.tsx
 
 ### Files
 
-| File | Purpose |
-|------|---------|
-| `src/lib/ensUtils.ts` | ENS/Basename/WNS/Mega name + avatar resolution, `resolveEnsIdentity()` |
-| `src/lib/ensIdentityCache.ts` | Cache read/write, `resolveAndCacheIdentity()` |
-| `src/utils/wei.ts` | Wei Name Service SDK — forward/reverse `.wei` name resolution |
-| `src/utils/mega.ts` | MegaNames utility — ABI, constants, `isMega()` for `.mega` resolution |
-| `src/hooks/useEnsIdentities.ts` | React hook: loads cache, resolves stale entries, exposes `refreshAddress()` |
-| `src/components/AccountSwitcher.tsx` | Integrates hook, renders ENS avatars/names/tags |
-| `src/components/AccountSettingsModal.tsx` | "Refresh ENS Data" button |
+| File                                      | Purpose                                                                     |
+| ----------------------------------------- | --------------------------------------------------------------------------- |
+| `src/lib/ensUtils.ts`                     | ENS/Basename/WNS/Mega name + avatar resolution, `resolveEnsIdentity()`      |
+| `src/lib/ensIdentityCache.ts`             | Cache read/write, `resolveAndCacheIdentity()`                               |
+| `src/utils/wei.ts`                        | Wei Name Service SDK — forward/reverse `.wei` name resolution               |
+| `src/utils/mega.ts`                       | MegaNames utility — ABI, constants, `isMega()` for `.mega` resolution       |
+| `src/hooks/useEnsIdentities.ts`           | React hook: loads cache, resolves stale entries, exposes `refreshAddress()` |
+| `src/components/AccountSwitcher.tsx`      | Integrates hook, renders ENS avatars/names/tags                             |
+| `src/components/AccountSettingsModal.tsx` | "Refresh ENS Data" button                                                   |
 
 ## RPC Proxy (CSP Bypass)
 
@@ -1228,6 +1238,7 @@ Decrypt Sensitive Data:
 ```
 
 **Migration Process**:
+
 1. On first unlock with master password after v1.3.0+, vault key system is created
 2. API key is re-encrypted with vault key → saved to `encryptedApiKeyVault`
 3. All private keys are re-encrypted with vault key → `pkVault` entries updated with `salt: ""`
@@ -1235,10 +1246,12 @@ Decrypt Sensitive Data:
 5. Both master and agent passwords work for all operations (except private key reveal)
 
 **Storage Format Detection**:
+
 - `salt === ""` in keystore → vault-key encrypted (current format)
 - `salt !== ""` in keystore → password encrypted (legacy format, backward compatible)
 
 **IMPORTANT**: When saving credentials after vault key migration:
+
 - API keys: Use `encryptedApiKeyVault` (encrypted with vault key), NOT `encryptedApiKey`
 - Private keys: Use vault-key encryption via `encryptPrivateKeyWithVaultKey()`, NOT password encryption
 - The system automatically detects which format is in use and saves to the correct location
@@ -1305,41 +1318,45 @@ Users can optionally configure an **agent password** that allows AI agents to un
 
 **Storage Schema** (in `chrome.storage.local`):
 
-| Key | Description |
-| --- | ----------- |
-| `encryptedVaultKeyMaster` | Vault key encrypted with master password |
-| `encryptedVaultKeyAgent` | Vault key encrypted with agent password (optional) |
-| `encryptedApiKeyVault` | API key encrypted with vault key (current format) |
-| `encryptedApiKey` | API key encrypted with password (legacy, kept for migration) |
-| `agentPasswordEnabled` | Boolean flag for UI |
+| Key                       | Description                                                  |
+| ------------------------- | ------------------------------------------------------------ |
+| `encryptedVaultKeyMaster` | Vault key encrypted with master password                     |
+| `encryptedVaultKeyAgent`  | Vault key encrypted with agent password (optional)           |
+| `encryptedApiKeyVault`    | API key encrypted with vault key (current format)            |
+| `encryptedApiKey`         | API key encrypted with password (legacy, kept for migration) |
+| `agentPasswordEnabled`    | Boolean flag for UI                                          |
 
 **Migration**: Existing users are automatically migrated to the vault key system on first unlock with master password. The migration:
+
 1. Generates a new 256-bit vault key
 2. Encrypts vault key with master password → saved to `encryptedVaultKeyMaster`
 3. Re-encrypts API key with vault key → saved to `encryptedApiKeyVault`
 4. Re-encrypts all private keys with vault key → `pkVault` entries updated (v1.3.0+)
 5. Re-encrypts all seed phrases with vault key → `mnemonicVault` entries updated (v1.3.0+)
 
-**Partial Migration Detection**: If vault key system exists but private keys are still password-encrypted (e.g., upgraded from v1.2.0 to v1.3.0), the system automatically detects this on next master password unlock and completes the migration. Agent password unlock will fail with "Failed to decrypt vault" until migration is complete.
-4. Legacy `encryptedApiKey` is kept but no longer read after migration
+**Partial Migration Detection**: If vault key system exists but private keys are still password-encrypted (e.g., upgraded from v1.2.0 to v1.3.0), the system automatically detects this on next master password unlock and completes the migration. Agent password unlock will fail with "Failed to decrypt vault" until migration is complete. 4. Legacy `encryptedApiKey` is kept but no longer read after migration
 
 **Credential Saving** (v1.3.0+): When saving/updating credentials after wallet setup:
 
 **API Keys**:
+
 - If `cachedVaultKey` exists → encrypt with vault key → save to `encryptedApiKeyVault`
 - If no vault key (legacy) → encrypt with password → save to `encryptedApiKey`
 - Handled automatically by `handleSaveApiKeyWithCachedPassword()` and `addBankrAccount` handler
 
 **Private Keys**:
+
 - If `cachedVaultKey` exists → encrypt with vault key via `encryptPrivateKeyWithVaultKey()` → save to `pkVault` with `salt: ""`
 - If no vault key (legacy) → encrypt with password via `encryptPrivateKey()` → save to `pkVault` with `salt: "base64..."`
 - Handled automatically by `addKeyToVault()` in `vaultCrypto.ts`
 
 **Seed Phrases**:
+
 - Same pattern as private keys using `encryptMnemonicWithVaultKey()` or `encryptMnemonic()`
 - Saved to `mnemonicVault` with appropriate salt indicator
 
 **Security Invariants**:
+
 1. Private key reveal is **always blocked** when unlocked with agent password
 2. Seed phrase reveal is **always blocked** when unlocked with agent password
 3. Adding seed phrases / deriving accounts is **blocked** with agent password
@@ -1387,6 +1404,7 @@ When auto-lock is set to "Never", the extension stores session data in `chrome.s
 **Why This Is Needed**:
 
 Chrome MV3 service workers are frequently suspended/restarted to save resources. When this happens:
+
 1. All in-memory state is cleared (`cachedApiKey`, `cachedVault`, `cachedVaultKey`, etc.)
 2. The `suspend` event clears cached credentials
 3. Without session restoration, users would see unlock prompts even with auto-lock "Never"
@@ -1439,22 +1457,22 @@ Chrome MV3 service workers are frequently suspended/restarted to save resources.
 
 The following message handlers attempt session restoration when auto-lock is "Never" and credentials are not cached:
 
-| Handler                            | Purpose                                        |
-| ---------------------------------- | ---------------------------------------------- |
-| `isWalletUnlocked`                 | Main lock state check (used by UI)             |
-| `getCachedPassword`                | Check if password is cached (used by UI)       |
-| `getCachedApiKey`                  | Display API key in settings                    |
-| `submitChatPrompt`                 | Chat with Bankr AI                             |
-| `saveApiKeyWithCachedPassword`     | Update API key while unlocked                  |
-| `changePasswordWithCachedPassword` | Change wallet password while unlocked          |
-| `addBankrAccount`                  | Add new Bankr account with API key             |
-| `addPrivateKeyAccount`             | Add new private key account                    |
-| `addSeedPhraseGroup`               | Generate/import seed phrase                    |
-| `deriveSeedAccount`                | Derive new account from seed phrase            |
-| `revealPrivateKey`                 | Reveal private key (security-sensitive)        |
-| `revealSeedPhrase`                 | Reveal seed phrase (security-sensitive)        |
-| `setAgentPassword`                 | Set agent password (in authHandlers.ts)        |
-| `cancelTransaction`                | Cancel in-progress transaction                 |
+| Handler                            | Purpose                                  |
+| ---------------------------------- | ---------------------------------------- |
+| `isWalletUnlocked`                 | Main lock state check (used by UI)       |
+| `getCachedPassword`                | Check if password is cached (used by UI) |
+| `getCachedApiKey`                  | Display API key in settings              |
+| `submitChatPrompt`                 | Chat with Bankr AI                       |
+| `saveApiKeyWithCachedPassword`     | Update API key while unlocked            |
+| `changePasswordWithCachedPassword` | Change wallet password while unlocked    |
+| `addBankrAccount`                  | Add new Bankr account with API key       |
+| `addPrivateKeyAccount`             | Add new private key account              |
+| `addSeedPhraseGroup`               | Generate/import seed phrase              |
+| `deriveSeedAccount`                | Derive new account from seed phrase      |
+| `revealPrivateKey`                 | Reveal private key (security-sensitive)  |
+| `revealSeedPhrase`                 | Reveal seed phrase (security-sensitive)  |
+| `setAgentPassword`                 | Set agent password (in authHandlers.ts)  |
+| `cancelTransaction`                | Cancel in-progress transaction           |
 
 **CRITICAL: Adding New Handlers**
 
@@ -1486,19 +1504,19 @@ if (!password) {
 
 **Storage Schema** (in `chrome.storage.session`):
 
-| Key                        | Type    | Description                           |
-| -------------------------- | ------- | ------------------------------------- |
-| `sessionId`                | string  | Unique session identifier             |
-| `sessionStartedAt`         | number  | Timestamp when session started        |
-| `autoLockNever`            | boolean | Whether auto-lock is "Never"          |
-| `encryptedSessionPassword` | object  | Encrypted password { data, key, iv }  |
+| Key                        | Type    | Description                          |
+| -------------------------- | ------- | ------------------------------------ |
+| `sessionId`                | string  | Unique session identifier            |
+| `sessionStartedAt`         | number  | Timestamp when session started       |
+| `autoLockNever`            | boolean | Whether auto-lock is "Never"         |
+| `encryptedSessionPassword` | object  | Encrypted password { data, key, iv } |
 
 **Message Types**:
 
-| Type                 | Description                                              |
-| -------------------- | -------------------------------------------------------- |
-| `validateSession`    | Check if session is valid (returns { valid, sessionId }) |
-| `tryRestoreSession`  | Attempt to restore session (returns boolean)             |
+| Type                | Description                                              |
+| ------------------- | -------------------------------------------------------- |
+| `validateSession`   | Check if session is valid (returns { valid, sessionId }) |
+| `tryRestoreSession` | Attempt to restore session (returns boolean)             |
 
 **UI Port Reconnection**:
 
@@ -1532,6 +1550,7 @@ When changing the wallet password (Settings → Change Password):
 - Password handling stays entirely in background worker (never exposed to UI)
 
 **With Vault Key System** (current) — atomic write pattern:
+
 1. Decrypt vault key with cached (old) password to get raw bytes
 2. Compute re-encrypted vault key with new password (in memory)
 3. **Only re-encrypt legacy entries** (if any exist):
@@ -1551,6 +1570,7 @@ When changing the wallet password (Settings → Change Password):
 **Note (v1.3.0+)**: After migration, `pkVault` and `mnemonicVault` entries are encrypted with the vault key (indicated by `salt: ""`), NOT with the user's password. Only legacy entries (pre-migration) need re-encryption during password change.
 
 **Legacy System** (pre-vault key migration):
+
 1. Decrypt API key with old password
 2. Re-encrypt API key with new password
 3. Re-encrypt private key vault with new password
@@ -1671,60 +1691,60 @@ Build command: `pnpm build`
 
 ### Content Script → Background (chrome.runtime)
 
-| Type               | Description              |
-| ------------------ | ------------------------ |
+| Type               | Description                                               |
+| ------------------ | --------------------------------------------------------- |
 | `sendTransaction`  | Submit transaction (includes gas params if dapp provided) |
-| `signatureRequest` | Submit signature request |
-| `rpcRequest`       | Proxy RPC call (protocol-validated, 15s timeout) |
+| `signatureRequest` | Submit signature request                                  |
+| `rpcRequest`       | Proxy RPC call (protocol-validated, 15s timeout)          |
 
 ### Popup → Background (chrome.runtime)
 
-| Type                               | Description                                             |
-| ---------------------------------- | ------------------------------------------------------- |
-| `getPendingTxRequests`             | Get all pending tx requests                             |
-| `getPendingTransaction`            | Get specific tx details                                 |
-| `isApiKeyCached`                   | Check if password needed                                |
-| `unlockWallet`                     | Unlock wallet with password                             |
-| `lockWallet`                       | Lock wallet (clear cached credentials)                  |
-| `confirmTransaction`               | User approved tx (sync, waits)                          |
-| `confirmTransactionAsync`          | User approved tx (async, Bankr API). Optional `functionName` field |
+| Type                               | Description                                                                                     |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `getPendingTxRequests`             | Get all pending tx requests                                                                     |
+| `getPendingTransaction`            | Get specific tx details                                                                         |
+| `isApiKeyCached`                   | Check if password needed                                                                        |
+| `unlockWallet`                     | Unlock wallet with password                                                                     |
+| `lockWallet`                       | Lock wallet (clear cached credentials)                                                          |
+| `confirmTransaction`               | User approved tx (sync, waits)                                                                  |
+| `confirmTransactionAsync`          | User approved tx (async, Bankr API). Optional `functionName` field                              |
 | `confirmTransactionAsyncPK`        | User approved tx (async, PK/seed local sign). Optional `functionName` and `gasOverrides` fields |
-| `estimateGas`                      | Estimate gas for pending tx (returns `GasEstimate` with fees, balance, USD price) |
-| `rejectTransaction`                | User rejected tx                                        |
-| `getPendingSignatureRequests`      | Get all pending signature requests                      |
-| `rejectSignatureRequest`           | User rejected signature request                         |
-| `cancelTransaction`                | User cancelled in-progress tx                           |
-| `clearApiKeyCache`                 | Clear cached API key                                    |
-| `getCachedPassword`                | Check if password is cached                             |
-| `getCachedApiKey`                  | Get decrypted API key (if cached). **Sender-verified**: extension pages only |
-| `saveApiKeyWithCachedPassword`     | Save new API key using cached password                  |
-| `changePasswordWithCachedPassword` | Change password using cached password                   |
-| `isSidePanelSupported`             | Check if browser supports sidepanel                     |
-| `getSidePanelMode`                 | Get current sidepanel mode setting                      |
-| `setSidePanelMode`                 | Set sidepanel mode (true/false)                         |
-| `setArcBrowser`                    | Mark browser as Arc (disables sidepanel)                |
-| `getAutoLockTimeout`               | Get current auto-lock timeout (ms)                      |
-| `setAutoLockTimeout`               | Set auto-lock timeout (ms)                              |
-| `getTxHistory`                     | Get completed transaction history                       |
-| `clearTxHistory`                   | Clear all transaction history                           |
-| `getAccounts`                      | Get all accounts (metadata only)                        |
-| `getActiveAccount`                 | Get currently active account                            |
-| `setActiveAccount`                 | Set active account by ID (also updates storage address) |
-| `addPrivateKeyAccount`             | Import new private key account                          |
-| `removeAccount`                    | Remove account by ID                                    |
-| `getTabAccount`                    | Get account for specific tab                            |
-| `setTabAccount`                    | Set account for specific tab                            |
-| `confirmSignatureRequest`          | Sign message (PK accounts only)                         |
-| `revealPrivateKey`                 | Reveal private key (requires password verification). **Sender-verified** |
-| `updateAccountDisplayName`         | Update account display name                             |
-| `addImpersonatorAccount`           | Add view-only impersonator account (address only)       |
-| `generateMnemonic`                | Generate fresh BIP39 mnemonic (no storage). **Sender-verified**  |
-| `addSeedPhraseGroup`              | Generate/import mnemonic, create seed group, derive first account (handles PK collision) |
-| `deriveSeedAccount`               | Derive next account from existing seed group (handles PK collision) |
-| `revealSeedPhrase`                | Reveal mnemonic (requires master password verification). **Sender-verified** |
-| `getSeedGroups`                   | Get all seed group metadata                              |
-| `renameSeedGroup`                 | Rename a seed group (broadcasts accountsUpdated)         |
-| `initiateTransfer`                 | Create pending tx for extension-initiated token transfer |
+| `estimateGas`                      | Estimate gas for pending tx (returns `GasEstimate` with fees, balance, USD price)               |
+| `rejectTransaction`                | User rejected tx                                                                                |
+| `getPendingSignatureRequests`      | Get all pending signature requests                                                              |
+| `rejectSignatureRequest`           | User rejected signature request                                                                 |
+| `cancelTransaction`                | User cancelled in-progress tx                                                                   |
+| `clearApiKeyCache`                 | Clear cached API key                                                                            |
+| `getCachedPassword`                | Check if password is cached                                                                     |
+| `getCachedApiKey`                  | Get decrypted API key (if cached). **Sender-verified**: extension pages only                    |
+| `saveApiKeyWithCachedPassword`     | Save new API key using cached password                                                          |
+| `changePasswordWithCachedPassword` | Change password using cached password                                                           |
+| `isSidePanelSupported`             | Check if browser supports sidepanel                                                             |
+| `getSidePanelMode`                 | Get current sidepanel mode setting                                                              |
+| `setSidePanelMode`                 | Set sidepanel mode (true/false)                                                                 |
+| `setArcBrowser`                    | Mark browser as Arc (disables sidepanel)                                                        |
+| `getAutoLockTimeout`               | Get current auto-lock timeout (ms)                                                              |
+| `setAutoLockTimeout`               | Set auto-lock timeout (ms)                                                                      |
+| `getTxHistory`                     | Get completed transaction history                                                               |
+| `clearTxHistory`                   | Clear all transaction history                                                                   |
+| `getAccounts`                      | Get all accounts (metadata only)                                                                |
+| `getActiveAccount`                 | Get currently active account                                                                    |
+| `setActiveAccount`                 | Set active account by ID (also updates storage address)                                         |
+| `addPrivateKeyAccount`             | Import new private key account                                                                  |
+| `removeAccount`                    | Remove account by ID                                                                            |
+| `getTabAccount`                    | Get account for specific tab                                                                    |
+| `setTabAccount`                    | Set account for specific tab                                                                    |
+| `confirmSignatureRequest`          | Sign message (PK accounts only)                                                                 |
+| `revealPrivateKey`                 | Reveal private key (requires password verification). **Sender-verified**                        |
+| `updateAccountDisplayName`         | Update account display name                                                                     |
+| `addImpersonatorAccount`           | Add view-only impersonator account (address only)                                               |
+| `generateMnemonic`                 | Generate fresh BIP39 mnemonic (no storage). **Sender-verified**                                 |
+| `addSeedPhraseGroup`               | Generate/import mnemonic, create seed group, derive first account (handles PK collision)        |
+| `deriveSeedAccount`                | Derive next account from existing seed group (handles PK collision)                             |
+| `revealSeedPhrase`                 | Reveal mnemonic (requires master password verification). **Sender-verified**                    |
+| `getSeedGroups`                    | Get all seed group metadata                                                                     |
+| `renameSeedGroup`                  | Rename a seed group (broadcasts accountsUpdated)                                                |
+| `initiateTransfer`                 | Create pending tx for extension-initiated token transfer                                        |
 
 ### Background → Views (chrome.runtime broadcast)
 
@@ -1748,12 +1768,12 @@ The extension supports Chrome's Side Panel API (Chrome 114+). Sidepanel mode is 
 
 ### Browser Compatibility
 
-| Browser         | Sidepanel Support       | Default Mode |
-| --------------- | ----------------------- | ------------ |
-| Google Chrome   | ✅ Full support          | Sidepanel    |
-| Arc             | ❌ Phantom API (silent)  | Popup        |
-| Brave / Edge    | ❌ Blocked (unverified)  | Popup        |
-| Firefox         | ❌ No API                | Popup        |
+| Browser       | Sidepanel Support       | Default Mode |
+| ------------- | ----------------------- | ------------ |
+| Google Chrome | ✅ Full support         | Sidepanel    |
+| Arc           | ❌ Phantom API (silent) | Popup        |
+| Brave / Edge  | ❌ Blocked (unverified) | Popup        |
+| Firefox       | ❌ No API               | Popup        |
 
 ### Non-Chrome Browser Detection
 
@@ -1766,11 +1786,14 @@ function isNonChromeBrowser(): boolean {
   const uaData = (navigator as any).userAgentData;
   if (!uaData?.brands) return false;
   // Genuine Chrome always includes "Google Chrome" in brands
-  return !uaData.brands.some((b: { brand: string }) => b.brand === "Google Chrome");
+  return !uaData.brands.some(
+    (b: { brand: string }) => b.brand === "Google Chrome",
+  );
 }
 ```
 
 Legacy fallbacks are retained:
+
 - **UA string**: `navigator.userAgent.includes("Arc/")` (older Arc versions)
 - **CSS variable**: `--arc-palette-title` check in `App.tsx` / onboarding (sets `isArcBrowser` storage flag)
 
@@ -1817,7 +1840,7 @@ Instead, the extension controls popup vs sidepanel via `chrome.action.setPopup()
 | Setting     | Storage Key         | Default                                 | Description                                       |
 | ----------- | ------------------- | --------------------------------------- | ------------------------------------------------- |
 | Mode        | `sidePanelMode`     | `true` (after onboarding, if supported) | Whether to use sidepanel or popup                 |
-| Verified    | `sidePanelVerified` | Set on first successful enable          | Whether sidepanel has been tested and works        |
+| Verified    | `sidePanelVerified` | Set on first successful enable          | Whether sidepanel has been tested and works       |
 | Arc Browser | `isArcBrowser`      | Detected via CSS variable (legacy)      | Whether running in Arc browser (legacy detection) |
 
 ### UI Toggle

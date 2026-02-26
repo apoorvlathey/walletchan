@@ -1,7 +1,7 @@
 /**
  * @bankr-wallet/shared
  *
- * Shared design tokens and assets for BankrWallet
+ * Shared design tokens and assets for WalletChan
  */
 
 export {

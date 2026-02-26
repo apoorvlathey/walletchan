@@ -9,7 +9,7 @@ Media assets are available in `./chrome-webstore/`
 
 **What does your extension do?**
 
-BankrWallet is a Chrome extension that provides an interface to connect BankrBot API wallets to web3 apps and send transaction requests on supported EVM chains (Base, Ethereum, Polygon, Unichain). It works by injecting a Web3 provider into web pages like any other standard wallet.
+WalletChan is a Chrome extension that provides an interface to connect BankrBot API wallets to web3 apps and send transaction requests on supported EVM chains (Base, Ethereum, Polygon, Unichain). It works by injecting a Web3 provider into web pages like any other standard wallet.
 
 ---
 
@@ -98,7 +98,7 @@ The extension does not read tab content, URLs, or any sensitive information. It 
 
 **Justification:**
 
-BankrWallet is a Web3 wallet that must work on any website with dApp functionality. Specifically:
+WalletChan is a Web3 wallet that must work on any website with dApp functionality. Specifically:
 
 1. Content Script Injection: Bridges communication between dApps and the extension. Standard practice for all Web3 wallets.
 

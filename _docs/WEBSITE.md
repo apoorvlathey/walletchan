@@ -1,6 +1,6 @@
-# BankrWallet Landing Page - Product Requirements Document
+# WalletChan Landing Page - Product Requirements Document
 
-**Domain**: bankrwallet.app  
+**Domain**: walletchan.com  
 **Design System**: Bauhaus (see STYLING.md)  
 **Status**: Planning
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-A funky, bold landing page that showcases BankrWallet—the browser extension that brings your Bankr terminal wallet into any dapp. The website follows our Bauhaus design system with geometric shapes, primary colors (Red, Blue, Yellow), hard shadows, and constructivist typography.
+A funky, bold landing page that showcases WalletChan—the browser extension that brings your Bankr terminal wallet into any dapp. The website follows our Bauhaus design system with geometric shapes, primary colors (Red, Blue, Yellow), hard shadows, and constructivist typography.
 
 **Vibe**: Retro-futuristic, Constructivist, Bold, Playful yet Professional, "Wallets should be fun"
 
@@ -52,14 +52,14 @@ A funky, bold landing page that showcases BankrWallet—the browser extension th
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  [●▲■] BANKRWALLET          Features  Token  Install     [CTA] │
+│  [●▲■] WalletChan          Features  Token  Install     [CTA] │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 **Elements**:
 
-- **Logo**: Animated mascot GIF (`bankrwallet-animated.gif`) + "BANKRWALLET" text in uppercase, font-black
+- **Logo**: Animated mascot GIF (`walletchan-animated.gif`) + "WalletChan" text in uppercase, font-black
 - **Nav Links**: Features | Token | Install | Tweets (uppercase, font-bold, tracking-wider)
 - **CTA Button**: "Add to Chrome" - Red primary button with hard shadow
 
@@ -527,7 +527,7 @@ A funky, bold landing page that showcases BankrWallet—the browser extension th
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                 │
-│  [●▲■] BANKRWALLET                                             │
+│  [●▲■] WalletChan                                             │
 │                                                                 │
 │  Pull your Bankr wallet out of the           Links:            │
 │  terminal and into your browser.             • GitHub          │
@@ -536,7 +536,7 @@ A funky, bold landing page that showcases BankrWallet—the browser extension th
 │                                              • Privacy Policy  │
 │  ─────────────────────────────────────────────────────────────  │
 │                                                                 │
-│  Built by @apoorveth                      © 2025 BankrWallet   │
+│  Built by @apoorveth                      © 2026 WalletChan   │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -595,25 +595,25 @@ A funky, bold landing page that showcases BankrWallet—the browser extension th
 ## SEO & Meta
 
 ```html
-<title>BankrWallet - Your Bankr Wallet, Anywhere</title>
+<title>WalletChan - The Wallet for AI Era</title>
 <meta
   name="description"
   content="Browser extension that brings your Bankr terminal wallet to any dapp. AI-powered transactions, multi-chain support, no seed phrases needed."
 />
 
 <!-- Open Graph -->
-<meta property="og:title" content="BankrWallet" />
+<meta property="og:title" content="WalletChan" />
 <meta
   property="og:description"
   content="Pull your Bankr wallet into any dapp, like MetaMask!"
 />
-<meta property="og:image" content="https://bankrwallet.app/og-image.png" />
-<meta property="og:url" content="https://bankrwallet.app" />
+<meta property="og:image" content="https://walletchan.com/og-image.png" />
+<meta property="og:url" content="https://walletchan.com" />
 
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:site" content="@apoorveth" />
-<meta name="twitter:image" content="https://bankrwallet.app/twitter-card.png" />
+<meta name="twitter:image" content="https://walletchan.com/twitter-card.png" />
 ```
 
 ---
@@ -622,8 +622,8 @@ A funky, bold landing page that showcases BankrWallet—the browser extension th
 
 ### Existing (from repo)
 
-- `bankrwallet-animated.gif` - Animated mascot
-- `bankrwallet-icon.png` - Static icon
+- `walletchan-animated.gif` - Animated mascot
+- `walletchan-icon.png` - Static icon
 - `.github/usage/*.png` - Extension screenshots
 - `.github/installation/developer-mode.png` - Install screenshot
 - `public/chainIcons/*.svg` - Chain logos
@@ -713,7 +713,7 @@ Option B: Custom styled cards with curated tweet data (requires manual updates)
 
 ### Phase 4: Launch
 
-- [ ] Domain setup (bankrwallet.app)
+- [ ] Domain setup (walletchan.com)
 - [ ] Vercel deployment
 - [ ] Analytics integration
 - [ ] Final QA

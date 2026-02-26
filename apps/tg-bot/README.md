@@ -1,4 +1,4 @@
-# BankrWallet TG Bot
+# WalletChan TG Bot
 
 Token-gated Telegram bot that manages access to a private group based on sBNKRW staked balance.
 
@@ -49,17 +49,17 @@ This is a pnpm monorepo with workspace dependencies, so Railway needs a **Docker
 
 In the service's Variables tab, add:
 
-| Variable | Value |
-|----------|-------|
-| `BOT_TOKEN` | From [@BotFather](https://t.me/BotFather) |
-| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (Railway reference) |
-| `INDEXER_API_URL` | Your staking indexer URL (e.g. `https://staking-indexer.up.railway.app`) |
-| `PRIVATE_GROUP_ID` | TG group chat ID (negative number) |
-| `MIN_STAKE_THRESHOLD` | Min sBNKRW in wei, e.g. `1000000000000000000000` (1000 tokens) |
-| `ADMIN_TG_ID` | Your Telegram user ID |
-| `VERIFY_URL` | `https://bankrwallet.app/verify` |
-| `STAKE_URL` | `https://stake.bankrwallet.app` |
-| `PORT` | `3001` |
+| Variable              | Value                                                                    |
+| --------------------- | ------------------------------------------------------------------------ |
+| `BOT_TOKEN`           | From [@BotFather](https://t.me/BotFather)                                |
+| `DATABASE_URL`        | `${{Postgres.DATABASE_URL}}` (Railway reference)                         |
+| `INDEXER_API_URL`     | Your staking indexer URL (e.g. `https://staking-indexer.up.railway.app`) |
+| `PRIVATE_GROUP_ID`    | TG group chat ID (negative number)                                       |
+| `MIN_STAKE_THRESHOLD` | Min sBNKRW in wei, e.g. `1000000000000000000000` (1000 tokens)           |
+| `ADMIN_TG_ID`         | Your Telegram user ID                                                    |
+| `VERIFY_URL`          | `https://walletchan.com/verify`                                          |
+| `STAKE_URL`           | `https://stake.walletchan.com`                                           |
+| `PORT`                | `3001`                                                                   |
 
 ### 5. Run migrations
 
@@ -78,6 +78,7 @@ DATABASE_URL="<paste_DATABASE_PUBLIC_URL>" npx drizzle-kit migrate
 ### 6. Bot permissions
 
 The bot needs these permissions in the private TG group (set as admin):
+
 - **Invite Users via Link** — to create one-time invite links
 - **Ban Users** — to kick members who fall below threshold
 

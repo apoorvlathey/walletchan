@@ -2,7 +2,7 @@
 
 **Last Updated:** January 31, 2026
 
-BankrWallet ("the Extension") is a Chrome browser extension that allows users to interact with decentralized applications (dApps) using the Bankr API. This Privacy Policy explains how we handle your information.
+WalletChan ("the Extension") is a Chrome browser extension that allows users to interact with decentralized applications (dApps) using the Bankr API. This Privacy Policy explains how we handle your information.
 
 ---
 
@@ -104,4 +104,4 @@ If you have questions about this Privacy Policy, you can reach out via:
 
 ## Open Source
 
-BankrWallet is open source. You can review the code to verify our privacy practices.
+WalletChan is open source. You can review the code to verify our privacy practices.
