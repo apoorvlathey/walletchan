@@ -12,6 +12,7 @@ import {
   IconButton,
   Button,
   Image,
+  useToast,
 } from "@chakra-ui/react";
 import { RefreshCw, AlertTriangle } from "lucide-react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -26,6 +27,7 @@ import {
 import { formatUnits } from "viem";
 import { Navigation } from "../components/Navigation";
 import { ADDRESSES } from "@/lib/wchan-swap/addresses";
+import { useTokenData } from "../contexts/TokenDataContext";
 
 const BASE_CHAIN_ID = 8453;
 const HOOK_ADDRESS = ADDRESSES[BASE_CHAIN_ID].hook as `0x${string}`;
@@ -44,6 +46,34 @@ const HOOK_ABI = [
   {
     inputs: [],
     name: "claimFees",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+const CLANKER_FEE_LOCKER = "0xF3622742b1E446D92e45E22923Ef11C2fcD55D68" as `0x${string}`;
+const CLANKER_FEE_OWNER = "0x74992be74bc3c3a72e97df34a2c3a62c15f55970" as `0x${string}`;
+const WETH_ADDRESS = "0x4200000000000000000000000000000000000006" as `0x${string}`;
+const BNKRW_ADDRESS = "0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07" as `0x${string}`;
+
+const CLANKER_FEE_ABI = [
+  {
+    inputs: [
+      { name: "feeOwner", type: "address" },
+      { name: "token", type: "address" },
+    ],
+    name: "availableFees",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "feeOwner", type: "address" },
+      { name: "token", type: "address" },
+    ],
+    name: "claim",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -73,8 +103,11 @@ function formatUsd(value: number): string {
 }
 
 export default function AdminContent() {
+  const toast = useToast();
   const [ethPrice, setEthPrice] = useState<number | null>(null);
   const [ethPriceLoading, setEthPriceLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { tokenData } = useTokenData();
 
   // Chain detection
   const { isConnected: isWalletConnected } = useAccount();
@@ -123,14 +156,30 @@ export default function AdminContent() {
 
   // Force refetch after claim confirms (with delay for indexing)
   useEffect(() => {
-    if (isClaimConfirmed) {
+    if (isClaimConfirmed && claimTxHash) {
+      const txUrl = `https://basescan.org/tx/${claimTxHash}`;
+      toast({
+        title: "Hook fees claimed",
+        description: (
+          <>
+            ETH fees have been claimed.{" "}
+            <a href={txUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
+              View on BaseScan
+            </a>
+          </>
+        ),
+        status: "success",
+        duration: 10000,
+        isClosable: true,
+        position: "bottom-right",
+      });
       const timeout = setTimeout(() => {
         refetchFees();
         fetchEthPrice();
       }, 2000);
       return () => clearTimeout(timeout);
     }
-  }, [isClaimConfirmed, refetchFees, fetchEthPrice]);
+  }, [isClaimConfirmed, claimTxHash, refetchFees, fetchEthPrice, toast]);
 
   const handleClaim = () => {
     writeContract({
@@ -141,10 +190,149 @@ export default function AdminContent() {
     });
   };
 
+  // Clanker fee reads
+  const {
+    data: clankerWethFees,
+    isLoading: clankerWethLoading,
+    refetch: refetchClankerWeth,
+  } = useReadContract({
+    address: CLANKER_FEE_LOCKER,
+    abi: CLANKER_FEE_ABI,
+    functionName: "availableFees",
+    args: [CLANKER_FEE_OWNER, WETH_ADDRESS],
+    chainId: BASE_CHAIN_ID,
+    query: { refetchInterval: FEES_POLL_MS },
+  });
+
+  const {
+    data: clankerBnkrwFees,
+    isLoading: clankerBnkrwLoading,
+    refetch: refetchClankerBnkrw,
+  } = useReadContract({
+    address: CLANKER_FEE_LOCKER,
+    abi: CLANKER_FEE_ABI,
+    functionName: "availableFees",
+    args: [CLANKER_FEE_OWNER, BNKRW_ADDRESS],
+    chainId: BASE_CHAIN_ID,
+    query: { refetchInterval: FEES_POLL_MS },
+  });
+
+  // Clanker claim WETH
+  const {
+    writeContract: claimClankerWeth,
+    data: clankerWethTxHash,
+    isPending: isClankerWethClaiming,
+  } = useWriteContract();
+  const { isLoading: isClankerWethConfirming, isSuccess: isClankerWethConfirmed } =
+    useWaitForTransactionReceipt({ hash: clankerWethTxHash });
+
+  // Clanker claim BNKRW
+  const {
+    writeContract: claimClankerBnkrw,
+    data: clankerBnkrwTxHash,
+    isPending: isClankerBnkrwClaiming,
+  } = useWriteContract();
+  const { isLoading: isClankerBnkrwConfirming, isSuccess: isClankerBnkrwConfirmed } =
+    useWaitForTransactionReceipt({ hash: clankerBnkrwTxHash });
+
+  // Refetch after Clanker claims confirm
+  useEffect(() => {
+    if (isClankerWethConfirmed && clankerWethTxHash) {
+      const txUrl = `https://basescan.org/tx/${clankerWethTxHash}`;
+      toast({
+        title: "Clanker WETH claimed",
+        description: (
+          <>
+            WETH fees have been claimed.{" "}
+            <a href={txUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
+              View on BaseScan
+            </a>
+          </>
+        ),
+        status: "success",
+        duration: 10000,
+        isClosable: true,
+        position: "bottom-right",
+      });
+      const timeout = setTimeout(() => refetchClankerWeth(), 2000);
+      return () => clearTimeout(timeout);
+    }
+  }, [isClankerWethConfirmed, clankerWethTxHash, refetchClankerWeth, toast]);
+
+  useEffect(() => {
+    if (isClankerBnkrwConfirmed && clankerBnkrwTxHash) {
+      const txUrl = `https://basescan.org/tx/${clankerBnkrwTxHash}`;
+      toast({
+        title: "Clanker BNKRW claimed",
+        description: (
+          <>
+            BNKRW fees have been claimed.{" "}
+            <a href={txUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
+              View on BaseScan
+            </a>
+          </>
+        ),
+        status: "success",
+        duration: 10000,
+        isClosable: true,
+        position: "bottom-right",
+      });
+      const timeout = setTimeout(() => refetchClankerBnkrw(), 2000);
+      return () => clearTimeout(timeout);
+    }
+  }, [isClankerBnkrwConfirmed, clankerBnkrwTxHash, refetchClankerBnkrw, toast]);
+
+  const handleClaimClankerWeth = () => {
+    claimClankerWeth({
+      address: CLANKER_FEE_LOCKER,
+      abi: CLANKER_FEE_ABI,
+      functionName: "claim",
+      args: [CLANKER_FEE_OWNER, WETH_ADDRESS],
+      chainId: BASE_CHAIN_ID,
+    });
+  };
+
+  const handleClaimClankerBnkrw = () => {
+    claimClankerBnkrw({
+      address: CLANKER_FEE_LOCKER,
+      abi: CLANKER_FEE_ABI,
+      functionName: "claim",
+      args: [CLANKER_FEE_OWNER, BNKRW_ADDRESS],
+      chainId: BASE_CHAIN_ID,
+    });
+  };
+
+  // Clanker derived values
+  const clankerWethFloat = clankerWethFees
+    ? parseFloat(formatUnits(clankerWethFees, 18))
+    : 0;
+  const clankerWethUsd = ethPrice ? clankerWethFloat * ethPrice : null;
+  const hasClankerWeth = clankerWethFees !== undefined && clankerWethFees > 0n;
+
+  const clankerBnkrwFloat = clankerBnkrwFees
+    ? parseFloat(formatUnits(clankerBnkrwFees, 18))
+    : 0;
+  const bnkrwPrice = tokenData?.priceRaw ?? null;
+  const clankerBnkrwUsd = bnkrwPrice ? clankerBnkrwFloat * bnkrwPrice : null;
+  const hasClankerBnkrw = clankerBnkrwFees !== undefined && clankerBnkrwFees > 0n;
+
   const wethAmount = pendingFees?.[0];
   const ethFloat = wethAmount ? parseFloat(formatUnits(wethAmount, 18)) : 0;
   const usdValue = ethPrice ? ethFloat * ethPrice : null;
+  const wchanAmount = pendingFees?.[1];
+  const wchanFloat = wchanAmount ? parseFloat(formatUnits(wchanAmount, 18)) : 0;
+  const wchanUsd = bnkrwPrice ? wchanFloat * bnkrwPrice : null;
   const hasClaimable = wethAmount !== undefined && wethAmount > 0n;
+
+  // Totals across all sources
+  const totalEthFloat = ethFloat + clankerWethFloat;
+  const totalEthUsd = ethPrice ? totalEthFloat * ethPrice : null;
+  const totalBnkrwUsd = clankerBnkrwUsd;
+  const totalClaimableUsd =
+    totalEthUsd !== null || totalBnkrwUsd !== null
+      ? (totalEthUsd ?? 0) + (totalBnkrwUsd ?? 0)
+      : null;
+  const allFeesLoading = feesLoading || clankerWethLoading || clankerBnkrwLoading;
 
   return (
     <Box minH="100vh" bg="bauhaus.background">
@@ -153,20 +341,35 @@ export default function AdminContent() {
       <Container maxW="4xl" py={12}>
         <VStack spacing={8} align="stretch">
           {/* Header */}
-          <Flex justify="space-between" align="flex-start">
-            <Box>
-              <Text
-                fontWeight="black"
-                fontSize="3xl"
-                textTransform="uppercase"
-                letterSpacing="tight"
-              >
-                Admin
-              </Text>
-              <Text fontSize="sm" color="gray.600" mt={1}>
-                WCHAN Dev Fee Hook &middot; Base
-              </Text>
-            </Box>
+          <Flex justify="space-between" align="center">
+            <HStack spacing={4}>
+              {/* Geometric logo cluster */}
+              <VStack spacing={0}>
+                <Box w={3} h={3} bg="bauhaus.red" borderRadius="full" />
+                <Box w={3} h={3} bg="bauhaus.blue" transform="rotate(45deg)" mt={-0.5} />
+              </VStack>
+              <Box>
+                <Text
+                  fontWeight="black"
+                  fontSize={{ base: "2xl", lg: "3xl" }}
+                  textTransform="uppercase"
+                  letterSpacing="tighter"
+                  lineHeight="0.9"
+                >
+                  Admin
+                </Text>
+                <Text
+                  fontSize="xs"
+                  fontWeight="bold"
+                  textTransform="uppercase"
+                  letterSpacing="widest"
+                  color="gray.500"
+                  mt={1}
+                >
+                  Fee Dashboard &middot; Base
+                </Text>
+              </Box>
+            </HStack>
             <Box
               sx={{
                 "& button": {
@@ -225,87 +428,332 @@ export default function AdminContent() {
             </HStack>
           )}
 
-          {/* Pending Fees Card */}
+          {/* Total Claimable (parent card with nested sub-cards) */}
           <Box
             bg="white"
             border={{ base: "2px solid", lg: "4px solid" }}
             borderColor="bauhaus.border"
             boxShadow={{ base: "3px 3px 0px 0px #121212", lg: "8px 8px 0px 0px #121212" }}
-            p={8}
+            position="relative"
+            overflow="hidden"
           >
-            <HStack mb={4}>
-              <Text
-                fontWeight="bold"
-                fontSize="sm"
-                textTransform="uppercase"
-                letterSpacing="wider"
-                color="gray.500"
-              >
-                Pending ETH Fees
-              </Text>
-              <IconButton
-                aria-label="Refresh fees"
-                icon={<RefreshCw size={14} />}
-                size="xs"
-                variant="ghost"
-                color="gray.400"
-                _hover={{ color: "bauhaus.black" }}
-                onClick={() => {
-                  refetchFees();
-                  fetchEthPrice();
-                }}
-              />
-            </HStack>
+            {/* Yellow accent bar at top */}
+            <Box h="6px" bg="bauhaus.yellow" />
 
-            <Flex justify="space-between" align="center">
-              <VStack spacing={4} align="stretch">
-                {/* USD Value (primary) */}
-                <Flex align="baseline" gap={3}>
-                  {feesLoading || ethPriceLoading ? (
-                    <Skeleton h="40px" w="200px" />
-                  ) : usdValue !== null ? (
-                    <Text fontWeight="black" fontSize="4xl" lineHeight="1">
-                      {formatUsd(usdValue)}
-                    </Text>
-                  ) : (
-                    <Text fontSize="lg" color="gray.400">
-                      USD price unavailable
-                    </Text>
-                  )}
-                </Flex>
+            <Box p={{ base: 5, lg: 8 }}>
+              {/* Total Summary */}
+              <HStack mb={4} spacing={3}>
+                <Box w={2} h={2} bg="bauhaus.yellow" borderRadius="full" />
+                <Text
+                  fontWeight="bold"
+                  fontSize="xs"
+                  textTransform="uppercase"
+                  letterSpacing="widest"
+                  color="gray.500"
+                >
+                  Total Claimable
+                </Text>
+                <IconButton
+                  aria-label="Refresh all fees"
+                  icon={
+                    <Box
+                      as={RefreshCw}
+                      size={14}
+                      animation={isRefreshing ? "spin 1s linear infinite" : undefined}
+                      sx={{
+                        "@keyframes spin": {
+                          from: { transform: "rotate(0deg)" },
+                          to: { transform: "rotate(360deg)" },
+                        },
+                      }}
+                    />
+                  }
+                  size="xs"
+                  variant="ghost"
+                  color="gray.400"
+                  _hover={{ color: "bauhaus.black" }}
+                  onClick={() => {
+                    setIsRefreshing(true);
+                    refetchFees();
+                    refetchClankerWeth();
+                    refetchClankerBnkrw();
+                    fetchEthPrice();
+                    setTimeout(() => setIsRefreshing(false), 1500);
+                  }}
+                />
+              </HStack>
 
-                {/* ETH Amount (secondary) */}
-                <HStack spacing={2}>
-                  {feesLoading ? (
-                    <Skeleton h="24px" w="120px" />
-                  ) : (
-                    <Text fontWeight="bold" fontSize="lg" color="bauhaus.blue">
-                      {formatEth(wethAmount)} ETH
-                    </Text>
-                  )}
-                </HStack>
+              {allFeesLoading || ethPriceLoading ? (
+                <Skeleton h="56px" w="280px" mb={4} />
+              ) : totalClaimableUsd !== null ? (
+                <Text
+                  fontWeight="black"
+                  fontSize={{ base: "4xl", lg: "6xl" }}
+                  lineHeight="1"
+                  mb={4}
+                  letterSpacing="tighter"
+                >
+                  {formatUsd(totalClaimableUsd)}
+                </Text>
+              ) : (
+                <Text fontSize="lg" color="gray.400" mb={4}>
+                  USD price unavailable
+                </Text>
+              )}
 
-                {/* ETH Price Reference */}
+              <HStack spacing={6} mb={8}>
+                {allFeesLoading ? (
+                  <Skeleton h="20px" w="200px" />
+                ) : (
+                  <>
+                    <Text fontWeight="bold" fontSize="sm" color="bauhaus.blue">
+                      {totalEthFloat.toLocaleString(undefined, {
+                        minimumFractionDigits: 4,
+                        maximumFractionDigits: 6,
+                      })}{" "}
+                      ETH
+                      {totalEthUsd !== null && (
+                        <Text as="span" color="gray.400" fontWeight="normal" ml={1}>
+                          ({formatUsd(totalEthUsd)})
+                        </Text>
+                      )}
+                    </Text>
+                    <Text fontWeight="bold" fontSize="sm" color="bauhaus.red">
+                      {clankerBnkrwFloat.toLocaleString(undefined, {
+                        minimumFractionDigits: 4,
+                        maximumFractionDigits: 6,
+                      })}{" "}
+                      BNKRW
+                      {clankerBnkrwUsd !== null && (
+                        <Text as="span" color="gray.400" fontWeight="normal" ml={1}>
+                          ({formatUsd(clankerBnkrwUsd)})
+                        </Text>
+                      )}
+                    </Text>
+                  </>
+                )}
+              </HStack>
+
+              {/* Nested Fee Cards Side by Side */}
+              <Flex gap={{ base: 4, lg: 6 }} direction={{ base: "column", lg: "row" }}>
+                {/* Pending ETH Fees */}
+                <Box
+                  flex={1}
+                  bg="white"
+                  border="2px solid"
+                  borderColor="bauhaus.border"
+                  boxShadow="3px 3px 0px 0px #121212"
+                  position="relative"
+                  overflow="hidden"
+                >
+                  {/* Blue left accent */}
+                  <Box
+                    position="absolute"
+                    left={0}
+                    top={0}
+                    bottom={0}
+                    w="4px"
+                    bg="bauhaus.blue"
+                  />
+                  <Box p={5} pl={6}>
+                    <HStack mb={4} spacing={2}>
+                      <Box w={1.5} h={1.5} bg="bauhaus.blue" borderRadius="full" />
+                      <Text
+                        fontWeight="bold"
+                        fontSize="xs"
+                        textTransform="uppercase"
+                        letterSpacing="widest"
+                        color="gray.500"
+                      >
+                        Pending ETH Fees
+                      </Text>
+                    </HStack>
+
+                    <VStack spacing={3} align="stretch">
+                      {feesLoading || ethPriceLoading ? (
+                        <Skeleton h="32px" w="140px" />
+                      ) : usdValue !== null ? (
+                        <Text fontWeight="black" fontSize="2xl" lineHeight="1">
+                          {formatUsd(usdValue)}
+                        </Text>
+                      ) : (
+                        <Text fontSize="md" color="gray.400">
+                          USD price unavailable
+                        </Text>
+                      )}
+
+                      {feesLoading ? (
+                        <Skeleton h="18px" w="100px" />
+                      ) : (
+                        <Text fontWeight="bold" fontSize="sm" color="bauhaus.blue">
+                          {formatEth(wethAmount)} ETH
+                        </Text>
+                      )}
+
+                      <Button
+                        variant="primary"
+                        size="md"
+                        onClick={handleClaim}
+                        isLoading={isClaiming || isClaimConfirming}
+                        loadingText={isClaimConfirming ? "Confirming..." : "Claiming..."}
+                        isDisabled={!isWalletConnected || isWrongChain || !hasClaimable}
+                        mt={2}
+                        w="full"
+                      >
+                        Claim Fees
+                      </Button>
+
+                      {/* WCHAN FYI (not included in total) */}
+                      {!feesLoading && wchanFloat > 0 && (
+                        <Text fontSize="xs" color="gray.400" mt={1}>
+                          ISP: {formatEth(wchanAmount)} WCHAN
+                          {wchanUsd !== null && ` (${formatUsd(wchanUsd)})`}
+                        </Text>
+                      )}
+                    </VStack>
+                  </Box>
+                </Box>
+
+                {/* Clanker Fees */}
+                <Box
+                  flex={1}
+                  bg="white"
+                  border="2px solid"
+                  borderColor="bauhaus.border"
+                  boxShadow="3px 3px 0px 0px #121212"
+                  position="relative"
+                  overflow="hidden"
+                >
+                  {/* Red left accent */}
+                  <Box
+                    position="absolute"
+                    left={0}
+                    top={0}
+                    bottom={0}
+                    w="4px"
+                    bg="bauhaus.red"
+                  />
+                  <Box p={5} pl={6}>
+                    <HStack mb={4} spacing={2}>
+                      <Box w={1.5} h={1.5} bg="bauhaus.red" borderRadius="full" />
+                      <Text
+                        fontWeight="bold"
+                        fontSize="xs"
+                        textTransform="uppercase"
+                        letterSpacing="widest"
+                        color="gray.500"
+                      >
+                        Clanker Fees (BNKRW)
+                      </Text>
+                    </HStack>
+
+                    <VStack spacing={5} align="stretch">
+                      {/* WETH Row */}
+                      <Flex justify="space-between" align="center">
+                        <VStack spacing={1} align="stretch">
+                          <Text
+                            fontWeight="bold"
+                            fontSize="xs"
+                            textTransform="uppercase"
+                            letterSpacing="wider"
+                            color="gray.400"
+                          >
+                            WETH
+                          </Text>
+                          {clankerWethLoading || ethPriceLoading ? (
+                            <Skeleton h="24px" w="100px" />
+                          ) : clankerWethUsd !== null ? (
+                            <Text fontWeight="black" fontSize="lg" lineHeight="1">
+                              {formatUsd(clankerWethUsd)}
+                            </Text>
+                          ) : (
+                            <Text fontSize="sm" color="gray.400">
+                              USD price unavailable
+                            </Text>
+                          )}
+                          {clankerWethLoading ? (
+                            <Skeleton h="14px" w="80px" />
+                          ) : (
+                            <Text fontWeight="bold" fontSize="sm" color="bauhaus.blue">
+                              {formatEth(clankerWethFees)} ETH
+                            </Text>
+                          )}
+                        </VStack>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={handleClaimClankerWeth}
+                          isLoading={isClankerWethClaiming || isClankerWethConfirming}
+                          loadingText={isClankerWethConfirming ? "Confirming..." : "Claiming..."}
+                          isDisabled={!isWalletConnected || isWrongChain || !hasClankerWeth}
+                        >
+                          Claim
+                        </Button>
+                      </Flex>
+
+                      <Box h="2px" bg="bauhaus.border" opacity={0.1} />
+
+                      {/* BNKRW Row */}
+                      <Flex justify="space-between" align="center">
+                        <VStack spacing={1} align="stretch">
+                          <Text
+                            fontWeight="bold"
+                            fontSize="xs"
+                            textTransform="uppercase"
+                            letterSpacing="wider"
+                            color="gray.400"
+                          >
+                            BNKRW
+                          </Text>
+                          {clankerBnkrwLoading || !bnkrwPrice ? (
+                            <Skeleton h="24px" w="100px" />
+                          ) : clankerBnkrwUsd !== null ? (
+                            <Text fontWeight="black" fontSize="lg" lineHeight="1">
+                              {formatUsd(clankerBnkrwUsd)}
+                            </Text>
+                          ) : (
+                            <Text fontSize="sm" color="gray.400">
+                              USD price unavailable
+                            </Text>
+                          )}
+                          {clankerBnkrwLoading ? (
+                            <Skeleton h="14px" w="80px" />
+                          ) : (
+                            <Text fontWeight="bold" fontSize="sm" color="bauhaus.red">
+                              {formatEth(clankerBnkrwFees)} BNKRW
+                            </Text>
+                          )}
+                        </VStack>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={handleClaimClankerBnkrw}
+                          isLoading={isClankerBnkrwClaiming || isClankerBnkrwConfirming}
+                          loadingText={isClankerBnkrwConfirming ? "Confirming..." : "Claiming..."}
+                          isDisabled={!isWalletConnected || isWrongChain || !hasClankerBnkrw}
+                        >
+                          Claim
+                        </Button>
+                      </Flex>
+                    </VStack>
+                  </Box>
+                </Box>
+              </Flex>
+
+              {/* Price references */}
+              <HStack mt={5} spacing={4} opacity={0.6}>
                 {ethPrice && (
-                  <Text fontSize="xs" color="gray.400">
-                    ETH price: ${ethPrice.toLocaleString()} &middot; updates every
-                    30s
+                  <Text fontSize="xs" color="gray.500" fontWeight="medium">
+                    ETH: ${ethPrice.toLocaleString()}
                   </Text>
                 )}
-              </VStack>
-
-              {/* Claim Button */}
-              <Button
-                variant="primary"
-                size="md"
-                onClick={handleClaim}
-                isLoading={isClaiming || isClaimConfirming}
-                loadingText={isClaimConfirming ? "Confirming..." : "Claiming..."}
-                isDisabled={!isWalletConnected || isWrongChain || !hasClaimable}
-              >
-                Claim Fees
-              </Button>
-            </Flex>
+                {tokenData && (
+                  <Text fontSize="xs" color="gray.500" fontWeight="medium">
+                    BNKRW MCap: {tokenData.marketCap}
+                  </Text>
+                )}
+              </HStack>
+            </Box>
           </Box>
         </VStack>
       </Container>
