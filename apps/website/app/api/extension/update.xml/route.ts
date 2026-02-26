@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 const EXTENSION_ID = process.env.EXTENSION_ID!;
-const GITHUB_REPO = 'apoorvlathey/bankr-wallet';
+const GITHUB_REPO = "apoorvlathey/walletchan";
 
 interface GitHubAsset {
   name: string;
@@ -17,7 +17,7 @@ export async function GET() {
   try {
     const response = await fetch(
       `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
-      { next: { revalidate: 300 } } // 5 min cache
+      { next: { revalidate: 300 } }, // 5 min cache
     );
 
     if (!response.ok) {
@@ -25,8 +25,8 @@ export async function GET() {
     }
 
     const release: GitHubRelease = await response.json();
-    const version = release.tag_name.replace(/^v/, '');
-    const crxAsset = release.assets.find((a) => a.name.endsWith('.crx'));
+    const version = release.tag_name.replace(/^v/, "");
+    const crxAsset = release.assets.find((a) => a.name.endsWith(".crx"));
 
     if (!crxAsset) {
       return new NextResponse(fallbackXml(EXTENSION_ID), xmlHeaders());
@@ -57,8 +57,8 @@ function fallbackXml(id: string) {
 function xmlHeaders() {
   return {
     headers: {
-      'Content-Type': 'application/xml',
-      'Cache-Control': 'public, max-age=300',
+      "Content-Type": "application/xml",
+      "Cache-Control": "public, max-age=300",
     },
   };
 }
