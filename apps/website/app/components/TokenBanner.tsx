@@ -2,7 +2,7 @@
 
 import { Box, HStack, Text, Link, useDisclosure } from "@chakra-ui/react";
 import { useTokenData } from "../contexts/TokenDataContext";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname, useSearchParams } from "next/navigation";
 import { DEXSCREENER_URL, TOKEN_ADDRESS } from "../constants";
@@ -19,18 +19,23 @@ const WCHAN_TOKEN: BuyToken = {
   imageUrl: "/images/walletchan-icon-nobg.png",
 };
 
-export function TokenBanner() {
-  const { tokenData, isLoading } = useTokenData();
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const pathname = usePathname();
+function BuyWCHANAutoOpen({ onOpen }: { onOpen: () => void }) {
   const searchParams = useSearchParams();
 
-  // Auto-open BuyModal when ?buyWCHAN=true is in the URL
   useEffect(() => {
     if (searchParams.get("buyWCHAN") === "true") {
       onOpen();
     }
   }, [searchParams, onOpen]);
+
+  return null;
+}
+
+export function TokenBanner() {
+  const { tokenData, isLoading } = useTokenData();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const pathname = usePathname();
+
   const isMigratePage =
     pathname === "/migrate" ||
     (typeof window !== "undefined" &&
@@ -77,6 +82,9 @@ export function TokenBanner() {
 
   return (
     <Box position="sticky" top={0} zIndex={100}>
+      <React.Suspense fallback={null}>
+        <BuyWCHANAutoOpen onOpen={onOpen} />
+      </React.Suspense>
       <HStack
         bg="bauhaus.yellow"
         py={2}
