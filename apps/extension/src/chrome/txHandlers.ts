@@ -3,17 +3,20 @@
  * Manages pending transactions, signature requests, and their lifecycle
  */
 
-import {
-  loadDecryptedApiKey,
-  hasEncryptedApiKey,
-} from "./crypto";
+import { loadDecryptedApiKey, hasEncryptedApiKey } from "./crypto";
 import {
   submitTransactionDirect,
   signMessageViaApi,
   TransactionParams,
   BankrApiError,
 } from "./bankrApi";
-import { ALLOWED_CHAIN_IDS, BANKR_SUPPORTED_CHAIN_IDS, CHAIN_NAMES, DEFAULT_NETWORKS, OP_STACK_CHAIN_IDS } from "../constants/networks";
+import {
+  ALLOWED_CHAIN_IDS,
+  BANKR_SUPPORTED_CHAIN_IDS,
+  CHAIN_NAMES,
+  DEFAULT_NETWORKS,
+  OP_STACK_CHAIN_IDS,
+} from "../constants/networks";
 import { CHAIN_CONFIG } from "../constants/chainConfig";
 import type { Account } from "./types";
 import {
@@ -68,7 +71,11 @@ import {
   tryRestoreSession,
 } from "./sessionCache";
 import { handleUnlockWallet } from "./authHandlers";
-import { getSidePanelMode, setSidePanelMode, isSidePanelSupported } from "./sidepanelManager";
+import {
+  getSidePanelMode,
+  setSidePanelMode,
+  isSidePanelSupported,
+} from "./sidepanelManager";
 
 // In-memory map for resolving transaction promises back to content script
 export interface PendingResolver {
@@ -94,7 +101,10 @@ export interface SignatureResult {
   error?: string;
 }
 
-export const pendingSignatureResolvers = new Map<string, PendingSignatureResolver>();
+export const pendingSignatureResolvers = new Map<
+  string,
+  PendingSignatureResolver
+>();
 
 // Active transaction AbortControllers for cancellation
 export const activeAbortControllers = new Map<string, AbortController>();
@@ -126,7 +136,7 @@ export async function handleTransactionRequest(
     favicon?: string | null;
   },
   sendResponse: (response: TransactionResult) => void,
-  senderWindowId?: number
+  senderWindowId?: number,
 ): Promise<void> {
   const { tx, origin, favicon } = message;
 
@@ -135,7 +145,7 @@ export async function handleTransactionRequest(
     sendResponse({
       success: false,
       error: `Chain ${tx.chainId} not supported. Supported chains: ${Array.from(
-        ALLOWED_CHAIN_IDS
+        ALLOWED_CHAIN_IDS,
       )
         .map((id) => CHAIN_NAMES[id] || id)
         .join(", ")}`,
@@ -148,7 +158,8 @@ export async function handleTransactionRequest(
   if (!hasKey) {
     sendResponse({
       success: false,
-      error: "API key not configured. Please configure your Bankr API key in the extension settings.",
+      error:
+        "API key not configured. Please configure your Bankr API key in the extension settings.",
     });
     return;
   }
@@ -173,9 +184,11 @@ export async function handleTransactionRequest(
   pendingResolvers.set(txId, { resolve: sendResponse });
 
   // Notify any open extension views (sidepanel/popup) about the new tx request
-  chrome.runtime.sendMessage({ type: "newPendingTxRequest", txRequest: pendingRequest }).catch(() => {
-    // Ignore errors if no listeners (popup/sidepanel not open)
-  });
+  chrome.runtime
+    .sendMessage({ type: "newPendingTxRequest", txRequest: pendingRequest })
+    .catch(() => {
+      // Ignore errors if no listeners (popup/sidepanel not open)
+    });
 
   // Open the extension popup/sidepanel for user to confirm
   openExtensionPopup(senderWindowId);
@@ -192,7 +205,7 @@ export async function handleSignatureRequest(
     favicon?: string | null;
   },
   sendResponse: (response: SignatureResult) => void,
-  senderWindowId?: number
+  senderWindowId?: number,
 ): Promise<void> {
   const { signature, origin, favicon } = message;
 
@@ -200,7 +213,8 @@ export async function handleSignatureRequest(
 
   // Create pending signature request
   const sigId = crypto.randomUUID();
-  const chainName = CHAIN_NAMES[signature.chainId] || `Chain ${signature.chainId}`;
+  const chainName =
+    CHAIN_NAMES[signature.chainId] || `Chain ${signature.chainId}`;
 
   const pendingRequest: PendingSignatureRequest = {
     id: sigId,
@@ -218,9 +232,14 @@ export async function handleSignatureRequest(
   pendingSignatureResolvers.set(sigId, { resolve: sendResponse });
 
   // Notify any open extension views (sidepanel/popup) about the new signature request
-  chrome.runtime.sendMessage({ type: "newPendingSignatureRequest", sigRequest: pendingRequest }).catch(() => {
-    // Ignore errors if no listeners (popup/sidepanel not open)
-  });
+  chrome.runtime
+    .sendMessage({
+      type: "newPendingSignatureRequest",
+      sigRequest: pendingRequest,
+    })
+    .catch(() => {
+      // Ignore errors if no listeners (popup/sidepanel not open)
+    });
 
   // Open the extension popup/sidepanel for user to view
   openExtensionPopup(senderWindowId);
@@ -231,14 +250,18 @@ export async function handleSignatureRequest(
  * Respects user preference: tries sidePanel.open() first in sidepanel mode,
  * falls back to popup window if sidepanel fails (e.g., Arc browser)
  */
-export async function openExtensionPopup(senderWindowId?: number): Promise<void> {
+export async function openExtensionPopup(
+  senderWindowId?: number,
+): Promise<void> {
   const useSidePanel = await getSidePanelMode();
 
   // If sidepanel mode is enabled, try to open the sidepanel directly
   if (useSidePanel && isSidePanelSupported()) {
     try {
       // Try to ping any open extension views first
-      const response = await chrome.runtime.sendMessage({ type: "ping" }).catch(() => null);
+      const response = await chrome.runtime
+        .sendMessage({ type: "ping" })
+        .catch(() => null);
       if (response === "pong") {
         // An extension view is open and responded, don't open popup
         return;
@@ -249,7 +272,9 @@ export async function openExtensionPopup(senderWindowId?: number): Promise<void>
 
     // Try sidePanel.open() with the sender's window, then verify it actually opened
     try {
-      const windowId = senderWindowId || (await chrome.windows.getLastFocused({ populate: false })).id;
+      const windowId =
+        senderWindowId ||
+        (await chrome.windows.getLastFocused({ populate: false })).id;
       if (windowId) {
         await chrome.sidePanel.open({ windowId });
 
@@ -257,10 +282,14 @@ export async function openExtensionPopup(senderWindowId?: number): Promise<void>
         await new Promise((r) => setTimeout(r, 600));
         let opened = false;
         if (chrome.runtime.getContexts) {
-          const contexts = await chrome.runtime.getContexts({ contextTypes: [("SIDE_PANEL" as chrome.runtime.ContextType)] });
+          const contexts = await chrome.runtime.getContexts({
+            contextTypes: ["SIDE_PANEL" as chrome.runtime.ContextType],
+          });
           opened = contexts.length > 0;
         } else {
-          const pong = await chrome.runtime.sendMessage({ type: "ping" }).catch(() => null);
+          const pong = await chrome.runtime
+            .sendMessage({ type: "ping" })
+            .catch(() => null);
           opened = pong === "pong";
         }
 
@@ -269,19 +298,24 @@ export async function openExtensionPopup(senderWindowId?: number): Promise<void>
         await setSidePanelMode(false);
       }
     } catch (error) {
-      console.warn("Sidepanel failed to open for tx confirmation, falling back to popup:", error);
+      console.warn(
+        "Sidepanel failed to open for tx confirmation, falling back to popup:",
+        error,
+      );
       await setSidePanelMode(false);
     }
   }
 
   // Popup window fallback (also used when sidepanel is disabled)
-  const existingWindows = await chrome.windows.getAll({ windowTypes: ["popup"] });
+  const existingWindows = await chrome.windows.getAll({
+    windowTypes: ["popup"],
+  });
   const popupUrl = chrome.runtime.getURL("index.html");
 
   for (const win of existingWindows) {
     if (win.id) {
       const tabs = await chrome.tabs.query({ windowId: win.id });
-      if (tabs.some(tab => tab.url?.startsWith(popupUrl))) {
+      if (tabs.some((tab) => tab.url?.startsWith(popupUrl))) {
         // Focus existing popup window
         await chrome.windows.update(win.id, { focused: true });
         return;
@@ -295,7 +329,9 @@ export async function openExtensionPopup(senderWindowId?: number): Promise<void>
   // Method 1: Use sender's window ID (most accurate)
   if (senderWindowId) {
     try {
-      targetWindow = await chrome.windows.get(senderWindowId, { populate: false });
+      targetWindow = await chrome.windows.get(senderWindowId, {
+        populate: false,
+      });
     } catch {
       targetWindow = null;
     }
@@ -316,10 +352,12 @@ export async function openExtensionPopup(senderWindowId?: number): Promise<void>
   let left: number | undefined;
   let top: number | undefined;
 
-  if (targetWindow &&
-      targetWindow.left !== undefined &&
-      targetWindow.width !== undefined &&
-      targetWindow.top !== undefined) {
+  if (
+    targetWindow &&
+    targetWindow.left !== undefined &&
+    targetWindow.width !== undefined &&
+    targetWindow.top !== undefined
+  ) {
     left = targetWindow.left + targetWindow.width - popupWidth - 10;
     top = targetWindow.top + 80;
   }
@@ -347,11 +385,13 @@ export async function openPopupWindow(): Promise<void> {
   const popupUrl = chrome.runtime.getURL("index.html");
 
   // Check if popup window already exists
-  const existingWindows = await chrome.windows.getAll({ windowTypes: ["popup"] });
+  const existingWindows = await chrome.windows.getAll({
+    windowTypes: ["popup"],
+  });
   for (const win of existingWindows) {
     if (win.id) {
       const tabs = await chrome.tabs.query({ windowId: win.id });
-      if (tabs.some(tab => tab.url?.startsWith(popupUrl))) {
+      if (tabs.some((tab) => tab.url?.startsWith(popupUrl))) {
         await chrome.windows.update(win.id, { focused: true });
         return;
       }
@@ -372,10 +412,12 @@ export async function openPopupWindow(): Promise<void> {
   let left: number | undefined;
   let top: number | undefined;
 
-  if (targetWindow &&
-      targetWindow.left !== undefined &&
-      targetWindow.width !== undefined &&
-      targetWindow.top !== undefined) {
+  if (
+    targetWindow &&
+    targetWindow.left !== undefined &&
+    targetWindow.width !== undefined &&
+    targetWindow.top !== undefined
+  ) {
     left = targetWindow.left + targetWindow.width - popupWidth - 10;
     top = targetWindow.top + 80;
   }
@@ -401,7 +443,7 @@ export async function openPopupWindow(): Promise<void> {
  */
 export async function handleConfirmTransaction(
   txId: string,
-  password: string
+  password: string,
 ): Promise<TransactionResult> {
   const pending = await getPendingTxRequestById(txId);
   if (!pending || Date.now() - pending.timestamp > TX_EXPIRY_MS) {
@@ -442,7 +484,11 @@ export async function handleConfirmTransaction(
   activeAbortControllers.set(txId, abortController);
 
   try {
-    const result = await submitTransactionDirect(apiKey, pending.tx, abortController.signal);
+    const result = await submitTransactionDirect(
+      apiKey,
+      pending.tx,
+      abortController.signal,
+    );
 
     if (result.status === "reverted") {
       return { success: false, error: "Transaction reverted" };
@@ -476,7 +522,9 @@ export function handleRejectTransaction(_txId: string): TransactionResult {
 /**
  * Handles cancellation of an in-progress transaction
  */
-export async function handleCancelTransaction(txId: string): Promise<{ success: boolean; error?: string }> {
+export async function handleCancelTransaction(
+  txId: string,
+): Promise<{ success: boolean; error?: string }> {
   const abortController = activeAbortControllers.get(txId);
 
   if (!abortController) {
@@ -495,7 +543,7 @@ export async function handleCancelTransaction(txId: string): Promise<{ success: 
 export async function showNotification(
   notificationId: string,
   title: string,
-  message: string
+  message: string,
 ): Promise<string> {
   return new Promise((resolve) => {
     chrome.notifications.create(
@@ -512,7 +560,7 @@ export async function showNotification(
           console.error("Notification error:", chrome.runtime.lastError);
         }
         resolve(createdId || notificationId);
-      }
+      },
     );
   });
 }
@@ -527,14 +575,18 @@ async function lookupFunctionName(calldata: string): Promise<string | null> {
 
   // Try Sourcify first
   try {
-    const url = new URL("https://api.4byte.sourcify.dev/signature-database/v1/lookup");
+    const url = new URL(
+      "https://api.4byte.sourcify.dev/signature-database/v1/lookup",
+    );
     url.searchParams.append("function", selector);
     const res = await fetch(url);
     const data = await res.json();
     if (data?.ok && data.result?.function?.[selector]?.[0]?.name) {
       return data.result.function[selector][0].name;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   // Fallback to 4byte.directory
   try {
@@ -547,7 +599,9 @@ async function lookupFunctionName(calldata: string): Promise<string | null> {
       const sig = data.results[0].text_signature;
       return sig.split("(")[0];
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   return null;
 }
@@ -577,7 +631,11 @@ export async function getRpcUrl(chainId: number): Promise<string | undefined> {
  * Fetches both eth_getTransactionByHash (for gasLimit) and eth_getTransactionReceipt
  * (for gasUsed, effectiveGasPrice, and L1 fee data on OP Stack).
  */
-async function fetchAndStoreGasData(txId: string, txHash: string, chainId: number): Promise<void> {
+async function fetchAndStoreGasData(
+  txId: string,
+  txHash: string,
+  chainId: number,
+): Promise<void> {
   const rpcUrl = await getRpcUrl(chainId);
   if (!rpcUrl) return;
 
@@ -587,7 +645,9 @@ async function fetchAndStoreGasData(txId: string, txHash: string, chainId: numbe
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-      }).then((r) => r.json()).then((r) => r.result);
+      })
+        .then((r) => r.json())
+        .then((r) => r.result);
 
     const [txData, receipt] = await Promise.all([
       rpcCall("eth_getTransactionByHash", [txHash]),
@@ -597,15 +657,19 @@ async function fetchAndStoreGasData(txId: string, txHash: string, chainId: numbe
 
     const gasData: import("./txHistoryStorage").GasData = {
       gasUsed: BigInt(receipt.gasUsed).toString(),
-      gasLimit: txData?.gas ? BigInt(txData.gas).toString() : BigInt(receipt.gasUsed).toString(),
+      gasLimit: txData?.gas
+        ? BigInt(txData.gas).toString()
+        : BigInt(receipt.gasUsed).toString(),
       effectiveGasPrice: BigInt(receipt.effectiveGasPrice).toString(),
     };
 
     // OP Stack L2s include L1 fee fields in the receipt
     if (OP_STACK_CHAIN_IDS.has(chainId)) {
       if (receipt.l1Fee) gasData.l1Fee = BigInt(receipt.l1Fee).toString();
-      if (receipt.l1GasUsed) gasData.l1GasUsed = BigInt(receipt.l1GasUsed).toString();
-      if (receipt.l1GasPrice) gasData.l1GasPrice = BigInt(receipt.l1GasPrice).toString();
+      if (receipt.l1GasUsed)
+        gasData.l1GasUsed = BigInt(receipt.l1GasUsed).toString();
+      if (receipt.l1GasPrice)
+        gasData.l1GasPrice = BigInt(receipt.l1GasPrice).toString();
     }
 
     await updateTxInHistory(txId, { gasData });
@@ -620,7 +684,7 @@ async function fetchAndStoreGasData(txId: string, txHash: string, chainId: numbe
 export async function handleConfirmTransactionAsync(
   txId: string,
   password: string,
-  functionName?: string
+  functionName?: string,
 ): Promise<{ success: boolean; error?: string }> {
   // Prevent double-execution
   if (processingTxIds.has(txId)) {
@@ -635,7 +699,10 @@ export async function handleConfirmTransactionAsync(
 
   // Validate chain is supported for Bankr API accounts
   if (!BANKR_SUPPORTED_CHAIN_IDS.has(pending.tx.chainId)) {
-    return { success: false, error: `Chain ${CHAIN_NAMES[pending.tx.chainId] || pending.tx.chainId} is not supported for Bankr API accounts` };
+    return {
+      success: false,
+      error: `Chain ${CHAIN_NAMES[pending.tx.chainId] || pending.tx.chainId} is not supported for Bankr API accounts`,
+    };
   }
 
   processingTxIds.add(txId);
@@ -685,7 +752,7 @@ async function processTransactionInBackground(
   txId: string,
   pending: PendingTxRequest,
   apiKey: string,
-  functionName?: string
+  functionName?: string,
 ): Promise<void> {
   // Create AbortController for this transaction
   const abortController = new AbortController();
@@ -713,12 +780,21 @@ async function processTransactionInBackground(
   }
 
   try {
-    const result = await submitTransactionDirect(apiKey, pending.tx, abortController.signal);
+    const result = await submitTransactionDirect(
+      apiKey,
+      pending.tx,
+      abortController.signal,
+    );
     const resolver = pendingResolvers.get(txId);
     const txHash = result.transactionHash;
 
     if (result.status === "reverted") {
-      await handleTransactionFailure(txId, pending, "Transaction reverted", resolver);
+      await handleTransactionFailure(
+        txId,
+        pending,
+        "Transaction reverted",
+        resolver,
+      );
     } else {
       // success or pending — both mean tx was submitted
       await updateTxInHistory(txId, {
@@ -739,13 +815,15 @@ async function processTransactionInBackground(
         : null;
 
       if (explorerUrl) {
-        chrome.storage.local.set({ [`notification-${notificationId}`]: explorerUrl });
+        chrome.storage.local.set({
+          [`notification-${notificationId}`]: explorerUrl,
+        });
       }
 
       await showNotification(
         notificationId,
         "Transaction Confirmed",
-        `Transaction on ${pending.chainName} was successful. Click to view.`
+        `Transaction on ${pending.chainName} was successful. Click to view.`,
       );
 
       if (resolver) {
@@ -779,7 +857,7 @@ async function handleTransactionFailure(
   txId: string,
   pending: PendingTxRequest,
   error: string,
-  resolver?: PendingResolver
+  resolver?: PendingResolver,
 ): Promise<void> {
   const notificationId = `tx-failed-${txId}`;
 
@@ -800,12 +878,14 @@ async function handleTransactionFailure(
   });
 
   // Store notification ID for click handler
-  chrome.storage.local.set({ [`notification-${notificationId}`]: { type: "error", txId: notificationId } });
+  chrome.storage.local.set({
+    [`notification-${notificationId}`]: { type: "error", txId: notificationId },
+  });
 
   await showNotification(
     notificationId,
     "Transaction Failed",
-    error.length > 100 ? error.substring(0, 100) + "..." : error
+    error.length > 100 ? error.substring(0, 100) + "..." : error,
   );
 
   if (resolver) {
@@ -829,7 +909,7 @@ async function processLocalTransactionInBackground(
   account: Account,
   privateKey: `0x${string}`,
   functionName?: string,
-  gasOverrides?: GasOverrides
+  gasOverrides?: GasOverrides,
 ): Promise<void> {
   // Create AbortController for this transaction
   const abortController = new AbortController();
@@ -882,7 +962,11 @@ async function processLocalTransactionInBackground(
       : pending.tx;
 
     // Sign and broadcast the transaction
-    const result = await signAndBroadcastTransaction(privateKey, txForSigning, rpcUrl);
+    const result = await signAndBroadcastTransaction(
+      privateKey,
+      txForSigning,
+      rpcUrl,
+    );
     const txHash = result.txHash;
 
     // Send result back to content script
@@ -908,13 +992,15 @@ async function processLocalTransactionInBackground(
       : null;
 
     if (explorerUrl) {
-      chrome.storage.local.set({ [`notification-${notificationId}`]: explorerUrl });
+      chrome.storage.local.set({
+        [`notification-${notificationId}`]: explorerUrl,
+      });
     }
 
     await showNotification(
       notificationId,
       "Transaction Confirmed",
-      `Transaction on ${pending.chainName} was successful. Click to view.`
+      `Transaction on ${pending.chainName} was successful. Click to view.`,
     );
 
     if (resolver) {
@@ -922,7 +1008,8 @@ async function processLocalTransactionInBackground(
     }
   } catch (error) {
     const resolver = pendingResolvers.get(txId);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
 
     await handleTransactionFailure(txId, pending, errorMessage, resolver);
   } finally {
@@ -940,7 +1027,7 @@ export async function handleConfirmTransactionAsyncPK(
   password: string,
   tabId?: number,
   functionName?: string,
-  gasOverrides?: GasOverrides
+  gasOverrides?: GasOverrides,
 ): Promise<{ success: boolean; error?: string }> {
   // Prevent double-execution
   if (processingTxIds.has(txId)) {
@@ -1027,7 +1114,14 @@ export async function handleConfirmTransactionAsyncPK(
   await removePendingTxRequest(txId);
 
   // Start background processing (cleanup of processingTxIds happens in finally block)
-  processLocalTransactionInBackground(txId, pending, account, privateKey, functionName, gasOverrides);
+  processLocalTransactionInBackground(
+    txId,
+    pending,
+    account,
+    privateKey,
+    functionName,
+    gasOverrides,
+  );
 
   return { success: true };
 }
@@ -1038,7 +1132,7 @@ export async function handleConfirmTransactionAsyncPK(
 export async function handleConfirmSignatureRequest(
   sigId: string,
   password: string,
-  tabId?: number
+  tabId?: number,
 ): Promise<SignatureResult> {
   const pending = await getPendingSignatureRequestById(sigId);
   if (!pending) {
@@ -1052,7 +1146,11 @@ export async function handleConfirmSignatureRequest(
   }
 
   if (account.type !== "privateKey" && account.type !== "seedPhrase") {
-    return { success: false, error: "Signatures are only supported for Private Key and Seed Phrase accounts" };
+    return {
+      success: false,
+      error:
+        "Signatures are only supported for Private Key and Seed Phrase accounts",
+    };
   }
 
   // Try to get private key from cache first
@@ -1115,7 +1213,7 @@ export async function handleConfirmSignatureRequest(
       privateKey,
       pending.signature.method,
       pending.signature.params,
-      pending.signature.chainId
+      pending.signature.chainId,
     );
 
     // Remove from pending storage
@@ -1135,7 +1233,7 @@ export async function handleConfirmSignatureRequest(
  */
 export async function handleConfirmSignatureRequestBankr(
   sigId: string,
-  password: string
+  password: string,
 ): Promise<SignatureResult> {
   const pending = await getPendingSignatureRequestById(sigId);
   if (!pending) {
@@ -1173,7 +1271,7 @@ export async function handleConfirmSignatureRequestBankr(
     const result = await signMessageViaApi(
       apiKey,
       pending.signature.method,
-      pending.signature.params
+      pending.signature.params,
     );
 
     // Remove from pending storage
@@ -1194,7 +1292,7 @@ export async function handleConfirmSignatureRequestBankr(
 export async function handleAddPrivateKeyAccount(
   privateKey: `0x${string}`,
   password: string,
-  displayName?: string
+  displayName?: string,
 ): Promise<{ success: boolean; account?: Account; error?: string }> {
   try {
     // Derive address from private key
@@ -1202,7 +1300,10 @@ export async function handleAddPrivateKeyAccount(
 
     // Check if address already exists
     if (await addressExists(address)) {
-      return { success: false, error: "An account with this address already exists" };
+      return {
+        success: false,
+        error: "An account with this address already exists",
+      };
     }
 
     // Add the account metadata
@@ -1234,7 +1335,7 @@ export async function handleAddPrivateKeyAccount(
  * Removes an account (and its private key if PK account)
  */
 export async function handleRemoveAccount(
-  accountId: string
+  accountId: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const account = await getAccountById(accountId);
@@ -1265,7 +1366,10 @@ export async function handleRemoveAccount(
       const seedGroupId = (account as any).seedGroupId;
       const allAccounts = await getAccounts();
       const remaining = allAccounts.filter(
-        (a) => a.type === "seedPhrase" && (a as any).seedGroupId === seedGroupId && a.id !== accountId
+        (a) =>
+          a.type === "seedPhrase" &&
+          (a as any).seedGroupId === seedGroupId &&
+          a.id !== accountId,
       );
       if (remaining.length === 0) {
         // Last account in this group - remove mnemonic and group
@@ -1286,7 +1390,8 @@ export async function handleRemoveAccount(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to remove account",
+      error:
+        error instanceof Error ? error.message : "Failed to remove account",
     };
   }
 }
@@ -1337,12 +1442,10 @@ export function performSecurityReset(): void {
  * Handles transfer initiated from within the extension UI (not from a dapp).
  * Creates a PendingTxRequest and notifies the UI to show TransactionConfirmation.
  */
-export async function handleInitiateTransfer(
-  message: {
-    tx: TransactionParams;
-    chainName: string;
-  }
-): Promise<{ success: boolean; txId?: string; error?: string }> {
+export async function handleInitiateTransfer(message: {
+  tx: TransactionParams;
+  chainName: string;
+}): Promise<{ success: boolean; txId?: string; error?: string }> {
   const { tx, chainName } = message;
 
   // Validate chain ID
@@ -1358,7 +1461,7 @@ export async function handleInitiateTransfer(
   const pendingRequest: PendingTxRequest = {
     id: txId,
     tx,
-    origin: "BankrWallet",
+    origin: "WalletChan",
     favicon: null,
     chainName,
     timestamp: Date.now(),
@@ -1367,7 +1470,9 @@ export async function handleInitiateTransfer(
   await savePendingTxRequest(pendingRequest);
 
   // Notify extension UI about the new pending tx
-  chrome.runtime.sendMessage({ type: "newPendingTxRequest", txRequest: pendingRequest }).catch(() => {});
+  chrome.runtime
+    .sendMessage({ type: "newPendingTxRequest", txRequest: pendingRequest })
+    .catch(() => {});
 
   return { success: true, txId };
 }
@@ -1376,7 +1481,7 @@ export async function handleInitiateTransfer(
  * Cancels a processing transaction by aborting the in-flight request.
  */
 export async function handleCancelProcessingTx(
-  txId: string
+  txId: string,
 ): Promise<{ success: boolean; error?: string }> {
   const controller = activeAbortControllers.get(txId);
   if (controller) {
