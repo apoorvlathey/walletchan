@@ -17,11 +17,11 @@ The admin dashboard reads **pending** (unclaimed) fees on-chain. This indexer tr
 
 ### Event Filtering
 
-**ClankerFeeLocker** emits `ClaimTokens` for all fee owners and all tokens. The handler filters in code:
+**ClankerFeeLocker** is a shared contract — all clanker deployers claim fees through it. To avoid fetching thousands of irrelevant events, the `ponder.config.ts` uses RPC-level topic filtering via `filter.args` on the indexed `feeOwner` and `token` parameters:
 - `feeOwner` must match `0x74992be74bc3c3A72E97dF34A2C3A62c15f55970`
 - `token` must be WETH (`0x4200000000000000000000000000000000000006`) or BNKRW (`0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07`)
 
-All other `ClaimTokens` events are skipped.
+The handler also has a redundant JS-level filter as a safety net.
 
 **WCHANDevFeeHook** `WethClaimed` events are all indexed (no filtering needed).
 
@@ -83,8 +83,8 @@ Indexes: `dev`, `timestamp`
 
 ### `ClankerFeeLocker:ClaimTokens`
 
-1. Check `feeOwner` matches our address — skip if not
-2. Check `token` is WETH or BNKRW — skip if not
+1. RPC-level filter in `ponder.config.ts` ensures only events with our `feeOwner` and WETH/BNKRW `token` are fetched
+2. Handler has redundant JS-level check (safety net) — skip if not matching
 3. Insert into `clanker_claim` with `onConflictDoNothing` for idempotency
 
 ### `WCHANDevFeeHook:WethClaimed`
