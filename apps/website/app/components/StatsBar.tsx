@@ -110,7 +110,7 @@ export function StatsBar() {
           />
 
           <StatItem
-            value="1000+"
+            value="4000+"
             label="Token Holders"
             shape="square"
             color="blue"

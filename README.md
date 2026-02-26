@@ -1,26 +1,26 @@
-# BankrWallet
+# WalletChan
 
 <p align="center">
-  <img src="./.github/bankr-wallet-heading.png" alt="BankrWallet" />
+  <img src="./.github/walletchan-header.png" alt="WalletChan" />
 </p>
 
 <p align="center">
-  <b>Pull your BankrWallet out of the Terminal and into your browser to use with Any Dapp, just like Metamask!</b>
+  <b>The Wallet for AI Era. Use your Bankr Address across all the dapps, just like Metamask!</b>
 </p>
 
 <p align="center">
-  <a href="https://bankrwallet.app/">https://bankrwallet.app/</a>
+  <a href="https://walletchan.com/">https://walletchan.com/</a>
 </p>
 
 <table>
   <tr>
-    <td><img src="./.github/usage/password-page.png" alt="Password Page" /></td>
-    <td><img src="./.github/usage/homepage-new.png" alt="Homepage" /></td>
-    <td><img src="./.github/usage/settings.png" alt="Settings Page" /></td>
+    <td><img src="./apps/website/public/screenshots/password-page.png" alt="Password Page" /></td>
+    <td><img src="./apps/website/public/screenshots/homepage-new.png" alt="Homepage" /></td>
+    <td><img src="./apps/website/public/screenshots/settings.png" alt="Settings Page" /></td>
   </tr>
 </table>
 
-<img src="./.github/usage/tx-request.png" alt="Transaction Request" />
+<img src="./apps/website/public/screenshots/tx-request.png" alt="Transaction Request" />
 
 ## Features
 
@@ -38,7 +38,7 @@
 ### Download
 
 1. Go to the [latest release](https://github.com/apoorvlathey/walletchan/releases/latest) on GitHub
-2. Download the `bankr-wallet-vX.Y.Z.zip` file from the release assets (e.g., `bankr-wallet-v0.1.0.zip`)
+2. Download the `walletchan-vX.Y.Z.zip` file from the release assets (e.g., `walletchan-v1.4.0.zip`)
 3. Extract the zip file to a folder on your computer
 
 ### Chrome / Brave / Arc
@@ -53,7 +53,7 @@
 ## Getting Started
 
 1. Install the extension
-2. Click the Bankr Wallet icon to open the onboarding wizard
+2. Click the WalletChan icon to open the onboarding wizard
 3. Enter your Bankr API key (get one from [bankr.bot](https://bankr.bot/api))
 4. Enter your wallet address corresponding to the API key (supports ENS)
 5. Create a password to secure your API key
