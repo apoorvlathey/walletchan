@@ -13,7 +13,7 @@ export const WCHAN_L1_ETH_MAINNET =
 
 // App URLs
 export const CHROME_STORE_URL =
-  "https://chromewebstore.google.com/detail/bankrwallet/kofbkhbkfhiollbhjkbebajngppmpbgc";
+  "https://chromewebstore.google.com/detail/walletchan/kofbkhbkfhiollbhjkbebajngppmpbgc";
 export const GITHUB_URL = "https://github.com/apoorvlathey/walletchan";
 export const GITHUB_RELEASES_URL =
   "https://github.com/apoorvlathey/walletchan/releases/latest";
