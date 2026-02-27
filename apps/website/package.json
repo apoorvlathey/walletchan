@@ -10,6 +10,7 @@
     "fetch-dapps": "tsx scripts/fetchSafeDapps.ts"
   },
   "dependencies": {
+    "@walletchan/contract-addresses": "workspace:*",
     "@walletchan/shared": "workspace:*",
     "@walletchan/wchan-swap": "workspace:*",
     "@chakra-ui/next-js": "^2.4.2",

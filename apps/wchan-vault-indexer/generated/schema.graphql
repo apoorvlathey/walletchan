@@ -1,0 +1,167 @@
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON
+
+scalar BigInt
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+type ViewPageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+}
+
+type Meta {
+  status: JSON
+}
+
+type Query {
+  vaultSnapshot(id: String!): vaultSnapshot
+  vaultSnapshots(where: vaultSnapshotFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): vaultSnapshotPage!
+  _meta: Meta
+}
+
+type vaultSnapshot {
+  id: String!
+  eventType: String!
+  sender: String!
+  totalAssets: BigInt!
+  totalShares: BigInt!
+  wchanAmount: BigInt
+  wethAmount: BigInt
+  penaltyAmount: BigInt
+  burnedAmount: BigInt
+  retainedAmount: BigInt
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: String!
+}
+
+type vaultSnapshotPage {
+  items: [vaultSnapshot!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input vaultSnapshotFilter {
+  AND: [vaultSnapshotFilter]
+  OR: [vaultSnapshotFilter]
+  id: String
+  id_not: String
+  id_in: [String]
+  id_not_in: [String]
+  id_contains: String
+  id_not_contains: String
+  id_starts_with: String
+  id_ends_with: String
+  id_not_starts_with: String
+  id_not_ends_with: String
+  eventType: String
+  eventType_not: String
+  eventType_in: [String]
+  eventType_not_in: [String]
+  eventType_contains: String
+  eventType_not_contains: String
+  eventType_starts_with: String
+  eventType_ends_with: String
+  eventType_not_starts_with: String
+  eventType_not_ends_with: String
+  sender: String
+  sender_not: String
+  sender_in: [String]
+  sender_not_in: [String]
+  sender_contains: String
+  sender_not_contains: String
+  sender_starts_with: String
+  sender_ends_with: String
+  sender_not_starts_with: String
+  sender_not_ends_with: String
+  totalAssets: BigInt
+  totalAssets_not: BigInt
+  totalAssets_in: [BigInt]
+  totalAssets_not_in: [BigInt]
+  totalAssets_gt: BigInt
+  totalAssets_lt: BigInt
+  totalAssets_gte: BigInt
+  totalAssets_lte: BigInt
+  totalShares: BigInt
+  totalShares_not: BigInt
+  totalShares_in: [BigInt]
+  totalShares_not_in: [BigInt]
+  totalShares_gt: BigInt
+  totalShares_lt: BigInt
+  totalShares_gte: BigInt
+  totalShares_lte: BigInt
+  wchanAmount: BigInt
+  wchanAmount_not: BigInt
+  wchanAmount_in: [BigInt]
+  wchanAmount_not_in: [BigInt]
+  wchanAmount_gt: BigInt
+  wchanAmount_lt: BigInt
+  wchanAmount_gte: BigInt
+  wchanAmount_lte: BigInt
+  wethAmount: BigInt
+  wethAmount_not: BigInt
+  wethAmount_in: [BigInt]
+  wethAmount_not_in: [BigInt]
+  wethAmount_gt: BigInt
+  wethAmount_lt: BigInt
+  wethAmount_gte: BigInt
+  wethAmount_lte: BigInt
+  penaltyAmount: BigInt
+  penaltyAmount_not: BigInt
+  penaltyAmount_in: [BigInt]
+  penaltyAmount_not_in: [BigInt]
+  penaltyAmount_gt: BigInt
+  penaltyAmount_lt: BigInt
+  penaltyAmount_gte: BigInt
+  penaltyAmount_lte: BigInt
+  burnedAmount: BigInt
+  burnedAmount_not: BigInt
+  burnedAmount_in: [BigInt]
+  burnedAmount_not_in: [BigInt]
+  burnedAmount_gt: BigInt
+  burnedAmount_lt: BigInt
+  burnedAmount_gte: BigInt
+  burnedAmount_lte: BigInt
+  retainedAmount: BigInt
+  retainedAmount_not: BigInt
+  retainedAmount_in: [BigInt]
+  retainedAmount_not_in: [BigInt]
+  retainedAmount_gt: BigInt
+  retainedAmount_lt: BigInt
+  retainedAmount_gte: BigInt
+  retainedAmount_lte: BigInt
+  blockNumber: BigInt
+  blockNumber_not: BigInt
+  blockNumber_in: [BigInt]
+  blockNumber_not_in: [BigInt]
+  blockNumber_gt: BigInt
+  blockNumber_lt: BigInt
+  blockNumber_gte: BigInt
+  blockNumber_lte: BigInt
+  timestamp: BigInt
+  timestamp_not: BigInt
+  timestamp_in: [BigInt]
+  timestamp_not_in: [BigInt]
+  timestamp_gt: BigInt
+  timestamp_lt: BigInt
+  timestamp_gte: BigInt
+  timestamp_lte: BigInt
+  transactionHash: String
+  transactionHash_not: String
+  transactionHash_in: [String]
+  transactionHash_not_in: [String]
+  transactionHash_contains: String
+  transactionHash_not_contains: String
+  transactionHash_starts_with: String
+  transactionHash_ends_with: String
+  transactionHash_not_starts_with: String
+  transactionHash_not_ends_with: String
+}

@@ -1,5 +1,5 @@
 {
-  "name": "@walletchan/wchan-swap",
+  "name": "@walletchan/contract-addresses",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@walletchan/contract-addresses": "workspace:*",
     "viem": "^2.30.4"
   },
   "devDependencies": {

@@ -18,6 +18,8 @@
     "start:staking-indexer": "pnpm --filter @walletchan/staking-indexer start",
     "dev:fee-indexer": "pnpm --filter @walletchan/fee-indexer dev",
     "start:fee-indexer": "pnpm --filter @walletchan/fee-indexer start",
+    "dev:wchan-vault-indexer": "pnpm --filter @walletchan/wchan-vault-indexer dev",
+    "start:wchan-vault-indexer": "pnpm --filter @walletchan/wchan-vault-indexer start",
     "dev:tg-bot": "pnpm --filter @walletchan/tg-bot dev",
     "start:tg-bot": "pnpm --filter @walletchan/tg-bot start",
     "build:tg-bot": "pnpm --filter @walletchan/tg-bot build",

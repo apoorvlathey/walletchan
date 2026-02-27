@@ -30,6 +30,7 @@ import { Navigation } from "../components/Navigation";
 import { ADDRESSES } from "@/lib/wchan-swap/addresses";
 import { useTokenData } from "../contexts/TokenDataContext";
 import ClaimHistory from "./ClaimHistory";
+import DripSection from "./drip/DripSection";
 
 const BASE_CHAIN_ID = 8453;
 const HOOK_ADDRESS = ADDRESSES[BASE_CHAIN_ID].hook as `0x${string}`;
@@ -768,6 +769,8 @@ export default function AdminContent() {
               </HStack>
             </Box>
           </Box>
+          {/* WCHAN Drip Configuration */}
+          <DripSection />
           {/* Historical Claims */}
           <ClaimHistory
             ethPrice={ethPrice}

@@ -1,0 +1,25 @@
+{
+  "name": "@walletchan/wchan-vault-indexer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "ponder dev --port 42072",
+    "start": "ponder start --port 42072",
+    "codegen": "ponder codegen",
+    "serve": "ponder serve --port 42072",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@walletchan/contract-addresses": "workspace:*",
+    "hono": "^4.5.0",
+    "ponder": "^0.16",
+    "viem": "^2.21.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
