@@ -286,12 +286,15 @@ contract DripWCHANRewards is Ownable {
     function _computeDripAmount(DripStream storage stream, bool checkInterval) internal view returns (uint256) {
         if (stream.amountRemaining == 0) return 0;
 
-        uint256 elapsed = block.timestamp - stream.lastDripTimestamp;
-        if (checkInterval && elapsed < minDripInterval) return 0;
-
+        // End-of-stream check BEFORE interval check so the final tranche
+        // is always drainable once endTimestamp passes, regardless of when
+        // the last drip occurred.
         if (block.timestamp >= stream.endTimestamp) {
             return stream.amountRemaining;
         }
+
+        uint256 elapsed = block.timestamp - stream.lastDripTimestamp;
+        if (checkInterval && elapsed < minDripInterval) return 0;
 
         uint256 remainingDuration = stream.endTimestamp - stream.lastDripTimestamp;
         return Math.mulDiv(stream.amountRemaining, elapsed, remainingDuration);

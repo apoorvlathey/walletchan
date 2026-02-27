@@ -12,3 +12,6 @@ lcov.info
 
 # Dotenv file
 .env
+
+# Static analysis output
+static_analysis_semgrep_*/
