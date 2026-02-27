@@ -995,18 +995,17 @@ export default function DripSection() {
           />
         </Flex>
 
-        {/* Vault stake/unstake — Sepolia only */}
-        {selectedChainId === 11155111 && (
-          <VaultStake
+        {/* Vault stake/unstake */}
+        <VaultStake
             wchanAddress={wchanAddr}
             vaultAddress={vaultAddr}
             chainId={selectedChainId}
+            chainName={getChainName(selectedChainId)}
             isWalletConnected={isWalletConnected}
             isWrongChain={isWrongChain}
             explorerUrl={explorerUrl}
             onSuccess={refetchAll}
           />
-        )}
 
         {/* Vault indexer stats */}
         <VaultStats

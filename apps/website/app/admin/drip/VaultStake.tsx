@@ -43,6 +43,7 @@ interface VaultStakeProps {
   wchanAddress: `0x${string}`;
   vaultAddress: `0x${string}`;
   chainId: number;
+  chainName: string;
   isWalletConnected: boolean;
   isWrongChain: boolean;
   explorerUrl: string;
@@ -53,6 +54,7 @@ export default function VaultStake({
   wchanAddress,
   vaultAddress,
   chainId,
+  chainName,
   isWalletConnected,
   isWrongChain,
   explorerUrl,
@@ -354,7 +356,7 @@ export default function VaultStake({
             letterSpacing="widest"
             color="gray.500"
           >
-            Vault Stake / Unstake (Sepolia)
+            Vault Stake / Unstake ({chainName})
           </Text>
         </HStack>
         {isWalletConnected && sWchanBalance !== undefined && (sWchanBalance as bigint) > 0n && (
