@@ -258,10 +258,13 @@ contract WCHANVault is ERC4626, ERC20Permit, ERC20Votes {
         uint256 shares = _convertToShares(grossAssets, Math.Rounding.Ceil);
 
         // Safety cap: rounding between maxWithdraw (floor) and _convertToShares (ceil)
-        // can overshoot by 1 share at boundary values. This is safe because the
-        // maxWithdraw check above already validated the owner has enough value.
+        // can overshoot by 1 share at boundary values. When capped, recompute
+        // grossAssets from the actual shares to prevent inflated penalty/burn.
         uint256 ownerBalance = balanceOf(owner);
-        if (shares > ownerBalance) shares = ownerBalance;
+        if (shares > ownerBalance) {
+            shares = ownerBalance;
+            grossAssets = _convertToAssets(shares, Math.Rounding.Floor);
+        }
 
         uint256 penalty = grossAssets - assets;
         _executeWithdraw(receiver, owner, assets, penalty, shares);
