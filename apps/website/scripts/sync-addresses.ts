@@ -66,6 +66,18 @@ const DRIP_KEY_MAP: Record<string, string> = {
 const DRIP_CHAINS = ["11155111", "8453"];
 const DEFAULT_DRIP_CHAIN = "11155111";
 
+// ─── migrate staking zap addresses ───
+
+const MIGRATE_STAKING_ZAP_KEY_MAP: Record<string, string> = {
+  WCHAN_VAULT_MIGRATE_ZAP: "migrateZap",
+  OLD_VAULT: "oldVault",
+  WCHAN_VAULT: "wchanVault",
+  WCHAN: "wchan",
+  OLD_TOKEN: "oldToken",
+};
+
+const MIGRATE_STAKING_ZAP_CHAINS = ["8453"];
+
 // ─── generate ───
 
 function main() {
@@ -74,6 +86,7 @@ function main() {
 
   const swapSection = generateSwapSection(contracts);
   const dripSection = generateDripSection(contracts);
+  const migrateStakingZapSection = generateMigrateStakingZapSection(contracts);
 
   const liveCheck = LIVE_CHAINS.map((c) => `chainId === ${c}`).join(" || ");
 
@@ -128,6 +141,26 @@ ${dripSection}
 
 export const SUPPORTED_DRIP_CHAIN_IDS = Object.keys(DRIP_ADDRESSES).map(Number);
 export const DEFAULT_DRIP_CHAIN_ID = ${DEFAULT_DRIP_CHAIN};
+
+// ─── Migrate Staking Zap Addresses ───
+
+export interface MigrateStakingZapChainAddresses {
+  migrateZap: Address;
+  oldVault: Address;
+  wchanVault: Address;
+  wchan: Address;
+  oldToken: Address;
+}
+
+export const MIGRATE_STAKING_ZAP_ADDRESSES: Record<number, MigrateStakingZapChainAddresses> = {
+${migrateStakingZapSection}
+};
+
+export function getMigrateStakingZapAddresses(chainId: number): MigrateStakingZapChainAddresses {
+  const addrs = MIGRATE_STAKING_ZAP_ADDRESSES[chainId];
+  if (!addrs) throw new Error(\`Unsupported migrate staking zap chain: \${chainId}\`);
+  return addrs;
+}
 `;
 
   writeFileSync(OUTPUT, output);
@@ -173,6 +206,33 @@ function generateDripSection(
 
     const fields: Record<string, string> = {};
     for (const [jsonKey, tsField] of Object.entries(DRIP_KEY_MAP)) {
+      const val = src[jsonKey];
+      fields[tsField] = typeof val === "string" ? val : ZERO;
+    }
+
+    const comment = CHAIN_COMMENTS[chainId]
+      ? `  // ${CHAIN_COMMENTS[chainId]}\n`
+      : "";
+    const fieldLines = Object.entries(fields)
+      .map(([k, v]) => `    ${k}: "${v}",`)
+      .join("\n");
+
+    chainEntries.push(`${comment}  ${chainId}: {\n${fieldLines}\n  },`);
+  }
+
+  return chainEntries.join("\n");
+}
+
+function generateMigrateStakingZapSection(
+  contracts: Record<string, Record<string, unknown>>,
+): string {
+  const chainEntries: string[] = [];
+
+  for (const chainId of MIGRATE_STAKING_ZAP_CHAINS) {
+    const src = contracts[chainId] ?? {};
+
+    const fields: Record<string, string> = {};
+    for (const [jsonKey, tsField] of Object.entries(MIGRATE_STAKING_ZAP_KEY_MAP)) {
       const val = src[jsonKey];
       fields[tsField] = typeof val === "string" ? val : ZERO;
     }

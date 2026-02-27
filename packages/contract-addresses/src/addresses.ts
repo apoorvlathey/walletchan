@@ -86,4 +86,31 @@ export const DRIP_ADDRESSES: Record<number, DripChainAddresses> = {
 };
 
 export const SUPPORTED_DRIP_CHAIN_IDS = Object.keys(DRIP_ADDRESSES).map(Number);
-export const DEFAULT_DRIP_CHAIN_ID = 8453;
+export const DEFAULT_DRIP_CHAIN_ID = 11155111;
+
+// ─── Migrate Staking Zap Addresses ───
+
+export interface MigrateStakingZapChainAddresses {
+  migrateZap: Address;
+  oldVault: Address;
+  wchanVault: Address;
+  wchan: Address;
+  oldToken: Address;
+}
+
+export const MIGRATE_STAKING_ZAP_ADDRESSES: Record<number, MigrateStakingZapChainAddresses> = {
+  // Base mainnet
+  8453: {
+    migrateZap: "0x6b623E7EaE9F2717aBB042bF29EEFeabeA8237Fe",
+    oldVault: "0x7ac242481d5122c4d3400492aF6ADfBce21D7113",
+    wchanVault: "0x3F5ac2c27BBf08522Bc1F5C92237E137356A8AC8",
+    wchan: "0xBa5ED0000e1CA9136a695f0a848012A16008B032",
+    oldToken: "0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07",
+  },
+};
+
+export function getMigrateStakingZapAddresses(chainId: number): MigrateStakingZapChainAddresses {
+  const addrs = MIGRATE_STAKING_ZAP_ADDRESSES[chainId];
+  if (!addrs) throw new Error(`Unsupported migrate staking zap chain: ${chainId}`);
+  return addrs;
+}
