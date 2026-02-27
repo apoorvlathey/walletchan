@@ -8,5 +8,7 @@ broadcast/
 # Docs
 docs/
 
+lcov.info
+
 # Dotenv file
 .env
