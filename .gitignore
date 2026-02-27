@@ -13,6 +13,7 @@ node_modules
 .eslintcache
 .cache
 .turbo
+.ponder
 
 # testing
 /coverage
