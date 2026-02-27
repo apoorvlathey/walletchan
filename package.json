@@ -26,6 +26,8 @@
     "dev:arb-bot": "pnpm --filter @walletchan/arb-bot dev",
     "start:arb-bot": "pnpm --filter @walletchan/arb-bot start",
     "build:arb-bot": "pnpm --filter @walletchan/arb-bot build",
+    "dev:drip-bot": "pnpm --filter @walletchan/drip-bot dev",
+    "start:drip-bot": "pnpm --filter @walletchan/drip-bot start",
     "icons": "pnpm --filter @walletchan/extension icons",
     "release:patch": "pnpm --filter @walletchan/extension release:patch",
     "release:minor": "pnpm --filter @walletchan/extension release:minor",

@@ -274,6 +274,10 @@ See `_docs/IMPLEMENTATION.md` → "Handlers with Session Restoration" for the fu
 
 ## Development Practices
 
+### Environment Variables
+
+**When adding or using new environment variables in any app**, always update (or create) the `.env.example` file in that app's directory. This ensures developers know what env vars are needed.
+
 ### Storage/Encryption Changes
 
 **CRITICAL**: Chrome extensions auto-update silently — users on ANY previous version will receive new code. Before adding, removing, renaming, or changing the shape of ANY `chrome.storage` key, you **MUST**:
