@@ -86,4 +86,4 @@ export const DRIP_ADDRESSES: Record<number, DripChainAddresses> = {
 };
 
 export const SUPPORTED_DRIP_CHAIN_IDS = Object.keys(DRIP_ADDRESSES).map(Number);
-export const DEFAULT_DRIP_CHAIN_ID = 11155111;
+export const DEFAULT_DRIP_CHAIN_ID = 8453;
