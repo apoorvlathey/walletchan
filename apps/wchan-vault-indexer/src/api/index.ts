@@ -196,7 +196,7 @@ app.get("/snapshots", async (c) => {
   const type = c.req.query("type");
 
   let query;
-  if (type && ["donate", "donate_reward", "penalty"].includes(type)) {
+  if (type && ["deposit", "withdraw", "donate", "donate_reward", "penalty"].includes(type)) {
     query = db
       .select()
       .from(schema.vaultSnapshot)
