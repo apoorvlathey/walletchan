@@ -12,9 +12,10 @@ import {
   IconButton,
   Button,
   Image,
+  Link,
   useToast,
 } from "@chakra-ui/react";
-import { RefreshCw, AlertTriangle } from "lucide-react";
+import { RefreshCw, AlertTriangle, ExternalLink as ExternalLinkIcon } from "lucide-react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import {
   useAccount,
@@ -773,6 +774,31 @@ export default function AdminContent() {
             bnkrwPrice={bnkrwPrice}
             refreshKey={historyRefreshKey}
           />
+          {/* Internal Pages */}
+          <HStack justify="center" pt={4} spacing={4} flexWrap="wrap" opacity={0.6}>
+            {[
+              { href: "/swap", label: "Swap" },
+              { href: "/swap-wchan", label: "Swap WCHAN" },
+              { href: "/verify", label: "Verify" },
+              { href: "/apps", label: "Apps" },
+              { href: "/migrate", label: "Migrate" },
+              { href: "/mainnet", label: "Bridge to Mainnet" },
+              { href: "/l1-base-deploy", label: "L1 Base Token Deploy" },
+            ].map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                fontSize="xs"
+                fontWeight="700"
+                textTransform="uppercase"
+                letterSpacing="wider"
+                color="gray.500"
+                _hover={{ color: "bauhaus.blue" }}
+              >
+                {label}
+              </Link>
+            ))}
+          </HStack>
         </VStack>
       </Container>
     </Box>
