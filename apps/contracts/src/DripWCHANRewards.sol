@@ -56,7 +56,7 @@ contract DripWCHANRewards is Ownable {
     IERC20 public immutable weth;
 
     /// @notice Minimum time between permissionless `drip()` calls (per stream).
-    uint256 public constant MIN_DRIP_INTERVAL = 1 hours;
+    uint256 public minDripInterval;
 
     // ── State ──
 
@@ -73,6 +73,8 @@ contract DripWCHANRewards is Ownable {
     event Dripped(bool indexed isWeth, uint256 amount);
     /// @notice Emitted when the owner recovers tokens from this contract.
     event TokensRecovered(address indexed token, address indexed to, uint256 amount);
+    /// @notice Emitted when the owner updates the minimum drip interval.
+    event MinDripIntervalUpdated(uint256 newInterval);
 
     // ── Errors ──
 
@@ -89,6 +91,7 @@ contract DripWCHANRewards is Ownable {
         vault = vault_;
         wchan = wchan_;
         weth = weth_;
+        minDripInterval = 1 hours;
 
         // Max approve vault for both tokens (vault pulls via safeTransferFrom)
         wchan_.approve(address(vault_), type(uint256).max);
@@ -124,7 +127,8 @@ contract DripWCHANRewards is Ownable {
         token.safeTransferFrom(msg.sender, address(this), amount);
 
         // If stream is fresh (fully drained after settlement), reset timestamps
-        if (stream.amountRemaining == 0) {
+        bool isFresh = stream.amountRemaining == 0;
+        if (isFresh) {
             stream.startTimestamp = block.timestamp;
             stream.lastDripTimestamp = block.timestamp;
         }
@@ -137,6 +141,32 @@ contract DripWCHANRewards is Ownable {
         }
 
         emit DripConfigured(isWeth, amount, stream.endTimestamp);
+
+        // Execute the first drip immediately so rewards go live in this tx.
+        // Drip one interval's worth (or everything if duration < interval).
+        if (isFresh) {
+            uint256 totalDuration = stream.endTimestamp - block.timestamp;
+            uint256 firstDrip = totalDuration <= minDripInterval
+                ? stream.amountRemaining
+                : Math.mulDiv(stream.amountRemaining, minDripInterval, totalDuration);
+            if (firstDrip > 0) {
+                stream.amountRemaining -= firstDrip;
+                // Don't update lastDripTimestamp — it stays at block.timestamp
+                // so the next drip() call works after minDripInterval
+                if (isWeth) {
+                    if (vault.totalSupply() > 0) {
+                        vault.donateReward(firstDrip);
+                        emit Dripped(true, firstDrip);
+                    } else {
+                        // No stakers — put tokens back, they'll drip later
+                        stream.amountRemaining += firstDrip;
+                    }
+                } else {
+                    vault.donate(firstDrip);
+                    emit Dripped(false, firstDrip);
+                }
+            }
+        }
     }
 
     /**
@@ -161,13 +191,22 @@ contract DripWCHANRewards is Ownable {
         emit TokensRecovered(token, owner(), amount);
     }
 
+    /**
+     * @notice Update the minimum interval between permissionless `drip()` calls.
+     * @param newInterval New interval in seconds (0 = no minimum).
+     */
+    function setMinDripInterval(uint256 newInterval) external onlyOwner {
+        minDripInterval = newInterval;
+        emit MinDripIntervalUpdated(newInterval);
+    }
+
     // ═══════════════════════════════════════════════
     //            Permissionless Drip
     // ═══════════════════════════════════════════════
 
     /**
      * @notice Execute a drip for both streams. Permissionless — anyone can call.
-     * @dev    For each stream, requires MIN_DRIP_INTERVAL since the last drip.
+     * @dev    For each stream, requires minDripInterval since the last drip.
      *         WCHAN is always sent via `vault.donate()`.
      *         WETH is sent via `vault.donateReward()` only if `vault.totalSupply() > 0`.
      *         When no stakers exist, WETH is skipped WITHOUT updating lastDripTimestamp,
@@ -180,24 +219,31 @@ contract DripWCHANRewards is Ownable {
 
         if (wchanAmount == 0 && wethAmount == 0) revert NothingToDrip();
 
+        // ── Effects (update state before external calls — CEI pattern) ──
+
         if (wchanAmount > 0) {
             wchanStream.amountRemaining -= wchanAmount;
             wchanStream.lastDripTimestamp = block.timestamp;
+        }
+
+        // Skip WETH drip if no stakers — don't update lastDripTimestamp
+        // so elapsed keeps growing for self-correction.
+        // totalSupply() is a view/staticcall, safe to call in effects phase.
+        bool dripWeth = wethAmount > 0 && vault.totalSupply() > 0;
+        if (dripWeth) {
+            wethStream.amountRemaining -= wethAmount;
+            wethStream.lastDripTimestamp = block.timestamp;
+        }
+
+        // ── Interactions (external calls after all state is finalized) ──
+
+        if (wchanAmount > 0) {
             vault.donate(wchanAmount);
             emit Dripped(false, wchanAmount);
         }
-
-        if (wethAmount > 0) {
-            // Skip WETH drip if no stakers — don't update lastDripTimestamp
-            // so elapsed keeps growing for self-correction
-            if (vault.totalSupply() == 0) {
-                // do nothing — amount stays, timestamp not updated
-            } else {
-                wethStream.amountRemaining -= wethAmount;
-                wethStream.lastDripTimestamp = block.timestamp;
-                vault.donateReward(wethAmount);
-                emit Dripped(true, wethAmount);
-            }
+        if (dripWeth) {
+            vault.donateReward(wethAmount);
+            emit Dripped(true, wethAmount);
         }
     }
 
@@ -241,7 +287,7 @@ contract DripWCHANRewards is Ownable {
         if (stream.amountRemaining == 0) return 0;
 
         uint256 elapsed = block.timestamp - stream.lastDripTimestamp;
-        if (checkInterval && elapsed < MIN_DRIP_INTERVAL) return 0;
+        if (checkInterval && elapsed < minDripInterval) return 0;
 
         if (block.timestamp >= stream.endTimestamp) {
             return stream.amountRemaining;
