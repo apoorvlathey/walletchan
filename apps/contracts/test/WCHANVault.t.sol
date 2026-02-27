@@ -2970,3 +2970,664 @@ contract WCHANVaultDelegateBySigTest is WCHANVaultBaseTest {
         vault.delegateBySig(bob, 999, expiry, v, r, s);
     }
 }
+
+// ═══════════════════════════════════════════════════════
+//     Shares-Cap Regression & Donate+Withdraw Solvency
+// ═══════════════════════════════════════════════════════
+
+contract WCHANVaultSharesCapRegression is WCHANVaultBaseTest {
+    /// @dev Item 1: Targeted regression for the shares-cap fix in withdraw().
+    ///      Construct non-1:1 rate (via donation) + active penalty where
+    ///      _convertToShares(grossFromNet(maxW), Ceil) > balanceOf(owner).
+    ///      Assert total outflow ≤ gross backing of burned shares.
+    function test_sharesCap_nonOneToOneRate_withPenalty() public {
+        // Alice deposits 100 WCHAN
+        vm.prank(alice);
+        vault.deposit(100 ether, alice);
+
+        // Donation skews the rate to ~2:1 (each share worth ~2 WCHAN)
+        vm.prank(donor);
+        vault.donate(100 ether);
+
+        // Verify non-1:1 rate
+        uint256 aliceShares = vault.balanceOf(alice);
+        uint256 grossBacking = vault.convertToAssets(aliceShares);
+        assertGt(grossBacking, aliceShares); // Rate > 1:1
+
+        // Alice still has active penalty (no time warp)
+        assertGt(vault.getPenaltyBps(alice), 0);
+
+        // Track balances before withdraw
+        uint256 burnBefore = wchan.balanceOf(BURN_ADDRESS);
+        uint256 vaultBefore = wchan.balanceOf(address(vault));
+
+        // Withdraw maxWithdraw — this exercises the shares cap path
+        uint256 maxW = vault.maxWithdraw(alice);
+        vm.prank(alice);
+        uint256 sharesBurned = vault.withdraw(maxW, alice, alice);
+
+        // Total outflow = net + burned penalty
+        uint256 vaultDelta = vaultBefore - wchan.balanceOf(address(vault));
+
+        // Outflow must not exceed gross backing of burned shares
+        // Vault lost (net + burnedPenalty), rest is retained
+        assertLe(maxW + (wchan.balanceOf(BURN_ADDRESS) - burnBefore), vaultDelta + 1); // +1 for rounding
+
+        // Solvency: vault WCHAN balance >= totalAssets
+        assertGe(wchan.balanceOf(address(vault)), vault.totalAssets());
+
+        // Alice has 0 shares left
+        assertEq(vault.balanceOf(alice), 0);
+    }
+
+    /// @dev Item 1 fuzz version: vary deposit, donation, and elapsed time.
+    function test_fuzz_sharesCap_regression(
+        uint256 depositAmount,
+        uint256 donateAmount,
+        uint256 elapsed
+    ) public {
+        depositAmount = bound(depositAmount, 1 ether, INITIAL / 2);
+        donateAmount = bound(donateAmount, 1 ether, INITIAL / 2);
+        elapsed = bound(elapsed, 0, 7 days - 1); // keep some penalty active
+
+        vm.prank(alice);
+        vault.deposit(depositAmount, alice);
+
+        // Donate to skew rate
+        vm.prank(donor);
+        vault.donate(donateAmount);
+
+        vm.warp(block.timestamp + elapsed);
+
+        uint256 maxW = vault.maxWithdraw(alice);
+        if (maxW == 0) return;
+
+        vm.prank(alice);
+        vault.withdraw(maxW, alice, alice);
+
+        // Solvency: vault WCHAN balance >= totalAssets
+        assertGe(wchan.balanceOf(address(vault)), vault.totalAssets());
+    }
+
+    /// @dev Item 5: Withdraw after donate — non-1:1 rate + penalty solvency.
+    ///      Fuzz deposit + donate + elapsed, withdraw maxWithdraw, assert solvency.
+    function test_fuzz_withdrawAfterDonate_solvency(
+        uint256 depositAmount,
+        uint256 donateAmount,
+        uint256 elapsed
+    ) public {
+        depositAmount = bound(depositAmount, 1 ether, INITIAL / 2);
+        donateAmount = bound(donateAmount, 1 ether, INITIAL / 2);
+        elapsed = bound(elapsed, 0, 14 days);
+
+        vm.prank(alice);
+        vault.deposit(depositAmount, alice);
+
+        vm.prank(donor);
+        vault.donate(donateAmount);
+
+        vm.warp(block.timestamp + elapsed);
+
+        uint256 maxW = vault.maxWithdraw(alice);
+        if (maxW == 0) return;
+
+        vm.prank(alice);
+        vault.withdraw(maxW, alice, alice);
+
+        // WCHAN solvency: vault balance >= totalAssets
+        assertGe(wchan.balanceOf(address(vault)), vault.totalAssets());
+
+        // Share price check: if any shares remain (dead shares), price should be >= 1
+        if (vault.totalSupply() > 0) {
+            assertGe(vault.convertToAssets(1e18), 1e18);
+        }
+    }
+
+    /// @dev Item 5 with two depositors: both withdraw after donate.
+    function test_fuzz_twoDepositors_donateWithdraw_solvency(
+        uint256 aliceDeposit,
+        uint256 bobDeposit,
+        uint256 donateAmount,
+        uint256 elapsed
+    ) public {
+        aliceDeposit = bound(aliceDeposit, 1 ether, INITIAL / 4);
+        bobDeposit = bound(bobDeposit, 1 ether, INITIAL / 4);
+        donateAmount = bound(donateAmount, 1 ether, INITIAL / 4);
+        elapsed = bound(elapsed, 0, 14 days);
+
+        vm.prank(alice);
+        vault.deposit(aliceDeposit, alice);
+        vm.prank(bob);
+        vault.deposit(bobDeposit, bob);
+
+        vm.prank(donor);
+        vault.donate(donateAmount);
+
+        vm.warp(block.timestamp + elapsed);
+
+        // Alice withdraws max
+        uint256 aliceMax = vault.maxWithdraw(alice);
+        if (aliceMax > 0) {
+            vm.prank(alice);
+            vault.withdraw(aliceMax, alice, alice);
+        }
+
+        // Solvency after alice
+        assertGe(wchan.balanceOf(address(vault)), vault.totalAssets());
+
+        // Bob withdraws max
+        uint256 bobMax = vault.maxWithdraw(bob);
+        if (bobMax > 0) {
+            vm.prank(bob);
+            vault.withdraw(bobMax, bob, bob);
+        }
+
+        // Solvency after both
+        assertGe(wchan.balanceOf(address(vault)), vault.totalAssets());
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//         maxWithdraw ↔ previewRedeemNet Consistency
+//             + Withdraw vs Redeem Net Parity
+// ═══════════════════════════════════════════════════════
+
+contract WCHANVaultConsistencyFuzzTest is WCHANVaultBaseTest {
+    /// @dev Item 2: maxWithdraw and previewRedeemNet must always agree.
+    ///      They compute the same value via different paths:
+    ///        maxWithdraw: convertToAssets(balance, Floor) → _applyPenalty (forward)
+    ///        previewRedeemNet: convertToAssets(shares, Floor) → _applyPenalty (forward)
+    ///      When shares == balanceOf(owner), they must be identical.
+    function test_fuzz_maxWithdraw_eq_previewRedeemNet(
+        uint256 depositAmount,
+        uint256 elapsed
+    ) public {
+        depositAmount = bound(depositAmount, 1 ether, INITIAL);
+        elapsed = bound(elapsed, 0, 14 days);
+
+        vm.prank(alice);
+        vault.deposit(depositAmount, alice);
+
+        vm.warp(block.timestamp + elapsed);
+
+        uint256 allShares = vault.balanceOf(alice);
+        uint256 maxW = vault.maxWithdraw(alice);
+        uint256 previewNet = vault.previewRedeemNet(allShares, alice);
+
+        assertEq(maxW, previewNet);
+    }
+
+    /// @dev Item 2 with donation: non-1:1 rate.
+    function test_fuzz_maxWithdraw_eq_previewRedeemNet_withDonate(
+        uint256 depositAmount,
+        uint256 donateAmount,
+        uint256 elapsed
+    ) public {
+        depositAmount = bound(depositAmount, 1 ether, INITIAL / 2);
+        donateAmount = bound(donateAmount, 1 ether, INITIAL / 2);
+        elapsed = bound(elapsed, 0, 14 days);
+
+        vm.prank(alice);
+        vault.deposit(depositAmount, alice);
+
+        vm.prank(donor);
+        vault.donate(donateAmount);
+
+        vm.warp(block.timestamp + elapsed);
+
+        uint256 allShares = vault.balanceOf(alice);
+        uint256 maxW = vault.maxWithdraw(alice);
+        uint256 previewNet = vault.previewRedeemNet(allShares, alice);
+
+        assertEq(maxW, previewNet);
+    }
+
+    /// @dev Item 4: For the same position, withdraw(maxWithdraw) and redeem(allShares)
+    ///      should deliver the same net WCHAN (within 1 wei from rounding).
+    ///      Uses snapshot/revert to test both paths on identical vault state.
+    function test_fuzz_withdraw_vs_redeem_netParity(
+        uint256 depositAmount,
+        uint256 elapsed
+    ) public {
+        depositAmount = bound(depositAmount, 1 ether, INITIAL);
+        elapsed = bound(elapsed, 0, 14 days);
+
+        vm.prank(alice);
+        vault.deposit(depositAmount, alice);
+
+        vm.warp(block.timestamp + elapsed);
+
+        // Snapshot state before exit
+        uint256 snap = vm.snapshotState();
+
+        // Path A: withdraw(maxWithdraw)
+        uint256 maxW = vault.maxWithdraw(alice);
+        uint256 aliceBefore = wchan.balanceOf(alice);
+        vm.prank(alice);
+        vault.withdraw(maxW, alice, alice);
+        uint256 withdrawNet = wchan.balanceOf(alice) - aliceBefore;
+
+        // Revert to snapshot
+        vm.revertToStateAndDelete(snap);
+
+        // Path B: redeem(allShares)
+        uint256 shares = vault.balanceOf(alice);
+        aliceBefore = wchan.balanceOf(alice);
+        vm.prank(alice);
+        vault.redeem(shares, alice, alice);
+        uint256 redeemNet = wchan.balanceOf(alice) - aliceBefore;
+
+        // Both should get the same net amount (within 1 wei rounding)
+        assertApproxEqAbs(withdrawNet, redeemNet, 1);
+    }
+
+    /// @dev Item 4 with donation: non-1:1 rate parity.
+    function test_fuzz_withdraw_vs_redeem_netParity_withDonate(
+        uint256 depositAmount,
+        uint256 donateAmount,
+        uint256 elapsed
+    ) public {
+        depositAmount = bound(depositAmount, 1 ether, INITIAL / 2);
+        donateAmount = bound(donateAmount, 1 ether, INITIAL / 2);
+        elapsed = bound(elapsed, 0, 14 days);
+
+        vm.prank(alice);
+        vault.deposit(depositAmount, alice);
+
+        vm.prank(donor);
+        vault.donate(donateAmount);
+
+        vm.warp(block.timestamp + elapsed);
+
+        // Snapshot state before exit
+        uint256 snap = vm.snapshotState();
+
+        // Path A: withdraw(maxWithdraw)
+        uint256 maxW = vault.maxWithdraw(alice);
+        uint256 aliceBefore = wchan.balanceOf(alice);
+        vm.prank(alice);
+        vault.withdraw(maxW, alice, alice);
+        uint256 withdrawNet = wchan.balanceOf(alice) - aliceBefore;
+
+        // Revert to snapshot
+        vm.revertToStateAndDelete(snap);
+
+        // Path B: redeem(allShares)
+        uint256 shares = vault.balanceOf(alice);
+        aliceBefore = wchan.balanceOf(alice);
+        vm.prank(alice);
+        vault.redeem(shares, alice, alice);
+        uint256 redeemNet = wchan.balanceOf(alice) - aliceBefore;
+
+        // Both should get the same net (within 1 wei — shares cap rounding)
+        assertApproxEqAbs(withdrawNet, redeemNet, 1);
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//          Edge Cases & Withdraw Penalty Accounting
+// ═══════════════════════════════════════════════════════
+
+contract WCHANVaultEdgeFuzzTest is WCHANVaultBaseTest {
+    /// @dev Item 3: withdraw(0) should succeed silently.
+    function test_withdraw_zero() public {
+        vm.prank(alice);
+        vault.deposit(100 ether, alice);
+
+        // withdraw(0) during penalty window
+        vm.prank(alice);
+        uint256 shares = vault.withdraw(0, alice, alice);
+
+        assertEq(shares, 0);
+        assertEq(vault.balanceOf(alice), 100 ether); // unchanged
+    }
+
+    /// @dev Item 3: withdraw(0) after cooldown
+    function test_withdraw_zero_afterCooldown() public {
+        vm.prank(alice);
+        vault.deposit(100 ether, alice);
+        vm.warp(block.timestamp + 7 days);
+
+        vm.prank(alice);
+        uint256 shares = vault.withdraw(0, alice, alice);
+
+        assertEq(shares, 0);
+        assertEq(vault.balanceOf(alice), 100 ether);
+    }
+
+    /// @dev Item 7: Penalty split accounting on withdraw path.
+    ///      The withdraw path computes penalty as (grossAssets - assets).
+    ///      Verify: net + burned + retained = gross identity.
+    ///      retained stays in vault (not transferred), so we compute it from penaltyBps.
+    function test_fuzz_penaltySplit_withdraw_path(
+        uint256 amount,
+        uint256 elapsed
+    ) public {
+        amount = bound(amount, 1 ether, INITIAL);
+        elapsed = bound(elapsed, 0, 7 days);
+
+        vm.prank(alice);
+        vault.deposit(amount, alice);
+        vm.warp(block.timestamp + elapsed);
+
+        uint256 maxW = vault.maxWithdraw(alice);
+        if (maxW == 0) return;
+
+        // Read penalty BEFORE withdraw (time-dependent)
+        uint256 penaltyBps = vault.getPenaltyBps(alice);
+
+        uint256 burnBefore = wchan.balanceOf(BURN_ADDRESS);
+        uint256 aliceBefore = wchan.balanceOf(alice);
+
+        vm.prank(alice);
+        vault.withdraw(maxW, alice, alice);
+
+        uint256 netReceived = wchan.balanceOf(alice) - aliceBefore;
+        uint256 burned = wchan.balanceOf(BURN_ADDRESS) - burnBefore;
+
+        // net equals exactly what was requested
+        assertEq(netReceived, maxW);
+
+        if (penaltyBps > 0) {
+            // Compute expected gross and penalty from penaltyBps
+            // gross = ceil(net * BPS / (BPS - penaltyBps))
+            uint256 expectedGross = (netReceived * 10_000 + (10_000 - penaltyBps) - 1) / (10_000 - penaltyBps);
+            uint256 expectedPenalty = expectedGross - netReceived;
+            uint256 expectedBurn = expectedPenalty / 2;
+            uint256 expectedRetained = expectedPenalty - expectedBurn;
+
+            // burned ≈ expected (shares cap recomputation introduces up to 2 wei delta)
+            assertApproxEqAbs(burned, expectedBurn, 2);
+
+            // burned ≈ retained
+            assertApproxEqAbs(burned, expectedRetained, 2);
+        } else {
+            assertEq(burned, 0);
+        }
+
+        // Solvency
+        assertGe(wchan.balanceOf(address(vault)), vault.totalAssets());
+    }
+
+    /// @dev Item 7 with donation: non-1:1 rate penalty split on withdraw.
+    function test_fuzz_penaltySplit_withdraw_withDonate(
+        uint256 amount,
+        uint256 donateAmount,
+        uint256 elapsed
+    ) public {
+        amount = bound(amount, 1 ether, INITIAL / 2);
+        donateAmount = bound(donateAmount, 1 ether, INITIAL / 2);
+        elapsed = bound(elapsed, 0, 7 days);
+
+        vm.prank(alice);
+        vault.deposit(amount, alice);
+
+        vm.prank(donor);
+        vault.donate(donateAmount);
+
+        vm.warp(block.timestamp + elapsed);
+
+        uint256 maxW = vault.maxWithdraw(alice);
+        if (maxW == 0) return;
+
+        uint256 penaltyBps = vault.getPenaltyBps(alice);
+        uint256 burnBefore = wchan.balanceOf(BURN_ADDRESS);
+        uint256 aliceBefore = wchan.balanceOf(alice);
+
+        vm.prank(alice);
+        vault.withdraw(maxW, alice, alice);
+
+        uint256 netReceived = wchan.balanceOf(alice) - aliceBefore;
+        uint256 burned = wchan.balanceOf(BURN_ADDRESS) - burnBefore;
+
+        assertEq(netReceived, maxW);
+
+        if (penaltyBps > 0) {
+            // With shares cap, actual penalty may differ slightly from the
+            // reverse formula, but burned ≈ retained must hold
+            assertGt(burned, 0);
+        }
+
+        // Solvency
+        assertGe(wchan.balanceOf(address(vault)), vault.totalAssets());
+    }
+
+    /// @dev Item 7: Partial withdraw with penalty — accounting still holds.
+    function test_fuzz_penaltySplit_partialWithdraw(
+        uint256 amount,
+        uint256 withdrawPct,
+        uint256 elapsed
+    ) public {
+        amount = bound(amount, 1 ether, INITIAL);
+        withdrawPct = bound(withdrawPct, 1, 100);
+        elapsed = bound(elapsed, 0, 7 days);
+
+        vm.prank(alice);
+        vault.deposit(amount, alice);
+        vm.warp(block.timestamp + elapsed);
+
+        uint256 maxW = vault.maxWithdraw(alice);
+        uint256 toWithdraw = maxW * withdrawPct / 100;
+        if (toWithdraw == 0) return;
+
+        uint256 penaltyBps = vault.getPenaltyBps(alice);
+        uint256 burnBefore = wchan.balanceOf(BURN_ADDRESS);
+        uint256 aliceBefore = wchan.balanceOf(alice);
+
+        vm.prank(alice);
+        vault.withdraw(toWithdraw, alice, alice);
+
+        uint256 netReceived = wchan.balanceOf(alice) - aliceBefore;
+        uint256 burned = wchan.balanceOf(BURN_ADDRESS) - burnBefore;
+
+        // Net equals exactly what was requested
+        assertEq(netReceived, toWithdraw);
+
+        if (penaltyBps > 0) {
+            uint256 expectedGross = (netReceived * 10_000 + (10_000 - penaltyBps) - 1) / (10_000 - penaltyBps);
+            uint256 expectedPenalty = expectedGross - netReceived;
+            uint256 expectedBurn = expectedPenalty / 2;
+            uint256 expectedRetained = expectedPenalty - expectedBurn;
+
+            // Allow 2 wei tolerance for shares-cap recomputation
+            assertApproxEqAbs(burned, expectedBurn, 2);
+            assertApproxEqAbs(burned, expectedRetained, 2);
+        } else {
+            assertEq(burned, 0);
+        }
+
+        // Solvency
+        assertGe(wchan.balanceOf(address(vault)), vault.totalAssets());
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//            Stateful Invariant Test (Handler)
+// ═══════════════════════════════════════════════════════
+
+/// @dev Handler contract that performs random vault operations for invariant testing.
+contract VaultHandler is Test {
+    WCHANVault public vault;
+    MockWCHAN public wchan;
+    MockWETH public weth;
+
+    address[] public actors;
+    uint256 public totalWethDonated;
+    uint256 public totalWethClaimed;
+    uint256 public lastSharePrice; // scaled by 1e18
+
+    constructor(WCHANVault _vault, MockWCHAN _wchan, MockWETH _weth, address[] memory _actors) {
+        vault = _vault;
+        wchan = _wchan;
+        weth = _weth;
+        actors = _actors;
+
+        // Initialize share price
+        if (vault.totalSupply() > 0) {
+            lastSharePrice = vault.convertToAssets(1e18);
+        }
+    }
+
+    function _actor(uint256 seed) internal view returns (address) {
+        return actors[seed % actors.length];
+    }
+
+    function deposit(uint256 actorSeed, uint256 amount) external {
+        address actor = _actor(actorSeed);
+        amount = bound(amount, 1, wchan.balanceOf(actor));
+        if (amount == 0) return;
+
+        vm.prank(actor);
+        vault.deposit(amount, actor);
+    }
+
+    function withdraw(uint256 actorSeed, uint256 pct) external {
+        address actor = _actor(actorSeed);
+        uint256 maxW = vault.maxWithdraw(actor);
+        if (maxW == 0) return;
+
+        pct = bound(pct, 1, 100);
+        uint256 toWithdraw = maxW * pct / 100;
+        if (toWithdraw == 0) return;
+
+        vm.prank(actor);
+        vault.withdraw(toWithdraw, actor, actor);
+    }
+
+    function redeem(uint256 actorSeed, uint256 pct) external {
+        address actor = _actor(actorSeed);
+        uint256 shares = vault.balanceOf(actor);
+        if (shares == 0) return;
+
+        pct = bound(pct, 1, 100);
+        uint256 toRedeem = shares * pct / 100;
+        if (toRedeem == 0) return;
+
+        vm.prank(actor);
+        vault.redeem(toRedeem, actor, actor);
+    }
+
+    function donate(uint256 amount) external {
+        amount = bound(amount, 1, wchan.balanceOf(address(this)));
+        if (amount == 0) return;
+        if (vault.totalSupply() == 0) return;
+
+        // Record share price before donate
+        uint256 priceBefore = vault.convertToAssets(1e18);
+
+        wchan.approve(address(vault), amount);
+        vault.donate(amount);
+
+        // Share price must not decrease after donation
+        uint256 priceAfter = vault.convertToAssets(1e18);
+        assert(priceAfter >= priceBefore);
+    }
+
+    function donateReward(uint256 amount) external {
+        amount = bound(amount, 1, 100 ether);
+        if (vault.totalSupply() == 0) return;
+
+        weth.mint(address(this), amount);
+        weth.approve(address(vault), amount);
+        vault.donateReward(amount);
+        totalWethDonated += amount;
+    }
+
+    function claimRewards(uint256 actorSeed) external {
+        address actor = _actor(actorSeed);
+        uint256 owed = vault.earned(actor);
+        if (owed == 0) return;
+
+        uint256 balBefore = weth.balanceOf(actor);
+        vm.prank(actor);
+        vault.claimRewards();
+        uint256 claimed = weth.balanceOf(actor) - balBefore;
+        totalWethClaimed += claimed;
+    }
+
+    function transferShares(uint256 fromSeed, uint256 toSeed, uint256 pct) external {
+        address from = _actor(fromSeed);
+        address to = _actor(toSeed);
+        if (from == to) return;
+
+        uint256 shares = vault.balanceOf(from);
+        if (shares == 0) return;
+
+        pct = bound(pct, 1, 100);
+        uint256 toTransfer = shares * pct / 100;
+        if (toTransfer == 0) return;
+
+        vm.prank(from);
+        vault.transfer(to, toTransfer);
+    }
+
+    function warpTime(uint256 seconds_) external {
+        seconds_ = bound(seconds_, 1, 2 days);
+        vm.warp(block.timestamp + seconds_);
+    }
+}
+
+contract WCHANVaultInvariantTest is WCHANVaultBaseTest {
+    VaultHandler public handler;
+
+    address internal charlie = makeAddr("charlie");
+
+    function setUp() public override {
+        super.setUp();
+
+        // Fund charlie
+        wchan.mint(charlie, INITIAL);
+        vm.prank(charlie);
+        wchan.approve(address(vault), type(uint256).max);
+
+        // Create actor list
+        address[] memory actors = new address[](3);
+        actors[0] = alice;
+        actors[1] = bob;
+        actors[2] = charlie;
+
+        handler = new VaultHandler(vault, wchan, weth, actors);
+
+        // Fund handler for donations
+        wchan.mint(address(handler), INITIAL);
+
+        // Seed initial deposits so operations have something to work with
+        vm.prank(alice);
+        vault.deposit(100 ether, alice);
+        vm.prank(bob);
+        vault.deposit(200 ether, bob);
+        vm.prank(charlie);
+        vault.deposit(50 ether, charlie);
+
+        // Target only the handler for invariant calls
+        targetContract(address(handler));
+    }
+
+    /// @dev Invariant 1: Vault WCHAN balance >= totalAssets (WCHAN solvency)
+    function invariant_wchanSolvency() public view {
+        assertGe(wchan.balanceOf(address(vault)), vault.totalAssets());
+    }
+
+    /// @dev Invariant 2: Total WETH claimed <= total WETH donated (WETH solvency)
+    function invariant_wethSolvency() public view {
+        assertLe(handler.totalWethClaimed(), handler.totalWethDonated());
+    }
+
+    /// @dev Invariant 3: Penalty BPS never exceeds MAX_PENALTY_BPS for any actor
+    function invariant_penaltyBounded() public view {
+        assertLe(vault.getPenaltyBps(alice), vault.MAX_PENALTY_BPS());
+        assertLe(vault.getPenaltyBps(bob), vault.MAX_PENALTY_BPS());
+        assertLe(vault.getPenaltyBps(charlie), vault.MAX_PENALTY_BPS());
+    }
+
+    /// @dev Invariant 4: Share price >= 1e18 (initial 1:1 rate)
+    ///      Withdrawals with penalty retain half in vault, donations increase price.
+    ///      Only user withdrawals reduce shares; neither can decrease share price.
+    function invariant_sharePriceNonDecreasing() public view {
+        if (vault.totalSupply() > 0) {
+            // Share price should be >= initial 1:1 rate
+            // (penalties retained + donations only increase it)
+            assertGe(vault.convertToAssets(1e18), 1e18);
+        }
+    }
+}

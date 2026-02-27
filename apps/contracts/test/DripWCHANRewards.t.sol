@@ -68,6 +68,13 @@ abstract contract DripBaseTest is Test {
         vm.prank(user);
         vault.deposit(amount, user);
     }
+
+    /// @dev Mirror the contract's first-drip calculation for a fresh stream.
+    function _firstDripAmount(uint256 amount, uint256 duration) internal view returns (uint256) {
+        uint256 interval = drip.minDripInterval();
+        if (duration <= interval) return amount;
+        return amount * interval / duration;
+    }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -102,7 +109,7 @@ contract DripConstructorTest is DripBaseTest {
     }
 
     function test_minDripInterval() public view {
-        assertEq(drip.MIN_DRIP_INTERVAL(), 1 hours);
+        assertEq(drip.minDripInterval(), 1 hours);
     }
 }
 
@@ -121,14 +128,15 @@ contract DripConfigureTest is DripBaseTest {
         vm.prank(owner);
         drip.configureDrip(false, amount, endTs);
 
+        uint256 fd = _firstDripAmount(amount, 7 days);
         (uint256 start, uint256 end, uint256 lastDrip, uint256 remaining) = drip.wchanStream();
         assertEq(start, block.timestamp);
         assertEq(end, endTs);
         assertEq(lastDrip, block.timestamp);
-        assertEq(remaining, amount);
+        assertEq(remaining, amount - fd);
 
-        // Tokens pulled from owner
-        assertEq(wchan.balanceOf(address(drip)), amount);
+        // Tokens pulled from owner (minus first drip sent to vault)
+        assertEq(wchan.balanceOf(address(drip)), amount - fd);
     }
 
     function test_configureWethStream() public {
@@ -138,13 +146,14 @@ contract DripConfigureTest is DripBaseTest {
         vm.prank(owner);
         drip.configureDrip(true, amount, endTs);
 
+        uint256 fd = _firstDripAmount(amount, 14 days);
         (uint256 start, uint256 end, uint256 lastDrip, uint256 remaining) = drip.wethStream();
         assertEq(start, block.timestamp);
         assertEq(end, endTs);
         assertEq(lastDrip, block.timestamp);
-        assertEq(remaining, amount);
+        assertEq(remaining, amount - fd);
 
-        assertEq(weth.balanceOf(address(drip)), amount);
+        assertEq(weth.balanceOf(address(drip)), amount - fd);
     }
 
     function test_topUp_additive() public {
@@ -154,8 +163,9 @@ contract DripConfigureTest is DripBaseTest {
         vm.prank(owner);
         drip.configureDrip(false, 500 ether, block.timestamp + 7 days);
 
+        uint256 fd = _firstDripAmount(1000 ether, 7 days);
         (, , , uint256 remaining) = drip.wchanStream();
-        assertEq(remaining, 1500 ether);
+        assertEq(remaining, 1000 ether - fd + 500 ether);
     }
 
     function test_topUp_extendsEnd() public {
@@ -193,12 +203,13 @@ contract DripConfigureTest is DripBaseTest {
         uint256 vaultAfter = wchan.balanceOf(address(vault));
         uint256 settled = vaultAfter - vaultBefore;
 
-        // ~500 ether should have been settled (half of 1000 over 10 days)
-        assertApproxEqAbs(settled, 500 ether, 1);
+        // Half of remaining-after-first-drip should have been settled
+        uint256 afterSetup = 1000 ether - _firstDripAmount(1000 ether, 10 days);
+        assertApproxEqAbs(settled, afterSetup / 2, 1);
 
-        // Remaining = (1000 - 500) + 200 = 700
+        // Remaining = afterSetup/2 + 200
         (, , , uint256 remaining) = drip.wchanStream();
-        assertApproxEqAbs(remaining, 700 ether, 1);
+        assertApproxEqAbs(remaining, afterSetup / 2 + 200 ether, 1);
     }
 
     function test_configure_resetsAfterDrain() public {
@@ -212,11 +223,12 @@ contract DripConfigureTest is DripBaseTest {
         vm.prank(owner);
         drip.configureDrip(false, 500 ether, newEnd);
 
+        uint256 fd2 = _firstDripAmount(500 ether, 7 days);
         (uint256 start, uint256 end, uint256 lastDrip, uint256 remaining) = drip.wchanStream();
         assertEq(start, block.timestamp);
         assertEq(lastDrip, block.timestamp);
         assertEq(end, newEnd);
-        assertEq(remaining, 500 ether);
+        assertEq(remaining, 500 ether - fd2);
     }
 
     function test_configure_revertsZeroAmount() public {
@@ -236,6 +248,86 @@ contract DripConfigureTest is DripBaseTest {
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
         drip.configureDrip(false, 100 ether, block.timestamp + 1 days);
     }
+    function test_configure_firstDripEmitsEvent() public {
+        _stakeInVault(alice, 1000 ether);
+
+        vm.expectEmit(true, false, false, false, address(drip));
+        emit DripWCHANRewards.DripConfigured(false, 1000 ether, block.timestamp + 10 days);
+        vm.expectEmit(true, false, false, false, address(drip));
+        emit DripWCHANRewards.Dripped(false, 0);
+
+        vm.prank(owner);
+        drip.configureDrip(false, 1000 ether, block.timestamp + 10 days);
+    }
+
+    function test_configure_firstDripWethSkippedNoStakers() public {
+        // Use the real vault (dead shares only, but totalSupply > 0)
+        // This means WETH first drip IS sent (dead shares absorb it)
+        _setupWethStream(500 ether, 10 days);
+
+        uint256 fd = _firstDripAmount(500 ether, 10 days);
+        (, , , uint256 remaining) = drip.wethStream();
+        assertEq(remaining, 500 ether - fd);
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//              setMinDripInterval
+// ═══════════════════════════════════════════════════════
+
+contract DripSetIntervalTest is DripBaseTest {
+    function test_setMinDripInterval() public {
+        vm.prank(owner);
+        drip.setMinDripInterval(30 minutes);
+        assertEq(drip.minDripInterval(), 30 minutes);
+    }
+
+    function test_setMinDripInterval_emitsEvent() public {
+        vm.expectEmit(false, false, false, true, address(drip));
+        emit DripWCHANRewards.MinDripIntervalUpdated(2 hours);
+
+        vm.prank(owner);
+        drip.setMinDripInterval(2 hours);
+    }
+
+    function test_setMinDripInterval_revertsNonOwner() public {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+        drip.setMinDripInterval(30 minutes);
+    }
+
+    function test_setMinDripInterval_toZero() public {
+        _stakeInVault(alice, 1000 ether);
+        _setupWchanStream(1000 ether, 10 days);
+
+        // Set interval to 0 — drip should work immediately
+        vm.prank(owner);
+        drip.setMinDripInterval(0);
+
+        vm.warp(block.timestamp + 1);
+        (bool wchanCan, ) = drip.canDrip();
+        assertTrue(wchanCan);
+        drip.drip();
+    }
+
+    function test_setMinDripInterval_affectsDrip() public {
+        _stakeInVault(alice, 1000 ether);
+        _setupWchanStream(1000 ether, 10 days);
+
+        // Increase interval to 2 hours
+        vm.prank(owner);
+        drip.setMinDripInterval(2 hours);
+
+        // 1 hour should not be enough
+        vm.warp(block.timestamp + 1 hours);
+        (bool wchanCan, ) = drip.canDrip();
+        assertFalse(wchanCan);
+
+        // 2 hours should work
+        vm.warp(block.timestamp + 1 hours);
+        (wchanCan, ) = drip.canDrip();
+        assertTrue(wchanCan);
+    }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -254,9 +346,9 @@ contract DripExecutionTest is DripBaseTest {
         uint256 vaultAfter = wchan.balanceOf(address(vault));
 
         uint256 dripped = vaultAfter - vaultBefore;
-        // 1 hour out of 10 days ≈ 4.166 ether
-        uint256 tenDays = 10 days;
-        assertApproxEqAbs(dripped, 1000 ether * 1 hours / tenDays, 1);
+        // 1 hour out of 10 days, based on remaining after first drip
+        uint256 afterSetup = 1000 ether - _firstDripAmount(1000 ether, 10 days);
+        assertApproxEqAbs(dripped, afterSetup * 1 hours / 10 days, 1);
     }
 
     function test_basicWethDrip() public {
@@ -270,9 +362,10 @@ contract DripExecutionTest is DripBaseTest {
         uint256 earnedAfter = vault.earned(alice);
 
         uint256 dripped = earnedAfter - earnedBefore;
-        uint256 tenDays = 10 days;
+        // 1 hour out of 10 days, based on remaining after first drip
+        uint256 afterSetup = 500 ether - _firstDripAmount(500 ether, 10 days);
         // Vault's rewardPerShareStored mulDiv + dead-share fraction introduce rounding
-        assertApproxEqAbs(dripped, 500 ether * 1 hours / tenDays, 1e4);
+        assertApproxEqAbs(dripped, afterSetup * 1 hours / 10 days, 1e4);
     }
 
     function test_bothStreamsDrip() public {
@@ -316,8 +409,9 @@ contract DripExecutionTest is DripBaseTest {
         drip.drip();
         uint256 dripped = wchan.balanceOf(address(vault)) - vaultBefore;
 
-        // Should catch up: ~500 ether (half of stream)
-        assertApproxEqAbs(dripped, 500 ether, 1);
+        // Should catch up: half of remaining after first drip
+        uint256 afterSetup = 1000 ether - _firstDripAmount(1000 ether, 10 days);
+        assertApproxEqAbs(dripped, afterSetup / 2, 1);
     }
 
     function test_drainsToZeroAtEnd() public {
@@ -331,7 +425,9 @@ contract DripExecutionTest is DripBaseTest {
         drip.drip();
         uint256 dripped = wchan.balanceOf(address(vault)) - vaultBefore;
 
-        assertEq(dripped, 1000 ether);
+        // First drip already happened during configure
+        uint256 fd = _firstDripAmount(1000 ether, 10 days);
+        assertEq(dripped, 1000 ether - fd);
 
         (, , , uint256 remaining) = drip.wchanStream();
         assertEq(remaining, 0);
@@ -441,8 +537,9 @@ contract DripFormulaTest is DripBaseTest {
 
         vm.warp(block.timestamp + 5 days);
 
+        uint256 afterSetup = 1000 ether - _firstDripAmount(1000 ether, 10 days);
         (uint256 wchanPreview, ) = drip.previewDrip();
-        assertApproxEqAbs(wchanPreview, 500 ether, 1);
+        assertApproxEqAbs(wchanPreview, afterSetup / 2, 1);
     }
 
     function test_quarterAmount() public {
@@ -451,8 +548,9 @@ contract DripFormulaTest is DripBaseTest {
 
         vm.warp(block.timestamp + 2.5 days);
 
+        uint256 afterSetup = 1000 ether - _firstDripAmount(1000 ether, 10 days);
         (uint256 wchanPreview, ) = drip.previewDrip();
-        assertApproxEqAbs(wchanPreview, 250 ether, 1);
+        assertApproxEqAbs(wchanPreview, afterSetup / 4, 1);
     }
 
     function test_exactEnd() public {
@@ -461,8 +559,9 @@ contract DripFormulaTest is DripBaseTest {
 
         vm.warp(block.timestamp + 10 days);
 
+        uint256 afterSetup = 1000 ether - _firstDripAmount(1000 ether, 10 days);
         (uint256 wchanPreview, ) = drip.previewDrip();
-        assertEq(wchanPreview, 1000 ether);
+        assertEq(wchanPreview, afterSetup);
     }
 
     function test_pastEnd() public {
@@ -471,32 +570,37 @@ contract DripFormulaTest is DripBaseTest {
 
         vm.warp(block.timestamp + 20 days);
 
+        uint256 afterSetup = 1000 ether - _firstDripAmount(1000 ether, 10 days);
         (uint256 wchanPreview, ) = drip.previewDrip();
-        assertEq(wchanPreview, 1000 ether);
+        assertEq(wchanPreview, afterSetup);
     }
 
     function test_recalculationAfterDrip() public {
         _stakeInVault(alice, 1000 ether);
         _setupWchanStream(1000 ether, 10 days);
 
+        uint256 afterSetup = 1000 ether - _firstDripAmount(1000 ether, 10 days);
+
         // First drip at day 2
         vm.warp(block.timestamp + 2 days);
         drip.drip();
 
         (, , , uint256 remaining) = drip.wchanStream();
-        assertApproxEqAbs(remaining, 800 ether, 1);
+        assertApproxEqAbs(remaining, afterSetup * 4 / 5, 1);
 
         // Next drip at day 4 — should be based on remaining/remainingDuration
         vm.warp(block.timestamp + 2 days);
         (uint256 preview, ) = drip.previewDrip();
-        // 2 days elapsed out of 8 days remaining = 800 * 2/8 = 200
-        assertApproxEqAbs(preview, 200 ether, 1);
+        // 2 days elapsed out of 8 days remaining = remaining * 2/8
+        assertApproxEqAbs(preview, afterSetup / 5, 1);
     }
 
     function test_dustDrainage() public {
         _stakeInVault(alice, 1000 ether);
         // Small amount that creates rounding
         _setupWchanStream(7 ether, 3 days);
+
+        uint256 fd = _firstDripAmount(7 ether, 3 days);
 
         // Drip at 1 hour intervals until past end
         uint256 totalDripped;
@@ -510,8 +614,8 @@ contract DripFormulaTest is DripBaseTest {
             }
         }
 
-        // All tokens should have been dripped
-        assertEq(totalDripped, 7 ether);
+        // All tokens should have been dripped (first drip + subsequent drips)
+        assertEq(totalDripped + fd, 7 ether);
         (, , , uint256 remaining) = drip.wchanStream();
         assertEq(remaining, 0);
     }
@@ -602,8 +706,9 @@ contract DripRecoverTest is DripBaseTest {
         vm.prank(owner);
         drip.recoverTokens(address(wchan), 100 ether);
 
+        uint256 fd = _firstDripAmount(1000 ether, 10 days);
         (, , , uint256 remaining) = drip.wchanStream();
-        assertEq(remaining, 900 ether);
+        assertEq(remaining, 1000 ether - fd - 100 ether);
     }
 
     function test_recoverWeth() public {
@@ -621,8 +726,9 @@ contract DripRecoverTest is DripBaseTest {
         vm.prank(owner);
         drip.recoverTokens(address(weth), 50 ether);
 
+        uint256 fd = _firstDripAmount(500 ether, 10 days);
         (, , , uint256 remaining) = drip.wethStream();
-        assertEq(remaining, 450 ether);
+        assertEq(remaining, 500 ether - fd - 50 ether);
     }
 
     function test_recoverArbitraryToken() public {
@@ -642,9 +748,10 @@ contract DripRecoverTest is DripBaseTest {
         vm.prank(owner);
         drip.recoverTokens(address(other), 100 ether);
 
-        // WCHAN stream unaffected
+        // WCHAN stream unaffected (minus first drip)
+        uint256 fd = _firstDripAmount(1000 ether, 10 days);
         (, , , uint256 remaining) = drip.wchanStream();
-        assertEq(remaining, 1000 ether);
+        assertEq(remaining, 1000 ether - fd);
     }
 
     function test_recoverMoreThanRemaining_capsReduction() public {
@@ -666,16 +773,18 @@ contract DripRecoverTest is DripBaseTest {
         _stakeInVault(alice, 1000 ether);
         _setupWchanStream(1000 ether, 10 days);
 
-        // Recover 200 — remaining goes to 800
+        uint256 fd = _firstDripAmount(1000 ether, 10 days);
+
+        // Recover 200 — remaining goes to (1000-fd-200)
         vm.prank(owner);
         drip.recoverTokens(address(wchan), 200 ether);
 
-        // Drip past end — should drain exactly 800 (not revert)
+        // Drip past end — should drain remaining (not revert)
         vm.warp(block.timestamp + 11 days);
 
         uint256 vaultBefore = wchan.balanceOf(address(vault));
         drip.drip();
-        assertEq(wchan.balanceOf(address(vault)) - vaultBefore, 800 ether);
+        assertEq(wchan.balanceOf(address(vault)) - vaultBefore, 1000 ether - fd - 200 ether);
     }
 
     function test_recoverEmitsEvent() public {
@@ -713,6 +822,10 @@ contract DripFuzzTest is DripBaseTest {
         drip.configureDrip(false, amount, block.timestamp + duration);
 
         vm.warp(block.timestamp + elapsed);
+
+        // First drip may have drained everything (short durations)
+        (bool wchanCan, ) = drip.canDrip();
+        if (!wchanCan) return;
 
         uint256 vaultBefore = wchan.balanceOf(address(vault));
         drip.drip();
@@ -787,11 +900,13 @@ contract DripFuzzTest is DripBaseTest {
         vm.prank(owner);
         drip.configureDrip(false, amount1, block.timestamp + 10 days);
 
+        uint256 fd = _firstDripAmount(amount1, 10 days);
+
         vm.prank(owner);
         drip.configureDrip(false, amount2, block.timestamp + 10 days);
 
         (, , , uint256 remaining) = drip.wchanStream();
-        assertEq(remaining, amount1 + amount2);
+        assertEq(remaining, amount1 - fd + amount2);
     }
 
     function test_fuzz_previewMatchesActual(uint256 amount, uint256 elapsed) public {
@@ -825,6 +940,10 @@ contract DripFuzzTest is DripBaseTest {
         drip.configureDrip(true, amount, block.timestamp + duration);
 
         vm.warp(block.timestamp + elapsed);
+
+        // First drip may have drained everything (short durations)
+        (, bool wethCan) = drip.canDrip();
+        if (!wethCan) return;
 
         (, , , uint256 remainingBefore) = drip.wethStream();
         drip.drip();
@@ -902,10 +1021,11 @@ contract DripFuzzTest is DripBaseTest {
         uint256 settled = wchan.balanceOf(address(vault)) - vaultBefore;
         (, , , uint256 remainingAfter) = drip.wchanStream();
 
-        // remaining = (old - settled) + topUp
-        assertEq(remainingAfter, remainingBefore - settled + topUp);
-        // settled should never exceed what was there
-        assertLe(settled, remainingBefore);
+        // Vault change (settled) includes both settlement and potential first drip on fresh stream.
+        // Invariant: remainingAfter + settled == remainingBefore + topUp
+        assertEq(remainingAfter + settled, remainingBefore + topUp);
+        // settled should never exceed what was available
+        assertLe(settled, remainingBefore + topUp);
     }
 
     function test_fuzz_bothStreamsIndependent(
@@ -926,12 +1046,14 @@ contract DripFuzzTest is DripBaseTest {
         (uint256 wchanPreview, uint256 wethPreview) = drip.previewDrip();
 
         // Both should be calculable independently
+        uint256 wchanAfterSetup = wchanAmt - _firstDripAmount(wchanAmt, 10 days);
+        uint256 wethAfterSetup = wethAmt - _firstDripAmount(wethAmt, 10 days);
         if (elapsed >= 10 days) {
-            assertEq(wchanPreview, wchanAmt);
-            assertEq(wethPreview, wethAmt);
+            assertEq(wchanPreview, wchanAfterSetup);
+            assertEq(wethPreview, wethAfterSetup);
         } else {
-            assertLe(wchanPreview, wchanAmt);
-            assertLe(wethPreview, wethAmt);
+            assertLe(wchanPreview, wchanAfterSetup);
+            assertLe(wethPreview, wethAfterSetup);
         }
     }
 }
@@ -949,18 +1071,17 @@ contract DripWethSettlementTest is DripBaseTest {
 
         uint256 earnedBefore = vault.earned(alice);
 
-        // Reconfigure triggers _settleDrip for WETH (lines 258-261)
+        // Reconfigure triggers _settleDrip for WETH
         vm.prank(owner);
         drip.configureDrip(true, 200 ether, block.timestamp + 10 days);
 
         uint256 earnedAfter = vault.earned(alice);
-
-        // ~250 WETH should have been settled to vault
         assertGt(earnedAfter, earnedBefore);
 
-        // Remaining = (500 - ~250) + 200 = ~450
+        // Remaining = (500-fd)/2 + 200
+        uint256 afterSetup = 500 ether - _firstDripAmount(500 ether, 10 days);
         (, , , uint256 remaining) = drip.wethStream();
-        assertApproxEqAbs(remaining, 450 ether, 1);
+        assertApproxEqAbs(remaining, afterSetup / 2 + 200 ether, 1);
     }
 
     function test_configure_settlesWethPending_exactAmounts() public {
@@ -969,16 +1090,16 @@ contract DripWethSettlementTest is DripBaseTest {
 
         vm.warp(block.timestamp + 2 days);
 
-        // Settlement should drip 2/10 of 1000 = 200 WETH
+        uint256 afterSetup = 1000 ether - _firstDripAmount(1000 ether, 10 days);
         (, , , uint256 remainingBefore) = drip.wethStream();
-        assertEq(remainingBefore, 1000 ether);
+        assertEq(remainingBefore, afterSetup);
 
         vm.prank(owner);
         drip.configureDrip(true, 100 ether, block.timestamp + 10 days);
 
         (, , , uint256 remainingAfter) = drip.wethStream();
-        // 1000 - 200 + 100 = 900
-        assertApproxEqAbs(remainingAfter, 900 ether, 1);
+        // afterSetup - afterSetup*2/10 + 100 = afterSetup*8/10 + 100
+        assertApproxEqAbs(remainingAfter, afterSetup * 8 / 10 + 100 ether, 1);
     }
 
     function test_configure_settlesWeth_afterDrain() public {
@@ -991,10 +1112,11 @@ contract DripWethSettlementTest is DripBaseTest {
         vm.prank(owner);
         drip.configureDrip(true, 300 ether, block.timestamp + 7 days);
 
+        uint256 fd2 = _firstDripAmount(300 ether, 7 days);
         (uint256 start, uint256 end, uint256 lastDrip, uint256 remaining) = drip.wethStream();
         assertEq(start, block.timestamp);
         assertEq(lastDrip, block.timestamp);
-        assertEq(remaining, 300 ether);
+        assertEq(remaining, 300 ether - fd2);
         assertEq(end, block.timestamp + 7 days);
     }
 
@@ -1185,15 +1307,14 @@ contract DripEdgeCaseTest is DripBaseTest {
         _stakeInVault(alice, 1000 ether);
 
         // endTimestamp = block.timestamp + 1 (minimum valid)
+        // Duration (1s) < minDripInterval → first drip sends everything
+        uint256 vaultBefore = wchan.balanceOf(address(vault));
         vm.prank(owner);
         drip.configureDrip(false, 100 ether, block.timestamp + 1);
 
-        // 1 hour later — past end, drains everything
-        vm.warp(block.timestamp + 1 hours);
-
-        uint256 vaultBefore = wchan.balanceOf(address(vault));
-        drip.drip();
         assertEq(wchan.balanceOf(address(vault)) - vaultBefore, 100 ether);
+        (, , , uint256 remaining) = drip.wchanStream();
+        assertEq(remaining, 0);
     }
 
     function test_twoDripsInSameBlock_reverts() public {
@@ -1216,8 +1337,9 @@ contract DripEdgeCaseTest is DripBaseTest {
         vm.prank(owner);
         drip.configureDrip(false, 500 ether, block.timestamp + 10 days);
 
+        uint256 fd = _firstDripAmount(1000 ether, 10 days);
         (, , , uint256 remaining) = drip.wchanStream();
-        assertEq(remaining, 1500 ether);
+        assertEq(remaining, 1000 ether - fd + 500 ether);
     }
 
     function test_recoverExceedsBalance_reverts() public {
@@ -1246,8 +1368,9 @@ contract DripEdgeCaseTest is DripBaseTest {
         (, , , uint256 wethAfter) = drip.wethStream();
         uint256 wethDripped = wethBefore - wethAfter;
 
-        // WCHAN fully drained
-        assertEq(wchanDripped, 100 ether);
+        // WCHAN fully drained (minus first drip from configure)
+        uint256 wchanFd = _firstDripAmount(100 ether, 1 days);
+        assertEq(wchanDripped, 100 ether - wchanFd);
         // WETH partially dripped
         assertGt(wethDripped, 0);
         assertLt(wethDripped, 500 ether);
@@ -1309,6 +1432,7 @@ contract DripEdgeCaseTest is DripBaseTest {
         _stakeInVault(alice, 1000 ether);
         _setupWethStream(7 ether, 3 days);
 
+        uint256 fd = _firstDripAmount(7 ether, 3 days);
         uint256 totalDripped;
         for (uint256 i = 0; i < 80; i++) {
             vm.warp(block.timestamp + 1 hours);
@@ -1321,7 +1445,7 @@ contract DripEdgeCaseTest is DripBaseTest {
             }
         }
 
-        assertEq(totalDripped, 7 ether);
+        assertEq(totalDripped + fd, 7 ether);
         (, , , uint256 remaining) = drip.wethStream();
         assertEq(remaining, 0);
     }
@@ -1338,7 +1462,8 @@ contract DripEdgeCaseTest is DripBaseTest {
         (, , , uint256 after_) = drip.wethStream();
 
         uint256 dripped = before - after_;
-        assertApproxEqAbs(dripped, 500 ether, 1);
+        uint256 afterSetup = 1000 ether - _firstDripAmount(1000 ether, 10 days);
+        assertApproxEqAbs(dripped, afterSetup / 2, 1);
     }
 
     function test_wethDrainsToZeroAtEnd() public {
@@ -1382,14 +1507,21 @@ contract DripEdgeCaseTest is DripBaseTest {
         duration = bound(duration, 1 hours, 365 days);
 
         _stakeInVault(alice, 1000 ether);
+        uint256 fd = _firstDripAmount(1, duration);
         _setupWchanStream(1, duration);
 
         // Go past end
         vm.warp(block.timestamp + duration + 1);
 
-        uint256 vaultBefore = wchan.balanceOf(address(vault));
-        drip.drip();
-        assertEq(wchan.balanceOf(address(vault)) - vaultBefore, 1);
+        if (fd == 1) {
+            // First drip already sent the 1 wei — nothing left to drip
+            (, , , uint256 remaining) = drip.wchanStream();
+            assertEq(remaining, 0);
+        } else {
+            uint256 vaultBefore = wchan.balanceOf(address(vault));
+            drip.drip();
+            assertEq(wchan.balanceOf(address(vault)) - vaultBefore, 1);
+        }
     }
 
     function test_fuzz_oddAmountNoDustLoss(uint256 amount, uint256 duration) public {
@@ -1397,6 +1529,8 @@ contract DripEdgeCaseTest is DripBaseTest {
         duration = bound(duration, 1 hours, 30 days);
 
         _stakeInVault(alice, 1000 ether);
+
+        uint256 fd = _firstDripAmount(amount, duration);
         _setupWchanStream(amount, duration);
 
         // Drip hourly until well past end
@@ -1414,8 +1548,8 @@ contract DripEdgeCaseTest is DripBaseTest {
             }
         }
 
-        // Zero dust — every wei must be dripped eventually
-        assertEq(totalDripped, amount);
+        // Zero dust — first drip + subsequent drips = total configured
+        assertEq(totalDripped + fd, amount);
     }
 }
 
@@ -1452,8 +1586,9 @@ contract DripBlackhatFuzzTest is DripBaseTest {
             }
         }
 
+        uint256 fd = _firstDripAmount(amount, duration);
         (, , , uint256 remaining) = drip.wchanStream();
-        assertEq(totalDripped + remaining, amount, "accounting invariant violated");
+        assertEq(totalDripped + remaining + fd, amount, "accounting invariant violated");
     }
 
     /// @dev Invariant: same for WETH stream.
@@ -1484,8 +1619,9 @@ contract DripBlackhatFuzzTest is DripBaseTest {
             }
         }
 
+        uint256 fd = _firstDripAmount(amount, duration);
         (, , , uint256 remaining) = drip.wethStream();
-        assertEq(totalDripped + remaining, amount, "weth accounting invariant violated");
+        assertEq(totalDripped + remaining + fd, amount, "weth accounting invariant violated");
     }
 
     /// @dev Attack: interleave recover + drip — verify no revert and accounting stays consistent.
@@ -1501,14 +1637,15 @@ contract DripBlackhatFuzzTest is DripBaseTest {
         _stakeInVault(alice, 1000 ether);
         _setupWchanStream(amount, 10 days);
 
-        uint256 recoverAmt = amount * recoverPct / 100;
+        uint256 fd = _firstDripAmount(amount, 10 days);
+        uint256 recoverAmt = (amount - fd) * recoverPct / 100;
 
         // Owner recovers some tokens
         vm.prank(owner);
         drip.recoverTokens(address(wchan), recoverAmt);
 
         (, , , uint256 remainingAfterRecover) = drip.wchanStream();
-        assertEq(remainingAfterRecover, amount - recoverAmt);
+        assertEq(remainingAfterRecover, amount - fd - recoverAmt);
 
         // Warp and drip — should not revert
         vm.warp(block.timestamp + elapsed);
@@ -1587,7 +1724,8 @@ contract DripBlackhatFuzzTest is DripBaseTest {
             }
         }
 
-        assertEq(totalDripped, amount, "must drain exactly configured amount");
+        uint256 fd = _firstDripAmount(amount, 2 days);
+        assertEq(totalDripped + fd, amount, "must drain exactly configured amount");
         (, , , uint256 remaining) = drip.wchanStream();
         assertEq(remaining, 0);
     }
@@ -1617,8 +1755,9 @@ contract DripBlackhatFuzzTest is DripBaseTest {
         drip.drip();
         uint256 dripped = wchan.balanceOf(address(vault)) - vaultBefore;
 
-        // Must drain exactly the remaining amount, never more
-        assertEq(dripped, amount);
+        // Must drain exactly the remaining amount (minus first drip), never more
+        uint256 fd = _firstDripAmount(amount, duration);
+        assertEq(dripped, amount - fd);
     }
 
     /// @dev Attack: Extend endTimestamp many times — verify all tokens still get distributed.
@@ -1735,7 +1874,11 @@ contract DripBlackhatFuzzTest is DripBaseTest {
         elapsed = bound(elapsed, 1 hours, 10 days);
 
         _stakeInVault(alice, 1000 ether);
+
+        // Track first drip from initial configure
+        uint256 vaultBeforeSetup = wchan.balanceOf(address(vault));
         _setupWchanStream(amount, 10 days);
+        uint256 initialFirstDrip = wchan.balanceOf(address(vault)) - vaultBeforeSetup;
 
         vm.warp(block.timestamp + elapsed);
 
@@ -1757,7 +1900,7 @@ contract DripBlackhatFuzzTest is DripBaseTest {
         drip.drip();
         uint256 finalDrip = wchan.balanceOf(address(vault)) - vaultBefore;
 
-        uint256 totalDistributed = frontRunDrip + settledOnConfigure + finalDrip;
+        uint256 totalDistributed = initialFirstDrip + frontRunDrip + settledOnConfigure + finalDrip;
 
         // Total distributed must equal total configured (amount + topUp)
         assertEq(totalDistributed, amount + topUp, "front-run should not affect total");
@@ -1770,9 +1913,11 @@ contract DripBlackhatFuzzTest is DripBaseTest {
         _stakeInVault(alice, 1000 ether);
         _setupWchanStream(amount, 10 days);
 
-        // Owner recovers everything
+        // Owner recovers everything remaining (first drip already sent some to vault)
+        uint256 fd = _firstDripAmount(amount, 10 days);
+        uint256 contractBal = amount - fd;
         vm.prank(owner);
-        drip.recoverTokens(address(wchan), amount);
+        drip.recoverTokens(address(wchan), contractBal);
 
         (, , , uint256 remaining) = drip.wchanStream();
         assertEq(remaining, 0);
@@ -1792,8 +1937,11 @@ contract DripBlackhatFuzzTest is DripBaseTest {
 
         // Mint enough tokens
         wchan.mint(owner, amount);
+
+        uint256 vaultBeforeSetup = wchan.balanceOf(address(vault));
         vm.prank(owner);
         drip.configureDrip(false, amount, block.timestamp + 1 days);
+        uint256 firstDrip = wchan.balanceOf(address(vault)) - vaultBeforeSetup;
 
         // Drip at midpoint
         vm.warp(block.timestamp + 12 hours);
@@ -1801,9 +1949,10 @@ contract DripBlackhatFuzzTest is DripBaseTest {
         drip.drip();
         uint256 dripped = wchan.balanceOf(address(vault)) - vaultBefore;
 
-        // Should be approximately half
-        assertApproxEqAbs(dripped, amount / 2, 1);
-        assertLe(dripped, amount);
+        uint256 afterSetup = amount - firstDrip;
+        // Should be approximately half of remaining after first drip
+        assertApproxEqAbs(dripped, afterSetup / 2, 1);
+        assertLe(dripped, afterSetup);
 
         // Drain the rest
         vm.warp(block.timestamp + 1 days);
@@ -1811,7 +1960,7 @@ contract DripBlackhatFuzzTest is DripBaseTest {
         drip.drip();
         uint256 rest = wchan.balanceOf(address(vault)) - vaultBefore;
 
-        assertEq(dripped + rest, amount);
+        assertEq(firstDrip + dripped + rest, amount);
     }
 
     /// @dev Attack: race condition — drip WCHAN succeeds but WETH gets skipped.
@@ -1862,7 +2011,9 @@ contract DripBlackhatFuzzTest is DripBaseTest {
         uint256 recoverAmt
     ) public {
         amount = bound(amount, 1 ether, INITIAL / 2);
-        recoverAmt = bound(recoverAmt, 1, amount);
+        uint256 fd = _firstDripAmount(amount, 10 days);
+        uint256 afterSetup = amount - fd;
+        recoverAmt = bound(recoverAmt, 1, afterSetup);
 
         _setupWethStream(amount, 10 days);
 
@@ -1870,7 +2021,7 @@ contract DripBlackhatFuzzTest is DripBaseTest {
         drip.recoverTokens(address(weth), recoverAmt);
 
         (, , , uint256 remaining) = drip.wethStream();
-        assertEq(remaining, amount - recoverAmt);
+        assertEq(remaining, afterSetup - recoverAmt);
         assertEq(weth.balanceOf(owner), INITIAL - amount + recoverAmt);
     }
 
@@ -1902,12 +2053,13 @@ contract DripBlackhatFuzzTest is DripBaseTest {
         (, , , uint256 remainingAfterRecover) = drip.wethStream();
         assertEq(remainingAfterRecover, 0);
 
-        // Reconfigure with fresh amount
+        // Reconfigure with fresh amount (first drip executes immediately)
         vm.prank(owner);
         drip.configureDrip(true, amount2, block.timestamp + 10 days);
 
+        uint256 fd2 = _firstDripAmount(amount2, 10 days);
         (, , , uint256 newRemaining) = drip.wethStream();
-        assertEq(newRemaining, amount2, "fresh configure after full recovery");
+        assertEq(newRemaining, amount2 - fd2, "fresh configure after full recovery");
 
         // Drain all
         vm.warp(block.timestamp + 20 days);
@@ -2100,6 +2252,27 @@ contract DripToggleSupplyTest is Test {
         assertEq(remaining, 1200 ether);
     }
 
+    /// @dev Verify _settleDrip for WETH settles correctly when stakers present,
+    ///      then toggling off doesn't affect the settled amounts.
+    function test_settleWeth_settlesWhenStakersPresent() public {
+        mockVault.setHasStakers(true);
+
+        vm.prank(owner);
+        drip.configureDrip(true, 1000 ether, block.timestamp + 10 days);
+
+        vm.warp(block.timestamp + 5 days);
+
+        (, , , uint256 remainingBefore) = drip.wethStream();
+
+        // Reconfigure triggers _settleDrip which should settle (stakers present)
+        vm.prank(owner);
+        drip.configureDrip(true, 200 ether, block.timestamp + 10 days);
+
+        (, , , uint256 remainingAfter) = drip.wethStream();
+        // Settlement should have reduced remaining: remaining < 1000 + 200
+        assertLt(remainingAfter, remainingBefore + 200 ether);
+    }
+
     /// @dev Attack: toggle supply to 0 BETWEEN wchan and weth processing in drip().
     ///      This can't actually happen in a single tx (no reentrancy), but verify
     ///      that even with stakers, if a later toggle happens, next drip adapts.
@@ -2138,5 +2311,559 @@ contract DripToggleSupplyTest is Test {
 
         // WETH should have dripped now (catch-up for skipped interval)
         assertLt(wethAfter3, wethAfter2);
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//          Drip Frequency Independence
+// ═══════════════════════════════════════════════════════
+
+/// @dev Verifies the self-correcting formula drains the same total
+///      regardless of how frequently drip() is called.
+contract DripFrequencyIndependenceTest is DripBaseTest {
+    /// @dev Drip at 1-hour intervals vs drain once at end → same total.
+    function test_frequentVsOnce_wchan() public {
+        uint256 amount = 1000 ether;
+        uint256 duration = 10 days;
+
+        // ── Path A: hourly drips ──
+        _stakeInVault(alice, 1000 ether);
+        _setupWchanStream(amount, duration);
+        uint256 fd = _firstDripAmount(amount, duration);
+
+        uint256 totalA;
+        uint256 maxIters = duration / 1 hours + 5;
+        for (uint256 i = 0; i < maxIters; i++) {
+            vm.warp(block.timestamp + 1 hours);
+            (bool wchanCan, ) = drip.canDrip();
+            if (wchanCan) {
+                uint256 before = wchan.balanceOf(address(vault));
+                drip.drip();
+                totalA += wchan.balanceOf(address(vault)) - before;
+            }
+        }
+        (, , , uint256 remA) = drip.wchanStream();
+        assertEq(remA, 0, "path A should be fully drained");
+        assertEq(totalA + fd, amount, "path A: total + firstDrip = configured");
+
+        // ── Path B: single drip after end ──
+        // Fresh deployment
+        DripWCHANRewards drip2 = new DripWCHANRewards(owner, IWCHANVault(address(vault)), IERC20(address(wchan)), IERC20(address(weth)));
+        wchan.mint(owner, amount);
+        vm.prank(owner);
+        wchan.approve(address(drip2), type(uint256).max);
+        vm.prank(owner);
+        drip2.configureDrip(false, amount, block.timestamp + duration);
+
+        vm.warp(block.timestamp + duration + 1);
+        uint256 vaultBefore = wchan.balanceOf(address(vault));
+        drip2.drip();
+        uint256 totalB = wchan.balanceOf(address(vault)) - vaultBefore;
+        uint256 fd2 = _firstDripAmount(amount, duration);
+
+        assertEq(totalB + fd2, amount, "path B: total + firstDrip = configured");
+
+        // Both paths drained the same total
+        assertEq(totalA + fd, totalB + fd2, "frequency-independent: same total drained");
+    }
+
+    /// @dev Fuzz: compare rapid (every hour) vs slow (every 2 days) drip frequencies.
+    function test_fuzz_frequencyIndependence(uint256 amount, uint256 duration) public {
+        amount = bound(amount, 1 ether, INITIAL / 4);
+        duration = bound(duration, 2 days, 30 days);
+
+        _stakeInVault(alice, 1000 ether);
+
+        // ── Path A: hourly drips ──
+        _setupWchanStream(amount, duration);
+        uint256 fd = _firstDripAmount(amount, duration);
+
+        uint256 totalA;
+        uint256 maxIters = duration / 1 hours + 5;
+        if (maxIters > 800) maxIters = 800;
+        for (uint256 i = 0; i < maxIters; i++) {
+            vm.warp(block.timestamp + 1 hours);
+            (bool wchanCan, ) = drip.canDrip();
+            if (wchanCan) {
+                uint256 before = wchan.balanceOf(address(vault));
+                drip.drip();
+                totalA += wchan.balanceOf(address(vault)) - before;
+            }
+        }
+        assertEq(totalA + fd, amount, "path A accounting");
+
+        // ── Path B: single drip at end (fresh contract) ──
+        DripWCHANRewards drip2 = new DripWCHANRewards(owner, IWCHANVault(address(vault)), IERC20(address(wchan)), IERC20(address(weth)));
+        wchan.mint(owner, amount);
+        vm.prank(owner);
+        wchan.approve(address(drip2), type(uint256).max);
+        vm.prank(owner);
+        drip2.configureDrip(false, amount, block.timestamp + duration);
+        uint256 fd2 = _firstDripAmount(amount, duration);
+
+        vm.warp(block.timestamp + duration + 1);
+        uint256 vaultBefore = wchan.balanceOf(address(vault));
+        drip2.drip();
+        uint256 totalB = wchan.balanceOf(address(vault)) - vaultBefore;
+
+        assertEq(totalB + fd2, amount, "path B accounting");
+        assertEq(totalA + fd, totalB + fd2, "frequency-independent");
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//      Drain → Reconfigure Cycle + Settlement/FirstDrip
+// ═══════════════════════════════════════════════════════
+
+/// @dev Tests multiple drain→reconfigure cycles and verifies settlement + first drip
+///      interaction when configureDrip is called after (or during) stream expiry.
+contract DripDrainRecycleFuzzTest is DripBaseTest {
+    /// @dev Configure → drain → configure → drain → configure → drain.
+    ///      Total distributed must equal total configured across all cycles.
+    function test_multiCycleDrainReconfigure() public {
+        _stakeInVault(alice, 1000 ether);
+
+        uint256 totalConfigured;
+        uint256 totalDistributed;
+
+        // ── Cycle 1 ──
+        uint256 amt1 = 500 ether;
+        uint256 dur1 = 5 days;
+        uint256 vaultBefore = wchan.balanceOf(address(vault));
+        _setupWchanStream(amt1, dur1);
+        uint256 fd1 = wchan.balanceOf(address(vault)) - vaultBefore;
+        totalConfigured += amt1;
+        totalDistributed += fd1;
+
+        vm.warp(block.timestamp + dur1 + 1);
+        vaultBefore = wchan.balanceOf(address(vault));
+        drip.drip();
+        totalDistributed += wchan.balanceOf(address(vault)) - vaultBefore;
+
+        (, , , uint256 rem1) = drip.wchanStream();
+        assertEq(rem1, 0, "cycle 1 fully drained");
+
+        // ── Cycle 2 ──
+        uint256 amt2 = 300 ether;
+        uint256 dur2 = 3 days;
+        vaultBefore = wchan.balanceOf(address(vault));
+        vm.prank(owner);
+        drip.configureDrip(false, amt2, block.timestamp + dur2);
+        totalDistributed += wchan.balanceOf(address(vault)) - vaultBefore; // first drip
+        totalConfigured += amt2;
+
+        vm.warp(block.timestamp + dur2 + 1);
+        vaultBefore = wchan.balanceOf(address(vault));
+        drip.drip();
+        totalDistributed += wchan.balanceOf(address(vault)) - vaultBefore;
+
+        (, , , uint256 rem2) = drip.wchanStream();
+        assertEq(rem2, 0, "cycle 2 fully drained");
+
+        // ── Cycle 3 ──
+        uint256 amt3 = 700 ether;
+        uint256 dur3 = 7 days;
+        vaultBefore = wchan.balanceOf(address(vault));
+        vm.prank(owner);
+        drip.configureDrip(false, amt3, block.timestamp + dur3);
+        totalDistributed += wchan.balanceOf(address(vault)) - vaultBefore;
+        totalConfigured += amt3;
+
+        vm.warp(block.timestamp + dur3 + 1);
+        vaultBefore = wchan.balanceOf(address(vault));
+        drip.drip();
+        totalDistributed += wchan.balanceOf(address(vault)) - vaultBefore;
+
+        (, , , uint256 rem3) = drip.wchanStream();
+        assertEq(rem3, 0, "cycle 3 fully drained");
+
+        // Conservation: total distributed == total configured
+        assertEq(totalDistributed, totalConfigured, "conservation across 3 cycles");
+        assertEq(wchan.balanceOf(address(drip)), 0, "drip contract empty");
+    }
+
+    /// @dev Fuzz: configure → drain → configure → drain. Track totals.
+    function test_fuzz_drainRecycleTwoCycles(
+        uint256 amt1,
+        uint256 dur1,
+        uint256 amt2,
+        uint256 dur2
+    ) public {
+        amt1 = bound(amt1, 1 ether, INITIAL / 6);
+        dur1 = bound(dur1, 1 hours, 30 days);
+        amt2 = bound(amt2, 1 ether, INITIAL / 6);
+        dur2 = bound(dur2, 1 hours, 30 days);
+
+        _stakeInVault(alice, 1000 ether);
+
+        uint256 totalConfigured;
+        uint256 totalDistributed;
+
+        // Cycle 1
+        uint256 vaultBefore = wchan.balanceOf(address(vault));
+        _setupWchanStream(amt1, dur1);
+        totalDistributed += wchan.balanceOf(address(vault)) - vaultBefore;
+        totalConfigured += amt1;
+
+        vm.warp(block.timestamp + dur1 + 1);
+        vaultBefore = wchan.balanceOf(address(vault));
+        (bool can, ) = drip.canDrip();
+        if (can) {
+            drip.drip();
+            totalDistributed += wchan.balanceOf(address(vault)) - vaultBefore;
+        }
+
+        // Cycle 2 — settlement drains any leftover from cycle 1
+        vaultBefore = wchan.balanceOf(address(vault));
+        vm.prank(owner);
+        drip.configureDrip(false, amt2, block.timestamp + dur2);
+        totalDistributed += wchan.balanceOf(address(vault)) - vaultBefore;
+        totalConfigured += amt2;
+
+        vm.warp(block.timestamp + dur2 + 1);
+        vaultBefore = wchan.balanceOf(address(vault));
+        (can, ) = drip.canDrip();
+        if (can) {
+            drip.drip();
+            totalDistributed += wchan.balanceOf(address(vault)) - vaultBefore;
+        }
+
+        // Drain any leftover
+        (, , , uint256 rem) = drip.wchanStream();
+        if (rem > 0) {
+            vm.warp(block.timestamp + 365 days);
+            vaultBefore = wchan.balanceOf(address(vault));
+            drip.drip();
+            totalDistributed += wchan.balanceOf(address(vault)) - vaultBefore;
+        }
+
+        assertEq(totalDistributed, totalConfigured, "conservation across 2 fuzz cycles");
+    }
+
+    /// @dev Fuzz: settlement drains to 0 past end → configureDrip fires first drip on NEW tokens.
+    ///      Verify: settled + firstDrip + newRemaining == oldRemaining + newAmount.
+    function test_fuzz_settlementThenFirstDrip(uint256 amount, uint256 elapsed, uint256 topUp) public {
+        amount = bound(amount, 1 ether, INITIAL / 4);
+        elapsed = bound(elapsed, 1 hours, 30 days);
+        topUp = bound(topUp, 1 ether, INITIAL / 4);
+
+        _stakeInVault(alice, 1000 ether);
+        _setupWchanStream(amount, 10 days);
+
+        vm.warp(block.timestamp + elapsed);
+
+        (, , , uint256 remainingBefore) = drip.wchanStream();
+        uint256 vaultBefore = wchan.balanceOf(address(vault));
+
+        vm.prank(owner);
+        drip.configureDrip(false, topUp, block.timestamp + 10 days);
+
+        uint256 vaultDelta = wchan.balanceOf(address(vault)) - vaultBefore;
+        (, , , uint256 remainingAfter) = drip.wchanStream();
+
+        // Core invariant: settlement + firstDrip (if fresh) + newRemaining == oldRemaining + topUp
+        assertEq(vaultDelta + remainingAfter, remainingBefore + topUp, "settlement+firstDrip conservation");
+    }
+
+    /// @dev Specifically test: elapsed past end → settlement drains to 0 → isFresh → first drip fires.
+    function test_settlementDrainsToZero_thenFirstDrip() public {
+        _stakeInVault(alice, 1000 ether);
+        _setupWchanStream(100 ether, 2 days);
+
+        // Warp past end
+        vm.warp(block.timestamp + 3 days);
+
+        uint256 vaultBefore = wchan.balanceOf(address(vault));
+
+        // Configure new stream — settlement drains old to 0, then first drip fires
+        vm.prank(owner);
+        drip.configureDrip(false, 500 ether, block.timestamp + 10 days);
+
+        uint256 vaultDelta = wchan.balanceOf(address(vault)) - vaultBefore;
+        (, , , uint256 remaining) = drip.wchanStream();
+
+        uint256 fd = _firstDripAmount(100 ether, 2 days);
+        uint256 oldRemaining = 100 ether - fd; // what was left before settlement
+
+        // vaultDelta = settlement of oldRemaining + first drip of new 500
+        // remaining = 500 - firstDrip(500, 10 days)
+        uint256 newFd = _firstDripAmount(500 ether, 10 days);
+        assertEq(remaining, 500 ether - newFd, "new stream remaining after first drip");
+        assertEq(vaultDelta, oldRemaining + newFd, "vault got settlement + new first drip");
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//   Both-Streams Preview + WETH First-Drip Dead Shares
+// ═══════════════════════════════════════════════════════
+
+/// @dev Tests that previewDrip matches actual drip for BOTH streams simultaneously,
+///      and verifies WETH first-drip behavior with dead shares (no real stakers).
+contract DripBothStreamsPreviewTest is DripBaseTest {
+    /// @dev Fuzz: setup both streams, fuzz elapsed, compare both previews to actuals.
+    function test_fuzz_bothStreamPreviewsMatchActuals(uint256 wchanAmt, uint256 wethAmt, uint256 elapsed) public {
+        wchanAmt = bound(wchanAmt, 1 ether, INITIAL / 4);
+        wethAmt = bound(wethAmt, 1 ether, INITIAL / 4);
+        elapsed = bound(elapsed, 1 hours, 30 days);
+
+        _stakeInVault(alice, 1000 ether);
+        _setupWchanStream(wchanAmt, 10 days);
+        _setupWethStream(wethAmt, 10 days);
+
+        vm.warp(block.timestamp + elapsed);
+
+        // Preview
+        (uint256 wchanPreview, uint256 wethPreview) = drip.previewDrip();
+
+        // Snapshot state before drip
+        uint256 vaultWchanBefore = wchan.balanceOf(address(vault));
+        (, , , uint256 wethRemBefore) = drip.wethStream();
+
+        // Actual drip
+        drip.drip();
+
+        uint256 wchanActual = wchan.balanceOf(address(vault)) - vaultWchanBefore;
+        (, , , uint256 wethRemAfter) = drip.wethStream();
+        uint256 wethActual = wethRemBefore - wethRemAfter;
+
+        // WCHAN preview must match exactly (vault.donate is 1:1)
+        assertEq(wchanPreview, wchanActual, "WCHAN preview == actual");
+        // WETH preview must match the stream deduction exactly
+        assertEq(wethPreview, wethActual, "WETH preview == actual (stream delta)");
+    }
+
+    /// @dev With only dead shares (no real stakers), WETH first drip goes to dead shares.
+    ///      earned(BURN_ADDRESS) captures the first drip; it's unclaimable by any user.
+    function test_wethFirstDrip_goesToDeadShares() public {
+        // No real stakers — only dead shares from constructor seed (1e6 wei)
+        address burnAddr = vault.BURN_ADDRESS();
+        uint256 earnedBefore = vault.earned(burnAddr);
+
+        uint256 amount = 500 ether;
+        _setupWethStream(amount, 10 days);
+
+        // The first drip should have been sent to vault.donateReward
+        // Dead shares are the only holders → they earn all of it
+        uint256 earnedAfter = vault.earned(burnAddr);
+        uint256 fd = _firstDripAmount(amount, 10 days);
+
+        // Dead shares capture the first drip (minus rounding)
+        assertApproxEqAbs(earnedAfter - earnedBefore, fd, 1, "dead shares earned first drip");
+
+        // BURN_ADDRESS cannot claim (it's an EOA that nobody controls)
+        // Verify earned > 0 but the rewards are effectively locked
+        assertGt(vault.earned(burnAddr), 0, "dead shares have unclaimed rewards");
+    }
+
+    /// @dev After dead shares absorb first drip, real staker joins and earns subsequent drips.
+    function test_wethFirstDripDeadShares_thenRealStakerEarns() public {
+        address burnAddr = vault.BURN_ADDRESS();
+
+        _setupWethStream(500 ether, 10 days);
+        uint256 deadEarnedAfterConfig = vault.earned(burnAddr);
+        assertGt(deadEarnedAfterConfig, 0, "dead shares got first drip");
+
+        // Alice stakes — she starts earning from this point
+        _stakeInVault(alice, 1000 ether);
+
+        vm.warp(block.timestamp + 1 hours);
+        drip.drip();
+
+        uint256 aliceEarned = vault.earned(alice);
+        assertGt(aliceEarned, 0, "alice earns after staking");
+
+        // Alice's share of dripped WETH should be much larger than dead shares' fraction
+        // (Alice has 1000 ether shares vs 1e6 wei dead shares)
+        uint256 deadEarnedDelta = vault.earned(burnAddr) - deadEarnedAfterConfig;
+        assertGt(aliceEarned, deadEarnedDelta * 1000, "alice earns >> dead shares from hourly drip");
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//              Stateful Invariant Test
+// ═══════════════════════════════════════════════════════
+
+/// @dev Handler for invariant testing — exposes bounded actions the fuzzer can call.
+contract DripHandler is Test {
+    DripWCHANRewards public drip;
+    MockToken public wchan;
+    MockToken public weth;
+    WCHANVault public vault;
+
+    address internal owner;
+    address internal alice;
+
+    // Ghost variables for tracking total configured and distributed
+    uint256 public totalWchanConfigured;
+    uint256 public totalWethConfigured;
+    uint256 public totalWchanDripped;
+    uint256 public totalWethDripped;
+    // Track first drips separately (they're distributed but not via drip())
+    uint256 public totalWchanFirstDrips;
+    uint256 public totalWethFirstDrips;
+
+    constructor(
+        DripWCHANRewards _drip,
+        MockToken _wchan,
+        MockToken _weth,
+        WCHANVault _vault,
+        address _owner,
+        address _alice
+    ) {
+        drip = _drip;
+        wchan = _wchan;
+        weth = _weth;
+        vault = _vault;
+        owner = _owner;
+        alice = _alice;
+    }
+
+    function configureWchan(uint256 amount, uint256 duration) external {
+        amount = bound(amount, 1 ether, 100_000 ether);
+        duration = bound(duration, 1 hours + 1, 30 days);
+
+        // Mint and approve
+        wchan.mint(owner, amount);
+        vm.prank(owner);
+        wchan.approve(address(drip), amount);
+
+        uint256 vaultBefore = wchan.balanceOf(address(vault));
+
+        vm.prank(owner);
+        drip.configureDrip(false, amount, block.timestamp + duration);
+
+        uint256 vaultDelta = wchan.balanceOf(address(vault)) - vaultBefore;
+
+        totalWchanConfigured += amount;
+        // vaultDelta = settlement + possible first drip
+        totalWchanDripped += vaultDelta;
+    }
+
+    function configureWeth(uint256 amount, uint256 duration) external {
+        amount = bound(amount, 1 ether, 100_000 ether);
+        duration = bound(duration, 1 hours + 1, 30 days);
+
+        weth.mint(owner, amount);
+        vm.prank(owner);
+        weth.approve(address(drip), amount);
+
+        (, , , uint256 remBefore) = drip.wethStream();
+
+        vm.prank(owner);
+        drip.configureDrip(true, amount, block.timestamp + duration);
+
+        (, , , uint256 remAfter) = drip.wethStream();
+        // Deduction from remaining = settlement + firstDrip (if applicable)
+        uint256 deducted = (remBefore + amount) - remAfter;
+        totalWethConfigured += amount;
+        totalWethDripped += deducted;
+    }
+
+    function doDrip() external {
+        (bool wchanCan, bool wethCan) = drip.canDrip();
+        if (!wchanCan && !wethCan) return;
+
+        uint256 vaultWchanBefore = wchan.balanceOf(address(vault));
+        (, , , uint256 wethRemBefore) = drip.wethStream();
+
+        drip.drip();
+
+        uint256 wchanDripped = wchan.balanceOf(address(vault)) - vaultWchanBefore;
+        (, , , uint256 wethRemAfter) = drip.wethStream();
+        uint256 wethDripped = wethRemBefore - wethRemAfter;
+
+        totalWchanDripped += wchanDripped;
+        totalWethDripped += wethDripped;
+    }
+
+    function recoverWchan(uint256 pct) external {
+        (, , , uint256 remaining) = drip.wchanStream();
+        uint256 bal = wchan.balanceOf(address(drip));
+        uint256 maxRecover = bal < remaining ? bal : remaining;
+        if (maxRecover == 0) return;
+
+        pct = bound(pct, 1, 100);
+        uint256 recoverAmt = maxRecover * pct / 100;
+        if (recoverAmt == 0) return;
+
+        vm.prank(owner);
+        drip.recoverTokens(address(wchan), recoverAmt);
+
+        // Recovery reduces configured total effectively
+        totalWchanConfigured -= recoverAmt;
+    }
+
+    function recoverWeth(uint256 pct) external {
+        (, , , uint256 remaining) = drip.wethStream();
+        uint256 bal = weth.balanceOf(address(drip));
+        uint256 maxRecover = bal < remaining ? bal : remaining;
+        if (maxRecover == 0) return;
+
+        pct = bound(pct, 1, 100);
+        uint256 recoverAmt = maxRecover * pct / 100;
+        if (recoverAmt == 0) return;
+
+        vm.prank(owner);
+        drip.recoverTokens(address(weth), recoverAmt);
+
+        totalWethConfigured -= recoverAmt;
+    }
+
+    function setInterval(uint256 newInterval) external {
+        newInterval = bound(newInterval, 0, 4 hours);
+        vm.prank(owner);
+        drip.setMinDripInterval(newInterval);
+    }
+
+    function warpTime(uint256 seconds_) external {
+        seconds_ = bound(seconds_, 1, 3 days);
+        vm.warp(block.timestamp + seconds_);
+    }
+}
+
+contract DripInvariantTest is DripBaseTest {
+    DripHandler public handler;
+
+    function setUp() public override {
+        super.setUp();
+
+        // Stake so drips work
+        _stakeInVault(alice, 1000 ether);
+
+        handler = new DripHandler(drip, wchan, weth, vault, owner, alice);
+
+        targetContract(address(handler));
+    }
+
+    /// @dev Invariant 1: WCHAN solvency — contract balance >= stream remaining.
+    function invariant_wchanSolvency() public view {
+        (, , , uint256 remaining) = drip.wchanStream();
+        assertGe(wchan.balanceOf(address(drip)), remaining, "WCHAN solvency: balance >= remaining");
+    }
+
+    /// @dev Invariant 2: WETH solvency — contract balance >= stream remaining.
+    function invariant_wethSolvency() public view {
+        (, , , uint256 remaining) = drip.wethStream();
+        assertGe(weth.balanceOf(address(drip)), remaining, "WETH solvency: balance >= remaining");
+    }
+
+    /// @dev Invariant 3: WCHAN conservation — dripped + remaining == configured.
+    function invariant_wchanConservation() public view {
+        (, , , uint256 remaining) = drip.wchanStream();
+        assertEq(
+            handler.totalWchanDripped() + remaining,
+            handler.totalWchanConfigured(),
+            "WCHAN conservation: dripped + remaining == configured"
+        );
+    }
+
+    /// @dev Invariant 4: WETH conservation — dripped + remaining == configured.
+    function invariant_wethConservation() public view {
+        (, , , uint256 remaining) = drip.wethStream();
+        assertEq(
+            handler.totalWethDripped() + remaining,
+            handler.totalWethConfigured(),
+            "WETH conservation: dripped + remaining == configured"
+        );
     }
 }
