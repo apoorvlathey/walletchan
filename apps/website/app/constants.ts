@@ -8,6 +8,9 @@ export const POOL_ADDRESS = WCHAN_POOL_ID;
 export const BNKRW_POOL_ADDRESS =
   "0x6c8fd04c19e3c6c3efc21f6f5ae79c1453a19d971b7b7d4969df1928c380aaad";
 
+export const WCHAN_L1_ETH_MAINNET =
+  "0x5767Eb96BB936ddE132CBcD01BC3CF1dae2EF4F4";
+
 // App URLs
 export const CHROME_STORE_URL =
   "https://chromewebstore.google.com/detail/bankrwallet/kofbkhbkfhiollbhjkbebajngppmpbgc";
