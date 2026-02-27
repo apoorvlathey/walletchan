@@ -1,4 +1,4 @@
-// ERC-20 functions (for BNKRW token)
+// ERC-20 minimal ABI (balanceOf, allowance, approve)
 export const erc20Abi = [
   {
     inputs: [{ name: "account", type: "address" }],
@@ -29,8 +29,22 @@ export const erc20Abi = [
   },
 ] as const;
 
-// ERC-4626 vault functions (for sBNKRW vault)
-export const vaultAbi = [
+// WCHANVault (ERC-4626 + penalty)
+export const wchanVaultAbi = [
+  {
+    inputs: [],
+    name: "totalAssets",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalSupply",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
   {
     inputs: [{ name: "account", type: "address" }],
     name: "balanceOf",
@@ -74,8 +88,25 @@ export const vaultAbi = [
     type: "function",
   },
   {
+    inputs: [
+      { name: "shares", type: "uint256" },
+      { name: "owner", type: "address" },
+    ],
+    name: "previewRedeemNet",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [{ name: "owner", type: "address" }],
-    name: "maxDeposit",
+    name: "getPenaltyBps",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "owner", type: "address" }],
+    name: "maxWithdraw",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
@@ -85,6 +116,38 @@ export const vaultAbi = [
     name: "maxRedeem",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "", type: "address" }],
+    name: "lastDepositTimestamp",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "account", type: "address" }],
+    name: "earned",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "claimRewards",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+// WCHANVaultMigrateZap
+export const migrateZapAbi = [
+  {
+    inputs: [{ name: "shares", type: "uint256" }],
+    name: "migrate",
+    outputs: [{ name: "newShares", type: "uint256" }],
+    stateMutability: "nonpayable",
     type: "function",
   },
 ] as const;

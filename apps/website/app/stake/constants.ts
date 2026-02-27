@@ -1,8 +1,15 @@
-export {
-  BASE_CHAIN_ID as STAKE_CHAIN_ID,
-  BNKRW_TOKEN_ADDRESS,
-  SBNKRW_VAULT_ADDRESS,
-} from "@walletchan/shared/contracts";
+import {
+  MIGRATE_STAKING_ZAP_ADDRESSES,
+  DRIP_ADDRESSES,
+} from "@walletchan/contract-addresses";
 
-// Wasabi API (website-only, not shared)
-export const WASABI_API_URL = "https://api.wasabi.xyz";
+export const STAKE_CHAIN_ID = 8453;
+
+const migrate = MIGRATE_STAKING_ZAP_ADDRESSES[STAKE_CHAIN_ID];
+const drip = DRIP_ADDRESSES[STAKE_CHAIN_ID];
+
+export const WCHAN_VAULT_ADDR = drip.wchanVault as `0x${string}`;
+export const WCHAN_TOKEN_ADDR = drip.wchan as `0x${string}`;
+export const OLD_VAULT_ADDR = migrate.oldVault as `0x${string}`;
+export const OLD_TOKEN_ADDR = migrate.oldToken as `0x${string}`;
+export const MIGRATE_ZAP_ADDR = migrate.migrateZap as `0x${string}`;

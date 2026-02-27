@@ -28,13 +28,28 @@ import {
   useBalance,
 } from "wagmi";
 import { formatUnits, parseEther } from "viem";
-import { DRIP_ADDRESSES as DRIP_CHAINS, DEFAULT_DRIP_CHAIN_ID } from "@walletchan/contract-addresses";
+import { DRIP_ADDRESSES as DRIP_CHAINS } from "@walletchan/contract-addresses";
 import { erc20Abi, weth9Abi, wchanVaultAbi, dripRewardsAbi } from "./abi";
 import VaultStake from "./VaultStake";
 import VaultStats from "./VaultStats";
 import { useTokenData } from "../../contexts/TokenDataContext";
 
 const POLL_MS = 5_000;
+
+function formatUsd(value: number): string {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(2)}K`;
+  if (value >= 0.01) return `$${value.toFixed(2)}`;
+  if (value > 0) return `<$0.01`;
+  return `$0.00`;
+}
+
+function weiToUsd(wei: bigint | undefined, price: number | null): string | null {
+  if (!wei || !price) return null;
+  const num = parseFloat(formatUnits(wei, 18));
+  if (num === 0) return null;
+  return formatUsd(num * price);
+}
 
 function fmtBal(wei: bigint | undefined, decimals = 4): string {
   if (!wei) return "0";
@@ -128,6 +143,7 @@ interface StreamInputProps {
   selectedChainId: number;
   isWalletConnected: boolean;
   isWrongChain: boolean;
+  isNotOwner: boolean;
   dripTokenPrice: number | null;
   wchanPrice: number | null;
   explorerUrl: string;
@@ -151,6 +167,7 @@ function StreamInput({
   isWalletConnected,
   isWrongChain,
   dripTokenPrice,
+  isNotOwner,
   wchanPrice,
   explorerUrl,
   onSuccess,
@@ -441,21 +458,6 @@ function StreamInput({
           </Text>
         </HStack>
 
-        {/* Balance display */}
-        <HStack mb={3} spacing={1} flexWrap="wrap">
-          <Text fontSize="xs" fontWeight="700" color="gray.500" textTransform="uppercase">
-            {tokenSymbol}:
-          </Text>
-          <Text fontSize="xs" fontWeight="900">
-            {fmtBal(balance)}
-          </Text>
-          {isWeth && ethBalance !== undefined && (
-            <Text fontSize="xs" fontWeight="700" color="gray.400">
-              (+ {fmtBal(ethBalance)} ETH)
-            </Text>
-          )}
-        </HStack>
-
         {/* Existing stream info */}
         {streamActive && (
           <Box
@@ -468,31 +470,78 @@ function StreamInput({
             <Text fontSize="xs" fontWeight="700" color="gray.500" textTransform="uppercase">
               Active Stream
             </Text>
-            <Text fontSize="xs" fontWeight="bold">
-              {fmtBal(existingStream!.amountRemaining)} remaining
-            </Text>
+            <HStack spacing={1}>
+              <Text fontSize="xs" fontWeight="bold">
+                {fmtBal(existingStream!.amountRemaining)} remaining
+              </Text>
+              {weiToUsd(existingStream!.amountRemaining, dripTokenPrice) && (
+                <Text fontSize="xs" fontWeight="700" color="gray.400">
+                  {weiToUsd(existingStream!.amountRemaining, dripTokenPrice)}
+                </Text>
+              )}
+            </HStack>
             <Text fontSize="xs" color="gray.400">
               Ends: {new Date(Number(existingStream!.endTimestamp) * 1000).toLocaleString()}
             </Text>
           </Box>
         )}
 
+        {/* Balance display */}
+        <HStack mb={2} spacing={1} flexWrap="wrap">
+          <Text fontSize="xs" fontWeight="700" color="gray.500" textTransform="uppercase">
+            Your {tokenSymbol}:
+          </Text>
+          <Text fontSize="xs" fontWeight="900">
+            {fmtBal(balance)}
+          </Text>
+          {weiToUsd(balance, dripTokenPrice) && (
+            <Text fontSize="xs" fontWeight="700" color="gray.400">
+              {weiToUsd(balance, dripTokenPrice)}
+            </Text>
+          )}
+          {isWeth && ethBalance !== undefined && (
+            <Text fontSize="xs" fontWeight="700" color="gray.400">
+              (+ {fmtBal(ethBalance)} ETH{weiToUsd(ethBalance, dripTokenPrice) ? ` ${weiToUsd(ethBalance, dripTokenPrice)}` : ""})
+            </Text>
+          )}
+        </HStack>
+
         {/* Amount input + slider */}
         <VStack spacing={2} align="stretch" mb={3}>
-          <Input
-            placeholder="0.0"
-            value={amount}
-            onChange={(e) => {
-              setAmount(e.target.value);
-              setSliderPct(0);
-            }}
-            size="sm"
-            fontWeight="bold"
-            borderRadius={0}
+          <Flex
+            align="center"
             border="2px solid"
             borderColor={hasInsufficientBalance ? "red.400" : "bauhaus.border"}
-            _focus={{ borderColor: accentColor }}
-          />
+            _focusWithin={{ borderColor: accentColor }}
+            px={2}
+          >
+            <Input
+              placeholder="0.0"
+              value={amount}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setSliderPct(0);
+              }}
+              size="sm"
+              fontWeight="bold"
+              borderRadius={0}
+              border="none"
+              p={0}
+              flex={1}
+              _focus={{ boxShadow: "none" }}
+            />
+            {amount && parseFloat(amount) > 0 && dripTokenPrice && (
+              <Text
+                fontSize="xs"
+                fontWeight="700"
+                color="gray.400"
+                whiteSpace="nowrap"
+                ml={2}
+              >
+                ≈ {formatUsd(parseFloat(amount) * dripTokenPrice)}
+              </Text>
+            )}
+          </Flex>
           <Slider
             value={sliderPct}
             onChange={handleSlider}
@@ -590,6 +639,7 @@ function StreamInput({
           isDisabled={
             !isWalletConnected ||
             isWrongChain ||
+            isNotOwner ||
             !parsedAmount ||
             (hasInsufficientBalance && !needsWrap) ||
             isBusy
@@ -617,9 +667,7 @@ export default function DripSection() {
   useEffect(() => {
     const fetchEthPrice = async () => {
       try {
-        const res = await fetch(
-          "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
-        );
+        const res = await fetch("/api/eth-price");
         const data = await res.json();
         if (data?.ethereum?.usd) setEthPrice(data.ethereum.usd);
       } catch {
@@ -631,7 +679,7 @@ export default function DripSection() {
     return () => clearInterval(interval);
   }, []);
 
-  const [selectedChainId, setSelectedChainId] = useState(DEFAULT_DRIP_CHAIN_ID);
+  const [selectedChainId, setSelectedChainId] = useState(8453);
   const chain = DRIP_CHAINS[selectedChainId]!;
   const isWrongChain = isWalletConnected && walletChainId !== selectedChainId;
   const getChainName = (id: number) => chains.find((c) => c.id === id)?.name ?? String(id);
@@ -641,6 +689,19 @@ export default function DripSection() {
   const wethAddr = chain.weth as `0x${string}`;
   const vaultAddr = chain.wchanVault as `0x${string}`;
   const dripAddr = chain.dripWchanRewards as `0x${string}`;
+
+  // Check contract owner
+  const { data: dripOwner } = useReadContract({
+    address: dripAddr,
+    abi: dripRewardsAbi,
+    functionName: "owner",
+    chainId: selectedChainId,
+  });
+  const isNotOwner =
+    isWalletConnected &&
+    !!address &&
+    !!dripOwner &&
+    address.toLowerCase() !== (dripOwner as string).toLowerCase();
 
   // On-chain reads
   const { data: vaultTotalAssets, refetch: refetchAssets } = useReadContract({
@@ -918,6 +979,34 @@ export default function DripSection() {
           </HStack>
         )}
 
+        {/* Not owner banner */}
+        {isNotOwner && (
+          <HStack
+            justify="center"
+            spacing={3}
+            bg="orange.400"
+            border="2px solid"
+            borderColor="bauhaus.border"
+            px={4}
+            py={2}
+            mb={4}
+          >
+            <AlertTriangle size={16} color="white" />
+            <Text
+              fontSize="xs"
+              fontWeight="800"
+              textTransform="uppercase"
+              letterSpacing="wide"
+              color="white"
+            >
+              Not Contract Owner
+            </Text>
+            <Text fontSize="xs" fontWeight="700" color="white">
+              Owner: {(dripOwner as string).slice(0, 6)}...{(dripOwner as string).slice(-4)}
+            </Text>
+          </HStack>
+        )}
+
         {/* Vault stats + drip trigger */}
         <Flex mb={4} justify="space-between" align="center" flexWrap="wrap" gap={2}>
           <Text fontSize="xs" fontWeight="700" color="gray.500">
@@ -925,6 +1014,11 @@ export default function DripSection() {
             <Text as="span" fontWeight="900" color="bauhaus.black">
               {vaultTotalAssets ? fmtBal(vaultTotalAssets) : "—"} WCHAN
             </Text>
+            {weiToUsd(vaultTotalAssets as bigint | undefined, wchanPrice) && (
+              <Text as="span" fontWeight="700" color="gray.400">
+                {" "}{weiToUsd(vaultTotalAssets as bigint | undefined, wchanPrice)}
+              </Text>
+            )}
           </Text>
           <HStack spacing={3}>
             {!canDripEither && nextDripTime && (
@@ -967,6 +1061,7 @@ export default function DripSection() {
             selectedChainId={selectedChainId}
             isWalletConnected={isWalletConnected}
             isWrongChain={isWrongChain}
+            isNotOwner={!!isNotOwner}
             dripTokenPrice={wchanPrice}
             wchanPrice={wchanPrice}
             explorerUrl={explorerUrl}
@@ -988,6 +1083,7 @@ export default function DripSection() {
             selectedChainId={selectedChainId}
             isWalletConnected={isWalletConnected}
             isWrongChain={isWrongChain}
+            isNotOwner={!!isNotOwner}
             dripTokenPrice={ethPrice}
             wchanPrice={wchanPrice}
             explorerUrl={explorerUrl}

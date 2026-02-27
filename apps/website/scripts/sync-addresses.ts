@@ -64,7 +64,6 @@ const DRIP_KEY_MAP: Record<string, string> = {
 };
 
 const DRIP_CHAINS = ["11155111", "8453"];
-const DEFAULT_DRIP_CHAIN = "11155111";
 
 // ─── migrate staking zap addresses ───
 
@@ -140,7 +139,6 @@ ${dripSection}
 };
 
 export const SUPPORTED_DRIP_CHAIN_IDS = Object.keys(DRIP_ADDRESSES).map(Number);
-export const DEFAULT_DRIP_CHAIN_ID = ${DEFAULT_DRIP_CHAIN};
 
 // ─── Migrate Staking Zap Addresses ───
 

@@ -6,13 +6,16 @@ export {
   // Drip
   DRIP_ADDRESSES,
   SUPPORTED_DRIP_CHAIN_IDS,
-  DEFAULT_DRIP_CHAIN_ID,
+  // Migrate Staking Zap
+  MIGRATE_STAKING_ZAP_ADDRESSES,
+  getMigrateStakingZapAddresses,
 } from "./addresses";
 
 export type {
   SwapChainAddresses,
   SupportedSwapChainId,
   DripChainAddresses,
+  MigrateStakingZapChainAddresses,
 } from "./addresses";
 
 // Backwards-compatible aliases for wchan-swap consumers

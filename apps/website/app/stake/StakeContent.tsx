@@ -14,9 +14,9 @@ import {
   SliderFilledTrack,
   SliderThumb,
   SliderMark,
-  Skeleton,
   Image,
   Flex,
+  Center,
   Link,
   Spinner,
   useToast,
@@ -38,17 +38,16 @@ import { TokenBanner } from "../components/TokenBanner";
 import { Footer } from "../components/Footer";
 import { useVaultData } from "../contexts/VaultDataContext";
 import { useTokenData } from "../contexts/TokenDataContext";
-import { erc20Abi, vaultAbi } from "./abi";
+import { erc20Abi, wchanVaultAbi, migrateZapAbi } from "./abi";
 import {
   STAKE_CHAIN_ID,
-  BNKRW_TOKEN_ADDRESS,
-  SBNKRW_VAULT_ADDRESS,
+  WCHAN_VAULT_ADDR,
+  WCHAN_TOKEN_ADDR,
+  OLD_VAULT_ADDR,
+  MIGRATE_ZAP_ADDR,
 } from "./constants";
 
 const MotionBox = motion(Box);
-
-const VAULT_ADDR = SBNKRW_VAULT_ADDRESS as `0x${string}`;
-const TOKEN_ADDR = BNKRW_TOKEN_ADDRESS as `0x${string}`;
 
 type TabType = "deposit" | "withdraw";
 
@@ -64,12 +63,279 @@ function formatBalance(raw: bigint | undefined, decimals: number = 18): string {
 function formatUsd(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
   if (value >= 1_000) return `$${(value / 1_000).toFixed(2)}K`;
-  return `$${value.toFixed(2)}`;
+  if (value >= 0.01) return `$${value.toFixed(2)}`;
+  if (value > 0) return `<$0.01`;
+  return `$0.00`;
 }
 
-function formatApr(value: number): string {
-  return `${value.toFixed(2)}%`;
+// ═══════════════════════════════════════════════════════
+//               Migration Banner
+// ═══════════════════════════════════════════════════════
+
+function MigrationBanner({
+  address,
+  onMigrated,
+}: {
+  address: `0x${string}`;
+  onMigrated: () => void;
+}) {
+  const toast = useToast();
+  const { vaultData } = useVaultData();
+
+  // Old vault (sBNKRW) balance
+  const { data: oldVaultBalance, refetch: refetchOldBalance } = useReadContract(
+    {
+      address: OLD_VAULT_ADDR,
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [address],
+      chainId: STAKE_CHAIN_ID,
+      query: { enabled: true, refetchInterval: 5000 },
+    },
+  );
+
+  // Old vault shares allowance for zap
+  const { data: zapAllowance, refetch: refetchZapAllowance } = useReadContract({
+    address: OLD_VAULT_ADDR,
+    abi: erc20Abi,
+    functionName: "allowance",
+    args: [address, MIGRATE_ZAP_ADDR],
+    chainId: STAKE_CHAIN_ID,
+    query: { enabled: true, refetchInterval: 5000 },
+  });
+
+  const balance = oldVaultBalance as bigint | undefined;
+  const allowance = zapAllowance as bigint | undefined;
+
+  const needsApproval =
+    balance !== undefined &&
+    balance > 0n &&
+    allowance !== undefined &&
+    allowance < balance;
+
+  // Approve
+  const {
+    writeContract: writeApprove,
+    data: approveTxHash,
+    isPending: isApproving,
+    reset: resetApprove,
+  } = useWriteContract();
+
+  const { isLoading: isApproveConfirming, isSuccess: isApproveConfirmed } =
+    useWaitForTransactionReceipt({ hash: approveTxHash });
+
+  // Migrate
+  const {
+    writeContract: writeMigrate,
+    data: migrateTxHash,
+    isPending: isMigrating,
+    reset: resetMigrate,
+  } = useWriteContract();
+
+  const { isLoading: isMigrateConfirming, isSuccess: isMigrateConfirmed } =
+    useWaitForTransactionReceipt({ hash: migrateTxHash });
+
+  const isBusy =
+    isApproving || isApproveConfirming || isMigrating || isMigrateConfirming;
+
+  useEffect(() => {
+    if (isApproveConfirmed) {
+      refetchZapAllowance().then(() => {
+        toast({
+          title: "Approval confirmed",
+          description: "You can now migrate your sBNKRW.",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+          position: "bottom-right",
+        });
+        resetApprove();
+      });
+    }
+  }, [isApproveConfirmed, refetchZapAllowance, toast, resetApprove]);
+
+  useEffect(() => {
+    if (isMigrateConfirmed && migrateTxHash) {
+      refetchOldBalance();
+      onMigrated();
+      const txUrl = `https://basescan.org/tx/${migrateTxHash}`;
+      toast({
+        title: "Migration successful",
+        description: (
+          <>
+            Your sBNKRW has been migrated to sWCHAN.{" "}
+            <a
+              href={txUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: "underline" }}
+            >
+              View on BaseScan
+            </a>
+          </>
+        ),
+        status: "success",
+        duration: 10000,
+        isClosable: true,
+        position: "bottom-right",
+      });
+      resetMigrate();
+    }
+  }, [
+    isMigrateConfirmed,
+    migrateTxHash,
+    refetchOldBalance,
+    onMigrated,
+    toast,
+    resetMigrate,
+  ]);
+
+  const handleApprove = useCallback(() => {
+    if (!balance) return;
+    writeApprove(
+      {
+        address: OLD_VAULT_ADDR,
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [MIGRATE_ZAP_ADDR, balance],
+        chainId: STAKE_CHAIN_ID,
+      },
+      {
+        onError: (err) => {
+          toast({
+            title: "Approval failed",
+            description: err.message.split("\n")[0],
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "bottom-right",
+          });
+        },
+      },
+    );
+  }, [balance, writeApprove, toast]);
+
+  const handleMigrate = useCallback(() => {
+    if (!balance) return;
+    writeMigrate(
+      {
+        address: MIGRATE_ZAP_ADDR,
+        abi: migrateZapAbi,
+        functionName: "migrate",
+        args: [balance],
+        chainId: STAKE_CHAIN_ID,
+      },
+      {
+        onError: (err) => {
+          toast({
+            title: "Migration failed",
+            description: err.message.split("\n")[0],
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "bottom-right",
+          });
+        },
+      },
+    );
+  }, [balance, writeMigrate, toast]);
+
+  // Don't show if no balance
+  if (!balance || balance === 0n) return null;
+
+  const buttonLabel = (() => {
+    if (isApproving || isApproveConfirming) return "Approving...";
+    if (isMigrating || isMigrateConfirming) return "Migrating...";
+    if (needsApproval) return "Approve sBNKRW";
+    return "Migrate All to sWCHAN";
+  })();
+
+  return (
+    <Box
+      bg="bauhaus.yellow"
+      border="3px solid"
+      borderColor="bauhaus.black"
+      boxShadow="4px 4px 0px 0px #121212"
+      p={4}
+    >
+      <Flex
+        direction={{ base: "column", md: "row" }}
+        align={{ base: "stretch", md: "center" }}
+        justify="space-between"
+        gap={3}
+      >
+        <VStack align="flex-start" spacing={1}>
+          <Text
+            fontWeight="900"
+            fontSize="sm"
+            textTransform="uppercase"
+            letterSpacing="wider"
+          >
+            Migrate from old vault
+          </Text>
+          <Text fontSize="xs" fontWeight="600" color="gray.700">
+            You have{" "}
+            <Text as="span" fontWeight="900">
+              {formatBalance(balance)}
+            </Text>{" "}
+            sBNKRW in the old vault.
+          </Text>
+          <Text fontSize="xs" fontWeight="600" color="gray.700">
+            Migrate to sWCHAN in one click and
+          </Text>
+          <Text fontSize="xs" fontWeight="600" color="gray.700">
+            start earning{" "}
+            <Text as="span" fontWeight="900">
+              {vaultData ? `${vaultData.totalApy.toFixed(1)}%` : "—"} APY.
+            </Text>
+          </Text>
+        </VStack>
+        <Button
+          variant="secondary"
+          size="sm"
+          minW="160px"
+          isDisabled={isBusy}
+          isLoading={isBusy}
+          loadingText={buttonLabel}
+          onClick={needsApproval ? handleApprove : handleMigrate}
+        >
+          {buttonLabel}
+        </Button>
+      </Flex>
+
+      {/* Tx status */}
+      {(approveTxHash || migrateTxHash) && (
+        <HStack justify="center" mt={2} spacing={2}>
+          {(isApproveConfirming || isMigrateConfirming) && (
+            <>
+              <Spinner size="xs" />
+              <Text fontSize="xs" fontWeight="700" textTransform="uppercase">
+                Confirming...
+              </Text>
+            </>
+          )}
+          <Link
+            href={`https://basescan.org/tx/${approveTxHash || migrateTxHash}`}
+            isExternal
+            fontSize="xs"
+            fontWeight="700"
+            textTransform="uppercase"
+            display="inline-flex"
+            alignItems="center"
+            gap={1}
+          >
+            View on BaseScan
+            <ExternalLink size={10} />
+          </Link>
+        </HStack>
+      )}
+    </Box>
+  );
 }
+
+// ═══════════════════════════════════════════════════════
+//               Main Stake Content
+// ═══════════════════════════════════════════════════════
 
 export default function StakeContent() {
   const [activeTab, setActiveTab] = useState<TabType>("deposit");
@@ -85,19 +351,37 @@ export default function StakeContent() {
   const { switchChain } = useSwitchChain();
   const isWrongChain = isWalletConnected && chainId !== STAKE_CHAIN_ID;
 
-  // Vault data from Wasabi API
-  const { vaultData, isLoading: isVaultLoading, refetchVaultData } = useVaultData();
+  // Vault data from indexer
+  const {
+    vaultData,
+    isLoading: isVaultLoading,
+    refetchVaultData,
+  } = useVaultData();
 
   // Token price
   const { tokenData } = useTokenData();
   const tokenPrice = tokenData?.priceRaw ?? 0;
 
-  // BNKRW balance
-  const {
-    data: bnkrwBalance,
-    refetch: refetchBnkrw,
-  } = useReadContract({
-    address: TOKEN_ADDR,
+  // ETH price for WETH rewards USD display
+  const [ethPrice, setEthPrice] = useState<number>(0);
+  useEffect(() => {
+    const fetchEthPrice = async () => {
+      try {
+        const res = await fetch("/api/eth-price");
+        const data = await res.json();
+        if (data?.ethereum?.usd) setEthPrice(data.ethereum.usd);
+      } catch {
+        // silent
+      }
+    };
+    fetchEthPrice();
+    const interval = setInterval(fetchEthPrice, 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // WCHAN balance
+  const { data: wchanBalance, refetch: refetchWchan } = useReadContract({
+    address: WCHAN_TOKEN_ADDR,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
@@ -105,55 +389,73 @@ export default function StakeContent() {
     query: { enabled: !!address, refetchInterval: 2000 },
   });
 
-  // sBNKRW (staked) balance
-  const {
-    data: stakedBalance,
-    refetch: refetchStaked,
-  } = useReadContract({
-    address: VAULT_ADDR,
-    abi: vaultAbi,
+  // sWCHAN (staked) balance
+  const { data: stakedBalance, refetch: refetchStaked } = useReadContract({
+    address: WCHAN_VAULT_ADDR,
+    abi: wchanVaultAbi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     chainId: STAKE_CHAIN_ID,
     query: { enabled: !!address, refetchInterval: 2000 },
   });
 
-  // BNKRW allowance for vault
-  const {
-    data: allowance,
-    refetch: refetchAllowance,
-  } = useReadContract({
-    address: TOKEN_ADDR,
+  // WCHAN allowance for vault
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
+    address: WCHAN_TOKEN_ADDR,
     abi: erc20Abi,
     functionName: "allowance",
-    args: address ? [address, VAULT_ADDR] : undefined,
+    args: address ? [address, WCHAN_VAULT_ADDR] : undefined,
     chainId: STAKE_CHAIN_ID,
     query: { enabled: !!address, refetchInterval: 2000 },
   });
 
-  // Preview deposit (BNKRW -> sBNKRW)
+  // Penalty info (needed on both deposit and withdraw tabs)
+  const { data: penaltyBps } = useReadContract({
+    address: WCHAN_VAULT_ADDR,
+    abi: wchanVaultAbi,
+    functionName: "getPenaltyBps",
+    args: address ? [address] : undefined,
+    chainId: STAKE_CHAIN_ID,
+    query: {
+      enabled: !!address,
+      refetchInterval: 5000,
+    },
+  });
+
+  // Last deposit timestamp (for penalty countdown)
+  const { data: lastDepositTs } = useReadContract({
+    address: WCHAN_VAULT_ADDR,
+    abi: wchanVaultAbi,
+    functionName: "lastDepositTimestamp",
+    args: address ? [address] : undefined,
+    chainId: STAKE_CHAIN_ID,
+    query: {
+      enabled: !!address,
+      refetchInterval: 5000,
+    },
+  });
+
+  // Preview deposit (WCHAN -> sWCHAN)
   const parsedAmount =
-    amount && parseFloat(amount) > 0
-      ? parseUnits(amount, 18)
-      : undefined;
+    amount && parseFloat(amount) > 0 ? parseUnits(amount, 18) : undefined;
 
   const { data: previewShares } = useReadContract({
-    address: VAULT_ADDR,
-    abi: vaultAbi,
+    address: WCHAN_VAULT_ADDR,
+    abi: wchanVaultAbi,
     functionName: "previewDeposit",
     args: parsedAmount ? [parsedAmount] : undefined,
     chainId: STAKE_CHAIN_ID,
     query: { enabled: activeTab === "deposit" && !!parsedAmount },
   });
 
-  // Preview redeem (sBNKRW -> BNKRW)
-  const { data: previewAssets } = useReadContract({
-    address: VAULT_ADDR,
-    abi: vaultAbi,
-    functionName: "previewRedeem",
-    args: parsedAmount ? [parsedAmount] : undefined,
+  // Preview redeem net (sWCHAN -> WCHAN, after penalty)
+  const { data: previewAssetsNet } = useReadContract({
+    address: WCHAN_VAULT_ADDR,
+    abi: wchanVaultAbi,
+    functionName: "previewRedeemNet",
+    args: parsedAmount && address ? [parsedAmount, address] : undefined,
     chainId: STAKE_CHAIN_ID,
-    query: { enabled: activeTab === "withdraw" && !!parsedAmount },
+    query: { enabled: activeTab === "withdraw" && !!parsedAmount && !!address },
   });
 
   // Write contracts
@@ -178,6 +480,26 @@ export default function StakeContent() {
     reset: resetRedeem,
   } = useWriteContract();
 
+  // WETH rewards
+  const { data: earnedWeth, refetch: refetchEarned } = useReadContract({
+    address: WCHAN_VAULT_ADDR,
+    abi: wchanVaultAbi,
+    functionName: "earned",
+    args: address ? [address] : undefined,
+    chainId: STAKE_CHAIN_ID,
+    query: { enabled: !!address, refetchInterval: 5000 },
+  });
+
+  const {
+    writeContract: writeClaim,
+    data: claimTxHash,
+    isPending: isClaiming,
+    reset: resetClaim,
+  } = useWriteContract();
+
+  const { isLoading: isClaimConfirming, isSuccess: isClaimConfirmed } =
+    useWaitForTransactionReceipt({ hash: claimTxHash });
+
   // Wait for tx receipts
   const { isLoading: isApproveConfirming, isSuccess: isApproveConfirmed } =
     useWaitForTransactionReceipt({ hash: approveTxHash });
@@ -189,9 +511,8 @@ export default function StakeContent() {
     useWaitForTransactionReceipt({ hash: redeemTxHash });
 
   // Derived state
-  const currentBalance =
-    activeTab === "deposit" ? bnkrwBalance : stakedBalance;
-  const currentSymbol = activeTab === "deposit" ? "BNKRW" : "sBNKRW";
+  const currentBalance = activeTab === "deposit" ? wchanBalance : stakedBalance;
+  const currentSymbol = activeTab === "deposit" ? "WCHAN" : "sWCHAN";
 
   const needsApproval =
     activeTab === "deposit" &&
@@ -212,13 +533,22 @@ export default function StakeContent() {
     isRedeeming ||
     isRedeemConfirming;
 
-  // After approve confirms, refetch allowance then reset
+  const penaltyPct =
+    penaltyBps !== undefined ? Number(penaltyBps as bigint) / 100 : 0;
+
+  const PENALTY_DURATION = 7 * 24 * 60 * 60; // 7 days in seconds
+  const zeroPenaltyDate =
+    lastDepositTs !== undefined && (lastDepositTs as bigint) > 0n
+      ? new Date((Number(lastDepositTs as bigint) + PENALTY_DURATION) * 1000)
+      : null;
+
+  // After approve confirms
   useEffect(() => {
     if (isApproveConfirmed) {
       refetchAllowance().then(() => {
         toast({
           title: "Approval confirmed",
-          description: "You can now deposit your BNKRW.",
+          description: "You can now deposit your WCHAN.",
           status: "success",
           duration: 3000,
           isClosable: true,
@@ -229,10 +559,10 @@ export default function StakeContent() {
     }
   }, [isApproveConfirmed, refetchAllowance, toast, resetApprove]);
 
-  // After deposit confirms, refetch balances and reset
+  // After deposit confirms
   useEffect(() => {
     if (isDepositConfirmed && depositTxHash) {
-      refetchBnkrw();
+      refetchWchan();
       refetchStaked();
       refetchAllowance();
       refetchVaultData();
@@ -242,8 +572,13 @@ export default function StakeContent() {
         title: "Deposit successful",
         description: (
           <>
-            Your BNKRW has been staked.{" "}
-            <a href={txUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
+            Your WCHAN has been staked.{" "}
+            <a
+              href={txUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: "underline" }}
+            >
               View on BaseScan
             </a>
           </>
@@ -255,12 +590,21 @@ export default function StakeContent() {
       });
       resetDeposit();
     }
-  }, [isDepositConfirmed, depositTxHash, refetchBnkrw, refetchStaked, refetchAllowance, refetchVaultData, toast, resetDeposit]);
+  }, [
+    isDepositConfirmed,
+    depositTxHash,
+    refetchWchan,
+    refetchStaked,
+    refetchAllowance,
+    refetchVaultData,
+    toast,
+    resetDeposit,
+  ]);
 
-  // After redeem confirms, refetch balances and reset
+  // After redeem confirms
   useEffect(() => {
     if (isRedeemConfirmed && redeemTxHash) {
-      refetchBnkrw();
+      refetchWchan();
       refetchStaked();
       refetchVaultData();
       setAmount("");
@@ -269,8 +613,13 @@ export default function StakeContent() {
         title: "Withdrawal successful",
         description: (
           <>
-            Your BNKRW has been unstaked.{" "}
-            <a href={txUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
+            Your WCHAN has been unstaked.{" "}
+            <a
+              href={txUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: "underline" }}
+            >
               View on BaseScan
             </a>
           </>
@@ -282,12 +631,54 @@ export default function StakeContent() {
       });
       resetRedeem();
     }
-  }, [isRedeemConfirmed, redeemTxHash, refetchBnkrw, refetchStaked, refetchVaultData, toast, resetRedeem]);
+  }, [
+    isRedeemConfirmed,
+    redeemTxHash,
+    refetchWchan,
+    refetchStaked,
+    refetchVaultData,
+    toast,
+    resetRedeem,
+  ]);
+
+  // After claim confirms
+  useEffect(() => {
+    if (isClaimConfirmed && claimTxHash) {
+      refetchEarned();
+      const txUrl = `https://basescan.org/tx/${claimTxHash}`;
+      toast({
+        title: "WETH claimed",
+        description: (
+          <>
+            Your WETH rewards have been claimed.{" "}
+            <a
+              href={txUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: "underline" }}
+            >
+              View on BaseScan
+            </a>
+          </>
+        ),
+        status: "success",
+        duration: 10000,
+        isClosable: true,
+        position: "bottom-right",
+      });
+      resetClaim();
+    }
+  }, [isClaimConfirmed, claimTxHash, refetchEarned, toast, resetClaim]);
 
   const handleAmountChange = (val: string) => {
     if (val === "" || /^\d*\.?\d*$/.test(val)) {
       setAmount(val);
-      if (val === "" || parseFloat(val) === 0 || !currentBalance || (currentBalance as bigint) === 0n) {
+      if (
+        val === "" ||
+        parseFloat(val) === 0 ||
+        !currentBalance ||
+        (currentBalance as bigint) === 0n
+      ) {
         setSliderValue(0);
       } else {
         try {
@@ -305,10 +696,10 @@ export default function StakeContent() {
   const handleApprove = useCallback(() => {
     writeApprove(
       {
-        address: TOKEN_ADDR,
+        address: WCHAN_TOKEN_ADDR,
         abi: erc20Abi,
         functionName: "approve",
-        args: [VAULT_ADDR, parsedAmount!],
+        args: [WCHAN_VAULT_ADDR, parsedAmount!],
         chainId: STAKE_CHAIN_ID,
       },
       {
@@ -322,7 +713,7 @@ export default function StakeContent() {
             position: "bottom-right",
           });
         },
-      }
+      },
     );
   }, [writeApprove, parsedAmount, toast]);
 
@@ -330,8 +721,8 @@ export default function StakeContent() {
     if (!parsedAmount || !address) return;
     writeDeposit(
       {
-        address: VAULT_ADDR,
-        abi: vaultAbi,
+        address: WCHAN_VAULT_ADDR,
+        abi: wchanVaultAbi,
         functionName: "deposit",
         args: [parsedAmount, address],
         chainId: STAKE_CHAIN_ID,
@@ -347,7 +738,7 @@ export default function StakeContent() {
             position: "bottom-right",
           });
         },
-      }
+      },
     );
   }, [parsedAmount, address, writeDeposit, toast]);
 
@@ -355,8 +746,8 @@ export default function StakeContent() {
     if (!parsedAmount || !address) return;
     writeRedeem(
       {
-        address: VAULT_ADDR,
-        abi: vaultAbi,
+        address: WCHAN_VAULT_ADDR,
+        abi: wchanVaultAbi,
         functionName: "redeem",
         args: [parsedAmount, address, address],
         chainId: STAKE_CHAIN_ID,
@@ -372,9 +763,32 @@ export default function StakeContent() {
             position: "bottom-right",
           });
         },
-      }
+      },
     );
   }, [parsedAmount, address, writeRedeem, toast]);
+
+  const handleClaim = useCallback(() => {
+    writeClaim(
+      {
+        address: WCHAN_VAULT_ADDR,
+        abi: wchanVaultAbi,
+        functionName: "claimRewards",
+        chainId: STAKE_CHAIN_ID,
+      },
+      {
+        onError: (err) => {
+          toast({
+            title: "Claim failed",
+            description: err.message.split("\n")[0],
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "bottom-right",
+          });
+        },
+      },
+    );
+  }, [writeClaim, toast]);
 
   const handleAction = () => {
     if (activeTab === "deposit") {
@@ -392,7 +806,7 @@ export default function StakeContent() {
     if (activeTab === "deposit") {
       if (isApproving || isApproveConfirming) return "Approving...";
       if (isDepositing || isDepositConfirming) return "Depositing...";
-      if (needsApproval) return "Approve BNKRW";
+      if (needsApproval) return "Approve WCHAN";
       return "Deposit";
     }
     if (isRedeeming || isRedeemConfirming) return "Withdrawing...";
@@ -428,7 +842,7 @@ export default function StakeContent() {
                   textTransform="uppercase"
                   letterSpacing="wider"
                 >
-                  BNKRW Staking
+                  WCHAN Staking
                 </Text>
                 <Box
                   w="16px"
@@ -441,45 +855,29 @@ export default function StakeContent() {
               </HStack>
             </MotionBox>
 
-            <Text fontSize="md" color="gray.600" maxW="500px" fontWeight="500">
-              Stake your{" "}
+            <Text
+              fontSize="lg"
+              color="gray.600"
+              maxW="500px"
+              fontWeight="500"
+              textAlign="center"
+            >
+              Stake & earn{" "}
               <Text as="span" fontWeight="800">
-                BNKRW
+                WETH + WCHAN
               </Text>{" "}
-              tokens to earn yield.
+              rewards.
             </Text>
-            <HStack spacing={2} justify="center">
-              <Link
-                href="https://app.wasabi.xyz/earn?vault=sBNKRW&network=base"
-                isExternal
-                bg="bauhaus.blue"
-                px={3}
-                py={1}
-                display="inline-flex"
-                alignItems="center"
-                gap={1}
-                _hover={{ opacity: 0.9, textDecoration: "none" }}
-              >
-                <Text fontSize="sm" color="white" fontWeight="600">
-                  Powered by Wasabi
-                </Text>
-                <ExternalLink size={12} color="white" />
-              </Link>
-              <Link
-                href={`https://basescan.org/address/${SBNKRW_VAULT_ADDRESS}`}
-                isExternal
-                display="inline-flex"
-                alignItems="center"
-                gap={1}
-                fontSize="xs"
-                fontWeight="700"
-                color="gray.500"
-                _hover={{ color: "bauhaus.red" }}
-              >
-                Vault
-                <ExternalLink size={12} />
-              </Link>
-            </HStack>
+            <Text
+              fontSize="xs"
+              color="gray.400"
+              maxW="500px"
+              fontWeight="500"
+              textAlign="center"
+            >
+              (20% early withdrawal penalty before 7 days, linearly decays to
+              0%)
+            </Text>
           </VStack>
 
           {/* Connect Button */}
@@ -544,42 +942,29 @@ export default function StakeContent() {
             </HStack>
           )}
 
+          {/* Migration Banner */}
+          {isWalletConnected && !isWrongChain && address && (
+            <Box maxW="lg" mx="auto" w="full">
+              <MigrationBanner
+                address={address}
+                onMigrated={() => {
+                  refetchWchan();
+                  refetchStaked();
+                  refetchVaultData();
+                }}
+              />
+            </Box>
+          )}
+
           {/* Staking Card */}
           <Box maxW="lg" mx="auto" w="full">
             {/* Stats Row */}
             {!isVaultLoading && vaultData && (
               <Flex gap={3} mb={4}>
-                {vaultData.apr > 0 && (
-                  <Box
-                    bg="white"
-                    border="3px solid"
-                    borderColor="bauhaus.black"
-                    boxShadow="4px 4px 0px 0px #121212"
-                    px={4}
-                    py={3}
-                    textAlign="center"
-                  >
-                    <Text
-                      fontSize="xs"
-                      fontWeight="800"
-                      textTransform="uppercase"
-                      letterSpacing="wider"
-                      color="gray.500"
-                    >
-                      APR
-                    </Text>
-                    <Text
-                      fontSize="xl"
-                      fontWeight="900"
-                      color="bauhaus.red"
-                    >
-                      {formatApr(vaultData.apr)}
-                    </Text>
-                  </Box>
-                )}
+                {/* APY Box */}
                 <Box
                   flex={1}
-                  bg="bauhaus.yellow"
+                  bg="white"
                   border="3px solid"
                   borderColor="bauhaus.black"
                   boxShadow="4px 4px 0px 0px #121212"
@@ -592,28 +977,95 @@ export default function StakeContent() {
                     fontWeight="800"
                     textTransform="uppercase"
                     letterSpacing="wider"
+                    color="gray.500"
+                  >
+                    Total APY
+                  </Text>
+                  <Text fontSize="xl" fontWeight="900" color="bauhaus.blue">
+                    {vaultData.totalApy.toFixed(2)}%
+                  </Text>
+                  <Flex gap={1.5} justify="center" mt={1}>
+                    <Text fontSize="xs" fontWeight="800" color="gray.500">
+                      WCHAN {vaultData.wchanApy.toFixed(1)}%
+                    </Text>
+                    <Text fontSize="xs" fontWeight="900" color="gray.400">
+                      +
+                    </Text>
+                    <Text fontSize="xs" fontWeight="800" color="gray.500">
+                      WETH {vaultData.wethApy.toFixed(1)}%
+                    </Text>
+                  </Flex>
+                </Box>
+
+                {/* TVL Box */}
+                <Flex
+                  flex={1}
+                  bg="bauhaus.yellow"
+                  border="3px solid"
+                  borderColor="bauhaus.black"
+                  boxShadow="4px 4px 0px 0px #121212"
+                  px={4}
+                  py={3}
+                  textAlign="center"
+                  direction="column"
+                  align="center"
+                  justify="center"
+                >
+                  <Text
+                    fontSize="xs"
+                    fontWeight="800"
+                    textTransform="uppercase"
+                    letterSpacing="wider"
                     color="bauhaus.black"
                   >
                     TVL
                   </Text>
-                  <Text
-                    fontSize="xl"
-                    fontWeight="900"
-                    color="bauhaus.black"
-                  >
+                  <Text fontSize="xl" fontWeight="900" color="bauhaus.black">
                     {formatUsd(vaultData.tvlUsd)}
                   </Text>
-                </Box>
-                {vaultData.utilizationRate > 0 && (
-                  <Box
-                    bg="white"
-                    border="3px solid"
-                    borderColor="bauhaus.black"
-                    boxShadow="4px 4px 0px 0px #121212"
-                    px={4}
-                    py={3}
-                    textAlign="center"
+                </Flex>
+              </Flex>
+            )}
+
+            {/* Staked Balance + WETH Rewards */}
+            {isWalletConnected && !isWrongChain && (
+              <Box
+                bg="white"
+                border="3px solid"
+                borderColor="bauhaus.black"
+                boxShadow="4px 4px 0px 0px #121212"
+                mb={4}
+              >
+                {/* Staked Balance */}
+                <Box px={4} py={3} borderBottom="2px solid" borderColor="gray.100">
+                  <Text
+                    fontSize="xs"
+                    fontWeight="800"
+                    textTransform="uppercase"
+                    letterSpacing="wider"
+                    color="gray.500"
                   >
+                    Your Staked Balance
+                  </Text>
+                  <HStack spacing={2} align="baseline">
+                    <Text fontSize="lg" fontWeight="900" color="bauhaus.black">
+                      {formatBalance(stakedBalance as bigint | undefined)} sWCHAN
+                    </Text>
+                    {tokenPrice > 0 && vaultData && stakedBalance !== undefined && (
+                      <Text fontSize="xs" fontWeight="600" color="gray.400">
+                        {formatUsd(
+                          parseFloat(formatUnits(stakedBalance as bigint, 18)) *
+                            parseFloat(formatUnits(BigInt(vaultData.sharePrice || "0"), 18)) *
+                            tokenPrice
+                        )}
+                      </Text>
+                    )}
+                  </HStack>
+                </Box>
+
+                {/* Claimable WETH Rewards */}
+                <Flex px={4} py={3} align="center" justify="space-between">
+                  <Box>
                     <Text
                       fontSize="xs"
                       fontWeight="800"
@@ -621,18 +1073,38 @@ export default function StakeContent() {
                       letterSpacing="wider"
                       color="gray.500"
                     >
-                      Utilization
+                      Claimable WETH Rewards
                     </Text>
-                    <Text
-                      fontSize="xl"
-                      fontWeight="900"
-                      color="bauhaus.black"
-                    >
-                      {(vaultData.utilizationRate * 100).toFixed(1)}%
-                    </Text>
+                    <HStack spacing={2} align="baseline">
+                      <Text fontSize="lg" fontWeight="900" color="bauhaus.black">
+                        {earnedWeth !== undefined
+                          ? `${formatUnits(earnedWeth as bigint, 18).slice(0, 12)} WETH`
+                          : "—"}
+                      </Text>
+                      {earnedWeth !== undefined && (earnedWeth as bigint) > 0n && ethPrice > 0 && (
+                        <Text fontSize="sm" fontWeight="700" color="gray.400">
+                          {formatUsd(parseFloat(formatUnits(earnedWeth as bigint, 18)) * ethPrice)}
+                        </Text>
+                      )}
+                    </HStack>
                   </Box>
-                )}
-              </Flex>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleClaim}
+                    isLoading={isClaiming || isClaimConfirming}
+                    loadingText="Claiming..."
+                    isDisabled={
+                      isClaiming ||
+                      isClaimConfirming ||
+                      !earnedWeth ||
+                      (earnedWeth as bigint) === 0n
+                    }
+                  >
+                    Claim
+                  </Button>
+                </Flex>
+              </Box>
             )}
 
             <Box
@@ -681,8 +1153,7 @@ export default function StakeContent() {
                   borderColor="bauhaus.black"
                   transition="all 0.15s ease-out"
                   _hover={{
-                    bg:
-                      activeTab === "deposit" ? "bauhaus.blue" : "gray.50",
+                    bg: activeTab === "deposit" ? "bauhaus.blue" : "gray.50",
                   }}
                   onClick={() => {
                     setActiveTab("deposit");
@@ -706,8 +1177,7 @@ export default function StakeContent() {
                   borderColor="bauhaus.black"
                   transition="all 0.15s ease-out"
                   _hover={{
-                    bg:
-                      activeTab === "withdraw" ? "bauhaus.blue" : "gray.50",
+                    bg: activeTab === "withdraw" ? "bauhaus.blue" : "gray.50",
                   }}
                   onClick={() => {
                     setActiveTab("withdraw");
@@ -731,8 +1201,8 @@ export default function StakeContent() {
                     color="gray.500"
                   >
                     {activeTab === "deposit"
-                      ? "Deposit BNKRW"
-                      : "Withdraw sBNKRW"}
+                      ? "Deposit WCHAN"
+                      : "Withdraw sWCHAN"}
                   </Text>
                   {isWalletConnected && (
                     <HStack spacing={1}>
@@ -761,7 +1231,9 @@ export default function StakeContent() {
                 <Box w="full">
                   <Flex
                     border="3px solid"
-                    borderColor={hasInsufficientBalance ? "red.400" : "bauhaus.black"}
+                    borderColor={
+                      hasInsufficientBalance ? "red.400" : "bauhaus.black"
+                    }
                     align="center"
                     px={4}
                     h="60px"
@@ -803,60 +1275,63 @@ export default function StakeContent() {
                   </Flex>
 
                   {/* Percentage slider */}
-                  {isWalletConnected && currentBalance !== undefined && (currentBalance as bigint) > 0n && (
-                    <Box px={2} pt={2} pb={6}>
-                      <Slider
-                        min={0}
-                        max={100}
-                        step={1}
-                        value={sliderValue}
-                        onChange={(val) => {
-                          const SNAP_THRESHOLD = 3;
-                          const snaps = [0, 25, 50, 75, 100];
-                          const nearest = snaps.find((s) => Math.abs(val - s) <= SNAP_THRESHOLD);
-                          const snapped = nearest !== undefined ? nearest : val;
-                          setSliderValue(snapped);
-                          if (snapped === 0) {
-                            setAmount("");
-                          } else {
-                            const bal = currentBalance as bigint;
-                            const pctAmount = (bal * BigInt(snapped)) / 100n;
-                            setAmount(formatUnits(pctAmount, 18));
-                          }
-                        }}
-                      >
-                        {[0, 25, 50, 75, 100].map((pct) => (
-                          <SliderMark
-                            key={pct}
-                            value={pct}
-                            mt={3}
-                            fontSize="xs"
-                            fontWeight="800"
-                            color={sliderValue >= pct ? "bauhaus.blue" : "gray.400"}
-                            whiteSpace="nowrap"
-                            transform="translateX(-50%)"
-                          >
-                            {pct}%
-                          </SliderMark>
-                        ))}
-                        <SliderTrack
-                          bg="gray.200"
-                          h="6px"
-                          borderRadius={0}
+                  {isWalletConnected &&
+                    currentBalance !== undefined &&
+                    (currentBalance as bigint) > 0n && (
+                      <Box px={2} pt={2} pb={6}>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={sliderValue}
+                          onChange={(val) => {
+                            const SNAP_THRESHOLD = 3;
+                            const snaps = [0, 25, 50, 75, 100];
+                            const nearest = snaps.find(
+                              (s) => Math.abs(val - s) <= SNAP_THRESHOLD,
+                            );
+                            const snapped =
+                              nearest !== undefined ? nearest : val;
+                            setSliderValue(snapped);
+                            if (snapped === 0) {
+                              setAmount("");
+                            } else {
+                              const bal = currentBalance as bigint;
+                              const pctAmount = (bal * BigInt(snapped)) / 100n;
+                              setAmount(formatUnits(pctAmount, 18));
+                            }
+                          }}
                         >
-                          <SliderFilledTrack bg="bauhaus.blue" />
-                        </SliderTrack>
-                        <SliderThumb
-                          boxSize={5}
-                          bg="bauhaus.blue"
-                          border="3px solid"
-                          borderColor="bauhaus.black"
-                          borderRadius={0}
-                          _focus={{ boxShadow: "none" }}
-                        />
-                      </Slider>
-                    </Box>
-                  )}
+                          {[0, 25, 50, 75, 100].map((pct) => (
+                            <SliderMark
+                              key={pct}
+                              value={pct}
+                              mt={3}
+                              fontSize="xs"
+                              fontWeight="800"
+                              color={
+                                sliderValue >= pct ? "bauhaus.blue" : "gray.400"
+                              }
+                              whiteSpace="nowrap"
+                              transform="translateX(-50%)"
+                            >
+                              {pct}%
+                            </SliderMark>
+                          ))}
+                          <SliderTrack bg="gray.200" h="6px" borderRadius={0}>
+                            <SliderFilledTrack bg="bauhaus.blue" />
+                          </SliderTrack>
+                          <SliderThumb
+                            boxSize={5}
+                            bg="bauhaus.blue"
+                            border="3px solid"
+                            borderColor="bauhaus.black"
+                            borderRadius={0}
+                            _focus={{ boxShadow: "none" }}
+                          />
+                        </Slider>
+                      </Box>
+                    )}
                 </Box>
 
                 {/* Insufficient balance warning */}
@@ -873,64 +1348,183 @@ export default function StakeContent() {
                   </Text>
                 )}
 
-                {/* Preview info row */}
-                {activeTab === "deposit" && parsedAmount && previewShares !== undefined && (
-                  <Flex
+                {/* Penalty warning */}
+                {activeTab === "withdraw" && penaltyPct > 0 && (
+                  <HStack
                     w="full"
-                    justify="space-between"
-                    bg="gray.50"
+                    spacing={2}
+                    bg="orange.50"
                     border="2px solid"
-                    borderColor="gray.200"
+                    borderColor="orange.300"
                     px={4}
                     py={3}
                   >
-                    <Text
-                      fontSize="xs"
-                      fontWeight="700"
-                      color="gray.500"
-                      textTransform="uppercase"
-                      letterSpacing="wider"
-                    >
-                      You receive
-                    </Text>
-                    <Text
-                      fontSize="xs"
-                      fontWeight="900"
-                      color="bauhaus.black"
-                    >
-                      {formatBalance(previewShares as bigint)} sBNKRW
-                    </Text>
-                  </Flex>
+                    <AlertTriangle
+                      size={14}
+                      color="#DD6B20"
+                      style={{ flexShrink: 0 }}
+                    />
+                    <Box>
+                      <Text fontSize="xs" fontWeight="700" color="orange.700">
+                        Early withdrawal penalty: {penaltyPct.toFixed(1)}%
+                        (decays linearly to 0%)
+                      </Text>
+                      {zeroPenaltyDate && (
+                        <Text fontSize="xs" fontWeight="600" color="orange.600">
+                          0% penalty in{" "}
+                          {(() => {
+                            const diff = zeroPenaltyDate.getTime() - Date.now();
+                            const days = Math.max(
+                              0,
+                              Math.ceil(diff / (1000 * 60 * 60 * 24)),
+                            );
+                            const formatted = zeroPenaltyDate.toLocaleString(
+                              "en-GB",
+                              {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                second: "2-digit",
+                                hour12: false,
+                              },
+                            );
+                            return `${days} day${days !== 1 ? "s" : ""} (${formatted})`;
+                          })()}
+                        </Text>
+                      )}
+                    </Box>
+                  </HStack>
                 )}
 
-                {activeTab === "withdraw" && parsedAmount && previewAssets !== undefined && (
-                  <Flex
-                    w="full"
-                    justify="space-between"
-                    bg="gray.50"
-                    border="2px solid"
-                    borderColor="gray.200"
-                    px={4}
-                    py={3}
-                  >
-                    <Text
-                      fontSize="xs"
-                      fontWeight="700"
-                      color="gray.500"
-                      textTransform="uppercase"
-                      letterSpacing="wider"
+                {/* Preview info row */}
+                {activeTab === "deposit" &&
+                  parsedAmount &&
+                  previewShares !== undefined && (
+                    <Box
+                      w="full"
+                      bg="gray.50"
+                      border="2px solid"
+                      borderColor="gray.200"
                     >
-                      You receive
-                    </Text>
-                    <Text
-                      fontSize="xs"
-                      fontWeight="900"
-                      color="bauhaus.black"
+                      <Flex justify="space-between" px={4} py={3}>
+                        <Text
+                          fontSize="xs"
+                          fontWeight="700"
+                          color="gray.500"
+                          textTransform="uppercase"
+                          letterSpacing="wider"
+                        >
+                          You receive
+                        </Text>
+                        <Text
+                          fontSize="xs"
+                          fontWeight="900"
+                          color="bauhaus.black"
+                        >
+                          {formatBalance(previewShares as bigint)} sWCHAN
+                        </Text>
+                      </Flex>
+                      {stakedBalance !== undefined &&
+                        lastDepositTs !== undefined && (
+                          <Flex
+                            justify="space-between"
+                            px={4}
+                            py={2}
+                            borderTop="1px solid"
+                            borderColor="gray.200"
+                          >
+                            <Text
+                              fontSize="xs"
+                              fontWeight="700"
+                              color="orange.500"
+                              textTransform="uppercase"
+                              letterSpacing="wider"
+                            >
+                              0% penalty at
+                            </Text>
+                            <Text
+                              fontSize="xs"
+                              fontWeight="800"
+                              color="orange.600"
+                            >
+                              {(() => {
+                                const existing = stakedBalance as bigint;
+                                const newShares = previewShares as bigint;
+                                const oldTs = lastDepositTs as bigint;
+                                const nowSec = BigInt(
+                                  Math.floor(Date.now() / 1000)
+                                );
+                                const newTs =
+                                  existing > 0n && oldTs > 0n
+                                    ? (oldTs * existing + nowSec * newShares) /
+                                      (existing + newShares)
+                                    : nowSec;
+                                const zeroPenalty = new Date(
+                                  (Number(newTs) + PENALTY_DURATION) * 1000
+                                );
+                                const diff =
+                                  zeroPenalty.getTime() - Date.now();
+                                const days = Math.max(
+                                  0,
+                                  Math.ceil(diff / (1000 * 60 * 60 * 24))
+                                );
+                                const formatted =
+                                  zeroPenalty.toLocaleString("en-GB", {
+                                    day: "2-digit",
+                                    month: "short",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    second: "2-digit",
+                                    hour12: false,
+                                  });
+                                return `in ${days} day${days !== 1 ? "s" : ""} (${formatted})`;
+                              })()}
+                            </Text>
+                          </Flex>
+                        )}
+                    </Box>
+                  )}
+
+                {activeTab === "withdraw" &&
+                  parsedAmount &&
+                  previewAssetsNet !== undefined && (
+                    <Flex
+                      w="full"
+                      justify="space-between"
+                      bg="gray.50"
+                      border="2px solid"
+                      borderColor="gray.200"
+                      px={4}
+                      py={3}
                     >
-                      {formatBalance(previewAssets as bigint)} BNKRW
-                    </Text>
-                  </Flex>
-                )}
+                      <Text
+                        fontSize="xs"
+                        fontWeight="700"
+                        color="gray.500"
+                        textTransform="uppercase"
+                        letterSpacing="wider"
+                      >
+                        You receive
+                      </Text>
+                      <Box textAlign="right">
+                        <Text
+                          fontSize="xs"
+                          fontWeight="900"
+                          color="bauhaus.black"
+                        >
+                          {formatBalance(previewAssetsNet as bigint)} WCHAN
+                        </Text>
+                        {penaltyPct > 0 && (
+                          <Text fontSize="xs" fontWeight="700" color="orange.500">
+                            ({penaltyPct.toFixed(1)}% penalty)
+                          </Text>
+                        )}
+                      </Box>
+                    </Flex>
+                  )}
 
                 {/* Tx status indicator */}
                 {(approveTxHash || depositTxHash || redeemTxHash) && (
@@ -944,10 +1538,17 @@ export default function StakeContent() {
                     px={4}
                     py={2}
                   >
-                    {(isApproveConfirming || isDepositConfirming || isRedeemConfirming) && (
+                    {(isApproveConfirming ||
+                      isDepositConfirming ||
+                      isRedeemConfirming) && (
                       <>
                         <Spinner size="xs" color="bauhaus.blue" />
-                        <Text fontSize="xs" fontWeight="700" color="gray.500" textTransform="uppercase">
+                        <Text
+                          fontSize="xs"
+                          fontWeight="700"
+                          color="gray.500"
+                          textTransform="uppercase"
+                        >
                           Confirming...
                         </Text>
                       </>
@@ -1044,11 +1645,23 @@ export default function StakeContent() {
                 )}
               </VStack>
             </Box>
-
-            {/* TODO: Vault details section
-            ...
-            */}
           </Box>
+          <Center>
+            <Link
+              href={`https://basescan.org/address/${WCHAN_VAULT_ADDR}`}
+              isExternal
+              display="inline-flex"
+              alignItems="center"
+              gap={1}
+              fontSize="xs"
+              fontWeight="700"
+              color="gray.500"
+              _hover={{ color: "bauhaus.red" }}
+            >
+              Vault
+              <ExternalLink size={12} />
+            </Link>
+          </Center>
         </VStack>
       </Container>
       <Footer />

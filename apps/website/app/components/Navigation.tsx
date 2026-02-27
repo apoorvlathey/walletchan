@@ -191,7 +191,7 @@ export function Navigation() {
                 </Box>
               ) : link.label === "Stake" ? (
                 <Box key={link.label} position="relative">
-                  {vaultData && vaultData.apr > 0 && (
+                  {vaultData && vaultData.totalApy > 0 && (
                     <Box
                       position="absolute"
                       bottom="100%"
@@ -211,7 +211,7 @@ export function Navigation() {
                         color="bauhaus.black"
                         letterSpacing="wide"
                       >
-                        {vaultData.apr.toFixed(1)}% APR
+                        {vaultData.totalApy.toFixed(1)}% APY
                       </Box>
                     </Box>
                   )}
@@ -343,7 +343,7 @@ export function Navigation() {
                   </Box>
                 ) : link.label === "Stake" ? (
                   <Box key={link.label} position="relative">
-                    {vaultData && vaultData.apr > 0 && (
+                    {vaultData && vaultData.totalApy > 0 && (
                       <Box
                         position="absolute"
                         top="-12px"
@@ -362,7 +362,7 @@ export function Navigation() {
                           color="bauhaus.black"
                           letterSpacing="wide"
                         >
-                          {vaultData.apr.toFixed(1)}% APR
+                          {vaultData.totalApy.toFixed(1)}% APY
                         </Box>
                       </Box>
                     )}

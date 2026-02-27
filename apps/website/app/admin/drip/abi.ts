@@ -104,6 +104,13 @@ export const wchanVaultAbi = [
 export const dripRewardsAbi = [
   {
     inputs: [],
+    name: "owner",
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "drip",
     outputs: [],
     stateMutability: "nonpayable",

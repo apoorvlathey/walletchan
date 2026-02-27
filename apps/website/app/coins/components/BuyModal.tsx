@@ -160,9 +160,7 @@ export function BuyModal({ token, isOpen, onClose, showWallet }: BuyModalProps) 
     let cancelled = false;
     async function fetchPrice() {
       try {
-        const res = await fetch(
-          "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
-        );
+        const res = await fetch("/api/eth-price");
         const data = await res.json();
         if (!cancelled && data?.ethereum?.usd) {
           setEthUsdPrice(data.ethereum.usd);
