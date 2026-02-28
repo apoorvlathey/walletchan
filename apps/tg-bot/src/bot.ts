@@ -5,7 +5,7 @@ import { db } from "./db/index.js";
 import { users } from "./db/schema.js";
 import { createVerificationToken } from "./services/verification.js";
 import {
-  getUserBalance,
+  getCombinedBalance,
   meetsThreshold,
   formatThreshold,
 } from "./services/balance.js";
@@ -51,7 +51,7 @@ export function createBot(): Bot {
         `Click the button below to verify your wallet.\n\n` +
           `You'll need to:\n` +
           `1. Connect your wallet\n` +
-          `2. Have at least ${formatThreshold()} sBNKRW staked\n` +
+          `2. Have at least ${formatThreshold()} sWCHAN staked\n` +
           `3. Sign a verification message\n\n` +
           `This link expires in 10 minutes.`,
         { reply_markup: keyboard },
@@ -60,9 +60,9 @@ export function createBot(): Bot {
     }
 
     await ctx.reply(
-      `Welcome to the BankrWallet Token Gate Bot!\n\n` +
-        `This bot manages access to the private BankrWallet holders group.\n\n` +
-        `You need at least ${formatThreshold()} sBNKRW staked to join.\n\n` +
+      `Welcome to the WalletChan Token Gate Bot!\n\n` +
+        `This bot manages access to the private WalletChan holders group.\n\n` +
+        `You need at least ${formatThreshold()} sWCHAN staked to join.\n\n` +
         `Use /help to see available commands.`,
     );
   });
@@ -89,7 +89,7 @@ export function createBot(): Bot {
       `Click the button below to verify your wallet.\n\n` +
         `You'll need to:\n` +
         `1. Connect your wallet\n` +
-        `2. Have at least ${formatThreshold()} sBNKRW staked\n` +
+        `2. Have at least ${formatThreshold()} sWCHAN staked\n` +
         `3. Sign a verification message\n\n` +
         `This link expires in 10 minutes.`,
       { reply_markup: keyboard },
@@ -110,15 +110,15 @@ export function createBot(): Bot {
       return;
     }
 
-    const balance = await getUserBalance(user.walletAddress);
+    const balance = await getCombinedBalance(user.walletAddress);
     const eligible = meetsThreshold(balance);
     const formatted = formatUnits(balance, 18);
     const threshold = formatThreshold();
 
     await ctx.reply(
       `Wallet: \`${user.walletAddress}\`\n` +
-        `Staked: ${parseFloat(formatted).toLocaleString()} sBNKRW\n` +
-        `Threshold: ${threshold} sBNKRW\n` +
+        `Staked: ${parseFloat(formatted).toLocaleString()} sWCHAN\n` +
+        `Threshold: ${threshold} sWCHAN\n` +
         `Eligible: ${eligible ? "Yes" : "No"}\n` +
         `Group Member: ${user.isMember ? "Yes" : "No"}`,
       { parse_mode: "Markdown" },

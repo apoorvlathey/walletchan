@@ -12,7 +12,8 @@ import {
   linkWalletToTelegram,
 } from "./services/verification.js";
 import {
-  getUserBalance,
+  getWchanBalance,
+  getCombinedBalance,
   meetsThreshold,
   formatThreshold,
 } from "./services/balance.js";
@@ -68,14 +69,14 @@ export function createApi(bot: Bot): Hono {
       return c.json({ success: false, error: sigResult.error }, 400);
     }
 
-    // Check balance
-    const balance = await getUserBalance(body.address);
+    // Check balance (new verifications require sWCHAN only)
+    const balance = await getWchanBalance(body.address);
     if (!meetsThreshold(balance)) {
       const formatted = formatUnits(balance, 18);
       return c.json(
         {
           success: false,
-          error: `Insufficient stake. You have ${parseFloat(formatted).toLocaleString()} sBNKRW, need ${formatThreshold()}.`,
+          error: `Insufficient stake. You have ${parseFloat(formatted).toLocaleString()} sWCHAN, need ${formatThreshold()}.`,
         },
         400
       );
@@ -133,7 +134,7 @@ export function createApi(bot: Bot): Hono {
     const enriched = await Promise.all(
       allUsers.map(async (user) => {
         const raw = user.walletAddress
-          ? await getUserBalance(user.walletAddress)
+          ? await getCombinedBalance(user.walletAddress)
           : 0n;
         return {
           tgId: user.tgId.toString(),

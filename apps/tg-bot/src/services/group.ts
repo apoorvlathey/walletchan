@@ -31,10 +31,10 @@ export async function sendKickDM(bot: Bot, userId: number): Promise<void> {
   try {
     await bot.api.sendMessage(
       userId,
-      `Your sBNKRW staked balance has fallen below the required threshold.\n\n` +
+      `Your sWCHAN staked balance has fallen below the required threshold.\n\n` +
         `You have been removed from the private group.\n\n` +
         `To rejoin:\n` +
-        `1. Stake more BNKRW at ${config.STAKE_URL}\n` +
+        `1. Stake WCHAN at ${config.STAKE_URL}\n` +
         `2. Run /verify to get a new verification link`
     );
   } catch (err) {

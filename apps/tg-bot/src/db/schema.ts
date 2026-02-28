@@ -12,6 +12,7 @@ export const users = pgTable("users", {
   walletAddress: text("wallet_address").unique(),
   verifiedAt: timestamp("verified_at"),
   isMember: boolean("is_member").default(false).notNull(),
+  belowThresholdSince: timestamp("below_threshold_since"),
 });
 
 export const verificationTokens = pgTable("verification_tokens", {

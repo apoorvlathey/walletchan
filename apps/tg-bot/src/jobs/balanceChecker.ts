@@ -3,7 +3,7 @@ import type { Bot } from "grammy";
 import { config } from "../config.js";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
-import { getUserBalance, meetsThreshold } from "../services/balance.js";
+import { getCombinedBalance, meetsThreshold } from "../services/balance.js";
 import { kickUser, sendKickDM } from "../services/group.js";
 
 async function checkBalances(bot: Bot): Promise<void> {
@@ -15,6 +15,8 @@ async function checkBalances(bot: Bot): Promise<void> {
 
   console.log(`[BalanceChecker] Checking ${members.length} members`);
 
+  const gracePeriodMs = config.KICK_GRACE_PERIOD_MINUTES * 60 * 1000;
+
   for (const member of members) {
     if (!member.walletAddress) continue;
 
@@ -22,21 +24,45 @@ async function checkBalances(bot: Bot): Promise<void> {
     if (member.tgId === config.ADMIN_TG_ID) continue;
 
     try {
-      const balance = await getUserBalance(member.walletAddress);
+      const balance = await getCombinedBalance(member.walletAddress);
 
       if (!meetsThreshold(balance)) {
-        console.log(
-          `[BalanceChecker] User ${member.tgId} below threshold, kicking...`
-        );
+        if (!member.belowThresholdSince) {
+          // First detection — set timestamp, don't kick yet
+          console.log(
+            `[BalanceChecker] User ${member.tgId} below threshold, starting grace period`
+          );
+          await db
+            .update(users)
+            .set({ belowThresholdSince: new Date() })
+            .where(eq(users.tgId, member.tgId));
+        } else {
+          // Check if grace period has elapsed
+          const elapsed = Date.now() - member.belowThresholdSince.getTime();
+          if (elapsed >= gracePeriodMs) {
+            console.log(
+              `[BalanceChecker] User ${member.tgId} grace period expired, kicking...`
+            );
 
-        const userId = Number(member.tgId);
-        await kickUser(bot, userId);
-        await sendKickDM(bot, userId);
+            const userId = Number(member.tgId);
+            await kickUser(bot, userId);
+            await sendKickDM(bot, userId);
 
-        await db
-          .update(users)
-          .set({ isMember: false })
-          .where(eq(users.tgId, member.tgId));
+            await db
+              .update(users)
+              .set({ isMember: false, belowThresholdSince: null })
+              .where(eq(users.tgId, member.tgId));
+          }
+          // Otherwise still within grace period — skip
+        }
+      } else {
+        // Above threshold — clear grace period if set
+        if (member.belowThresholdSince) {
+          await db
+            .update(users)
+            .set({ belowThresholdSince: null })
+            .where(eq(users.tgId, member.tgId));
+        }
       }
     } catch (err) {
       console.error(

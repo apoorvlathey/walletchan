@@ -2,7 +2,7 @@
 
 ## Overview
 
-Grammy bot + Hono API server in a single Node.js process. Gates access to a private Telegram group based on sBNKRW staked balance. Deployed on Railway.
+Grammy bot + Hono API server in a single Node.js process. Gates access to a private Telegram group based on sWCHAN staked balance (with backwards-compatible sBNKRW support during migration). Deployed on Railway.
 
 ## Process Architecture
 
@@ -20,7 +20,7 @@ All three run concurrently in one process. No webhooks — Grammy uses long poll
 
 PostgreSQL via Drizzle ORM. Two tables:
 
-- **`users`** — Linked TG accounts. `tg_id` (PK), `wallet_address` (UNIQUE), `is_member` (tracks group membership).
+- **`users`** — Linked TG accounts. `tg_id` (PK), `wallet_address` (UNIQUE), `is_member` (tracks group membership), `below_threshold_since` (nullable timestamp for kick grace period).
 - **`verification_tokens`** — Ephemeral tokens. UUID PK, 10min expiry, single-use. Links a TG user ID to a browser session.
 
 Migrations managed by `drizzle-kit`. Run `db:generate` after schema changes, `db:migrate` to apply.
@@ -72,7 +72,7 @@ The `/start` command checks `ctx.match` for the payload. If it equals `"verify"`
 4. User opens link in browser
 5. Website calls GET /api/verify-info?token=xxx → validates token exists + not expired + not used
 6. User connects wallet (RainbowKit)
-7. Website fetches balance from staking indexer: GET {INDEXER}/balances/{address}
+7. Website fetches balance from wchan-vault-indexer: GET {WCHAN_VAULT_INDEXER}/balances/{address}
 8. If balance >= threshold, user signs message:
      "Verify Telegram account for WalletChan\nToken: {token}\nTimestamp: {unix}"
 9. Website POSTs to /api/verify: { token, signature, address, timestamp }
@@ -107,12 +107,14 @@ All under Hono with CORS enabled for the website origin.
 `src/jobs/balanceChecker.ts` — runs on a `setInterval` (default 5min).
 
 1. Queries all users where `is_member = true`
-2. For each, fetches balance from staking indexer
+2. For each, fetches combined balance (`max(sBNKRW, sWCHAN)`) from both indexers in parallel
 3. If below threshold:
-   - Kicks from group (`banChatMember` → `unbanChatMember` so they can rejoin later)
-   - DMs user with explanation + stake link + `/verify` instructions
-   - Sets `is_member = false`
-4. Errors are caught per-user — one failure doesn't stop the rest
+   - **First detection**: sets `belowThresholdSince` to now, does NOT kick yet
+   - **Grace period elapsed** (`KICK_GRACE_PERIOD_MINUTES`, default 60min): kicks from group (`banChatMember` → `unbanChatMember`), DMs user, sets `is_member = false`, clears `belowThresholdSince`
+   - **Within grace period**: skips (no action)
+4. If above threshold and `belowThresholdSince` is set: clears it (user recovered)
+5. Errors are caught per-user — one failure doesn't stop the rest
+6. Admin (`ADMIN_TG_ID`) is always skipped
 
 ## Services
 
@@ -122,7 +124,18 @@ Token lifecycle (create, validate) + signature verification via viem `verifyMess
 
 ### `services/balance.ts`
 
-Fetches `GET {INDEXER_API_URL}/balances/{address}` from the staking indexer. Returns `BigInt` shares. `meetsThreshold()` compares against `MIN_STAKE_THRESHOLD`.
+Queries two indexers for staked balances:
+
+- `getUserBalance(address)` — fetches sBNKRW balance from staking-indexer (`INDEXER_API_URL`)
+- `getWchanBalance(address)` — fetches sWCHAN balance from wchan-vault-indexer (`WCHAN_VAULT_INDEXER_API_URL`)
+- `getCombinedBalance(address)` — queries both in parallel, returns `max(sBNKRW, sWCHAN)` for backwards compat
+- `meetsThreshold(shares)` — compares against `MIN_STAKE_THRESHOLD`
+
+**Usage:**
+- `POST /api/verify` uses `getWchanBalance()` — new verifications require sWCHAN only
+- Balance checker + `/status` + `GET /api/users` use `getCombinedBalance()` — existing sBNKRW stakers keep access
+
+Both functions return `0n` on error (indexer down, network failure). This means if both indexers are unreachable, members enter the grace period — they won't be kicked for at least `KICK_GRACE_PERIOD_MINUTES`.
 
 ### `services/group.ts`
 
@@ -166,6 +179,10 @@ Telegram group operations: `createInviteLink` (one-time, `member_limit: 1`), `ki
 ## Config
 
 `src/config.ts` — Zod schema validates all env vars at startup. Bot won't start with invalid config (except `PRIVATE_GROUP_ID` which is optional for initial `/chatid` setup).
+
+New env vars (with defaults):
+- `WCHAN_VAULT_INDEXER_API_URL` (default: `http://localhost:42072`) — sWCHAN vault indexer for new verifications and combined balance checks
+- `KICK_GRACE_PERIOD_MINUTES` (default: `60`) — how long below-threshold members get before being kicked
 
 ## File Structure
 
