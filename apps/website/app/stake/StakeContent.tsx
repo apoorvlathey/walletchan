@@ -1037,7 +1037,12 @@ export default function StakeContent() {
                 mb={4}
               >
                 {/* Staked Balance */}
-                <Box px={4} py={3} borderBottom="2px solid" borderColor="gray.100">
+                <Box
+                  px={4}
+                  py={3}
+                  borderBottom="2px solid"
+                  borderColor="gray.100"
+                >
                   <Text
                     fontSize="xs"
                     fontWeight="800"
@@ -1049,17 +1054,27 @@ export default function StakeContent() {
                   </Text>
                   <HStack spacing={2} align="baseline">
                     <Text fontSize="lg" fontWeight="900" color="bauhaus.black">
-                      {formatBalance(stakedBalance as bigint | undefined)} sWCHAN
+                      {formatBalance(stakedBalance as bigint | undefined)}{" "}
+                      sWCHAN
                     </Text>
-                    {tokenPrice > 0 && vaultData && stakedBalance !== undefined && (
-                      <Text fontSize="xs" fontWeight="600" color="gray.400">
-                        {formatUsd(
-                          parseFloat(formatUnits(stakedBalance as bigint, 18)) *
-                            parseFloat(formatUnits(BigInt(vaultData.sharePrice || "0"), 18)) *
-                            tokenPrice
-                        )}
-                      </Text>
-                    )}
+                    {tokenPrice > 0 &&
+                      vaultData &&
+                      stakedBalance !== undefined && (
+                        <Text fontSize="xs" fontWeight="600" color="gray.400">
+                          {formatUsd(
+                            parseFloat(
+                              formatUnits(stakedBalance as bigint, 18),
+                            ) *
+                              parseFloat(
+                                formatUnits(
+                                  BigInt(vaultData.sharePrice || "0"),
+                                  18,
+                                ),
+                              ) *
+                              tokenPrice,
+                          )}
+                        </Text>
+                      )}
                   </HStack>
                 </Box>
 
@@ -1076,16 +1091,26 @@ export default function StakeContent() {
                       Claimable WETH Rewards
                     </Text>
                     <HStack spacing={2} align="baseline">
-                      <Text fontSize="lg" fontWeight="900" color="bauhaus.black">
+                      <Text
+                        fontSize="lg"
+                        fontWeight="900"
+                        color="bauhaus.black"
+                      >
                         {earnedWeth !== undefined
                           ? `${formatUnits(earnedWeth as bigint, 18).slice(0, 12)} WETH`
                           : "—"}
                       </Text>
-                      {earnedWeth !== undefined && (earnedWeth as bigint) > 0n && ethPrice > 0 && (
-                        <Text fontSize="sm" fontWeight="700" color="gray.400">
-                          {formatUsd(parseFloat(formatUnits(earnedWeth as bigint, 18)) * ethPrice)}
-                        </Text>
-                      )}
+                      {earnedWeth !== undefined &&
+                        (earnedWeth as bigint) > 0n &&
+                        ethPrice > 0 && (
+                          <Text fontSize="sm" fontWeight="700" color="gray.400">
+                            {formatUsd(
+                              parseFloat(
+                                formatUnits(earnedWeth as bigint, 18),
+                              ) * ethPrice,
+                            )}
+                          </Text>
+                        )}
                     </HStack>
                   </Box>
                   <Button
@@ -1454,7 +1479,7 @@ export default function StakeContent() {
                                 const newShares = previewShares as bigint;
                                 const oldTs = lastDepositTs as bigint;
                                 const nowSec = BigInt(
-                                  Math.floor(Date.now() / 1000)
+                                  Math.floor(Date.now() / 1000),
                                 );
                                 const newTs =
                                   existing > 0n && oldTs > 0n
@@ -1462,16 +1487,16 @@ export default function StakeContent() {
                                       (existing + newShares)
                                     : nowSec;
                                 const zeroPenalty = new Date(
-                                  (Number(newTs) + PENALTY_DURATION) * 1000
+                                  (Number(newTs) + PENALTY_DURATION) * 1000,
                                 );
-                                const diff =
-                                  zeroPenalty.getTime() - Date.now();
+                                const diff = zeroPenalty.getTime() - Date.now();
                                 const days = Math.max(
                                   0,
-                                  Math.ceil(diff / (1000 * 60 * 60 * 24))
+                                  Math.ceil(diff / (1000 * 60 * 60 * 24)),
                                 );
-                                const formatted =
-                                  zeroPenalty.toLocaleString("en-GB", {
+                                const formatted = zeroPenalty.toLocaleString(
+                                  "en-GB",
+                                  {
                                     day: "2-digit",
                                     month: "short",
                                     year: "numeric",
@@ -1479,7 +1504,8 @@ export default function StakeContent() {
                                     minute: "2-digit",
                                     second: "2-digit",
                                     hour12: false,
-                                  });
+                                  },
+                                );
                                 return `in ${days} day${days !== 1 ? "s" : ""} (${formatted})`;
                               })()}
                             </Text>
@@ -1518,7 +1544,11 @@ export default function StakeContent() {
                           {formatBalance(previewAssetsNet as bigint)} WCHAN
                         </Text>
                         {penaltyPct > 0 && (
-                          <Text fontSize="xs" fontWeight="700" color="orange.500">
+                          <Text
+                            fontSize="xs"
+                            fontWeight="700"
+                            color="orange.500"
+                          >
                             ({penaltyPct.toFixed(1)}% penalty)
                           </Text>
                         )}

@@ -7,7 +7,9 @@
     "render": "remotion render src/index.ts AIAgentsNeedWallets out/ai-agents-need-wallets.mp4",
     "render:gif": "remotion render src/index.ts AIAgentsNeedWallets out/ai-agents-need-wallets.gif --image-format png",
     "render:v1": "remotion render src/index.ts V1Launch out/v1-launch.mp4",
-    "render:v1:gif": "remotion render src/index.ts V1Launch out/v1-launch.gif --image-format png"
+    "render:v1:gif": "remotion render src/index.ts V1Launch out/v1-launch.gif --image-format png",
+    "render:rebrand": "remotion render src/index.ts Rebrand out/rebrand.mp4",
+    "render:rebrand:gif": "remotion render src/index.ts Rebrand out/rebrand.gif --image-format png"
   },
   "dependencies": {
     "@remotion/cli": "4.0.419",
