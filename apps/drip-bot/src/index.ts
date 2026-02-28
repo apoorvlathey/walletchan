@@ -12,6 +12,22 @@ const contract = {
 let consecutiveErrors = 0;
 const MAX_CONSECUTIVE_ERRORS = 10;
 
+// BUG FIX: Local cooldown to prevent duplicate drip txs from stale RPC reads.
+//
+// Problem: After a successful drip, the bot loops and immediately re-reads
+// canDrip() + estimateGas(). These eth_call requests can be routed to a
+// different node in the RPC provider's load-balanced cluster — one that hasn't
+// processed the block containing our drip yet. So canDrip() returns true
+// (stale pre-drip state), estimateGas simulates against the same stale block
+// and passes, and the bot sends a duplicate tx that reverts with NothingToDrip().
+//
+// waitForTransactionReceipt only guarantees the node that RETURNED the receipt
+// has the block — not that every subsequent eth_call hits that same node.
+//
+// Fix: Track last successful drip time locally and enforce minDripInterval as
+// a sleep floor, ignoring potentially stale on-chain reads.
+let lastDripSuccessAt = 0n; // unix seconds
+
 interface StreamState {
   startTimestamp: bigint;
   endTimestamp: bigint;
@@ -101,7 +117,18 @@ async function main(): Promise<void> {
         sleepUntil = nextWchan < nextWeth ? nextWchan : nextWeth;
       }
 
-      // 3. Cap sleep at MAX_SLEEP
+      // 3. Enforce local cooldown to prevent stale-read duplicates.
+      //    On-chain reads above may return stale lastDripTimestamp (from a
+      //    load-balanced RPC node that's a block behind), computing sleepUntil
+      //    in the past and skipping sleep. This local floor overrides that.
+      if (lastDripSuccessAt > 0n) {
+        const minFromLastDrip = lastDripSuccessAt + minInterval;
+        if (minFromLastDrip > sleepUntil) {
+          sleepUntil = minFromLastDrip;
+        }
+      }
+
+      // 4. Cap sleep at MAX_SLEEP
       const maxSleepUntil = now + BigInt(Math.floor(config.maxSleepMs / 1000));
       if (sleepUntil > maxSleepUntil) {
         sleepUntil = maxSleepUntil;
@@ -114,7 +141,7 @@ async function main(): Promise<void> {
         await sleep(sleepMs);
       }
 
-      // 4. Check canDrip()
+      // 5. Check canDrip()
       const [wchanCan, wethCan] = await publicClient.readContract({
         ...contract,
         functionName: "canDrip",
@@ -128,7 +155,7 @@ async function main(): Promise<void> {
 
       log.info(`canDrip: WCHAN=${wchanCan}, WETH=${wethCan}`);
 
-      // 5. Preview what will be dripped
+      // 6. Preview what will be dripped
       const [previewWchan, previewWeth] = await publicClient.readContract({
         ...contract,
         functionName: "previewDrip",
@@ -137,7 +164,11 @@ async function main(): Promise<void> {
         `Preview: WCHAN=${formatEther(previewWchan)}, WETH=${formatEther(previewWeth)}`
       );
 
-      // 6. Estimate gas (also acts as simulation)
+      // 7. Estimate gas (also acts as simulation).
+      //    NOTE: This does NOT fully protect against stale reads — if the RPC
+      //    node behind eth_estimateGas is also on a stale block, the simulation
+      //    passes even though the tx will revert on-chain. The local cooldown
+      //    above (step 3) is the primary guard; this is defense-in-depth.
       let gasLimit: bigint;
       try {
         const estimated = await publicClient.estimateContractGas({
@@ -153,7 +184,7 @@ async function main(): Promise<void> {
         continue;
       }
 
-      // 7. Send drip() transaction
+      // 8. Send drip() transaction
       log.info("Sending drip() transaction...");
 
       const hash = await walletClient.writeContract({
@@ -171,6 +202,7 @@ async function main(): Promise<void> {
         log.info(
           `DRIP SUCCESS! Tx: ${hash} | Gas used: ${formatEther(gasUsed)} ETH`
         );
+        lastDripSuccessAt = BigInt(Math.floor(Date.now() / 1000));
       } else {
         log.error(`Tx reverted: ${hash}`);
       }
