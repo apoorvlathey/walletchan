@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { db } from "ponder:api";
 import schema from "ponder:schema";
 import { graphql } from "ponder";
-import { desc, eq, gte, lte, sum, count, asc } from "ponder";
+import { desc, eq, gt, gte, lte, sum, count, asc } from "ponder";
 
 function replaceBigInts(obj: unknown): unknown {
   if (typeof obj === "bigint") return obj.toString();
@@ -25,6 +25,39 @@ function computeSharePrice(totalAssets: bigint, totalShares: bigint): bigint {
 const app = new Hono();
 
 app.use("/graphql", graphql({ db, schema }));
+
+// GET /balances/:address - Single user's staked balance
+app.get("/balances/:address", async (c) => {
+  const address = c.req.param("address").toLowerCase();
+
+  const results = await db
+    .select()
+    .from(schema.userBalance)
+    .where(eq(schema.userBalance.id, address))
+    .limit(1);
+
+  if (results.length === 0) {
+    return c.json({ id: address, shares: "0" });
+  }
+
+  return c.json(replaceBigInts(results[0]));
+});
+
+// GET /balances - All users with non-zero balance (paginated, ordered by shares desc)
+app.get("/balances", async (c) => {
+  const limit = Math.min(Number(c.req.query("limit") || 50), 200);
+  const offset = Number(c.req.query("offset") || 0);
+
+  const results = await db
+    .select()
+    .from(schema.userBalance)
+    .where(gt(schema.userBalance.shares, 0n))
+    .orderBy(desc(schema.userBalance.shares))
+    .limit(limit)
+    .offset(offset);
+
+  return c.json(replaceBigInts(results));
+});
 
 // GET /apy?window=7d|30d|all
 app.get("/apy", async (c) => {

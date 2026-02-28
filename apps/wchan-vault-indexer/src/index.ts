@@ -1,5 +1,56 @@
 import { ponder } from "ponder:registry";
-import { vaultSnapshot } from "../ponder.schema";
+import { vaultSnapshot, userBalance } from "../ponder.schema";
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+// --- Transfer event: update per-user share balances ---
+ponder.on("WCHANVault:Transfer", async ({ event, context }) => {
+  const from = event.args.from.toLowerCase();
+  const to = event.args.to.toLowerCase();
+  const value = event.args.value;
+
+  // Decrement sender balance (skip mint from zero address)
+  if (from !== ZERO_ADDRESS) {
+    const existing = await context.db.find(userBalance, { id: from });
+    const currentShares = existing?.shares ?? 0n;
+    const newShares = currentShares - value;
+
+    await context.db
+      .insert(userBalance)
+      .values({
+        id: from,
+        shares: newShares,
+        lastUpdatedBlock: event.block.number,
+        lastUpdatedTimestamp: event.block.timestamp,
+      })
+      .onConflictDoUpdate({
+        shares: newShares,
+        lastUpdatedBlock: event.block.number,
+        lastUpdatedTimestamp: event.block.timestamp,
+      });
+  }
+
+  // Increment receiver balance (skip burn to zero address)
+  if (to !== ZERO_ADDRESS) {
+    const existing = await context.db.find(userBalance, { id: to });
+    const currentShares = existing?.shares ?? 0n;
+    const newShares = currentShares + value;
+
+    await context.db
+      .insert(userBalance)
+      .values({
+        id: to,
+        shares: newShares,
+        lastUpdatedBlock: event.block.number,
+        lastUpdatedTimestamp: event.block.timestamp,
+      })
+      .onConflictDoUpdate({
+        shares: newShares,
+        lastUpdatedBlock: event.block.number,
+        lastUpdatedTimestamp: event.block.timestamp,
+      });
+  }
+});
 
 ponder.on("WCHANVault:Deposit", async ({ event, context }) => {
   const id = `${event.transaction.hash}-${event.log.logIndex}`;

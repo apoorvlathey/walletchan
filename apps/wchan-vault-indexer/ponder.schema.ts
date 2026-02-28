@@ -1,5 +1,12 @@
 import { onchainTable, index } from "ponder";
 
+export const userBalance = onchainTable("user_balance", (t) => ({
+  id: t.text().primaryKey(), // lowercased address
+  shares: t.bigint().notNull(),
+  lastUpdatedBlock: t.bigint().notNull(),
+  lastUpdatedTimestamp: t.bigint().notNull(),
+}));
+
 export const vaultSnapshot = onchainTable(
   "vault_snapshot",
   (t) => ({

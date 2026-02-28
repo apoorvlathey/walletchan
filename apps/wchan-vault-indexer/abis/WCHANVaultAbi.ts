@@ -38,6 +38,17 @@ export const WCHANVaultAbi = [
     outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
     stateMutability: "view",
   },
+  // ERC20 Transfer event (for tracking per-user share balances)
+  {
+    type: "event",
+    name: "Transfer",
+    inputs: [
+      { name: "from", type: "address", indexed: true, internalType: "address" },
+      { name: "to", type: "address", indexed: true, internalType: "address" },
+      { name: "value", type: "uint256", indexed: false, internalType: "uint256" },
+    ],
+    anonymous: false,
+  },
   // Custom events
   {
     type: "event",
