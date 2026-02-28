@@ -48,3 +48,7 @@ export const TG_BOT_API_URL =
 // Staking Indexer API (separate from coin indexer)
 export const STAKING_INDEXER_API_URL =
   process.env.NEXT_PUBLIC_STAKING_INDEXER_API_URL || "http://localhost:42070";
+
+// WCHAN Vault Indexer API
+export const WCHAN_VAULT_INDEXER_API_URL =
+  process.env.NEXT_PUBLIC_WCHAN_VAULT_INDEXER_API_URL || "http://localhost:42072";

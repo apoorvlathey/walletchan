@@ -196,7 +196,8 @@ When working on features, refer to these docs:
 | `_docs/SWAP.md`                                          | Swap page: 0x API integration, fees, slippage, UI         |
 | `_docs/COINS.md`                                         | Coins page: SSE streaming, indexer API, pagination        |
 | `_docs/CALLDATA.md`                                      | Calldata decoder UI, param components, type routing       |
-| `apps/staking-indexer/STAKING_INDEXER_IMPLEMENTATION.md` | Staking indexer: vault events, balance tracking, API      |
+| `apps/staking-indexer/STAKING_INDEXER_IMPLEMENTATION.md` | Staking indexer: sBNKRW vault events, balance tracking (legacy) |
+| `apps/wchan-vault-indexer/IMPLEMENTATION.md`             | WCHAN vault indexer: sWCHAN balance tracking, APY, snapshots    |
 | `_docs/DEVELOPMENT.md`                                   | Build process, dev environment setup                      |
 | `_docs/PUBLISHING.md`                                    | Release workflow, CWS upload, auto-update, signing        |
 | `_docs/STORAGE.md`                                       | Every chrome.storage key, shapes, version history         |

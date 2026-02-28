@@ -19,7 +19,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useSignMessage } from "wagmi";
 import { formatUnits } from "viem";
 import { Navigation } from "../components/Navigation";
-import { TG_BOT_API_URL, STAKING_INDEXER_API_URL } from "../constants";
+import { TG_BOT_API_URL, WCHAN_VAULT_INDEXER_API_URL } from "../constants";
 
 const MotionBox = motion(Box);
 
@@ -76,7 +76,7 @@ function VerifyContent() {
     setIsLoadingBalance(true);
     try {
       const res = await fetch(
-        `${STAKING_INDEXER_API_URL}/balances/${address.toLowerCase()}`
+        `${WCHAN_VAULT_INDEXER_API_URL}/balances/${address.toLowerCase()}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -524,7 +524,7 @@ function VerifyContent() {
                           Your Stake
                         </Text>
                         <Text fontSize="sm" fontWeight="900" color={hasEnoughStake ? "green.600" : "red.500"}>
-                          {formatBalance(balance)} sBNKRW
+                          {formatBalance(balance)} sWCHAN
                         </Text>
                       </HStack>
                       <HStack
@@ -540,7 +540,7 @@ function VerifyContent() {
                           Required
                         </Text>
                         <Text fontSize="sm" fontWeight="900">
-                          {verifyInfo?.thresholdFormatted} sBNKRW
+                          {verifyInfo?.thresholdFormatted} sWCHAN
                         </Text>
                       </HStack>
 
@@ -558,7 +558,7 @@ function VerifyContent() {
                               h="40px"
                               rightIcon={<ExternalLink size={12} />}
                             >
-                              Stake BNKRW
+                              Stake WCHAN
                             </Button>
                           </Link>
                           <Button

@@ -2,7 +2,12 @@
 
 ## Overview
 
-A Telegram bot that gates access to a private TG group based on sBNKRW staking balance. Users must stake >= X sBNKRW tokens to join and maintain membership.
+A Telegram bot that gates access to a private TG group based on sWCHAN staking balance. Users must stake >= X WCHAN tokens (in the sWCHAN vault) to join and maintain membership.
+
+**Dual-indexer setup (migration from sBNKRW → sWCHAN):**
+- **New verifications** require sWCHAN only (via wchan-vault-indexer)
+- **Existing members** are checked against both sBNKRW AND sWCHAN (max of the two), so legacy sBNKRW stakers keep access while migrating
+- **Grace period**: members below threshold are not kicked immediately — a configurable grace period (default 60 min) gives them time to re-stake
 
 ## Architecture
 
@@ -10,37 +15,40 @@ A Telegram bot that gates access to a private TG group based on sBNKRW staking b
 User DMs Bot → /verify → Bot generates UUID token
   → User opens walletchan.com/verify?token=xxx
   → Connects wallet (RainbowKit)
-  → Sees staked balance (from staking indexer)
+  → Sees staked balance (from wchan-vault-indexer)
   → Signs verification message (EIP-191)
   → Website POSTs to Bot API
-  → Bot verifies signature + balance + token
+  → Bot verifies signature + sWCHAN balance + token
   → Bot generates one-time invite link → DMs user
 
 Background job (every 5min):
-  → Checks all members' balances
-  → Kicks users below threshold
-  → DMs them with re-stake instructions
+  → Checks all members' balances (max of sBNKRW + sWCHAN)
+  → If below threshold: starts grace period (sets belowThresholdSince)
+  → If grace period expired: kicks + DMs with re-stake instructions
+  → If recovered: clears grace period
 ```
 
 ## Components
 
-| Component       | Location                   | Purpose                           |
-| --------------- | -------------------------- | --------------------------------- |
-| TG Bot + API    | `apps/tg-bot`              | Grammy bot + Hono API server      |
-| Verify Page     | `apps/website/app/verify/` | Wallet connection + signature UI  |
-| Staking Indexer | `apps/staking-indexer`     | Provides `GET /balances/:address` |
+| Component            | Location                   | Purpose                                                   |
+| -------------------- | -------------------------- | --------------------------------------------------------- |
+| TG Bot + API         | `apps/tg-bot`              | Grammy bot + Hono API server                              |
+| Verify Page          | `apps/website/app/verify/` | Wallet connection + signature UI                          |
+| WCHAN Vault Indexer  | `apps/wchan-vault-indexer`  | Provides `GET /balances/:address` (sWCHAN, primary)       |
+| Staking Indexer      | `apps/staking-indexer`      | Provides `GET /balances/:address` (sBNKRW, legacy compat) |
 
 ## Database Schema (PostgreSQL + Drizzle)
 
 ### `users` table
 
-| Column         | Type      | Notes                              |
-| -------------- | --------- | ---------------------------------- |
-| tg_id          | bigint    | Primary key                        |
-| tg_username    | text      | Nullable, updated on verify        |
-| wallet_address | text      | UNIQUE — one wallet per TG account |
-| verified_at    | timestamp | When wallet was linked             |
-| is_member      | boolean   | Whether currently in private group |
+| Column                | Type      | Notes                                                |
+| --------------------- | --------- | ---------------------------------------------------- |
+| tg_id                 | bigint    | Primary key                                          |
+| tg_username           | text      | Nullable, updated on verify                          |
+| wallet_address        | text      | UNIQUE — one wallet per TG account                   |
+| verified_at           | timestamp | When wallet was linked                               |
+| is_member             | boolean   | Whether currently in private group                   |
+| below_threshold_since | timestamp | Nullable — set when first detected below threshold   |
 
 ### `verification_tokens` table
 
@@ -90,16 +98,18 @@ Timestamp: {unix_timestamp}
 
 ## Environment Variables
 
-| Variable              | Description                     | Example                         |
-| --------------------- | ------------------------------- | ------------------------------- |
-| `BOT_TOKEN`           | Telegram Bot API token          | From @BotFather                 |
-| `DATABASE_URL`        | PostgreSQL connection string    | `postgres://...`                |
-| `INDEXER_API_URL`     | Staking indexer URL             | `http://localhost:42070`        |
-| `PRIVATE_GROUP_ID`    | TG group chat ID (negative)     | `-1001234567890`                |
-| `MIN_STAKE_THRESHOLD` | Min sBNKRW in wei (18 decimals) | `1000000000000000000000` (1000) |
-| `VERIFY_URL`          | Website verify page base URL    | `https://walletchan.com/verify` |
-| `STAKE_URL`           | Staking page URL                | `https://stake.walletchan.com`  |
-| `PORT`                | Hono API port                   | `3001`                          |
+| Variable                       | Description                         | Example                         |
+| ------------------------------ | ----------------------------------- | ------------------------------- |
+| `BOT_TOKEN`                    | Telegram Bot API token              | From @BotFather                 |
+| `DATABASE_URL`                 | PostgreSQL connection string        | `postgres://...`                |
+| `INDEXER_API_URL`              | sBNKRW staking indexer URL (legacy) | `http://localhost:42070`        |
+| `WCHAN_VAULT_INDEXER_API_URL`  | sWCHAN vault indexer URL (primary)  | `http://localhost:42072`        |
+| `KICK_GRACE_PERIOD_MINUTES`    | Minutes before kicking below-threshold members | `60`               |
+| `PRIVATE_GROUP_ID`             | TG group chat ID (negative)         | `-1001234567890`                |
+| `MIN_STAKE_THRESHOLD`          | Min shares in wei (18 decimals)     | `1000000000000000000000` (1000) |
+| `VERIFY_URL`                   | Website verify page base URL        | `https://walletchan.com/verify` |
+| `STAKE_URL`                    | Staking page URL                    | `https://stake.walletchan.com`  |
+| `PORT`                         | Hono API port                       | `3001`                          |
 
 ## Security Considerations
 
@@ -115,7 +125,7 @@ Timestamp: {unix_timestamp}
 ### Structure
 
 - **Public channel** (`@wchanpublic`) — announcements, anyone can view
-- **Private group** — token-gated, only verified holders with sufficient sBNKRW stake
+- **Private group** — token-gated, only verified holders with sufficient sWCHAN stake (legacy sBNKRW stakers also accepted during migration)
 
 ### Posting a Verify Button to the Public Channel
 
@@ -126,7 +136,7 @@ curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/sendMessage" \
 -H "Content-Type: application/json" \
 -d '{
   "chat_id": "@wchanpublic",
-  "text": "Want access to the stakers-only group?\n\nStake and hold at least 20M sBNKRW to join.\n\nhttps://stake.walletchan.com/",
+  "text": "Want access to the stakers-only group?\n\nStake and hold at least 20M sWCHAN to join.\n\nhttps://stake.walletchan.com/",
   "reply_markup": {
     "inline_keyboard": [[{"text": "✅ Verify & Join", "url": "https://t.me/WalletChanBot?start=verify"}]]
   }
@@ -146,7 +156,7 @@ Single service running Grammy long polling + Hono HTTP server:
 - Grammy: long polling (no webhooks needed)
 - Hono: HTTP server on `PORT`
 - PostgreSQL: Railway managed database
-- No external dependencies beyond the staking indexer
+- No external dependencies beyond the staking indexer and wchan-vault-indexer
 
 ## Key Files
 

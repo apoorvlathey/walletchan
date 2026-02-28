@@ -1,6 +1,8 @@
-# Staking Indexer Implementation
+# Staking Indexer Implementation (Legacy — sBNKRW)
 
 Ponder-based indexer for the sBNKRW ERC-4626 vault on Base. Tracks Deposit, Withdraw, and Transfer events to maintain accurate per-user staked balances.
+
+> **Note**: This is the legacy sBNKRW indexer. The primary vault indexer is now `apps/wchan-vault-indexer` (sWCHAN). This indexer is still used by the TG bot's balance checker for backwards compatibility — existing sBNKRW stakers keep group access while migrating to sWCHAN.
 
 ## Contract
 
@@ -147,9 +149,9 @@ Copy `.env.example` to `.env.local`:
 
 ## Use Cases
 
-### Token-Gating Bot
+### Token-Gating Bot (Legacy)
 
-Query `/balances` to get all stakers ordered by shares. Compare against threshold to determine eligibility. Poll periodically or build a webhook on top.
+The TG bot queries this indexer's `/balances/:address` for sBNKRW balance as part of its `getCombinedBalance()` check (max of sBNKRW and sWCHAN). New verifications use the wchan-vault-indexer exclusively.
 
 ### User Staking Dashboard
 
