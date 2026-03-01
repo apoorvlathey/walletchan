@@ -18,7 +18,7 @@ export function buildVerificationMessage(
   token: string,
   timestamp: number
 ): string {
-  return `Verify Telegram account for BankrWallet\nToken: ${token}\nTimestamp: ${timestamp}`;
+  return `Verify Telegram account for WalletChan\nToken: ${token}\nTimestamp: ${timestamp}`;
 }
 
 export async function createVerificationToken(
