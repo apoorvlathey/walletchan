@@ -17,6 +17,7 @@ const envSchema = z.object({
   COIN_ANNOUNCE_THREAD_ID: z.coerce.number().int().optional(),
   PINATA_GATEWAY_URL: z.string().url().optional(),
   PINATA_GATEWAY_TOKEN: z.string().optional(),
+  BASE_RPC_URL: z.string().url().optional(),
 });
 
 export const config = envSchema.parse(process.env);

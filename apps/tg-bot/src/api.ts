@@ -82,19 +82,7 @@ export function createApi(bot: Bot): Hono {
       );
     }
 
-    // Link wallet
-    const linkResult = await linkWalletToTelegram(
-      body.token,
-      body.address,
-      sigResult.tgId!,
-      null
-    );
-
-    if (!linkResult.success) {
-      return c.json({ success: false, error: linkResult.error }, 400);
-    }
-
-    // Generate invite link
+    // Generate invite link BEFORE marking token as used, so user can retry on failure
     let inviteLink: string;
     try {
       inviteLink = await createInviteLink(bot);
@@ -104,6 +92,18 @@ export function createApi(bot: Bot): Hono {
         { success: false, error: "Failed to create invite link" },
         500
       );
+    }
+
+    // Link wallet (also marks token as used)
+    const linkResult = await linkWalletToTelegram(
+      body.token,
+      body.address,
+      sigResult.tgId!,
+      null
+    );
+
+    if (!linkResult.success) {
+      return c.json({ success: false, error: linkResult.error }, 400);
     }
 
     // DM the user with the invite link

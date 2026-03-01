@@ -8,7 +8,7 @@ import { config } from "../config.js";
 
 const publicClient = createPublicClient({
   chain: base,
-  transport: http(),
+  transport: http(config.BASE_RPC_URL),
 });
 
 const TOKEN_EXPIRY_MINUTES = 10;
@@ -73,11 +73,17 @@ export async function verifySignature(
 
   // Verify the signature (supports both EOA and ERC-1271 smart contract wallets)
   const message = buildVerificationMessage(token, timestamp);
-  const isValid = await publicClient.verifyMessage({
-    address,
-    message,
-    signature,
-  });
+  let isValid: boolean;
+  try {
+    isValid = await publicClient.verifyMessage({
+      address,
+      message,
+      signature,
+    });
+  } catch (err) {
+    console.error("Signature verification RPC error:", err);
+    return { valid: false, error: "Signature verification failed — please try again" };
+  }
 
   if (!isValid) {
     return { valid: false, error: "Invalid signature" };
