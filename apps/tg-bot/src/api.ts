@@ -86,10 +86,11 @@ export function createApi(bot: Bot): Hono {
     let inviteLink: string;
     try {
       inviteLink = await createInviteLink(bot);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create invite link:", err);
+      const detail = err?.message || err?.description || String(err);
       return c.json(
-        { success: false, error: "Failed to create invite link" },
+        { success: false, error: `Failed to create invite link: ${detail}` },
         500
       );
     }
