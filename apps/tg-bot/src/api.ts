@@ -83,16 +83,26 @@ export function createApi(bot: Bot): Hono {
     }
 
     // Generate invite link BEFORE marking token as used, so user can retry on failure
+    // Retry up to 3 times with backoff to handle Telegram 429 rate limits
     let inviteLink: string;
-    try {
-      inviteLink = await createInviteLink(bot);
-    } catch (err: any) {
-      console.error("Failed to create invite link:", err);
-      const detail = err?.message || err?.description || String(err);
-      return c.json(
-        { success: false, error: `Failed to create invite link: ${detail}` },
-        500
-      );
+    for (let attempt = 0; ; attempt++) {
+      try {
+        inviteLink = await createInviteLink(bot);
+        break;
+      } catch (err: any) {
+        const retryAfter = err?.parameters?.retry_after;
+        if (retryAfter && attempt < 3) {
+          console.warn(`[Verify] Rate limited creating invite link, retrying after ${retryAfter}s (attempt ${attempt + 1})`);
+          await new Promise((r) => setTimeout(r, retryAfter * 1000));
+          continue;
+        }
+        console.error("Failed to create invite link:", err);
+        const detail = err?.message || err?.description || String(err);
+        return c.json(
+          { success: false, error: `Failed to create invite link: ${detail}` },
+          500
+        );
+      }
     }
 
     // Link wallet (also marks token as used)
