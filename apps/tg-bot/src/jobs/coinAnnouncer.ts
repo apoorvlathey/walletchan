@@ -14,7 +14,19 @@ interface Coin {
   timestamp: string;
 }
 
+interface QueuedAnnouncement {
+  coin: Coin;
+  text: string;
+  tweetUrl: string | null;
+  keyboard: InlineKeyboard;
+  retries: number;
+}
+
 const MAX_ANNOUNCED_IDS = 500;
+const MIN_SEND_INTERVAL_MS = 1500; // 1.5s between sends
+const MAX_RETRIES = 3;
+const RETRY_BUFFER_MS = 500;
+const MAX_QUEUE_SIZE = 50;
 
 async function fetchLatestCoins(): Promise<Coin[]> {
   const res = await fetch(
@@ -39,6 +51,73 @@ export function startCoinAnnouncer(
   let latestTimestamp = "0";
   const announcedIds = new Set<string>();
   let initialized = false;
+  const sendQueue: QueuedAnnouncement[] = [];
+  let drainTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // --- Send queue drain loop ---
+
+  function scheduleDrain(delayMs: number = MIN_SEND_INTERVAL_MS): void {
+    if (drainTimer) return; // already scheduled
+    drainTimer = setTimeout(() => {
+      drainTimer = null;
+      drainQueue();
+    }, delayMs);
+  }
+
+  async function drainQueue(): Promise<void> {
+    if (sendQueue.length === 0) return;
+
+    const item = sendQueue[0]; // peek
+
+    try {
+      await bot.api.sendMessage(chatId, item.text, {
+        parse_mode: "HTML",
+        link_preview_options: item.tweetUrl
+          ? { url: item.tweetUrl, prefer_large_media: true }
+          : { is_disabled: true },
+        reply_markup: item.keyboard,
+        ...(threadId ? { message_thread_id: threadId } : {}),
+      });
+
+      sendQueue.shift();
+      console.log(
+        `[CoinAnnouncer] Announced $${item.coin.symbol} (${item.coin.id}), queue: ${sendQueue.length}`,
+      );
+
+      if (sendQueue.length > 0) {
+        scheduleDrain(MIN_SEND_INTERVAL_MS);
+      }
+    } catch (err: any) {
+      const retryAfter = err?.parameters?.retry_after;
+
+      if (retryAfter) {
+        const waitMs = retryAfter * 1000 + RETRY_BUFFER_MS;
+        console.warn(
+          `[CoinAnnouncer] Rate limited (429), waiting ${retryAfter}s. Queue: ${sendQueue.length}`,
+        );
+        scheduleDrain(waitMs);
+      } else if (item.retries < MAX_RETRIES) {
+        item.retries++;
+        const backoffMs = Math.min(2000 * Math.pow(2, item.retries - 1), 30_000);
+        console.warn(
+          `[CoinAnnouncer] Send failed for ${item.coin.id}, retry ${item.retries}/${MAX_RETRIES} in ${backoffMs}ms:`,
+          err?.message || err,
+        );
+        scheduleDrain(backoffMs);
+      } else {
+        sendQueue.shift();
+        console.error(
+          `[CoinAnnouncer] Dropping coin ${item.coin.id} after ${MAX_RETRIES} retries:`,
+          err?.message || err,
+        );
+        if (sendQueue.length > 0) {
+          scheduleDrain(MIN_SEND_INTERVAL_MS);
+        }
+      }
+    }
+  }
+
+  // --- Poll: collect new coins into queue ---
 
   async function poll(): Promise<void> {
     try {
@@ -67,6 +146,12 @@ export function startCoinAnnouncer(
         .reverse(); // oldest first
 
       for (const coin of newCoins) {
+        if (sendQueue.length >= MAX_QUEUE_SIZE) {
+          console.warn(`[CoinAnnouncer] Queue full (${MAX_QUEUE_SIZE}), dropping coin ${coin.id}`);
+          announcedIds.add(coin.id);
+          continue;
+        }
+
         try {
           // Resolve tweet URL from IPFS if not already provided by indexer
           let tweetUrl = coin.tweetUrl;
@@ -90,22 +175,13 @@ export function startCoinAnnouncer(
             `https://coins.walletchan.com?buy=${coin.coinAddress}`,
           );
 
-          await bot.api.sendMessage(chatId, text, {
-            parse_mode: "HTML",
-            link_preview_options: tweetUrl
-              ? { url: tweetUrl, prefer_large_media: true }
-              : { is_disabled: true },
-            reply_markup: keyboard,
-            ...(threadId ? { message_thread_id: threadId } : {}),
-          });
-
+          sendQueue.push({ coin, text, tweetUrl, keyboard, retries: 0 });
           announcedIds.add(coin.id);
         } catch (err) {
           console.error(
-            `[CoinAnnouncer] Failed to announce coin ${coin.id}:`,
+            `[CoinAnnouncer] Failed to prepare coin ${coin.id}:`,
             err,
           );
-          // Continue with next coin
         }
       }
 
@@ -121,6 +197,11 @@ export function startCoinAnnouncer(
         for (const id of toRemove) {
           announcedIds.delete(id);
         }
+      }
+
+      // Kick the drain loop if items were queued
+      if (sendQueue.length > 0) {
+        scheduleDrain(0);
       }
     } catch (err) {
       console.error("[CoinAnnouncer] Poll error:", err);
