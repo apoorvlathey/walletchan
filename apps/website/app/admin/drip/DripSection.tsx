@@ -36,6 +36,33 @@ import { useTokenData } from "../../contexts/TokenDataContext";
 
 const POLL_MS = 5_000;
 
+const VAULT_INDEXER_URL =
+  process.env.NEXT_PUBLIC_WCHAN_VAULT_INDEXER_API_URL || "";
+const VAULT_INDEXER_CHAIN_ID = Number(
+  process.env.NEXT_PUBLIC_WCHAN_VAULT_INDEXER_CHAIN_ID || "0"
+);
+
+interface IndexerApyData {
+  wchanAPY: number;
+  wethDistributed: string;
+  totalStaked: string;
+  secondsElapsed: number;
+}
+
+function computeCurrentWethApy(
+  data: IndexerApyData,
+  ethPrice: number | null,
+  wchanPrice: number | null,
+): number | null {
+  if (!ethPrice || !wchanPrice || data.secondsElapsed <= 0) return null;
+  const wethUsd =
+    parseFloat(formatUnits(BigInt(data.wethDistributed || "0"), 18)) * ethPrice;
+  const stakedUsd =
+    parseFloat(formatUnits(BigInt(data.totalStaked || "0"), 18)) * wchanPrice;
+  if (stakedUsd === 0) return null;
+  return (wethUsd / stakedUsd) * (31_536_000 / data.secondsElapsed) * 100;
+}
+
 function formatUsd(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
   if (value >= 1_000) return `$${(value / 1_000).toFixed(2)}K`;
@@ -147,6 +174,7 @@ interface StreamInputProps {
   dripTokenPrice: number | null;
   wchanPrice: number | null;
   explorerUrl: string;
+  currentApy: number | null;
   onSuccess: () => void;
 }
 
@@ -170,6 +198,7 @@ function StreamInput({
   isNotOwner,
   wchanPrice,
   explorerUrl,
+  currentApy,
   onSuccess,
 }: StreamInputProps) {
   const toast = useToast();
@@ -177,6 +206,30 @@ function StreamInput({
   const [sliderPct, setSliderPct] = useState(0);
   const [startDate, setStartDate] = useState(nowDateStr());
   const [endDate, setEndDate] = useState(futureDate(30));
+
+  // Minimum end date: contract only extends, never shortens.
+  const minEndDate = useMemo(() => {
+    if (
+      existingStream &&
+      existingStream.amountRemaining > 0n &&
+      existingStream.endTimestamp > BigInt(Math.floor(Date.now() / 1000))
+    ) {
+      return toLocalDateStr(new Date(Number(existingStream.endTimestamp) * 1000));
+    }
+    return nowDateStr();
+  }, [existingStream]);
+
+  // Auto-set start to now, end to active stream's end date (or default +30d)
+  useEffect(() => {
+    setStartDate(nowDateStr());
+    if (
+      existingStream &&
+      existingStream.amountRemaining > 0n &&
+      existingStream.endTimestamp > BigInt(Math.floor(Date.now() / 1000))
+    ) {
+      setEndDate(toLocalDateStr(new Date(Number(existingStream.endTimestamp) * 1000)));
+    }
+  }, [existingStream]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const parsedAmount = useMemo(() => {
     try {
@@ -588,7 +641,12 @@ function StreamInput({
             <Input
               type="datetime-local"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              min={minEndDate}
+              onChange={(e) => {
+                // Enforce min in case browser doesn't block it
+                if (e.target.value < minEndDate) return;
+                setEndDate(e.target.value);
+              }}
               onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
               size="xs"
               fontWeight="bold"
@@ -608,21 +666,36 @@ function StreamInput({
           border="2px solid"
           borderColor="bauhaus.border"
         >
-          <Text
-            fontSize="xs"
-            fontWeight="bold"
-            textTransform="uppercase"
-            letterSpacing="widest"
-            color="gray.500"
-            mb={1}
-          >
-            Estimated APY
-          </Text>
-          <Text fontWeight="black" fontSize="2xl" lineHeight="1" color={accentColor}>
-            {apy !== null ? `${apy.toFixed(2)}%` : "—"}
-          </Text>
+          <HStack justify="space-between" mb={1}>
+            <Text
+              fontSize="xs"
+              fontWeight="bold"
+              textTransform="uppercase"
+              letterSpacing="widest"
+              color="gray.500"
+            >
+              Current APY (7d)
+            </Text>
+            <Text fontSize="sm" fontWeight="black" color="gray.600">
+              {currentApy !== null ? `${currentApy.toFixed(2)}%` : "—"}
+            </Text>
+          </HStack>
+          <HStack justify="space-between" mb={2}>
+            <Text
+              fontSize="xs"
+              fontWeight="bold"
+              textTransform="uppercase"
+              letterSpacing="widest"
+              color="gray.500"
+            >
+              Est. New Config APY
+            </Text>
+            <Text fontSize="sm" fontWeight="black" color={accentColor}>
+              {apy !== null ? `${apy.toFixed(2)}%` : "—"}
+            </Text>
+          </HStack>
           {streamActive && parsedAmount && (
-            <Text fontSize="xs" color="gray.400" mt={1}>
+            <Text fontSize="xs" color="gray.400" mb={1}>
               Includes existing stream remainder
             </Text>
           )}
@@ -676,6 +749,23 @@ export default function DripSection() {
     };
     fetchEthPrice();
     const interval = setInterval(fetchEthPrice, 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch current APY from vault indexer (7d)
+  const [indexerApy, setIndexerApy] = useState<IndexerApyData | null>(null);
+  useEffect(() => {
+    if (!VAULT_INDEXER_URL) return;
+    const fetchApy = async () => {
+      try {
+        const res = await fetch(`${VAULT_INDEXER_URL}/apy?window=7d`);
+        if (res.ok) setIndexerApy(await res.json());
+      } catch {
+        // silent
+      }
+    };
+    fetchApy();
+    const interval = setInterval(fetchApy, 30_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -785,6 +875,21 @@ export default function DripSection() {
         amountRemaining: wethStreamRaw[3],
       }
     : undefined;
+
+  // Current APYs from indexer (only when on the right chain)
+  const hasIndexer =
+    !!VAULT_INDEXER_URL && VAULT_INDEXER_CHAIN_ID === selectedChainId;
+  const currentWchanApy = useMemo(
+    () => (hasIndexer && indexerApy ? indexerApy.wchanAPY : null),
+    [hasIndexer, indexerApy],
+  );
+  const currentWethApy = useMemo(
+    () =>
+      hasIndexer && indexerApy
+        ? computeCurrentWethApy(indexerApy, ethPrice, wchanPrice)
+        : null,
+    [hasIndexer, indexerApy, ethPrice, wchanPrice],
+  );
 
   // canDrip check
   const { data: canDripData, refetch: refetchCanDrip } = useReadContract({
@@ -1043,6 +1148,50 @@ export default function DripSection() {
           </HStack>
         </Flex>
 
+        {/* Current net APY summary */}
+        {hasIndexer && (currentWchanApy !== null || currentWethApy !== null) && (
+          <Box
+            mb={4}
+            p={4}
+            bg="gray.50"
+            border="2px solid"
+            borderColor="bauhaus.border"
+          >
+            <Text
+              fontSize="xs"
+              fontWeight="bold"
+              textTransform="uppercase"
+              letterSpacing="widest"
+              color="gray.500"
+              mb={2}
+            >
+              Current Net APY (7d)
+            </Text>
+            <HStack spacing={4} align="baseline">
+              <Text fontWeight="black" fontSize="2xl" lineHeight="1" color="bauhaus.black">
+                {((currentWchanApy ?? 0) + (currentWethApy ?? 0)).toFixed(2)}%
+              </Text>
+              <HStack spacing={1}>
+                <Text fontSize="xs" fontWeight="700" color="gray.400" textTransform="uppercase">
+                  WCHAN
+                </Text>
+                <Text fontSize="xs" fontWeight="black" color="bauhaus.blue">
+                  {currentWchanApy !== null ? `${currentWchanApy.toFixed(2)}%` : "—"}
+                </Text>
+              </HStack>
+              <Text fontSize="xs" fontWeight="900" color="gray.400">+</Text>
+              <HStack spacing={1}>
+                <Text fontSize="xs" fontWeight="700" color="gray.400" textTransform="uppercase">
+                  WETH
+                </Text>
+                <Text fontSize="xs" fontWeight="black" color="bauhaus.red">
+                  {currentWethApy !== null ? `${currentWethApy.toFixed(2)}%` : "—"}
+                </Text>
+              </HStack>
+            </HStack>
+          </Box>
+        )}
+
         {/* Two stream columns */}
         <Flex gap={{ base: 4, lg: 6 }} direction={{ base: "column", lg: "row" }}>
           <StreamInput
@@ -1065,6 +1214,7 @@ export default function DripSection() {
             dripTokenPrice={wchanPrice}
             wchanPrice={wchanPrice}
             explorerUrl={explorerUrl}
+            currentApy={currentWchanApy}
             onSuccess={refetchAll}
           />
           <StreamInput
@@ -1087,6 +1237,7 @@ export default function DripSection() {
             dripTokenPrice={ethPrice}
             wchanPrice={wchanPrice}
             explorerUrl={explorerUrl}
+            currentApy={currentWethApy}
             onSuccess={refetchAll}
           />
         </Flex>
