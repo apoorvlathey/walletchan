@@ -4,6 +4,12 @@ const OCTAV_API_URL =
   process.env.OCTAV_API_URL || "https://api.octav.fi";
 const OCTAV_API_KEY = process.env.OCTAV_API_KEY;
 
+// Custom logo overrides keyed by `${chainId}:${lowercaseAddress}`
+const LOGO_OVERRIDES: Record<string, string> = {
+  "8453:0xba5ed0000e1ca9136a695f0a848012a16008b032":
+    "https://walletchan.com/images/walletchan-icon.png",
+};
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -90,6 +96,12 @@ export async function GET(request: NextRequest) {
     }
 
     const tokens = Array.from(tokenMap.values());
+    // Apply custom logo overrides
+    for (const token of tokens) {
+      const key = `${token.chainId}:${token.contractAddress.toLowerCase()}`;
+      const override = LOGO_OVERRIDES[key];
+      if (override) token.logoUrl = override;
+    }
     // Sort by USD value descending
     tokens.sort((a, b) => b.valueUsd - a.valueUsd);
 
