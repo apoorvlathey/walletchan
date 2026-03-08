@@ -21,7 +21,6 @@ import {
   GITHUB_URL,
   TWITTER_URL,
   TELEGRAM_URL,
-  BANKR_API_URL,
 } from "../constants";
 
 const MAIN_SITE = "https://walletchan.com";
@@ -155,15 +154,6 @@ export function Footer() {
                 GitHub
               </Link>
               <Link
-                href={BANKR_API_URL}
-                target="_blank"
-                color="whiteAlpha.700"
-                fontSize="sm"
-                _hover={{ color: "bauhaus.yellow" }}
-              >
-                Bankr API
-              </Link>
-              <Link
                 href={installHref}
                 color="whiteAlpha.700"
                 fontSize="sm"
@@ -188,16 +178,6 @@ export function Footer() {
                 _hover={{ color: "bauhaus.yellow" }}
               >
                 GitHub
-              </Link>
-              <Text color="whiteAlpha.300">•</Text>
-              <Link
-                href={BANKR_API_URL}
-                target="_blank"
-                color="whiteAlpha.700"
-                fontSize="sm"
-                _hover={{ color: "bauhaus.yellow" }}
-              >
-                Bankr API
               </Link>
               <Text color="whiteAlpha.300">•</Text>
               <Link
