@@ -53,16 +53,17 @@ export function TweetGrid() {
               columnGap: "1.5rem",
             }}
           >
-            {tweets.map((tweetUrl, index) => (
+            {tweets.map((tweet, index) => (
               <Box
-                key={getTweetId(tweetUrl)}
+                key={getTweetId(tweet.url)}
                 mb={6}
                 sx={{
                   breakInside: "avoid",
                 }}
               >
                 <TweetCard
-                  tweetId={getTweetId(tweetUrl)}
+                  tweetId={getTweetId(tweet.url)}
+                  hideQuotedTweet={tweet.hideQuotedTweet}
                   decoratorColor={
                     DECORATOR_COLORS[index % DECORATOR_COLORS.length]
                   }

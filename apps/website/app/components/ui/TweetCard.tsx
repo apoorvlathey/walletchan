@@ -42,6 +42,7 @@ interface TweetCardProps {
   decoratorColor?: "red" | "blue" | "yellow";
   decoratorShape?: "circle" | "square" | "triangle";
   delay?: number;
+  hideQuotedTweet?: boolean;
 }
 
 // Style to convert HDR profile images to SDR
@@ -531,6 +532,7 @@ export function TweetCard({
   decoratorColor = "blue",
   decoratorShape = "circle",
   delay = 0,
+  hideQuotedTweet,
 }: TweetCardProps) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
@@ -658,7 +660,7 @@ export function TweetCard({
           </Text>
 
           {/* Quoted Tweet */}
-          {quotedTweet && <QuotedTweetCardContent tweet={quotedTweet} />}
+          {quotedTweet && !hideQuotedTweet && <QuotedTweetCardContent tweet={quotedTweet} />}
 
           {/* Media (if any) */}
           {tweet.photos && tweet.photos.length > 0 && (
