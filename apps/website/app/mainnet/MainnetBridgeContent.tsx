@@ -53,13 +53,9 @@ import { erc20Abi, l2StandardBridgeAbi } from "./abi";
 const TARGET_CHAIN_ID = base.id; // 8453
 const WCHAN_ADDR = WCHAN_TOKEN_ADDRESS as `0x${string}`;
 const WCHAN_L1_ADDR = WCHAN_L1_ETH_MAINNET as `0x${string}`;
-const L2_BRIDGE_ADDR =
-  "0x4200000000000000000000000000000000000010" as const;
+const L2_BRIDGE_ADDR = "0x4200000000000000000000000000000000000010" as const;
 
-function formatBalance(
-  raw: bigint | undefined,
-  decimals: number = 18
-): string {
+function formatBalance(raw: bigint | undefined, decimals: number = 18): string {
   if (!raw) return "0";
   const formatted = formatUnits(raw, decimals);
   const num = parseFloat(formatted);
@@ -343,9 +339,7 @@ export default function MainnetBridgeContent() {
       resetBridge();
       // Navigate to claim page after a short delay so toast is visible
       setTimeout(() => {
-        router.push(
-          mainnetHref(`/mainnet/claim?tx=${bridgeTxHash}`)
-        );
+        router.push(mainnetHref(`/mainnet/claim?tx=${bridgeTxHash}`));
       }, 1500);
     }
   }, [
@@ -402,7 +396,7 @@ export default function MainnetBridgeContent() {
             position: "bottom-right",
           });
         },
-      }
+      },
     );
   }, [writeApprove, parsedAmount, toast]);
 
@@ -427,7 +421,7 @@ export default function MainnetBridgeContent() {
             position: "bottom-right",
           });
         },
-      }
+      },
     );
   }, [writeBridge, parsedAmount, toast]);
 
@@ -462,7 +456,7 @@ export default function MainnetBridgeContent() {
                 letterSpacing="tight"
                 textAlign="center"
               >
-                Bridge WCHAN to Mainnet
+                Bridge WCHAN to ETH Mainnet
               </Text>
               <Text
                 fontSize="sm"
@@ -472,7 +466,7 @@ export default function MainnetBridgeContent() {
                 letterSpacing="wide"
                 textAlign="center"
               >
-                Transfer your WCHAN from Base to Ethereum L1
+                (Return to Mainnet)
               </Text>
             </VStack>
             <Box position="absolute" right={0} top={0}>
@@ -519,12 +513,7 @@ export default function MainnetBridgeContent() {
                 _hover={{ bg: "gray.100" }}
                 onClick={() => switchChain({ chainId: TARGET_CHAIN_ID })}
                 leftIcon={
-                  <Image
-                    src="/images/base.svg"
-                    alt="Base"
-                    w="18px"
-                    h="18px"
-                  />
+                  <Image src="/images/base.svg" alt="Base" w="18px" h="18px" />
                 }
               >
                 Switch to Base
@@ -625,17 +614,15 @@ export default function MainnetBridgeContent() {
                         const SNAP_THRESHOLD = 3;
                         const snaps = [0, 25, 50, 75, 100];
                         const nearest = snaps.find(
-                          (s) => Math.abs(val - s) <= SNAP_THRESHOLD
+                          (s) => Math.abs(val - s) <= SNAP_THRESHOLD,
                         );
-                        const snapped =
-                          nearest !== undefined ? nearest : val;
+                        const snapped = nearest !== undefined ? nearest : val;
                         setSliderValue(snapped);
                         if (snapped === 0) {
                           setAmount("");
                         } else {
                           const bal = wchanBalance as bigint;
-                          const pctAmount =
-                            (bal * BigInt(snapped)) / 100n;
+                          const pctAmount = (bal * BigInt(snapped)) / 100n;
                           setAmount(formatUnits(pctAmount, 18));
                         }
                       }}
