@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import {
   Drawer,
   DrawerOverlay,
@@ -19,20 +19,6 @@ import {
   Flex,
 } from "@chakra-ui/react";
 import { X, ExternalLink as ExternalLinkIcon } from "lucide-react";
-import {
-  createPublicClient,
-  http,
-  type TransactionReceipt,
-} from "viem";
-import { mainnet, base } from "viem/chains";
-import {
-  publicActionsL1,
-  publicActionsL2,
-  getWithdrawals,
-  getWithdrawalStatus,
-  getTimeToFinalize,
-} from "viem/op-stack";
-import { CHAIN_RPC_URLS } from "../wagmiConfig";
 import type {
   BridgeHistoryEntry,
   WithdrawalStatus,
@@ -43,8 +29,9 @@ interface BridgeHistoryDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   entries: BridgeHistoryEntry[];
-  updateEntry: (txHash: string, partial: Partial<BridgeHistoryEntry>) => void;
   removeEntry: (txHash: string) => void;
+  isPolling: boolean;
+  refreshNow: () => void;
 }
 
 function shortenHash(hash: string): string {
@@ -150,119 +137,13 @@ export default function BridgeHistoryDrawer({
   isOpen,
   onClose,
   entries,
-  updateEntry,
   removeEntry,
+  isPolling,
+  refreshNow,
 }: BridgeHistoryDrawerProps) {
-  const abortRef = useRef(false);
-
+  // Trigger a fresh fetch whenever the drawer opens
   useEffect(() => {
-    if (!isOpen) {
-      abortRef.current = true;
-      return;
-    }
-
-    abortRef.current = false;
-
-    const pendingEntries = entries.filter((e) => !e.done);
-    if (pendingEntries.length === 0) return;
-
-    const l1Client = createPublicClient({
-      chain: mainnet,
-      transport: http(CHAIN_RPC_URLS[1]),
-    }).extend(publicActionsL1());
-
-    const l2Client = createPublicClient({
-      chain: base,
-      transport: http(CHAIN_RPC_URLS[8453]),
-    }).extend(publicActionsL2());
-
-    (async () => {
-      for (const entry of pendingEntries) {
-        if (abortRef.current) break;
-
-        try {
-          const receipt: TransactionReceipt =
-            await l2Client.getTransactionReceipt({
-              hash: entry.txHash,
-            });
-
-          if (abortRef.current) break;
-
-          // Fetch block timestamp if we don't have it yet
-          let txTimestamp = entry.txTimestamp;
-          if (!txTimestamp) {
-            try {
-              const block = await l2Client.getBlock({
-                blockNumber: receipt.blockNumber,
-              });
-              txTimestamp = Number(block.timestamp) * 1000;
-            } catch {
-              // ignore
-            }
-          }
-
-          if (abortRef.current) break;
-
-          const withdrawals = getWithdrawals(receipt);
-          const withdrawal = withdrawals[0];
-
-          const status: WithdrawalStatus = await getWithdrawalStatus(
-            l1Client,
-            {
-              receipt,
-              targetChain: base,
-            }
-          );
-
-          if (abortRef.current) break;
-
-          // Fetch time estimate for waiting states
-          let estimateSeconds: number | null = null;
-          let estimateTimestamp: number | null = null;
-
-          if (status === "waiting-to-finalize" && withdrawal) {
-            try {
-              const ttf = await getTimeToFinalize(l1Client, {
-                targetChain: base,
-                withdrawalHash:
-                  withdrawal.withdrawalHash as `0x${string}`,
-              });
-              estimateSeconds = Number(ttf.seconds);
-              estimateTimestamp = Number(ttf.timestamp) * 1000;
-            } catch {
-              // dispute game may not be resolved yet
-            }
-          } else if (status === "waiting-to-prove" && txTimestamp) {
-            // Dispute game usually posted ~1h after tx
-            const estimatedReadyAt = txTimestamp + 60 * 60 * 1000;
-            const remaining = Math.max(
-              0,
-              Math.floor((estimatedReadyAt - Date.now()) / 1000)
-            );
-            estimateSeconds = remaining;
-            estimateTimestamp = estimatedReadyAt;
-          }
-
-          if (abortRef.current) break;
-
-          updateEntry(entry.txHash, {
-            lastStatus: status,
-            lastCheckedAt: Date.now(),
-            done: status === "finalized",
-            estimateSeconds,
-            estimateTimestamp,
-            ...(txTimestamp ? { txTimestamp } : {}),
-          });
-        } catch {
-          // skip entry on error
-        }
-      }
-    })();
-
-    return () => {
-      abortRef.current = true;
-    };
-    // Only re-run when drawer opens/closes, not on every entries change
+    if (isOpen) refreshNow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -283,7 +164,10 @@ export default function BridgeHistoryDrawer({
           borderBottom="3px solid"
           borderColor="bauhaus.border"
         >
-          Bridge History
+          <HStack spacing={2}>
+            <Text>Bridge History</Text>
+            {isPolling && <Spinner size="xs" color="bauhaus.blue" />}
+          </HStack>
         </DrawerHeader>
         <DrawerBody px={4} py={4}>
           {entries.length === 0 ? (

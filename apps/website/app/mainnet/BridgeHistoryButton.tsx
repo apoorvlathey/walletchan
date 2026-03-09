@@ -3,11 +3,8 @@
 import { Box, IconButton, useDisclosure } from "@chakra-ui/react";
 import { History } from "lucide-react";
 import { useBridgeHistory } from "./useBridgeHistory";
+import { useBridgeStatusPoller } from "./useBridgeStatusPoller";
 import BridgeHistoryDrawer from "./BridgeHistoryDrawer";
-
-export function useBridgeHistoryContext() {
-  return useBridgeHistory();
-}
 
 export function BridgeHistoryButton({
   hasActionable,
@@ -47,6 +44,10 @@ export function BridgeHistoryWidget({
   history: ReturnType<typeof useBridgeHistory>;
 }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isPolling, refreshNow } = useBridgeStatusPoller(
+    history.entries,
+    history.updateEntry,
+  );
 
   return (
     <>
@@ -55,8 +56,9 @@ export function BridgeHistoryWidget({
         isOpen={isOpen}
         onClose={onClose}
         entries={history.entries}
-        updateEntry={history.updateEntry}
         removeEntry={history.removeEntry}
+        isPolling={isPolling}
+        refreshNow={refreshNow}
       />
     </>
   );
