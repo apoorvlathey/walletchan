@@ -36,6 +36,11 @@ const CELL_GAP = 3;
 const WEEKS_TO_SHOW = 20;
 const DAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
 
+/** Local YYYY-MM-DD string (avoids UTC mismatch from toISOString) */
+function toLocalDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function ClaimHeatmap({ events, ethPrice, bnkrwPrice, wchanPrice }: ClaimHeatmapProps) {
   const [hoverDay, setHoverDay] = useState<string | null>(null);
 
@@ -47,7 +52,7 @@ export default function ClaimHeatmap({ events, ethPrice, bnkrwPrice, wchanPrice 
       const amtFloat = parseFloat(formatUnits(BigInt(evt.amount), 18));
       const price = evt.token === "WETH" ? ethPrice : evt.token === "WCHAN" ? wchanPrice : bnkrwPrice;
       const usd = price ? amtFloat * price : 0;
-      const dateKey = new Date(evt.timestamp * 1000).toISOString().slice(0, 10);
+      const dateKey = toLocalDateKey(new Date(evt.timestamp * 1000));
       const existing = map.get(dateKey);
       if (existing) {
         existing.usd += usd;
@@ -78,7 +83,7 @@ export default function ClaimHeatmap({ events, ethPrice, bnkrwPrice, wchanPrice 
     for (let w = 0; w < WEEKS_TO_SHOW; w++) {
       const week: { dateKey: string; date: Date }[] = [];
       for (let d = 0; d < 7; d++) {
-        const dateKey = cursor.toISOString().slice(0, 10);
+        const dateKey = toLocalDateKey(cursor);
         week.push({ dateKey, date: new Date(cursor) });
         cursor.setDate(cursor.getDate() + 1);
       }
