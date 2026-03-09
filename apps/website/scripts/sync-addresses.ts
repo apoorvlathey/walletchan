@@ -29,6 +29,8 @@ const SWAP_KEY_MAP: Record<string, string> = {
   WETH: "weth",
   UNIVERSAL_ROUTER: "universalRouter",
   POOL_MANAGER: "poolManager",
+  POSITION_MANAGER: "positionManager",
+  STATE_VIEW: "stateView",
   OLD_TOKEN: "oldToken",
   WCHAN_WRAP_HOOK: "wrapHook",
 };
@@ -104,6 +106,8 @@ export interface SwapChainAddresses {
   quoter: Address;
   permit2: Address;
   poolManager: Address;
+  positionManager: Address;
+  stateView: Address;
   oldToken: Address;
   wrapHook: Address;
   oldTokenPoolHook: Address;

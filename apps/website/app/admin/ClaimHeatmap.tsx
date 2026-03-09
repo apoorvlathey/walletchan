@@ -10,8 +10,8 @@ const COLORS = {
 };
 
 interface ClaimEvent {
-  source: "clanker" | "hook";
-  token: "WETH" | "BNKRW";
+  source: "clanker" | "hook" | "v4";
+  token: "WETH" | "BNKRW" | "WCHAN";
   amount: string;
   timestamp: number;
   transactionHash: string;
@@ -28,6 +28,7 @@ interface ClaimHeatmapProps {
   events: ClaimEvent[];
   ethPrice: number | null;
   bnkrwPrice: number | null;
+  wchanPrice: number | null;
 }
 
 const CELL_SIZE = 14;
@@ -35,7 +36,7 @@ const CELL_GAP = 3;
 const WEEKS_TO_SHOW = 20;
 const DAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
 
-export default function ClaimHeatmap({ events, ethPrice, bnkrwPrice }: ClaimHeatmapProps) {
+export default function ClaimHeatmap({ events, ethPrice, bnkrwPrice, wchanPrice }: ClaimHeatmapProps) {
   const [hoverDay, setHoverDay] = useState<string | null>(null);
 
   // Aggregate USD by day
@@ -44,7 +45,7 @@ export default function ClaimHeatmap({ events, ethPrice, bnkrwPrice }: ClaimHeat
 
     for (const evt of events) {
       const amtFloat = parseFloat(formatUnits(BigInt(evt.amount), 18));
-      const price = evt.token === "WETH" ? ethPrice : bnkrwPrice;
+      const price = evt.token === "WETH" ? ethPrice : evt.token === "WCHAN" ? wchanPrice : bnkrwPrice;
       const usd = price ? amtFloat * price : 0;
       const dateKey = new Date(evt.timestamp * 1000).toISOString().slice(0, 10);
       const existing = map.get(dateKey);
@@ -85,7 +86,7 @@ export default function ClaimHeatmap({ events, ethPrice, bnkrwPrice }: ClaimHeat
     }
 
     return { dailyMap: map, maxDailyUsd: maxUsd, weeks: weeksArr };
-  }, [events, ethPrice, bnkrwPrice]);
+  }, [events, ethPrice, bnkrwPrice, wchanPrice]);
 
   const getOpacity = (usd: number): number => {
     if (maxDailyUsd === 0 || usd === 0) return 0;

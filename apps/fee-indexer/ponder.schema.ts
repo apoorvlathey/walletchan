@@ -30,3 +30,18 @@ export const hookClaim = onchainTable(
     timestampIdx: index().on(table.timestamp),
   })
 );
+
+export const v4Claim = onchainTable(
+  "v4_claim",
+  (t) => ({
+    id: t.text().primaryKey(), // txHash-logIndex
+    ethAmount: t.bigint().notNull(), // ETH fees claimed (wei)
+    wchanAmount: t.bigint().notNull(), // WCHAN fees claimed (wei)
+    blockNumber: t.bigint().notNull(),
+    timestamp: t.bigint().notNull(),
+    transactionHash: t.hex().notNull(),
+  }),
+  (table) => ({
+    timestampIdx: index().on(table.timestamp),
+  })
+);

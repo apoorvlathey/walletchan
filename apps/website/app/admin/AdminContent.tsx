@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box,
   Container,
@@ -29,6 +29,13 @@ import { formatUnits } from "viem";
 import { Navigation } from "../components/Navigation";
 import { ADDRESSES } from "@/lib/wchan-swap/addresses";
 import { useTokenData } from "../contexts/TokenDataContext";
+import {
+  useV4PositionFees,
+  POSITION_MANAGER,
+  positionManagerAbi,
+  buildClaimCalldata,
+  V4_CHAIN_ID,
+} from "./useV4PositionFees";
 import ClaimHistory from "./ClaimHistory";
 import DripSection from "./drip/DripSection";
 
@@ -314,6 +321,64 @@ export default function AdminContent() {
     });
   };
 
+  // V4 LP position fees
+  const {
+    ethFees: v4EthFees,
+    wchanFees: v4WchanFees,
+    isLoading: v4Loading,
+    hasClaimable: hasV4Claimable,
+    refetch: refetchV4,
+  } = useV4PositionFees();
+
+  // V4 claim
+  const {
+    writeContract: claimV4,
+    data: v4TxHash,
+    isPending: isV4Claiming,
+  } = useWriteContract();
+  const { isLoading: isV4Confirming, isSuccess: isV4Confirmed } =
+    useWaitForTransactionReceipt({ hash: v4TxHash });
+
+  const v4ToastedTxRef = useRef<string | undefined>();
+  useEffect(() => {
+    if (isV4Confirmed && v4TxHash && v4ToastedTxRef.current !== v4TxHash) {
+      v4ToastedTxRef.current = v4TxHash;
+      const txUrl = `https://basescan.org/tx/${v4TxHash}`;
+      toast({
+        title: "V4 LP fees claimed",
+        description: (
+          <>
+            LP fees have been claimed.{" "}
+            <a href={txUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
+              View on BaseScan
+            </a>
+          </>
+        ),
+        status: "success",
+        duration: 10000,
+        isClosable: true,
+        position: "bottom-right",
+      });
+      const timeout = setTimeout(() => {
+        refetchV4();
+        fetchEthPrice();
+        setHistoryRefreshKey((k) => k + 1);
+      }, 2000);
+      return () => clearTimeout(timeout);
+    }
+  }, [isV4Confirmed, v4TxHash, refetchV4, fetchEthPrice, toast]);
+
+  const handleClaimV4 = () => {
+    const { unlockData, deadline } = buildClaimCalldata();
+    claimV4({
+      address: POSITION_MANAGER,
+      abi: positionManagerAbi,
+      functionName: "modifyLiquidities",
+      args: [unlockData, deadline],
+      chainId: V4_CHAIN_ID,
+    });
+  };
+
   // Clanker derived values
   const clankerWethFloat = clankerWethFees
     ? parseFloat(formatUnits(clankerWethFees, 18))
@@ -336,15 +401,25 @@ export default function AdminContent() {
   const wchanUsd = bnkrwPrice ? wchanFloat * bnkrwPrice : null;
   const hasClaimable = wethAmount !== undefined && wethAmount > 0n;
 
+  // V4 derived values
+  const v4EthFloat = v4EthFees ? parseFloat(formatUnits(v4EthFees, 18)) : 0;
+  const v4EthUsd = ethPrice ? v4EthFloat * ethPrice : null;
+  const v4WchanFloat = v4WchanFees ? parseFloat(formatUnits(v4WchanFees, 18)) : 0;
+  const v4WchanUsd = bnkrwPrice ? v4WchanFloat * bnkrwPrice : null;
+  const v4TotalUsd =
+    v4EthUsd !== null || v4WchanUsd !== null
+      ? (v4EthUsd ?? 0) + (v4WchanUsd ?? 0)
+      : null;
+
   // Totals across all sources
-  const totalEthFloat = ethFloat + clankerWethFloat;
+  const totalEthFloat = ethFloat + clankerWethFloat + v4EthFloat;
   const totalEthUsd = ethPrice ? totalEthFloat * ethPrice : null;
   const totalBnkrwUsd = clankerBnkrwUsd;
   const totalClaimableUsd =
-    totalEthUsd !== null || totalBnkrwUsd !== null
-      ? (totalEthUsd ?? 0) + (totalBnkrwUsd ?? 0)
+    totalEthUsd !== null || totalBnkrwUsd !== null || v4WchanUsd !== null
+      ? (totalEthUsd ?? 0) + (totalBnkrwUsd ?? 0) + (v4WchanUsd ?? 0)
       : null;
-  const allFeesLoading = feesLoading || clankerWethLoading || clankerBnkrwLoading;
+  const allFeesLoading = feesLoading || clankerWethLoading || clankerBnkrwLoading || v4Loading;
 
   return (
     <Box minH="100vh" bg="bauhaus.background">
@@ -489,6 +564,7 @@ export default function AdminContent() {
                     refetchFees();
                     refetchClankerWeth();
                     refetchClankerBnkrw();
+                    refetchV4();
                     fetchEthPrice();
                     setTimeout(() => setIsRefreshing(false), 1500);
                   }}
@@ -539,6 +615,18 @@ export default function AdminContent() {
                       {clankerBnkrwUsd !== null && (
                         <Text as="span" color="gray.400" fontWeight="normal" ml={1}>
                           ({formatUsd(clankerBnkrwUsd)})
+                        </Text>
+                      )}
+                    </Text>
+                    <Text fontWeight="bold" fontSize="sm" color="bauhaus.yellow">
+                      {v4WchanFloat.toLocaleString(undefined, {
+                        minimumFractionDigits: 4,
+                        maximumFractionDigits: 6,
+                      })}{" "}
+                      WCHAN
+                      {v4WchanUsd !== null && (
+                        <Text as="span" color="gray.400" fontWeight="normal" ml={1}>
+                          ({formatUsd(v4WchanUsd)})
                         </Text>
                       )}
                     </Text>
@@ -750,6 +838,86 @@ export default function AdminContent() {
                     </VStack>
                   </Box>
                 </Box>
+
+                {/* V4 LP Fees */}
+                <Box
+                  flex={1}
+                  bg="white"
+                  border="2px solid"
+                  borderColor="bauhaus.border"
+                  boxShadow="3px 3px 0px 0px #121212"
+                  position="relative"
+                  overflow="hidden"
+                >
+                  {/* Yellow left accent */}
+                  <Box
+                    position="absolute"
+                    left={0}
+                    top={0}
+                    bottom={0}
+                    w="4px"
+                    bg="bauhaus.yellow"
+                  />
+                  <Box p={5} pl={6}>
+                    <HStack mb={4} spacing={2}>
+                      <Box w={1.5} h={1.5} bg="bauhaus.yellow" borderRadius="full" />
+                      <Text
+                        fontWeight="bold"
+                        fontSize="xs"
+                        textTransform="uppercase"
+                        letterSpacing="widest"
+                        color="gray.500"
+                      >
+                        Uniswap V4 LP (WCHAN)
+                      </Text>
+                    </HStack>
+
+                    <VStack spacing={3} align="stretch">
+                      {v4Loading || ethPriceLoading ? (
+                        <Skeleton h="32px" w="140px" />
+                      ) : v4TotalUsd !== null ? (
+                        <Text fontWeight="black" fontSize="2xl" lineHeight="1">
+                          {formatUsd(v4TotalUsd)}
+                        </Text>
+                      ) : (
+                        <Text fontSize="md" color="gray.400">
+                          USD price unavailable
+                        </Text>
+                      )}
+
+                      {v4Loading ? (
+                        <Skeleton h="18px" w="100px" />
+                      ) : (
+                        <>
+                          <Text fontWeight="bold" fontSize="sm" color="bauhaus.blue">
+                            {formatEth(v4EthFees)} ETH
+                          </Text>
+                          <Text fontWeight="bold" fontSize="sm" color="bauhaus.yellow">
+                            {formatEth(v4WchanFees)} WCHAN
+                            {v4WchanUsd !== null && (
+                              <Text as="span" color="gray.400" fontWeight="normal" ml={1}>
+                                ({formatUsd(v4WchanUsd)})
+                              </Text>
+                            )}
+                          </Text>
+                        </>
+                      )}
+
+                      <Button
+                        variant="primary"
+                        size="md"
+                        onClick={handleClaimV4}
+                        isLoading={isV4Claiming || isV4Confirming}
+                        loadingText={isV4Confirming ? "Confirming..." : "Claiming..."}
+                        isDisabled={!isWalletConnected || isWrongChain || !hasV4Claimable}
+                        mt={2}
+                        w="full"
+                      >
+                        Claim Fees
+                      </Button>
+                    </VStack>
+                  </Box>
+                </Box>
               </Flex>
 
               {/* Price references */}
@@ -773,6 +941,7 @@ export default function AdminContent() {
           <ClaimHistory
             ethPrice={ethPrice}
             bnkrwPrice={bnkrwPrice}
+            wchanPrice={bnkrwPrice}
             refreshKey={historyRefreshKey}
           />
           {/* Internal Pages */}

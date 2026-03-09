@@ -13,6 +13,8 @@ export interface SwapChainAddresses {
   quoter: Address;
   permit2: Address;
   poolManager: Address;
+  positionManager: Address;
+  stateView: Address;
   oldToken: Address;
   wrapHook: Address;
   oldTokenPoolHook: Address;
@@ -26,6 +28,8 @@ export const SWAP_ADDRESSES: Record<number, SwapChainAddresses> = {
     weth: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
     universalRouter: "0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b",
     poolManager: "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
+    positionManager: "0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4",
+    stateView: "0x7ffe42c4a5deea5b0fec41c94c136cf115597227",
     oldToken: "0x89133805fD93aB6be23ECD0CC14938e59cf22278",
     wrapHook: "0x46cf392C84c6d6270b3e4FD0c4145b790fe0a888",
     quoter: "0x61b3f2011a92d183c7dbadbda940a7555ccf9227",
@@ -39,6 +43,8 @@ export const SWAP_ADDRESSES: Record<number, SwapChainAddresses> = {
     weth: "0x4200000000000000000000000000000000000006",
     universalRouter: "0x6fF5693b99212Da76ad316178A184AB56D299b43",
     poolManager: "0x498581ff718922c3f8e6a244956af099b2652b2b",
+    positionManager: "0x7c5f5a4bbd8fd63184577525326123b519429bdc",
+    stateView: "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71",
     oldToken: "0xf48bC234855aB08ab2EC0cfaaEb2A80D065a3b07",
     wrapHook: "0x8243a251EC38fB31c6410B3A28b0F370b4022888",
     quoter: "0x0d5e0f971ed27fbff6c2837bf31316121532048d",

@@ -1,6 +1,7 @@
 import { createConfig } from "ponder";
 import { ClankerFeeLockerAbi } from "./abis/ClankerFeeLockerAbi";
 import { WCHANDevFeeHookAbi } from "./abis/WCHANDevFeeHookAbi";
+import { PoolManagerAbi } from "./abis/PoolManagerAbi";
 
 export default createConfig({
   chains: {
@@ -31,6 +32,18 @@ export default createConfig({
       abi: WCHANDevFeeHookAbi,
       address: "0xD36646b7Aa77707c47478f64C1770e4c2F3f20cc",
       startBlock: 42607730,
+    },
+    PoolManager: {
+      chain: "base",
+      abi: PoolManagerAbi,
+      address: "0x498581ff718922c3f8e6a244956af099b2652b2b",
+      startBlock: 42792816,
+      filter: {
+        event: "ModifyLiquidity",
+        args: {
+          id: "0x81C7A2A2C33EA285F062C5AC0C4E3D4FFB2F6FD2588BBD354D0D3AF8A58B6337",
+        },
+      },
     },
   },
 });

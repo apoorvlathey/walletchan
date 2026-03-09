@@ -24,16 +24,29 @@ app.get("/stats", async (c) => {
     .select({ total: sum(schema.hookClaim.amount) })
     .from(schema.hookClaim);
 
+  const [v4EthResult] = await db
+    .select({ total: sum(schema.v4Claim.ethAmount) })
+    .from(schema.v4Claim);
+
+  const [v4WchanResult] = await db
+    .select({ total: sum(schema.v4Claim.wchanAmount) })
+    .from(schema.v4Claim);
+
   const clankerEth = BigInt(clankerEthResult?.total ?? "0");
   const clankerBnkrw = BigInt(clankerBnkrwResult?.total ?? "0");
   const hookEth = BigInt(hookEthResult?.total ?? "0");
+  const v4Eth = BigInt(v4EthResult?.total ?? "0");
+  const v4Wchan = BigInt(v4WchanResult?.total ?? "0");
 
   return c.json({
     clankerEth: clankerEth.toString(),
     clankerBnkrw: clankerBnkrw.toString(),
     hookEth: hookEth.toString(),
-    totalEth: (clankerEth + hookEth).toString(),
+    v4Eth: v4Eth.toString(),
+    v4Wchan: v4Wchan.toString(),
+    totalEth: (clankerEth + hookEth + v4Eth).toString(),
     totalBnkrw: clankerBnkrw.toString(),
+    totalWchan: v4Wchan.toString(),
   });
 });
 
@@ -49,6 +62,11 @@ app.get("/claims", async (c) => {
     .from(schema.hookClaim)
     .orderBy(desc(schema.hookClaim.timestamp));
 
+  const v4Claims = await db
+    .select()
+    .from(schema.v4Claim)
+    .orderBy(desc(schema.v4Claim.timestamp));
+
   const combined = [
     ...clankerClaims.map((c) => ({
       source: "clanker" as const,
@@ -59,11 +77,40 @@ app.get("/claims", async (c) => {
     })),
     ...hookClaims.map((c) => ({
       source: "hook" as const,
-      token: "WETH",
+      token: "WETH" as const,
       amount: c.amount.toString(),
       timestamp: Number(c.timestamp),
       transactionHash: c.transactionHash,
     })),
+    // Each V4 claim produces two entries: one for ETH, one for WCHAN
+    ...v4Claims.flatMap((c) => {
+      const entries: {
+        source: "v4";
+        token: "WETH" | "WCHAN";
+        amount: string;
+        timestamp: number;
+        transactionHash: `0x${string}`;
+      }[] = [];
+      if (c.ethAmount > 0n) {
+        entries.push({
+          source: "v4",
+          token: "WETH",
+          amount: c.ethAmount.toString(),
+          timestamp: Number(c.timestamp),
+          transactionHash: c.transactionHash,
+        });
+      }
+      if (c.wchanAmount > 0n) {
+        entries.push({
+          source: "v4",
+          token: "WCHAN",
+          amount: c.wchanAmount.toString(),
+          timestamp: Number(c.timestamp),
+          transactionHash: c.transactionHash,
+        });
+      }
+      return entries;
+    }),
   ].sort((a, b) => b.timestamp - a.timestamp);
 
   return c.json(combined);

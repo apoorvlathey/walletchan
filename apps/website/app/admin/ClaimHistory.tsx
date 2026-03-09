@@ -22,13 +22,16 @@ interface ClaimedStats {
   clankerEth: string;
   clankerBnkrw: string;
   hookEth: string;
+  v4Eth: string;
+  v4Wchan: string;
   totalEth: string;
   totalBnkrw: string;
+  totalWchan: string;
 }
 
 interface ClaimEvent {
-  source: "clanker" | "hook";
-  token: "WETH" | "BNKRW";
+  source: "clanker" | "hook" | "v4";
+  token: "WETH" | "BNKRW" | "WCHAN";
   amount: string;
   timestamp: number;
   transactionHash: string;
@@ -50,6 +53,7 @@ function formatLargeNumber(n: number): string {
 interface ClaimHistoryProps {
   ethPrice: number | null;
   bnkrwPrice: number | null;
+  wchanPrice: number | null;
   /** Increment this to trigger a refetch (e.g. after a claim confirms) */
   refreshKey: number;
 }
@@ -57,7 +61,7 @@ interface ClaimHistoryProps {
 type SortField = "date" | "amount";
 type SortDir = "asc" | "desc";
 
-export default function ClaimHistory({ ethPrice, bnkrwPrice, refreshKey }: ClaimHistoryProps) {
+export default function ClaimHistory({ ethPrice, bnkrwPrice, wchanPrice, refreshKey }: ClaimHistoryProps) {
   const [claimedStats, setClaimedStats] = useState<ClaimedStats | null>(null);
   const [claimEvents, setClaimEvents] = useState<ClaimEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,14 +102,17 @@ export default function ClaimHistory({ ethPrice, bnkrwPrice, refreshKey }: Claim
   const historicalBnkrwFloat = claimedStats
     ? parseFloat(formatUnits(BigInt(claimedStats.totalBnkrw), 18))
     : 0;
+  const historicalWchanFloat = claimedStats
+    ? parseFloat(formatUnits(BigInt(claimedStats.totalWchan), 18))
+    : 0;
 
   const getUsdValue = useCallback(
     (evt: ClaimEvent) => {
       const amtFloat = parseFloat(formatUnits(BigInt(evt.amount), 18));
-      const price = evt.token === "WETH" ? ethPrice : bnkrwPrice;
+      const price = evt.token === "WETH" ? ethPrice : evt.token === "WCHAN" ? wchanPrice : bnkrwPrice;
       return price ? amtFloat * price : 0;
     },
-    [ethPrice, bnkrwPrice]
+    [ethPrice, bnkrwPrice, wchanPrice]
   );
 
   const sortedEvents = useMemo(() => {
@@ -183,7 +190,7 @@ export default function ClaimHistory({ ethPrice, bnkrwPrice, refreshKey }: Claim
         ) : claimedStats ? (
           <VStack spacing={4} align="start" mb={6}>
             {/* Total USD */}
-            {(ethPrice || bnkrwPrice) && (
+            {(ethPrice || bnkrwPrice || wchanPrice) && (
               <Text
                 fontWeight="black"
                 fontSize={{ base: "4xl", lg: "5xl" }}
@@ -192,7 +199,8 @@ export default function ClaimHistory({ ethPrice, bnkrwPrice, refreshKey }: Claim
               >
                 {formatUsd(
                   (ethPrice ? historicalEthFloat * ethPrice : 0) +
-                    (bnkrwPrice ? historicalBnkrwFloat * bnkrwPrice : 0)
+                    (bnkrwPrice ? historicalBnkrwFloat * bnkrwPrice : 0) +
+                    (wchanPrice ? historicalWchanFloat * wchanPrice : 0)
                 )}
               </Text>
             )}
@@ -227,6 +235,24 @@ export default function ClaimHistory({ ethPrice, bnkrwPrice, refreshKey }: Claim
                   </Text>
                 )}
               </VStack>
+              {historicalWchanFloat > 0 && (
+                <>
+                  <Box w="2px" h="40px" bg="bauhaus.border" opacity={0.2} />
+                  <VStack spacing={0} align="start">
+                    <Text fontWeight="black" fontSize={{ base: "2xl", lg: "3xl" }} lineHeight="1">
+                      {formatLargeNumber(historicalWchanFloat)}{" "}
+                      <Text as="span" fontSize="lg" color="bauhaus.yellow">
+                        WCHAN
+                      </Text>
+                    </Text>
+                    {wchanPrice && (
+                      <Text fontSize="sm" color="gray.400" fontWeight="medium">
+                        {formatUsd(historicalWchanFloat * wchanPrice)}
+                      </Text>
+                    )}
+                  </VStack>
+                </>
+              )}
             </HStack>
           </VStack>
         ) : (
@@ -279,6 +305,33 @@ export default function ClaimHistory({ ethPrice, bnkrwPrice, refreshKey }: Claim
                 </Text>
               </HStack>
             )}
+            {BigInt(claimedStats.v4Eth) > 0n && (
+              <HStack bg="gray.50" border="1px solid" borderColor="gray.200" px={3} py={1.5}>
+                <Box w={1.5} h={1.5} bg="bauhaus.yellow" borderRadius="full" />
+                <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color="gray.500">
+                  V4 ETH
+                </Text>
+                <Text fontSize="xs" fontWeight="bold">
+                  {parseFloat(formatUnits(BigInt(claimedStats.v4Eth), 18)).toLocaleString(
+                    undefined,
+                    { maximumFractionDigits: 4 }
+                  )}
+                </Text>
+              </HStack>
+            )}
+            {BigInt(claimedStats.v4Wchan) > 0n && (
+              <HStack bg="gray.50" border="1px solid" borderColor="gray.200" px={3} py={1.5}>
+                <Box w={1.5} h={1.5} bg="bauhaus.yellow" borderRadius="full" />
+                <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color="gray.500">
+                  V4 WCHAN
+                </Text>
+                <Text fontSize="xs" fontWeight="bold">
+                  {formatLargeNumber(
+                    parseFloat(formatUnits(BigInt(claimedStats.v4Wchan), 18))
+                  )}
+                </Text>
+              </HStack>
+            )}
           </Flex>
         )}
 
@@ -306,6 +359,7 @@ export default function ClaimHistory({ ethPrice, bnkrwPrice, refreshKey }: Claim
                 events={claimEvents}
                 ethPrice={ethPrice}
                 bnkrwPrice={bnkrwPrice}
+                wchanPrice={wchanPrice}
               />
             </Box>
           </Box>
@@ -335,6 +389,7 @@ export default function ClaimHistory({ ethPrice, bnkrwPrice, refreshKey }: Claim
                 events={claimEvents}
                 ethPrice={ethPrice}
                 bnkrwPrice={bnkrwPrice}
+                wchanPrice={wchanPrice}
               />
             </Box>
           </Box>
@@ -417,7 +472,7 @@ export default function ClaimHistory({ ethPrice, bnkrwPrice, refreshKey }: Claim
             {sortedEvents.map((evt, i) => {
               const amtFloat = parseFloat(formatUnits(BigInt(evt.amount), 18));
               const date = new Date(evt.timestamp * 1000);
-              const price = evt.token === "WETH" ? ethPrice : bnkrwPrice;
+              const price = evt.token === "WETH" ? ethPrice : evt.token === "WCHAN" ? wchanPrice : bnkrwPrice;
               const usdVal = price ? amtFloat * price : null;
               return (
                 <Flex
@@ -442,19 +497,19 @@ export default function ClaimHistory({ ethPrice, bnkrwPrice, refreshKey }: Claim
                       w={1.5}
                       h={1.5}
                       borderRadius="full"
-                      bg={evt.source === "clanker" ? "bauhaus.red" : "bauhaus.blue"}
+                      bg={evt.source === "clanker" ? "bauhaus.red" : evt.source === "v4" ? "bauhaus.yellow" : "bauhaus.blue"}
                     />
                     <Text fontSize="sm" fontWeight="bold" textTransform="capitalize">
-                      {evt.source}
+                      {evt.source === "v4" ? "V4" : evt.source}
                     </Text>
                   </HStack>
                   <Text
                     flex={1}
                     fontSize="sm"
                     fontWeight="bold"
-                    color={evt.token === "WETH" ? "bauhaus.blue" : "bauhaus.red"}
+                    color={evt.token === "WETH" ? "bauhaus.blue" : evt.token === "WCHAN" ? "bauhaus.yellow" : "bauhaus.red"}
                   >
-                    {evt.token === "WETH" ? "ETH" : "BNKRW"}
+                    {evt.token === "WETH" ? "ETH" : evt.token}
                   </Text>
                   <VStack flex={1.5} spacing={0} align="end">
                     {usdVal !== null ? (
@@ -463,7 +518,7 @@ export default function ClaimHistory({ ethPrice, bnkrwPrice, refreshKey }: Claim
                       </Text>
                     ) : (
                       <Text fontSize="sm" fontWeight="bold">
-                        {evt.token === "BNKRW"
+                        {evt.token === "BNKRW" || evt.token === "WCHAN"
                           ? formatLargeNumber(amtFloat)
                           : amtFloat.toLocaleString(undefined, {
                               minimumFractionDigits: 4,
@@ -472,13 +527,13 @@ export default function ClaimHistory({ ethPrice, bnkrwPrice, refreshKey }: Claim
                       </Text>
                     )}
                     <Text fontSize="xs" color="gray.400" fontWeight="medium">
-                      {evt.token === "BNKRW"
+                      {evt.token === "BNKRW" || evt.token === "WCHAN"
                         ? formatLargeNumber(amtFloat)
                         : amtFloat.toLocaleString(undefined, {
                             minimumFractionDigits: 4,
                             maximumFractionDigits: 6,
                           })}{" "}
-                      {evt.token === "WETH" ? "ETH" : "BNKRW"}
+                      {evt.token === "WETH" ? "ETH" : evt.token}
                     </Text>
                   </VStack>
                   <Box w="36px" textAlign="right">

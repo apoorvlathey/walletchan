@@ -12,8 +12,8 @@ const COLORS = {
 };
 
 interface ClaimEvent {
-  source: "clanker" | "hook";
-  token: "WETH" | "BNKRW";
+  source: "clanker" | "hook" | "v4";
+  token: "WETH" | "BNKRW" | "WCHAN";
   amount: string;
   timestamp: number;
   transactionHash: string;
@@ -30,12 +30,13 @@ interface CumulativeChartProps {
   events: ClaimEvent[];
   ethPrice: number | null;
   bnkrwPrice: number | null;
+  wchanPrice: number | null;
 }
 
 const CHART_H = 200;
 const CHART_PADDING = { top: 10, right: 16, bottom: 30, left: 60 };
 
-export default function CumulativeChart({ events, ethPrice, bnkrwPrice }: CumulativeChartProps) {
+export default function CumulativeChart({ events, ethPrice, bnkrwPrice, wchanPrice }: CumulativeChartProps) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -46,7 +47,7 @@ export default function CumulativeChart({ events, ethPrice, bnkrwPrice }: Cumula
     let cumulative = 0;
     return sorted.map((evt) => {
       const amtFloat = parseFloat(formatUnits(BigInt(evt.amount), 18));
-      const price = evt.token === "WETH" ? ethPrice : bnkrwPrice;
+      const price = evt.token === "WETH" ? ethPrice : evt.token === "WCHAN" ? wchanPrice : bnkrwPrice;
       const usd = price ? amtFloat * price : 0;
       cumulative += usd;
       return {
@@ -57,7 +58,7 @@ export default function CumulativeChart({ events, ethPrice, bnkrwPrice }: Cumula
         source: evt.source,
       };
     });
-  }, [events, ethPrice, bnkrwPrice]);
+  }, [events, ethPrice, bnkrwPrice, wchanPrice]);
 
   if (dataPoints.length < 2) return null;
 
@@ -173,7 +174,7 @@ export default function CumulativeChart({ events, ethPrice, bnkrwPrice }: Cumula
             cx={toX(pt.timestamp)}
             cy={toY(pt.cumulative)}
             r={hoverIdx === i ? 5 : 3}
-            fill={pt.token === "WETH" ? COLORS.blue : COLORS.red}
+            fill={pt.token === "WETH" ? COLORS.blue : pt.token === "WCHAN" ? COLORS.yellow : COLORS.red}
             stroke="white"
             strokeWidth={1.5}
             pointerEvents="none"
@@ -272,7 +273,7 @@ export default function CumulativeChart({ events, ethPrice, bnkrwPrice }: Cumula
               w={1.5}
               h={1.5}
               borderRadius="full"
-              bg={hoverPoint.token === "WETH" ? COLORS.blue : COLORS.red}
+              bg={hoverPoint.token === "WETH" ? COLORS.blue : hoverPoint.token === "WCHAN" ? COLORS.yellow : COLORS.red}
             />
             <Text fontSize="xs" color="gray.500" fontWeight="bold">
               +{formatUsd(hoverPoint.usd)} ({hoverPoint.source})
