@@ -41,7 +41,7 @@ export default createConfig({
       filter: {
         event: "ModifyLiquidity",
         args: {
-          id: "0x81C7A2A2C33EA285F062C5AC0C4E3D4FFB2F6FD2588BBD354D0D3AF8A58B6337",
+          id: "0x81c7a2a2c33ea285f062c5ac0c4e3d4ffb2f6fd2588bbd354d0d3af8a58b6337",
         },
       },
     },
