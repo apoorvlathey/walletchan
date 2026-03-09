@@ -20,8 +20,15 @@ import {
   Spinner,
   Image,
   useToast,
+  useClipboard,
 } from "@chakra-ui/react";
-import { AlertTriangle, ExternalLink, ArrowUpRight } from "lucide-react";
+import {
+  AlertTriangle,
+  ExternalLink,
+  ArrowUpRight,
+  Copy,
+  Check,
+} from "lucide-react";
 import { useBridgeHistory } from "./useBridgeHistory";
 import { BridgeHistoryWidget } from "./BridgeHistoryButton";
 import { mainnetHref } from "./useMainnetUrl";
@@ -65,6 +72,136 @@ function formatUsd(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
   if (value >= 1_000) return `$${(value / 1_000).toFixed(2)}K`;
   return `$${value.toFixed(2)}`;
+}
+
+function TokenAddressCard({
+  chainLabel,
+  address,
+  explorer,
+  accentColor,
+}: {
+  chainLabel: string;
+  address: string;
+  explorer: string;
+  accentColor: string;
+}) {
+  const { hasCopied, onCopy } = useClipboard(address);
+  return (
+    <Box
+      bg="white"
+      border="4px solid"
+      borderColor="bauhaus.border"
+      boxShadow="6px 6px 0px 0px #121212"
+      p={{ base: 4, md: 5 }}
+      flex={1}
+      minW={0}
+      position="relative"
+      _hover={{ transform: "translateY(-2px)" }}
+      transition="transform 0.2s ease-out"
+    >
+      {/* Geometric decorator */}
+      <Box
+        position="absolute"
+        top={2}
+        right={2}
+        w={2.5}
+        h={2.5}
+        bg={accentColor}
+        borderRadius="full"
+      />
+      <VStack spacing={3} align="stretch">
+        <Text
+          fontSize="xs"
+          fontWeight="900"
+          textTransform="uppercase"
+          letterSpacing="widest"
+          color={accentColor}
+        >
+          {chainLabel}
+        </Text>
+        <HStack spacing={0}>
+          <Flex
+            px={3}
+            py={2}
+            bg="gray.50"
+            border="3px solid"
+            borderColor="bauhaus.border"
+            borderRight="none"
+            align="center"
+            flex={1}
+            minW={0}
+          >
+            <Text
+              fontFamily="mono"
+              fontSize={{ base: "2xs", md: "xs" }}
+              fontWeight="medium"
+              isTruncated
+            >
+              {address}
+            </Text>
+          </Flex>
+          <Flex
+            as="button"
+            onClick={onCopy}
+            bg={hasCopied ? "bauhaus.red" : accentColor}
+            minW="36px"
+            align="center"
+            justify="center"
+            alignSelf="stretch"
+            border="3px solid"
+            borderColor="bauhaus.border"
+            borderRight="none"
+            px={2}
+            cursor="pointer"
+            _hover={{ opacity: 0.85 }}
+            transition="all 0.15s ease-out"
+          >
+            {hasCopied ? (
+              <Check size={14} stroke="white" />
+            ) : (
+              <Copy size={14} stroke="white" />
+            )}
+          </Flex>
+          <Link
+            href={`${explorer}/address/${address}`}
+            isExternal
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            bg={accentColor}
+            minW="36px"
+            alignSelf="stretch"
+            border="3px solid"
+            borderColor="bauhaus.border"
+            px={2}
+            _hover={{ opacity: 0.85 }}
+            transition="all 0.15s ease-out"
+          >
+            <ExternalLink size={14} stroke="white" />
+          </Link>
+        </HStack>
+      </VStack>
+    </Box>
+  );
+}
+
+function TokenAddresses() {
+  return (
+    <Flex gap={{ base: 4, md: 6 }} direction={{ base: "column", md: "row" }}>
+      <TokenAddressCard
+        chainLabel="WCHAN on Base"
+        address={WCHAN_ADDR}
+        explorer="https://basescan.org"
+        accentColor="bauhaus.blue"
+      />
+      <TokenAddressCard
+        chainLabel="WCHAN on Ethereum"
+        address={WCHAN_L1_ADDR}
+        explorer="https://etherscan.io"
+        accentColor="bauhaus.red"
+      />
+    </Flex>
+  );
 }
 
 export default function MainnetBridgeContent() {
@@ -629,6 +766,9 @@ export default function MainnetBridgeContent() {
             Already bridged? Claim tokens on Mainnet
             <ArrowUpRight size={16} />
           </Link>
+
+          {/* Token Addresses */}
+          <TokenAddresses />
         </VStack>
       </Container>
 
