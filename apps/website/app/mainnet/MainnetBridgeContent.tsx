@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Box,
   Container,
@@ -21,6 +22,9 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import { AlertTriangle, ExternalLink, ArrowUpRight } from "lucide-react";
+import { useBridgeHistory } from "./useBridgeHistory";
+import { BridgeHistoryWidget } from "./BridgeHistoryButton";
+import { mainnetHref } from "./useMainnetUrl";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import {
   useAccount,
@@ -65,8 +69,11 @@ function formatUsd(value: number): string {
 
 export default function MainnetBridgeContent() {
   const toast = useToast();
+  const router = useRouter();
   const [amount, setAmount] = useState("");
   const [sliderValue, setSliderValue] = useState(0);
+  const bridgeHistory = useBridgeHistory();
+  const { addEntry } = bridgeHistory;
 
   // Wallet
   const { address, isConnected } = useAccount();
@@ -182,33 +189,27 @@ export default function MainnetBridgeContent() {
   // After bridge confirms
   useEffect(() => {
     if (isBridgeConfirmed && bridgeTxHash) {
+      addEntry(bridgeTxHash);
       refetchBalance();
       refetchAllowance();
       setAmount("");
       setSliderValue(0);
-      const txUrl = `https://basescan.org/tx/${bridgeTxHash}`;
       toast({
         title: "Bridge successful",
-        description: (
-          <>
-            Your WCHAN is being bridged to Ethereum Mainnet. This may take up to
-            ~7 days to finalize.{" "}
-            <a
-              href={txUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ textDecoration: "underline" }}
-            >
-              View on BaseScan
-            </a>
-          </>
-        ),
+        description:
+          "Withdrawal initiated! You can prove it in ~1 hour. Redirecting to claim page...",
         status: "success",
-        duration: 15000,
+        duration: 5000,
         isClosable: true,
         position: "bottom-right",
       });
       resetBridge();
+      // Navigate to claim page after a short delay so toast is visible
+      setTimeout(() => {
+        router.push(
+          mainnetHref(`/mainnet/claim?tx=${bridgeTxHash}`)
+        );
+      }, 1500);
     }
   }, [
     isBridgeConfirmed,
@@ -217,6 +218,8 @@ export default function MainnetBridgeContent() {
     refetchAllowance,
     toast,
     resetBridge,
+    addEntry,
+    router,
   ]);
 
   const handleAmountChange = (val: string) => {
@@ -313,27 +316,32 @@ export default function MainnetBridgeContent() {
       <Container maxW="2xl" px={{ base: 4, md: 6 }} py={{ base: 8, md: 16 }}>
         <VStack spacing={6} align="stretch">
           {/* Header */}
-          <VStack spacing={2}>
-            <Text
-              fontSize={{ base: "2xl", md: "3xl" }}
-              fontWeight="900"
-              textTransform="uppercase"
-              letterSpacing="tight"
-              textAlign="center"
-            >
-              Bridge WCHAN to Mainnet
-            </Text>
-            <Text
-              fontSize="sm"
-              fontWeight="700"
-              color="gray.500"
-              textTransform="uppercase"
-              letterSpacing="wide"
-              textAlign="center"
-            >
-              Transfer your WCHAN from Base to Ethereum L1
-            </Text>
-          </VStack>
+          <Box position="relative">
+            <VStack spacing={2}>
+              <Text
+                fontSize={{ base: "2xl", md: "3xl" }}
+                fontWeight="900"
+                textTransform="uppercase"
+                letterSpacing="tight"
+                textAlign="center"
+              >
+                Bridge WCHAN to Mainnet
+              </Text>
+              <Text
+                fontSize="sm"
+                fontWeight="700"
+                color="gray.500"
+                textTransform="uppercase"
+                letterSpacing="wide"
+                textAlign="center"
+              >
+                Transfer your WCHAN from Base to Ethereum L1
+              </Text>
+            </VStack>
+            <Box position="absolute" right={0} top={0}>
+              <BridgeHistoryWidget history={bridgeHistory} />
+            </Box>
+          </Box>
 
           {/* Connect Wallet */}
           <Flex justify="center">
@@ -604,6 +612,23 @@ export default function MainnetBridgeContent() {
               )}
             </VStack>
           </Box>
+          {/* Claim link */}
+          <Link
+            href={mainnetHref("/mainnet/claim")}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            gap={2}
+            fontSize="sm"
+            fontWeight="800"
+            color="bauhaus.blue"
+            textTransform="uppercase"
+            letterSpacing="wide"
+            _hover={{ color: "bauhaus.red", textDecoration: "none" }}
+          >
+            Already bridged? Claim tokens on Mainnet
+            <ArrowUpRight size={16} />
+          </Link>
         </VStack>
       </Container>
 

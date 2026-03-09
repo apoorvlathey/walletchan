@@ -41,6 +41,12 @@ const nextConfig = {
         destination: "https://compare.walletchan.com/:path*",
         permanent: true,
       },
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "mainnet.bankrwallet.app" }],
+        destination: "https://mainnet.walletchan.com/:path*",
+        permanent: true,
+      },
       // Redirect bankrwallet.app -> walletchan.com (main domain, must be last)
       {
         source: "/:path*",
@@ -97,6 +103,17 @@ const nextConfig = {
             },
           ],
           destination: "/compare/:path*",
+        },
+        // mainnet.walletchan.com -> /mainnet
+        {
+          source: "/:path((?!_next|api|images|og|screenshots).*)",
+          has: [
+            {
+              type: "host",
+              value: "mainnet.walletchan.com",
+            },
+          ],
+          destination: "/mainnet/:path*",
         },
       ],
     };
