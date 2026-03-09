@@ -888,6 +888,14 @@ export default function ClaimContent() {
     }
   }, [withdrawalData, toast, markDone, updateEntry]);
 
+  // Auto-refresh status after prove/finalize tx confirms
+  useEffect(() => {
+    if (isTxConfirmed && withdrawalData) {
+      refreshStatus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTxConfirmed]);
+
   const isBusy = actionLoading || isWritePending || isTxConfirming;
 
   return (
