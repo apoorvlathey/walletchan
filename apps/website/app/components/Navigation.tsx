@@ -41,7 +41,7 @@ const revolveBorder = keyframes`
 
 const navLinks = [
   { label: "Token", href: "#token" },
-  { label: "Coins", href: "/coins" },
+  // { label: "Coins", href: "/coins" },
   { label: "Stake", href: "/stake" },
   // { label: "Apps", href: "/apps" },
   { label: "Install", href: "#install" },

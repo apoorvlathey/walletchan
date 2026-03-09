@@ -25,6 +25,7 @@ export default createConfig({
       abi: UniswapV4ScheduledMulticurveInitializerAbi,
       address: "0xD59cE43E53D69F190E15d9822Fb4540dCcc91178",
       startBlock: 42019831,
+      endBlock: 43134366, // Stop indexing new coin launches
       filter: {
         event: "Lock",
         args: {},

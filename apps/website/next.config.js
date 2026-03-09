@@ -4,12 +4,18 @@ const nextConfig = {
   transpilePackages: ["@walletchan/shared"],
   async redirects() {
     return [
-      // Redirect bankrwallet.app subdomains -> walletchan.com subdomains
+      // Redirect coins subdomains -> homepage (coins page discontinued)
       {
         source: "/:path*",
         has: [{ type: "host", value: "coins.bankrwallet.app" }],
-        destination: "https://coins.walletchan.com/:path*",
-        permanent: true,
+        destination: "https://walletchan.com",
+        permanent: false,
+      },
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "coins.walletchan.com" }],
+        destination: "https://walletchan.com",
+        permanent: false,
       },
       {
         source: "/:path*",
@@ -41,17 +47,7 @@ const nextConfig = {
   async rewrites() {
     return {
       beforeFiles: [
-        // coins.walletchan.com -> /coins
-        {
-          source: "/:path((?!_next|api|images|og|screenshots).*)",
-          has: [
-            {
-              type: "host",
-              value: "coins.walletchan.com",
-            },
-          ],
-          destination: "/coins/:path*",
-        },
+        // coins.walletchan.com rewrite removed (redirects to homepage now)
         // stake.walletchan.com -> /stake
         {
           source: "/:path((?!_next|api|images|og|screenshots).*)",
