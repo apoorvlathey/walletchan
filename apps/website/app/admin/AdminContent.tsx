@@ -870,6 +870,14 @@ export default function AdminContent() {
                       >
                         Uniswap V4 LP (WCHAN)
                       </Text>
+                      <Link
+                        href="https://app.uniswap.org/positions/v4/base/1956399"
+                        isExternal
+                        color="gray.500"
+                        _hover={{ color: "bauhaus.yellow" }}
+                      >
+                        <ExternalLinkIcon size={14} />
+                      </Link>
                     </HStack>
 
                     <VStack spacing={3} align="stretch">
