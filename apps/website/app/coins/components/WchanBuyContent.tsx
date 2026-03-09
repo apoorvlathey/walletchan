@@ -14,7 +14,7 @@ import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { formatEther, parseEther } from "viem";
 import { base } from "wagmi/chains";
-import { SLIPPAGE_PRESETS } from "../../../lib/wchan-swap";
+import { SLIPPAGE_PRESETS, type SwapDirection } from "../../../lib/wchan-swap";
 import { useSwapQuote } from "../../swap-wchan/hooks/useSwapQuote";
 import { SwapButton } from "../../swap-wchan/components/SwapButton";
 import { SlippageSettings } from "../../swap/components/SlippageSettings";
@@ -31,22 +31,24 @@ function formatAmount(value: bigint): string {
 }
 
 interface WchanBuyContentProps {
+  direction: SwapDirection;
   sellAmount: string;
   sellAmountValid: boolean;
   slippageBps: number;
   onSlippageChange: (bps: number) => void;
-  buyTokenSymbol: string;
-  ethBalanceWei: bigint | undefined;
-  onTxConfirmed: () => void;
+  outputTokenSymbol: string;
+  inputBalanceWei: bigint | undefined;
+  onTxConfirmed: (hash?: `0x${string}`) => void;
 }
 
 export function WchanBuyContent({
+  direction,
   sellAmount,
   sellAmountValid,
   slippageBps,
   onSlippageChange,
-  buyTokenSymbol,
-  ethBalanceWei,
+  outputTokenSymbol,
+  inputBalanceWei,
   onTxConfirmed,
 }: WchanBuyContentProps) {
   const { isConnected } = useAccount();
@@ -61,22 +63,22 @@ export function WchanBuyContent({
     error: quoteError,
   } = useSwapQuote({
     chainId: CHAIN_ID,
-    direction: "buy",
+    direction,
     amount: sellAmount,
     enabled: sellAmountValid,
     routePreference: "auto",
   });
 
   const insufficientBalance = useMemo(() => {
-    if (!sellAmountValid || !isConnected || ethBalanceWei === undefined)
+    if (!sellAmountValid || !isConnected || inputBalanceWei === undefined)
       return false;
     try {
       const parsed = parseEther(sellAmount);
-      return parsed > ethBalanceWei;
+      return parsed > inputBalanceWei;
     } catch {
       return false;
     }
-  }, [sellAmount, sellAmountValid, ethBalanceWei, isConnected]);
+  }, [sellAmount, sellAmountValid, inputBalanceWei, isConnected]);
 
   const outputAmount =
     quote && quote.amountOut > 0n ? formatAmount(quote.amountOut) : "";
@@ -130,7 +132,7 @@ export function WchanBuyContent({
             flexShrink={0}
           >
             <Text fontWeight="bold" fontSize="sm" textTransform="uppercase">
-              {buyTokenSymbol}
+              {outputTokenSymbol}
             </Text>
           </Flex>
         </HStack>
@@ -145,7 +147,9 @@ export function WchanBuyContent({
             textAlign="right"
             mt={1}
           >
-            Route: {quote.route === "direct" ? "ETH→WCHAN" : "ETH→BNKRW→WCHAN"}
+            Route: {direction === "buy"
+              ? (quote.route === "direct" ? "ETH→WCHAN" : "ETH→BNKRW→WCHAN")
+              : (quote.route === "direct" ? "WCHAN→ETH" : "WCHAN→BNKRW→ETH")}
           </Text>
         )}
       </Box>
@@ -198,14 +202,14 @@ export function WchanBuyContent({
         </Button>
       ) : (
         <SwapButton
-          direction="buy"
+          direction={direction}
           quote={quote}
           chainId={CHAIN_ID}
           slippageBps={slippageBps}
           isQuoteLoading={isQuoteLoading}
           inputValid={sellAmountValid}
           insufficientBalance={insufficientBalance}
-          onTxConfirmed={() => onTxConfirmed()}
+          onTxConfirmed={onTxConfirmed}
         />
       )}
     </>

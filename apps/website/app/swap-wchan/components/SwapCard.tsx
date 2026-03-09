@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   Box,
   VStack,
@@ -111,10 +111,10 @@ export function SwapCard() {
     setAmount("");
   };
 
-  const handleTxConfirmed = () => {
+  const handleTxConfirmed = useCallback(() => {
     refetchEthBalance();
     refetchWchanBalance();
-  };
+  }, [refetchEthBalance, refetchWchanBalance]);
 
   const handleMaxClick = () => {
     if (direction === "buy" && ethBalance) {

@@ -2,7 +2,7 @@
 
 import { Box, HStack, Text, Link, useDisclosure } from "@chakra-ui/react";
 import { useTokenData } from "../contexts/TokenDataContext";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname, useSearchParams } from "next/navigation";
 import { DEXSCREENER_URL, TOKEN_ADDRESS } from "../constants";
@@ -21,9 +21,11 @@ const WCHAN_TOKEN: BuyToken = {
 
 function BuyWCHANAutoOpen({ onOpen }: { onOpen: () => void }) {
   const searchParams = useSearchParams();
+  const opened = useRef(false);
 
   useEffect(() => {
-    if (searchParams.get("buyWCHAN") === "true") {
+    if (!opened.current && searchParams.get("buyWCHAN") === "true") {
+      opened.current = true;
       onOpen();
     }
   }, [searchParams, onOpen]);
@@ -34,6 +36,23 @@ function BuyWCHANAutoOpen({ onOpen }: { onOpen: () => void }) {
 export function TokenBanner() {
   const { tokenData, isLoading } = useTokenData();
   const { isOpen, onOpen, onClose } = useDisclosure();
+
+  // Sync ?buyWCHAN=true in the URL bar when the modal opens/closes.
+  // Uses replaceState directly to avoid triggering Next.js re-renders.
+  const handleOpen = useCallback(() => {
+    onOpen();
+    const url = new URL(window.location.href);
+    url.searchParams.set("buyWCHAN", "true");
+    window.history.replaceState({}, "", url.toString());
+  }, [onOpen]);
+
+  const handleClose = useCallback(() => {
+    onClose();
+    const url = new URL(window.location.href);
+    url.searchParams.delete("buyWCHAN");
+    window.history.replaceState({}, "", url.toString());
+  }, [onClose]);
+
   const pathname = usePathname();
 
   const isMigratePage =
@@ -83,7 +102,7 @@ export function TokenBanner() {
   return (
     <Box position="sticky" top={0} zIndex={100}>
       <React.Suspense fallback={null}>
-        <BuyWCHANAutoOpen onOpen={onOpen} />
+        <BuyWCHANAutoOpen onOpen={handleOpen} />
       </React.Suspense>
       <HStack
         bg="bauhaus.yellow"
@@ -229,7 +248,7 @@ export function TokenBanner() {
             display="flex"
             alignItems="center"
             gap={1}
-            onClick={onOpen}
+            onClick={handleOpen}
             _hover={{
               opacity: 0.9,
               transform: "translateY(-1px)",
@@ -241,7 +260,7 @@ export function TokenBanner() {
             }}
             transition="all 0.2s ease-out"
           >
-            Buy
+            Buy/Sell
           </Box>
         </HStack>
 
@@ -267,7 +286,7 @@ export function TokenBanner() {
       <BuyModal
         token={WCHAN_TOKEN}
         isOpen={isOpen}
-        onClose={onClose}
+        onClose={handleClose}
         showWallet
       />
 
