@@ -1,18 +1,9 @@
 import { NextResponse } from "next/server";
-import { GECKOTERMINAL_API_URL } from "../../constants";
+import { getWchanPoolData } from "../../lib/geckoTerminalCache";
 
 export async function GET() {
   try {
-    const response = await fetch(GECKOTERMINAL_API_URL, {
-      next: { revalidate: 5 },
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return NextResponse.json(data, { status: response.status });
-    }
-
+    const data = await getWchanPoolData();
     return NextResponse.json(data);
   } catch (error) {
     console.error("GeckoTerminal API error:", error);
