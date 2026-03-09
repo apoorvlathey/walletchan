@@ -785,6 +785,14 @@ export default function AdminContent() {
               { href: "/migrate", label: "Migrate" },
               { href: "/mainnet", label: "Bridge to Mainnet" },
               { href: "/l1-base-deploy", label: "L1 Base Token Deploy" },
+              {
+                href:
+                  typeof window !== "undefined" &&
+                  window.location.hostname === "localhost"
+                    ? "/compare"
+                    : "https://compare.walletchan.com",
+                label: "Compare",
+              },
             ].map(({ href, label }) => (
               <Link
                 key={href}

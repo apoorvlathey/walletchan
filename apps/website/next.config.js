@@ -35,6 +35,12 @@ const nextConfig = {
         destination: "https://admin.walletchan.com/:path*",
         permanent: true,
       },
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "compare.bankrwallet.app" }],
+        destination: "https://compare.walletchan.com/:path*",
+        permanent: true,
+      },
       // Redirect bankrwallet.app -> walletchan.com (main domain, must be last)
       {
         source: "/:path*",
@@ -80,6 +86,17 @@ const nextConfig = {
             },
           ],
           destination: "/admin/:path*",
+        },
+        // compare.walletchan.com -> /compare
+        {
+          source: "/:path((?!_next|api|images|og|screenshots).*)",
+          has: [
+            {
+              type: "host",
+              value: "compare.walletchan.com",
+            },
+          ],
+          destination: "/compare/:path*",
         },
       ],
     };
