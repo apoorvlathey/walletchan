@@ -339,7 +339,7 @@ export default function AdminContent() {
   const { isLoading: isV4Confirming, isSuccess: isV4Confirmed } =
     useWaitForTransactionReceipt({ hash: v4TxHash });
 
-  const v4ToastedTxRef = useRef<string | undefined>();
+  const v4ToastedTxRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (isV4Confirmed && v4TxHash && v4ToastedTxRef.current !== v4TxHash) {
       v4ToastedTxRef.current = v4TxHash;
