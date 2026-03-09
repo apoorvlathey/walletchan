@@ -10,6 +10,7 @@ import {
   Button,
   Link,
   useDisclosure,
+  Skeleton,
 } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import { Navigation } from "../components/Navigation";
@@ -271,34 +272,34 @@ export default function CompareContent() {
                       </HStack>
 
                       {/* Market Cap */}
-                      <Text
-                        w={{ base: "90px", md: "120px" }}
-                        fontSize="sm"
-                        fontWeight="800"
-                        textAlign="right"
-                        color={!token.marketCap ? "gray.400" : undefined}
-                      >
-                        {token.marketCap || "..."}
-                      </Text>
+                      <Box w={{ base: "90px", md: "120px" }} textAlign="right">
+                        {token.marketCap ? (
+                          <Text fontSize="sm" fontWeight="800">
+                            {token.marketCap}
+                          </Text>
+                        ) : (
+                          <Skeleton h="16px" w="80px" ml="auto" borderRadius={0} />
+                        )}
+                      </Box>
 
                       {/* 24h Change */}
-                      <Text
-                        w={{ base: "65px", md: "80px" }}
-                        fontSize="sm"
-                        fontWeight="800"
-                        textAlign="right"
-                        color={
-                          token.change24h === null
-                            ? "gray.400"
-                            : token.change24h >= 0
-                              ? "bauhaus.green"
-                              : "bauhaus.red"
-                        }
-                      >
-                        {token.change24h !== null
-                          ? formatPercent(token.change24h)
-                          : "..."}
-                      </Text>
+                      <Box w={{ base: "65px", md: "80px" }} textAlign="right">
+                        {token.change24h !== null ? (
+                          <Text
+                            fontSize="sm"
+                            fontWeight="800"
+                            color={
+                              token.change24h >= 0
+                                ? "bauhaus.green"
+                                : "bauhaus.red"
+                            }
+                          >
+                            {formatPercent(token.change24h)}
+                          </Text>
+                        ) : (
+                          <Skeleton h="16px" w="50px" ml="auto" borderRadius={0} />
+                        )}
+                      </Box>
 
                       {/* Buy / Chart button (desktop) */}
                       <Box
