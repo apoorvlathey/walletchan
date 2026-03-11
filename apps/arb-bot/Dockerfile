@@ -6,6 +6,7 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 
 # Copy workspace dependencies
+COPY packages/contract-addresses/ packages/contract-addresses/
 COPY packages/wchan-swap/ packages/wchan-swap/
 
 # Copy the arb-bot package
