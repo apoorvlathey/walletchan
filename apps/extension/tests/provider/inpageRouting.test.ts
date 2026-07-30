@@ -12,6 +12,50 @@ import {
 import { setProviderInstance } from "../../src/chrome/provider/inpage/providerRegistry";
 import { installContentResultRouter } from "../../src/chrome/provider/inpage/resultRouter";
 
+test("inpage provider remains callable through a legacy wallet routing proxy", async () => {
+  const provider = new ImpersonatorProvider(
+    8453,
+    "0x0000000000000000000000000000000000000001",
+  );
+  const router = { currentProvider: provider };
+
+  // Rabby 0.93.97 / @rabby-wallet/page-provider 0.4.11 wraps the selected
+  // provider's request function, then reads its properties with the router
+  // Proxy as the receiver.
+  Object.defineProperty(provider, "request", {
+    value: new Proxy(provider.request, {
+      apply(target, thisArg, argArray) {
+        return Reflect.apply(target, thisArg, argArray);
+      },
+    }),
+  });
+  const legacyProvider = new Proxy(router, {
+    get(target, property, receiver) {
+      return Reflect.get(target.currentProvider, property, receiver);
+    },
+  }) as unknown as ImpersonatorProvider;
+
+  assert.equal(await legacyProvider.request({ method: "eth_chainId" }), "0x2105");
+  assert.equal(await legacyProvider.send("eth_chainId"), "0x2105");
+  assert.equal(
+    legacyProvider.selectedAddress,
+    "0x0000000000000000000000000000000000000001",
+  );
+
+  const accountEvents: string[][] = [];
+  legacyProvider.on("accountsChanged", (accounts) => {
+    accountEvents.push(accounts);
+  });
+  provider.setAddress("0x0000000000000000000000000000000000000002");
+  assert.deepEqual(accountEvents, [
+    ["0x0000000000000000000000000000000000000002"],
+  ]);
+  assert.equal(
+    legacyProvider.selectedAddress,
+    "0x0000000000000000000000000000000000000002",
+  );
+});
+
 test("inpage provider preserves request/result correlation and discovery", async () => {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
   const originalCustomEvent = Object.getOwnPropertyDescriptor(

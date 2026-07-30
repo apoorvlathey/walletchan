@@ -1544,6 +1544,15 @@ To avoid issues with other wallets intercepting `window.ethereum`, all internal 
 
 This ensures the wallet functions correctly even when `window.ethereum` is claimed by another extension.
 
+Some legacy multi-wallet routers discover providers through EIP-6963 and then
+relay `window.ethereum` through their own JavaScript `Proxy`. Such routers may
+invoke provider methods or access getters with the router proxy as the receiver
+instead of the announced provider instance. WalletChan's public `request`,
+legacy `send`, internal RPC callback, and getter-only `selectedAddress`
+projection are receiver-independent. The origin-authorized address remains a
+native private field; proxy compatibility does not expose the active-wallet
+fallback or weaken the connected-origin account boundary.
+
 ## File Structure
 
 ```

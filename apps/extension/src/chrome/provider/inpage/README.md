@@ -5,6 +5,9 @@ This folder is the page-world WalletChan provider built as `inpage.js`.
 - `provider.ts` owns only EIP-1193 state/events and delegates requests. Its
   getter-only MetaMask-compatible `selectedAddress` projection returns the
   origin-authorized account or `null`; it never exposes the wallet fallback.
+  The public request methods and address projection are receiver-independent so
+  legacy multi-wallet routers may proxy the EIP-6963 provider without breaking
+  its private-field boundary.
 - `requestRouter.ts` maps methods to account/chain, signing, ERC-5792,
   delegated-permission, transaction, or bounded RPC adapters.
 - `pendingRequests.ts` is the sole request/result correlation registry.

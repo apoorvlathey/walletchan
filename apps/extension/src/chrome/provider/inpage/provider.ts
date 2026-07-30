@@ -11,10 +11,17 @@ export const UNCONNECTED_PROVIDER_ADDRESS =
   "0x0000000000000000000000000000000000000000";
 const EXPOSED_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/u;
 
+function exposedSelectedAddress(address: string): string | null {
+  if (
+    !EXPOSED_ADDRESS_PATTERN.test(address) ||
+    address.toLowerCase() === UNCONNECTED_PROVIDER_ADDRESS
+  ) return null;
+  return address;
+}
+
 export class ImpersonatorProvider extends EventEmitter {
   isImpersonator = true;
   isMetaMask = true;
-
   #address: string;
   private chainId: number;
   private dappRpcForwarder = new DappRpcForwarder();
@@ -23,17 +30,19 @@ export class ImpersonatorProvider extends EventEmitter {
     super();
     this.chainId = chainId;
     this.#address = address;
+    // Legacy multi-wallet routers may read provider properties through a Proxy
+    // whose receiver is the router rather than this provider. Keep the public
+    // projection getter-only while closing over the real private-field owner.
+    Object.defineProperty(this, "selectedAddress", {
+      configurable: false,
+      enumerable: true,
+      get: () => exposedSelectedAddress(this.#address),
+    });
   }
 
   /** MetaMask-compatible legacy view of the origin-authorized account. */
   get selectedAddress(): string | null {
-    if (
-      !EXPOSED_ADDRESS_PATTERN.test(this.#address) ||
-      this.#address.toLowerCase() === UNCONNECTED_PROVIDER_ADDRESS
-    ) {
-      return null;
-    }
-    return this.#address;
+    return exposedSelectedAddress(this.#address);
   }
 
   setAddress = (address: string, emitAccountsChanged = true) => {
@@ -51,7 +60,7 @@ export class ImpersonatorProvider extends EventEmitter {
     this.emit("chainChanged", hexValue(chainId));
   };
 
-  private async rpc(method: string, params: any[] = []): Promise<any> {
+  private rpc = async (method: string, params: any[] = []): Promise<any> => {
     const discovered = await this.dappRpcForwarder.tryRequest(
       this.chainId,
       method,
@@ -60,13 +69,16 @@ export class ImpersonatorProvider extends EventEmitter {
     return discovered.forwarded
       ? discovered.result
       : requestRpcThroughContentScript(method, params);
-  }
+  };
 
-  request(request: { method: string; params?: Array<any> }): Promise<any> {
+  request = (request: {
+    method: string;
+    params?: Array<any>;
+  }): Promise<any> => {
     return this.send(request.method, request.params || []);
-  }
+  };
 
-  async send(method: string, params: Array<any> = []): Promise<any> {
+  send = async (method: string, params: Array<any> = []): Promise<any> => {
     if (isExecutionPermissionRequestInProgress()) {
       throw makeProviderError(
         ERC7715_PERMISSION_REQUEST_IN_PROGRESS_ERROR,
@@ -83,5 +95,5 @@ export class ImpersonatorProvider extends EventEmitter {
       method,
       params,
     );
-  }
+  };
 }

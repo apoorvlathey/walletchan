@@ -170,7 +170,7 @@ test("valid approval requests pass surface preflight for every wallet path", () 
     ],
   ] as const;
 
-  for (const accountType of ["bankr", "privateKey", "seedPhrase"]) {
+  for (const accountType of ["bankr", "privateKey", "seedPhrase", "ledger"]) {
     assert.equal(
       providerRequestPassesSurfacePreflight(
         "i_dappAccounts",
@@ -186,6 +186,7 @@ test("valid approval requests pass surface preflight for every wallet path", () 
       `${accountType}:connect`,
     );
     for (const [type, message] of requests) {
+      const expected = accountType !== "ledger" || type !== "i_walletSendCalls";
       assert.equal(
         providerRequestPassesSurfacePreflight(type, message, {
           address,
@@ -193,7 +194,7 @@ test("valid approval requests pass surface preflight for every wallet path", () 
           chainId: 1,
           dappConnected: true,
         }),
-        true,
+        expected,
         `${accountType}:${type}`,
       );
     }
