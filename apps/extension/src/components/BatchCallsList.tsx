@@ -81,6 +81,7 @@ export function CallCard({
   decodedName,
   origin,
   favicon,
+  hideCalldataDigest = false,
   onEditCallData,
 }: {
   call: ERC5792Call;
@@ -93,6 +94,7 @@ export function CallCard({
   decodedName?: string;
   origin?: string;
   favicon?: string | null;
+  hideCalldataDigest?: boolean;
   onEditCallData?: (
     newData: string,
   ) => Promise<{ success: boolean; error?: string }>;
@@ -415,6 +417,7 @@ export function CallCard({
           clearSigningMatched={clearSigningMatched}
           technicalDetailsOpen={technicalDetailsOpen}
           targetLabel={targetLabel}
+          hideCalldataDigest={hideCalldataDigest}
           onClearSigningResolved={(matched, intent) => {
             setClearSigningResolution({
               key: clearSigningKey,
@@ -498,10 +501,11 @@ export function CallCard({
                   to={call.to}
                   chainId={chainId}
                   onFunctionName={onFunctionName}
+                  flat
                 />
               </Box>
             )}
-            {hasCalldata && (
+            {hasCalldata && !hideCalldataDigest && (
               <Box w="full" px={2} pb={1.5}>
                 <CalldataDigestDisplay calldata={call.data!} />
               </Box>
@@ -531,6 +535,7 @@ function CalldataCallContent({
   clearSigningMatched,
   technicalDetailsOpen,
   targetLabel,
+  hideCalldataDigest,
   onClearSigningResolved,
   onFunctionName,
   onEditCallData,
@@ -546,6 +551,7 @@ function CalldataCallContent({
   clearSigningMatched: boolean;
   technicalDetailsOpen: boolean;
   targetLabel: string | null;
+  hideCalldataDigest: boolean;
   onClearSigningResolved: (matched: boolean, intent?: string) => void;
   onFunctionName: (name: string) => void;
   onEditCallData?: (
@@ -612,11 +618,12 @@ function CalldataCallContent({
             to={call.to}
             chainId={chainId}
             onFunctionName={onFunctionName}
+            flat
           />
         </Box>
       )}
 
-      {call.data && (
+      {call.data && !hideCalldataDigest && (
         <Box w="full" px={2} pb={1.5}>
           <CalldataDigestDisplay calldata={call.data} />
         </Box>
@@ -755,6 +762,7 @@ export function BatchCallsList({
   favicon,
   originPerCall,
   originCallIndex,
+  hideCalldataDigest = false,
 }: {
   calls: ERC5792Call[];
   chainId: number;
@@ -762,6 +770,7 @@ export function BatchCallsList({
   favicon?: string | null;
   originPerCall?: TxCallOrigin[];
   originCallIndex?: number;
+  hideCalldataDigest?: boolean;
 }) {
   const [expandedCalls, setExpandedCalls] = useState<Set<number>>(
     () => new Set(),
@@ -811,6 +820,7 @@ export function BatchCallsList({
             decodedName={decodedFunctionNames[index]}
             origin={callOrigin?.origin ?? fallbackOrigin}
             favicon={callOrigin ? callOrigin.favicon : fallbackFavicon}
+            hideCalldataDigest={hideCalldataDigest}
           />
         );
       })}

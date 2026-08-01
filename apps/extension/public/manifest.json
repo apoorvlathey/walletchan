@@ -102,7 +102,8 @@
         "browse.html",
         "interstitial.html",
         "ens-error.html",
-        "setup-kubo.html"
+        "setup-kubo.html",
+        "explorer.html"
       ],
       "matches": [
         "<all_urls>"

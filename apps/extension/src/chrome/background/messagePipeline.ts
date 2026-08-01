@@ -1,6 +1,7 @@
 /** Ordered main-listener policy and transport delegation pipeline. */
 
 import { handleEnsBrowsingMessage } from "../ensBrowsing";
+import { handleExplorerTransactionMessage } from "../explorerTransaction/messageRouter";
 import { validateExternalProviderMessage } from "../provider/messageValidation";
 import { isTrustedWalletUiSender } from "../trustedWalletUiSender";
 import { classifyBackgroundMessage } from "./messageAccessPolicy";
@@ -17,6 +18,10 @@ export function createBackgroundMessagePipeline(
     // ENS browsing owns its interstitial/banner/settings messages before the
     // wallet/provider audience gate and falls through for everything else.
     if (handleEnsBrowsingMessage(message, sender, sendResponse)) {
+      return true;
+    }
+
+    if (handleExplorerTransactionMessage(message, sender, sendResponse)) {
       return true;
     }
 

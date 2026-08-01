@@ -267,6 +267,23 @@
 
 ## Slop audit
 
+- 2026-08-01 block-explorer preference audit: placed the **Enhance Block
+  Explorers** destination immediately after Security in the established
+  Settings list. Its dedicated screen follows the Sounds preference grammar,
+  keeping the root row navigational and the default-on switch within a focused
+  destination. Result: pass.
+
+- 2026-08-01 explorer transaction decoder audit: embedded the existing
+  clear-signing and decoded/raw calldata hierarchy as the default peer of the
+  explorer's native Input Data view. The isolated site/WalletChan tabs preserve
+  the native fallback, keep 38px-plus keyboard-operable controls, and add no
+  gradients, decorative glass, or competing page-level card. Within the
+  left-aligned half-width WalletChan view, one shared transaction summary owns
+  Action, verified parameters, and Payment without repeating the explorer's
+  contract context; the independently collapsible calldata audit begins
+  expanded. ERC-7821 wrappers instead reuse the Activity call-list hierarchy,
+  so inner intent outranks the technical outer `execute`. Result: pass.
+
 - 2026-07-27 website Docs navigation audit: added the external Docs destination
   to the existing homepage navigation model immediately after `$WCHAN`, so the
   desktop and mobile menus share the same order, native link semantics, focus
@@ -1076,6 +1093,42 @@
   intent stays compact. Deterministic preview scenarios cover the full matrix.
 
 ## Changelog
+
+- 2026-08-01: added a compact, theme-aware decoded-transaction panel to
+  configured block explorer `/tx/<hash>` pages. It reuses WalletChan clear
+  signing and calldata views inside an isolated iframe, with the decoded action
+  as the signature line and raw bytes kept in the existing technical tab.
+- 2026-08-01: placed the explorer decoder directly after Etherscan's More
+  Details section, constrained it to a 960px technical reading measure, and
+  sized its iframe from intrinsic panel content so it does not reserve an empty
+  dark viewport below the decoded data.
+- 2026-08-01: made explorer placement resilient to delayed Scan-family markup
+  and History API navigation. The panel now waits for and follows the More
+  Details card on Etherscan and BaseScan, while unsupported explorer layouts
+  receive the generic main-content position after a short bounded delay.
+- 2026-08-01: replaced the standalone explorer decoder section with a compact,
+  isolated site/WalletChan tab selector inside the native Input Data value
+  column. The site view remains selected and untouched by default; WalletChan
+  creates its RPC-backed iframe only on explicit selection and restores the
+  explorer's exact raw/decoded state when users switch back.
+- 2026-08-01: aligned the WalletChan explorer view with transaction details:
+  the shared heading-free Action/Payment summary now leads every
+  decoded transaction, including calls without clear-signing descriptors.
+  Wallet identity is owned by the outer tab, address context stays quiet, and
+  parameter-level decoded/raw calldata remains a separate collapsible audit.
+- 2026-08-01: made WalletChan the initial explorer Input Data tab, constrained
+  its decoded view to a left-aligned responsive 52% reading column, merged verified
+  clear-signing parameters into the summary directly beneath Action, and made
+  the independently collapsible calldata audit start expanded.
+- 2026-08-01: gave explorer ERC-7821 self-batches the same decoded Calls/count
+  presentation as Activity transaction details. Each inner call now resolves
+  its own clear-signing or function label and disclosure instead of presenting
+  the opaque outer `execute` wrapper. The explorer projection omits per-call
+  calldata digests because raw inspection remains available in the native tab.
+- 2026-08-01: flattened decoded/raw calldata inside expanded batch-call cards
+  across requests, Activity details, and explorer embeds. The call card now
+  owns the only edge, removing the card-within-card hierarchy while preserving
+  tabs, copy, decoding, and technical disclosure.
 
 - 2026-07-27: added `Docs` immediately after `$WCHAN` in the shared homepage
   navigation model, linking desktop and mobile visitors to

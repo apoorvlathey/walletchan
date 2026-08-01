@@ -42,6 +42,8 @@ integration boundary, not the default home for new implementations.
 - `Chat/` owns the Bankr conversation screens and message presentation.
 - `ClearSigning/` owns descriptor loading and clear-signing renderers.
 - `Erc7715PermissionConfirmation/` owns delegated-execution permission review and decisions.
+- `ExplorerTransaction/` owns the read-only decoder panel embedded on recognized
+  block explorer transaction pages; its RPC effect is isolated in the feature hook.
 - `Ledger/` owns hardware pairing/address selection and live device-signing status.
 - `Portfolio/Holdings/` owns portfolio hydration, display transforms, and asset rows.
 - `Settings/` owns settings navigation and configuration screens.

@@ -63,6 +63,7 @@
     {
       "resources": [
         "static/js/inpage.js",
+        "explorer.html",
         "walletchan-animated.gif",
         "walletchan-icon.png",
         "walletchan-icon-white-bg.png"

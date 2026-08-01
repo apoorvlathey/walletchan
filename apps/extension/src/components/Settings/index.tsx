@@ -20,6 +20,7 @@ import PrivacyRecoverySettings from "./PrivacyRecoverySettings";
 import DataSettings from "./DataSettings";
 import AboutSettings from "./AboutSettings";
 import ClearTxHistoryScreen from "./ClearTxHistoryScreen";
+import ExplorerEnhancementsSettings, { ExplorerEnhancementsSettingsRow } from "./ExplorerEnhancementsSettings";
 import { SettingsMain } from "./SettingsMain";
 import { SettingsRow } from "./SettingsRow";
 import {
@@ -51,6 +52,7 @@ export type SettingsTab =
   | "appearance"
   | "accounts"
   | "sounds"
+  | "explorerEnhancements"
   | "ensBrowsing"
   | "clearSigning"
   | "clearTxHistory";
@@ -261,6 +263,8 @@ function Settings({
     body = <AccountsSettings {...accountsView} onBack={() => setTab("main")} />;
   } else if (tab === "sounds") {
     body = <SoundsSettings onBack={() => setTab("main")} />;
+  } else if (tab === "explorerEnhancements") {
+    body = <ExplorerEnhancementsSettings onBack={() => setTab("main")} />;
   } else if (tab === "clearSigning") {
     body = (
       <ClearSigningSettings
@@ -316,6 +320,7 @@ function Settings({
         onClick={() => setTab("accounts")}
       />
     );
+    const explorerRow = <ExplorerEnhancementsSettingsRow key="explorerEnhancements" onClick={() => setTab("explorerEnhancements")} />;
     const defaultRows = [
       renderRootLeaf("appearance"),
       accountsRow,
@@ -331,6 +336,7 @@ function Settings({
         showChevron
         onClick={() => setTab("security")}
       />,
+      explorerRow,
       renderRootLeaf("ensBrowsing"),
       <SettingsRow
         key="data"
@@ -350,7 +356,9 @@ function Settings({
 
     const accountSearchMatch = ["accounts", "wallet", "address", "import", "reorder", "manage"]
       .some((keyword) => keyword.includes(trimmedQuery.toLowerCase()));
-    const searchRows = [accountSearchMatch ? accountsRow : null, ...matches
+    const explorerSearchMatch = ["explorer", "etherscan", "basescan", "transaction", "decode"]
+      .some((keyword) => keyword.includes(trimmedQuery.toLowerCase()));
+    const searchRows = [accountSearchMatch ? accountsRow : null, explorerSearchMatch ? explorerRow : null, ...matches
       .map((entry) => renderRootLeaf(entry.id))
     ].filter((row) => row != null);
     const rows = trimmedQuery ? searchRows : defaultRows;

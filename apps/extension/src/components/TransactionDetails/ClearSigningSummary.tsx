@@ -1,8 +1,7 @@
-import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import type { CompletedTransaction } from "@/chrome/txHistoryStorage";
 import type { ERC5792Call } from "@/chrome/erc5792Types";
-import { BatchCallsList } from "@/components/BatchCallsList";
+import BatchCallsSummary from "@/components/shared/BatchCallsSummary";
 import ClearSignedSummaryCard from "@/components/ClearSignedSummaryCard";
 import { ClearSigningView } from "@/components/ClearSigning/ClearSigningView";
 import Erc7715PermissionRevokeSummary from "@/components/Erc7715PermissionRevokeSummary";
@@ -62,41 +61,14 @@ export default function ClearSigningSummary({
           calldata stays available inside the collapsed "Transaction
           Details" section below for power-users. */}
       {hasBatchCalls && (
-        <VStack spacing={2} align="stretch">
-          <HStack spacing={2}>
-            <Text
-              fontSize="xs"
-              color="text.secondary"
-              fontWeight="700"
-              textTransform="uppercase"
-              letterSpacing="wide"
-            >
-              Calls
-            </Text>
-            <Badge
-              bg="accent.highlight"
-              color="accentFg.highlight"
-              fontSize="2xs"
-              fontWeight="800"
-              px={1.5}
-              py={0}
-              border="1px solid"
-              borderColor="accent.highlight"
-            >
-              {batchCalls!.length}
-            </Badge>
-          </HStack>
-          <BatchCallsList
-            calls={batchCalls!}
-            chainId={tx.chainId}
-            origin={tx.origin}
-            favicon={tx.favicon}
-            originPerCall={tx.batchCallOrigins}
-            originCallIndex={
-              tx.bridge ? batchCalls!.length - 1 : undefined
-            }
-          />
-        </VStack>
+        <BatchCallsSummary
+          calls={batchCalls!}
+          chainId={tx.chainId}
+          origin={tx.origin}
+          favicon={tx.favicon}
+          originPerCall={tx.batchCallOrigins}
+          originCallIndex={tx.bridge ? batchCalls!.length - 1 : undefined}
+        />
       )}
 
       {hasDelegation && delegationMeta && (

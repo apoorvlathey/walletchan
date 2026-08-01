@@ -360,6 +360,21 @@ invalid or non-HTTP(S) `launchUrl` is discarded before persistence or launch.
 Favorite reordering may additionally store a numeric display-only `sortOrder`
 on those same non-secret records. Reordering neither changes the launch target
 nor grants, revokes, or reads dapp permissions or account data.
+`explorer.html` is separately web-accessible so the content script can embed a
+style-isolated decoder inside configured explorer `/tx/<hash>` Input Data
+sections. WalletChan is selected by default, so the content script creates the
+document as soon as a supported transaction page and native Input Data section
+are recognized. The resulting RPC and decoder traffic remains public-metadata
+only. It is never a trusted wallet UI: the exact document is accepted only by
+`explorerTransaction/messageRouter.ts`, which requires its Chrome-attested tab
+URL to remain a configured explorer page. Top-level instances therefore fail
+authorization. That router
+re-resolves Chrome-attested `sender.tab.url` against normalized built-in/custom
+explorers, binds metadata requests to the matched chain ID, and permits only
+calldata descriptor lookup, public token metadata, and a bounded random-token
+resize/dismiss relay back to the top-frame content script. It cannot read
+accounts, history, sessions, credentials, pending requests, or secrets, and it
+exposes no signing or submission effect.
 The same exact top-level launcher may call `ens-search-dapp-directory` with one
 user-entered query. The background trims and caps it at 120 characters, sends
 only that query to the exact DefiLlama HTTPS search endpoint, and applies a
@@ -1351,6 +1366,15 @@ connection prompts tied to the removed account are terminalized with `4100`,
 and connection approval shares the same account-binding lock as removal so it
 cannot recreate the grant on the other side of deletion.
 
+The same isolated-world content script may add an extension-origin iframe to a
+top-frame `/tx/<hash>` page only after the public URL matches a configured
+explorer. The frame receives only that public page URL plus a random
+resize-channel token. The exact iframe asks the background to relay only a
+bounded height or dismiss action; the top-frame content script accepts that
+event only for its active random token. RPC transaction and descriptor data
+stay inside the extension iframe and are not forwarded into page-world
+JavaScript.
+
 ### Inpage-to-Background Messages (via provider/contentBridge)
 
 Only the message types frozen in
@@ -1427,13 +1451,16 @@ confirmation/simulation flows) must stay on extension-controlled RPC paths.
 
 ### Background-to-Content-Script Messages
 
-Only these types are sent to content scripts (and thus forwarded to the webpage):
+Only these types are sent to content scripts. The provider-state rows are
+eligible for the separate page-world whitelist; the explorer event is consumed
+only by the isolated-world injection controller:
 
 | Message Type | Data Sent                                    |
 | ------------ | -------------------------------------------- |
 | `setAddress` | address, displayAddress                      |
 | `setChainId` | chainId                                      |
 | `setAccount` | address, displayName, accountId, accountType |
+| `EXPLORER_TRANSACTION_FRAME_EVENT` | Random token plus bounded height or dismiss action; no transaction or wallet data |
 
 **Rule**: Never send secrets (passwords, API keys, private keys) to content scripts. Any new background-to-content-script message type must be reviewed for data sensitivity.
 
@@ -1547,6 +1574,7 @@ accessible resources.
 | `hidePortfolioValue`                                   | Boolean - hide/show token USD values |
 | `unifyPortfolioBalances`                               | Non-secret boolean display preference; missing or malformed values default to unified balances |
 | `followDappNetwork`                                    | Non-secret boolean display preference; missing or malformed values default to following the active dapp network |
+| `explorerEnhancementsEnabled`                          | Non-secret block-explorer presentation preference; only exact `false` disables injection, explorer resolution, iframe creation, and its public transaction RPC work |
 
 ### IndexedDB (extension-origin, wallet-scoped)
 

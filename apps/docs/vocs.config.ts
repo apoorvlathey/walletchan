@@ -90,6 +90,7 @@ export default defineConfig({
       collapsed: true,
       items: [
         { text: "Review a transaction", link: "/transactions/review" },
+        { text: "Block explorer decoding", link: "/transactions/block-explorer-decoding" },
         { text: "Simulation & clear signing", link: "/transactions/simulation" },
         { text: "Messages, typed data & SIWE", link: "/transactions/signatures" },
         { text: "Batch transactions", link: "/transactions/batches" },

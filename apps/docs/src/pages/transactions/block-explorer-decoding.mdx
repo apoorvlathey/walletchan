@@ -1,0 +1,51 @@
+---
+title: Decode block explorer transactions
+description: Use WalletChan's clear signing, decoded calldata, and batch-call views directly on supported block explorer transaction pages.
+searchPriority: 8
+outline: 3
+---
+
+# Decode block explorer transactions
+
+WalletChan can add its transaction-details view to supported block explorer
+`/tx/<hash>` pages. This works for the explorers configured for WalletChan's
+active built-in and custom EVM networks, including Etherscan and BaseScan.
+
+## Switch between explorer and WalletChan details
+
+On a supported transaction page, WalletChan adds two tabs to the explorer's
+**Input Data** section:
+
+- The explorer tab preserves the site's original input-data display and tools.
+- **WalletChan** is selected by default and shows a compact, left-aligned
+  transaction view inside that section.
+
+WalletChan resolves the transaction hash from the page URL and uses the RPC
+configured for that explorer's chain. It checks the RPC chain and returned
+transaction before displaying anything.
+
+## What WalletChan shows
+
+- A plain-language action and verified clear-signing fields when available.
+- Decoded and raw calldata, expanded by default for technical verification.
+- Human-readable inner calls for ERC-7821 batch transactions instead of only
+  showing the outer `execute` wrapper.
+- Contract, token, address, and amount labels when public metadata resolves.
+
+The explorer view is read-only. It cannot access wallet accounts, history,
+credentials, pending requests, signing, or transaction submission.
+
+## Turn explorer enhancements off
+
+Open **Settings → Enhance Block Explorers** and disable **WalletChan transaction
+details**. WalletChan immediately removes an existing injected view and stops
+explorer resolution, iframe creation, and transaction RPC work until the
+setting is enabled again.
+
+The preference is on by default and syncs with your extension settings.
+
+## Related guides
+
+- [Review a transaction](/transactions/review)
+- [Understand simulation and clear signing](/transactions/simulation)
+- [Configure networks and RPCs](/settings/networks-and-rpcs)

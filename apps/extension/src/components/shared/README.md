@@ -38,6 +38,20 @@ name-service-aware editor remains available even when the saved list is empty.
 `TokenContractPopover.tsx` keeps ERC-20 contract copy and explorer tools behind
 the visible token symbol across transaction and permission-review surfaces.
 
+`DecodedFunctionSummary.tsx` owns the compact Action/Contract/Payment summary
+shared by Activity transaction details and the block-explorer decoder.
+It keeps contract identity resolution and native-value formatting visually
+identical across both surfaces.
+
+`BatchCallsSummary.tsx` owns the Calls/count heading and read-only
+`BatchCallsList` composition shared by Activity transaction details and the
+block-explorer decoder. Both surfaces therefore project decoded ERC-7821 inner
+calls through the same clear-signing, function-label, and disclosure hierarchy.
+The explorer may suppress the per-call calldata digest because its native tab
+already owns raw transaction inspection; trusted wallet review surfaces retain it.
+Expanded call cards remain the single surface owner, so their decoded/raw
+calldata content uses the flat decoder treatment in every consumer.
+
 Feature-specific state and one-off child components stay in their owning
 domain. Domain-free screen/list primitives belong in `components/ui/` instead.
 

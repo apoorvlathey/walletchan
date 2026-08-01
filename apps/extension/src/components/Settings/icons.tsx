@@ -124,6 +124,15 @@ export const GlobeIcon = (props: any) => (
   </Icon>
 );
 
+export const ExplorerIcon = (props: any) => (
+  <Icon {...lucideProps} {...props}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M3 9h18" />
+    <path d="m9 13-2 2 2 2" />
+    <path d="m15 13 2 2-2 2" />
+  </Icon>
+);
+
 export const DatabaseIcon = (props: any) => (
   <Icon {...lucideProps} {...props}>
     <ellipse cx="12" cy="5" rx="9" ry="3" />

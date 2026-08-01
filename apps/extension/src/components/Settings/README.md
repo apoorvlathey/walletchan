@@ -7,6 +7,9 @@
   changes the active account.
 - `ClearChatHistoryDialog.tsx` owns the root-level chat-history confirmation
   dialog while the Settings router retains the action state and deletion effect.
+- `ExplorerEnhancementsSettings.tsx` owns the **Enhance Block Explorers**
+  destination shown directly after Security and its default-on preference;
+  the sync-storage write is observed live by explorer content scripts.
 - `EditChain.tsx` composes the edit form and save/validation flow.
 - `NetworkIdentityFields.tsx` renders the editable/read-only network name and
   chain-ID controls.

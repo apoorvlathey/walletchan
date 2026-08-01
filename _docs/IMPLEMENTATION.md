@@ -4078,6 +4078,76 @@ Transaction calldata is decoded using the eth.sh API:
 - **Parameter display**: Color-coded by type (addresses=blue with labels, numbers=gold, bools=green/red, bytes=muted)
 - **Fallback**: Raw hex if decode fails or for contract deployments (no `to` address)
 
+### Block Explorer Transaction Decoder
+
+The all-sites `inject.js` content script recognizes top-frame `/tx/<hash>`
+paths, resolves the source against the normalized built-in/custom network
+registry, and inserts a style-isolated tab selector at the start of the
+explorer's native Input Data value column. The WalletChan tab includes the
+wallet mark, is selected by default, and replaces the native panes while
+selected. Its iframe uses a left-aligned 52% technical reading column up to 880px,
+then returns to full width below 900px. The site-derived tab label (`Etherscan`,
+`BaseScan`, and so on) restores the explorer's exact raw/decoded input panes
+and controls when selected.
+
+Settings shows an **Enhance Block Explorers** destination immediately after
+Security. Its dedicated screen owns a default-on switch. The synced
+`explorerEnhancementsEnabled` preference treats only
+the exact boolean `false` as disabled. Content scripts read it before resolving
+an explorer page, observe changes live, and remove an existing embed when it is
+turned off; while disabled they perform no explorer resolution, iframe creation,
+or transaction RPC work.
+
+Because WalletChan is the initial view, `explorer.html` is created during the
+recognized transaction-page mount and begins the configured transaction RPC,
+clear-signing descriptor, token-metadata, and calldata-decoder work. The iframe
+starts at its compact loading height and reports the intrinsic React-root
+height through the explorer-only background relay. Returning to WalletChan
+after viewing the site tab reuses the already resolved iframe rather than
+repeating initial RPC work.
+
+The content script observes DOM changes and also polls the current URL at a
+low frequency, so History API navigation from an address/search page into a
+transaction works even when the explorer does not emit `popstate`, `hashchange`,
+or a useful DOM mutation at the URL boundary. A recognized transaction waits
+for the native Input Data container rather than falling back to the top of the
+page. Late or replaced transaction markup is detected, detached controls are
+remounted, and native content plus frame-message listeners are restored or
+removed during navigation.
+
+`components/ExplorerTransaction/` resolves the explorer to `{ chainId, rpcUrl }`,
+checks `eth_chainId`, fetches the exact `eth_getTransactionByHash` record, and
+requires the returned hash and bounded transaction fields to match before
+rendering. The panel reuses `ClearSigningView` and `CalldataDecoder`, supports
+loading/error/retry states, and treats empty calldata and contract creation
+explicitly. ERC-7821 self-batches take the same `decodeErc7821Batch` → shared
+`BatchCallsSummary` path as Activity transaction details, replacing the opaque
+outer `execute` action and calldata with individually labeled, collapsible
+inner calls. The explorer projection suppresses each call's calldata digest
+because the adjacent native explorer tab already owns raw-data verification;
+Activity and confirmation consumers retain the digest. Across all three
+surfaces, an expanded call is the sole bordered surface owner; its nested
+decoded/raw calldata view uses the shared flat variant without another card
+edge. Ordinary transactions lead with the same heading-free
+Action/Payment summary adapted from transaction details. The decoded
+function name updates that summary even when no clear-signing descriptor
+matches. When clear signing resolves, its verified parameters render inside
+that same surface directly after Action and before Payment. The explorer's
+existing transaction context remains the contract authority, so the embed does
+not repeat a Contract row. Decoded/raw calldata starts expanded in a separate,
+collapsible technical surface. No transaction,
+signature, or account operation is available from this read-only surface.
+
+Because `explorer.html` is an embedded, web-accessible extension document, it
+is not a trusted wallet UI. `chrome/explorerTransaction/messageRouter.ts` is a
+pre-audience, public-metadata-only exception for the exact explorer document.
+It re-resolves Chrome-attested `sender.tab.url` against configured explorers
+and requires the
+message chain ID to match before allowing only calldata descriptor lookup or
+public token metadata, plus the token-bound resize/dismiss relay carrying no
+transaction data. All wallet, account, auth, history, and signing routes
+continue to fail the main audience gate.
+
 ### Clear Signing Descriptors
 
 `ClearSigningView` renders ERC-7730-style descriptors for transaction calldata
@@ -5714,6 +5784,7 @@ Build command: `pnpm build`
 | `setChainId`               | Chain changed (forwarded from background)            |
 | `accountsChanged`          | Emitted when address changes (for dApp notification) |
 | `walletExecutionPermissionsResult` | ERC-7715 delegated-permission result or error |
+| `EXPLORER_TRANSACTION_FRAME_EVENT` | Internal random-token-bound explorer iframe height/dismiss event; never forwarded to page world |
 
 ### Content Script → Background (chrome.runtime)
 
@@ -5743,8 +5814,9 @@ fails closed. Provider-classified routes still pass through the effect-free
 `provider/messageValidation.ts` dispatcher before dispatch. Its focused
 transaction, signature, batch, metadata, identifier/URL, resource-limit, and
 chain-boundary modules are shared directly with injected-provider and
-WalletConnect callers; there are no root compatibility shims. ENS browsing messages remain a
-deliberate pre-router exception with their own page-specific sender policy.
+WalletConnect callers; there are no root compatibility shims. ENS browsing and
+the embedded explorer decoder's two public-metadata messages remain deliberate
+pre-router exceptions with their own exact sender/page policies.
 
 Provider rejection delivery is described by the pure mapping in
 `background/providerRequestRejection.ts`, which fixes each provider method to its existing

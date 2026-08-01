@@ -30,6 +30,8 @@ interface CalldataDecoderProps {
    * card above already conveys the essential info.
    */
   defaultCollapsed?: boolean;
+  /** Keeps an expanded decoder dismissible; defaults to `defaultCollapsed`. */
+  collapsible?: boolean;
   /**
    * Drop the card drop-shadow. The default `boxShadow="card"` is calibrated
    * to lift the decoder off a flat page background; when the decoder is
@@ -39,7 +41,6 @@ interface CalldataDecoderProps {
    */
   flat?: boolean;
 }
-
 /**
  * Serialize decoded result to a JSON-friendly format for copying.
  */
@@ -129,7 +130,7 @@ function isAbiDecodeBetter(
   return false;
 }
 
-function CalldataDecoder({ calldata, to, chainId, onFunctionName, defaultCollapsed = false, flat = false }: CalldataDecoderProps) {
+function CalldataDecoder({ calldata, to, chainId, onFunctionName, defaultCollapsed = false, collapsible = defaultCollapsed, flat = false }: CalldataDecoderProps) {
   const { themeId, tokens } = useTheme();
   const isDarkTheme = isDarkThemeId(themeId);
   // Midnight keeps technical navigation quiet: the active view is marked by
@@ -375,7 +376,7 @@ function CalldataDecoder({ calldata, to, chainId, onFunctionName, defaultCollaps
         <Box pr={1}>
           <CopyButton value={copyValue} />
         </Box>
-        {defaultCollapsed && (
+        {collapsible && (
           <IconButton
             aria-label="Hide calldata"
             icon={<ChevronDownIcon />}

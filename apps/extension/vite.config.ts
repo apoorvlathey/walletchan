@@ -49,6 +49,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "index.html"),
+        explorer: path.resolve(__dirname, "explorer.html"),
       },
       output: {
         entryFileNames: "static/js/[name].js",

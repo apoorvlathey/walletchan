@@ -36,6 +36,7 @@ apps/extension/src/
 │   ├── AccountPicker/      # Shared select/manage account browser
 │   ├── BatchConfirmation/  # ERC-5792 review and confirmation
 │   ├── ClearSigning/       # Feature domain
+│   ├── ExplorerTransaction/ # Read-only block-explorer transaction decoder
 │   ├── Portfolio/Holdings/ # Portfolio loading and holdings presentation
 │   ├── SafeAccount/        # Safe import, discovery, security, and home controls
 │   ├── SafeApprovals/      # Safe proposal review, owner approval, and execution
@@ -48,7 +49,7 @@ apps/extension/src/
 │   ├── ui/                 # Domain-free application primitives
 │   └── shared/             # Cross-feature wallet presentation
 ├── hooks/                  # Hooks shared by multiple feature domains
-├── pages/                  # Build/page adapters and page-specific routing
+├── pages/                  # Build/page adapters, including explorer iframe UI
 └── theme/                  # Tokens, recipes, and visual primitives
 ```
 

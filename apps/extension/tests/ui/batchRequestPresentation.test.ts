@@ -87,4 +87,5 @@ test("cross-dapp call attribution keeps dapp marks legible and identifies wallet
     crossDappSource,
     /entry\.source\?\.kind === "walletGenerated"[\s\S]*"\/walletchan-icon\.png"/,
   );
+  assert.equal(callCardSource.match(/\n\s+flat\n/g)?.length, 2);
 });
