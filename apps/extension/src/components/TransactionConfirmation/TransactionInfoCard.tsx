@@ -9,6 +9,7 @@ import type { PendingTxRequest } from "@/chrome/requests/pendingTxStorage";
 import NativeValueAmount from "@/components/NativeValueAmount";
 import { LabeledAddressPopover } from "@/components/shared/LabeledAddressPopover";
 import { useTheme } from "@/theme";
+import { shouldShowTransactionInfoCard } from "./transactionPresentation";
 
 interface TransactionInfoCardProps {
   txRequest: PendingTxRequest;
@@ -36,6 +37,10 @@ export function TransactionInfoCard({
   const { tokens } = useTheme();
   const { tx } = txRequest;
   const interactingLabel = toLabels[0] ?? resolvedToName;
+
+  if (!shouldShowTransactionInfoCard(!!actionLabel, !!parsedApproval, isValueZero)) {
+    return null;
+  }
 
   return (
     <Box

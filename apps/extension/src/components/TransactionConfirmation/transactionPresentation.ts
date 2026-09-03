@@ -35,3 +35,11 @@ export function shouldShowTransactionEstimatedChanges(
 ): boolean {
   return !hasDelegation && !hasParsedApproval;
 }
+
+export function shouldShowTransactionInfoCard(
+  hasActionLabel: boolean,
+  hasParsedApproval: boolean,
+  isValueZero: boolean,
+): boolean {
+  return hasActionLabel || !hasParsedApproval || !isValueZero;
+}

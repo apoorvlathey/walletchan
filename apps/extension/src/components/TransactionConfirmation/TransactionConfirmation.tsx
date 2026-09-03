@@ -6,14 +6,12 @@ import { useNetworks } from "@/contexts/NetworksContext";
 import { getResolvedChainById } from "@/lib/chains";
 import { useIconChipBg, useStripTokens } from "@/theme";
 import { AdvancedDetails } from "./AdvancedDetails";
-import {
-  ConfirmActionButton,
-  RejectActionButton,
-} from "./ConfirmationActions";
+import { ConfirmActionButton, RejectActionButton } from "./ConfirmationActions";
 import { CopyButton } from "./CopyButton";
 import type { FeePaymentQuoteSummary } from "@/components/FeePaymentSelector";
 import { QueueNavigation } from "./QueueNavigation";
 import { shouldConfirmSimulationFailure } from "@/components/RequestConfirmation/simulationFailure";
+import { RequestChainContext } from "@/components/RequestConfirmation/EstimatedChangesHeading";
 import { ForceInclusionScreen, TransactionSentScreen } from "./StateScreens";
 import { TransactionContext } from "./TransactionContext";
 import { TransactionDecisionSummary } from "./TransactionDecisionSummary";
@@ -305,6 +303,7 @@ function TransactionConfirmation({
           isReadOnly={isLedgerWaiting || !!replacement}
         />
       }
+      contextHeaderAction={!showEstimatedChanges ? <RequestChainContext chainId={tx.chainId} chainName={resolvedChainName} /> : undefined}
       advancedDetails={
         <AdvancedDetails
           txRequest={txRequest}

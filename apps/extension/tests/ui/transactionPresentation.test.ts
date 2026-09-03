@@ -4,6 +4,7 @@ import {
   formatTransactionAction,
   getDecodedActionFallback,
   shouldShowTransactionEstimatedChanges,
+  shouldShowTransactionInfoCard,
 } from "../../src/components/TransactionConfirmation/transactionPresentation";
 
 test("formats decoded function names as concise action labels", () => {
@@ -61,4 +62,8 @@ test("standalone parsed ERC-20 approvals own their review without duplicate esti
     shouldShowTransactionEstimatedChanges(true, false),
     false,
   );
+  assert.equal(shouldShowTransactionInfoCard(false, true, true), false);
+  assert.equal(shouldShowTransactionInfoCard(true, true, true), true);
+  assert.equal(shouldShowTransactionInfoCard(false, true, false), true);
+  assert.equal(shouldShowTransactionInfoCard(false, false, true), true);
 });
