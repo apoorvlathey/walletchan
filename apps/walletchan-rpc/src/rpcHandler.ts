@@ -16,6 +16,7 @@ import {
   type JsonRpcResponse,
 } from "./rpcTypes.js";
 import { forwardToUpstream } from "./upstream.js";
+import { normalizeSendTransactionInput } from "./transactionNormalization.js";
 import type { SessionInfo, WalletBridge, WalletTransport } from "./walletBridge.js";
 
 export interface LocalCallBundleCall {
@@ -168,13 +169,19 @@ async function sendTransaction(
     throw new RpcError(-32602, "eth_sendTransaction requires a transaction object");
   }
 
-  const chain = resolveChainFromValue(tx.chainId, context) || context.getActiveChain();
-  const from = typeof tx.from === "string" ? tx.from.toLowerCase() : null;
+  const normalizedTx = normalizeSendTransactionInput(tx);
+
+  const chain = resolveChainFromValue(normalizedTx.chainId, context) || context.getActiveChain();
+  const from = typeof normalizedTx.from === "string" ? normalizedTx.from.toLowerCase() : null;
   if (from && !context.wallet.getAccounts(chain.chainId).includes(from)) {
-    throw new RpcError(4100, `Account ${tx.from} is not approved for chain ${chain.chainId}`);
+    throw new RpcError(4100, `Account ${normalizedTx.from} is not approved for chain ${chain.chainId}`);
   }
 
-  return sendWalletRequest(request, context, chain);
+  return sendWalletRequest(
+    { ...request, params: [normalizedTx, ...params.slice(1)] },
+    context,
+    chain,
+  );
 }
 
 async function sendCalls(
