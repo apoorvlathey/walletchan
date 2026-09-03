@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { glass, palette } from "./design";
 import { StoryMockup, type StoryId } from "./StoryMockup";
+import { trackStoreClick } from "./storeClickAnalytics";
 import { useInstallTarget } from "./useInstallTarget";
 
 const storySteps: Array<{
@@ -316,6 +317,13 @@ function HeroCopy({
           as="a"
           href={installTarget.href}
           target="_blank"
+          onClick={() =>
+            trackStoreClick({
+              href: installTarget.href,
+              placement: "homepage_hero",
+              browser: installTarget.browser,
+            })
+          }
           h="50px"
           px={6}
           borderRadius="10px"
@@ -599,6 +607,13 @@ function V2Nav({ condensed }: { condensed: boolean }) {
               as="a"
               href={installTarget.href}
               target="_blank"
+              onClick={() =>
+                trackStoreClick({
+                  href: installTarget.href,
+                  placement: "homepage_nav",
+                  browser: installTarget.browser,
+                })
+              }
               bg={palette.yellow}
               color={palette.ink}
               borderRadius="8px"

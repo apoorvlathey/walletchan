@@ -37,6 +37,8 @@ import {
 } from "../constants";
 import { FeatureCard, SectionHeading } from "./SectionPrimitives";
 import { hairline, palette } from "./design";
+import { trackStoreClick } from "./storeClickAnalytics";
+import { useInstallTarget } from "./useInstallTarget";
 
 const chains = [
   { name: "Ethereum", icon: "/images/ethereum.svg" },
@@ -291,6 +293,8 @@ export function TokenSection() {
 }
 
 export function FinalCta() {
+  const installTarget = useInstallTarget();
+
   return (
     <>
       <Box
@@ -326,6 +330,13 @@ export function FinalCta() {
                 as="a"
                 href={CHROME_STORE_URL}
                 target="_blank"
+                onClick={() =>
+                  trackStoreClick({
+                    href: CHROME_STORE_URL,
+                    placement: "homepage_final_cta",
+                    browser: installTarget.browser,
+                  })
+                }
                 h="50px"
                 px={7}
                 borderRadius="10px"
