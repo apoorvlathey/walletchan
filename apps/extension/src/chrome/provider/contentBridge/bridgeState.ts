@@ -55,3 +55,24 @@ export function notifyDappChainSwitch(
     .sendMessage({ type: "dappChainSwitchNotification", chainId, chainName })
     .catch(() => undefined);
 }
+
+// Public state for a site without account permission, independent of saved UI context.
+export const UNCONNECTED_CHAIN_ID = 1;
+export const UNCONNECTED_CHAIN_NAME = "Ethereum";
+let permissionRevision = 0;
+let chainRevision = 0;
+export const getChainRevision = (): number => chainRevision;
+
+export function setProviderChain(chainName: string, chainId: number): void {
+  chainRevision += 1;
+  bridgeState.chainName = chainName;
+  bridgeState.chainId = chainId;
+}
+export const getPermissionRevision = (): number => permissionRevision;
+
+export function resetDisconnectedChain(invalidatePending = false): void {
+  if (invalidatePending) permissionRevision += 1;
+  bridgeState.dappConnected = false;
+  setProviderChain(UNCONNECTED_CHAIN_NAME, UNCONNECTED_CHAIN_ID);
+  window.postMessage({ type: "setChainId", msg: { chainId: UNCONNECTED_CHAIN_ID } }, "*");
+}

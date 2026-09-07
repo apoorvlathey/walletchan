@@ -2,6 +2,8 @@ import type { NetworksInfo } from "@/types";
 import {
   bridgeState,
   UNCONNECTED_ADDRESS,
+  UNCONNECTED_CHAIN_ID,
+  UNCONNECTED_CHAIN_NAME,
 } from "./bridgeState";
 
 export async function initializeInpageProvider(): Promise<void> {
@@ -32,17 +34,22 @@ export async function initializeInpageProvider(): Promise<void> {
       const chainName = syncState.chainName as string | undefined;
       const networksInfo = syncState.networksInfo as NetworksInfo | undefined;
 
-      if (!networksInfo || !chainName || !networksInfo[chainName] || !address || !displayAddress) {
+      if (!address || !displayAddress) {
         return;
       }
+      const connected =
+        dappAccounts?.success === true &&
+        Array.isArray(dappAccounts?.accounts) &&
+        typeof dappAccounts.accounts[0] === "string";
+      const storedChain =
+        connected && chainName ? networksInfo?.[chainName] : undefined;
+      const initialChainId = storedChain?.chainId ?? UNCONNECTED_CHAIN_ID;
       Object.assign(bridgeState, {
         address,
         displayAddress,
-        chainName,
-        chainId: networksInfo[chainName].chainId,
-        dappConnected:
-          Array.isArray(dappAccounts?.accounts) &&
-          typeof dappAccounts.accounts[0] === "string",
+        chainName: storedChain ? chainName : UNCONNECTED_CHAIN_NAME,
+        chainId: initialChainId,
+        dappConnected: connected,
         accountId: account?.id || "",
         accountType: account?.type || "",
       });
@@ -50,12 +57,8 @@ export async function initializeInpageProvider(): Promise<void> {
         {
           type: "init",
           msg: {
-            address:
-              Array.isArray(dappAccounts?.accounts) &&
-              typeof dappAccounts.accounts[0] === "string"
-                ? dappAccounts.accounts[0]
-                : UNCONNECTED_ADDRESS,
-            chainId: networksInfo[chainName].chainId,
+            address: connected ? dappAccounts.accounts[0] : UNCONNECTED_ADDRESS,
+            chainId: initialChainId,
           },
         },
         "*",

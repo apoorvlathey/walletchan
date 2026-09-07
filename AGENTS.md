@@ -670,7 +670,7 @@ When working on features, refer to these docs:
 
 - **API key encryption**: AES-256-GCM with PBKDF2 (600k iterations)
 - **Session caching**: Decrypted API key cached in background worker memory with auto-lock timeout
-- **Per-tab chain state**: Each browser tab maintains its own selected chain
+- **Network scope**: There is no wallet-wide network selector. Injected chain state belongs to each loaded tab/document; wallet flows and WalletConnect have their own selection. Shared `chrome.storage.sync.chainName` is still written by renderer/provider paths and seeds already-connected providers; unconnected pages expose Ethereum mainnet. Do not call this a global selected network or assume durable per-origin isolation. Pre-connection switch requests use normal connection approval before continuing. See `_docs/IMPLEMENTATION.md` → "Chain State and Switching".
 - **Transaction persistence**: Pending transactions survive popup close (stored in chrome.storage.local)
 - **EIP-6963**: Modern wallet discovery alongside legacy window.ethereum
 - **Shared contract constants**: `packages/shared/src/contracts.ts` is the single source of truth for `BASE_CHAIN_ID`, `BNKRW_TOKEN_ADDRESS`, `SBNKRW_VAULT_ADDRESS`, `BNKRW_POOL_ADDRESS`. Import via `@walletchan/shared/contracts`.

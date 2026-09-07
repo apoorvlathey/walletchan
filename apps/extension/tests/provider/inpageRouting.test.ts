@@ -115,6 +115,18 @@ test("inpage provider preserves request/result correlation and discovery", async
         "0x0000000000000000000000000000000000000009";
     }, TypeError);
 
+    const switchPromise = provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0x1" }] });
+    const switchRequest = messages.at(-1);
+    let switchSettled = false;
+    void switchPromise.then(() => { switchSettled = true; });
+    deliver({ type: "switchEthereumChain", msg: { chainId: 1, id: "unrelated" } });
+    await Promise.resolve();
+    assert.equal(switchSettled, false);
+    deliver({ type: "switchEthereumChain", msg: { chainId: 1, id: switchRequest.msg.id } });
+    assert.equal(await switchPromise, null);
+    assert.equal(await provider.request({ method: "eth_chainId" }), "0x1");
+    provider.setChainId(8453);
+
     const accountsPromise = provider.send("eth_requestAccounts");
     const accountsRequest = messages.at(-1);
     assert.deepEqual(accountsRequest.type, "i_dappAccounts");

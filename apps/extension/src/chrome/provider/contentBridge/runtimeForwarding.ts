@@ -4,6 +4,10 @@ import {
 import {
   bridgeState,
   UNCONNECTED_ADDRESS,
+  getPermissionRevision,
+  getChainRevision,
+  setProviderChain,
+  resetDisconnectedChain,
 } from "./bridgeState";
 
 function exposedDappAddress(
@@ -62,14 +66,26 @@ export function installRuntimeToPageForwarding(): void {
           });
         break;
       }
-      case "setChainId":
-        bridgeState.chainName = message.msg.chainName as string;
-        bridgeState.chainId = message.msg.chainId as number;
-        window.postMessage(
-          { type: "setChainId", msg: { chainId: message.msg.chainId } },
-          "*",
-        );
+      case "setChainId": {
+        const revision = getPermissionRevision();
+        const chainRevision = getChainRevision();
+        void chrome.runtime.sendMessage({ type: "getDappAccounts", chainId: message.msg.chainId })
+          .then((result) => {
+            if (revision !== getPermissionRevision() || chainRevision !== getChainRevision()) return;
+            if (result?.success !== true || !result.accounts?.length) {
+              resetDisconnectedChain();
+              return;
+            }
+            bridgeState.dappConnected = true;
+            setProviderChain(message.msg.chainName, message.msg.chainId);
+            window.postMessage(
+              { type: "setChainId", msg: { chainId: message.msg.chainId } }, "*",
+            );
+          }).catch(() => {
+            if (revision === getPermissionRevision() && chainRevision === getChainRevision()) resetDisconnectedChain();
+          });
         break;
+      }
       case "setAccount":
         Object.assign(bridgeState, {
           address: message.msg.address as string,
@@ -102,7 +118,7 @@ export function installRuntimeToPageForwarding(): void {
         sendResponse(bridgeState);
         break;
       case "dappPermissionRevoked":
-        bridgeState.dappConnected = false;
+        resetDisconnectedChain(true);
         window.postMessage(
           { type: "accountsChanged", msg: { accounts: [] } },
           "*",

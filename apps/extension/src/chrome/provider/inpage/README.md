@@ -20,3 +20,9 @@ This folder is the page-world WalletChan provider built as `inpage.js`.
 The page receives no extension RPC URL or wallet-internal broadcast. All
 state-changing methods cross the content bridge, where the connected origin and
 attested chain are revalidated before persistence or signing.
+
+Same-origin iframes reuse the top document's EIP-6963 WalletChan provider via
+`sameOriginFrame.ts`, including late discovery. Their local init/result router
+is skipped so requests and events retain the top document's transport/state.
+Cross-origin and opaque frames do not use this path; direct iframe background
+requests remain unauthorized.

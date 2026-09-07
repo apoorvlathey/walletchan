@@ -57,7 +57,7 @@ function AmountText({
       minW={0}
       maxW="full"
       overflowWrap="anywhere"
-      fontVariantNumeric="tabular-nums"
+      sx={{ fontVariantNumeric: "tabular-nums" }}
     >
       {displayText}
     </Text>

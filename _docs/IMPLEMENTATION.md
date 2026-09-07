@@ -1371,7 +1371,7 @@ Built-in chain metadata and user-customized chain state are intentionally split:
 - `chrome.storage.sync.networksInfo` stores runtime overrides only: the active `rpcUrl`, hidden flags, and user-added custom chains. Every runtime RPC consumer continues to resolve only `rpcUrl`. Built-in-chain RPC selection/add/edit/remove actions autosave through the validated `updateNetwork` route, while custom-chain name, chain ID, endpoint, explorer, and currency changes remain staged until Save changes. Changing a custom chain ID re-keys its `networkRpcUrls` history in the service-worker mutation so saved endpoints remain attached to that network. `network/dappNetworkApproval.ts` owns confirmed EIP-3085 writes: a request for an existing hidden chain promotes the approved RPC, preserves prior endpoints, clears the hidden flag, and retains WalletChan's canonical identity/capability metadata under the network lock.
 - `chrome.storage.local.networkRpcUrls` stores the optional Settings-only endpoint history as a decimal-chain-ID keyed record of `{ url, name?, allowImpersonatedTransactions? }` objects. Each list is deduplicated by URL and limited to ten endpoints; names are display-only and bounded to 64 characters. The boolean developer flag is opt-in and belongs to that exact endpoint, not the chain. The repository still decodes the released `string[]` shape, so metadata is upgraded lazily on the next successful save. Keeping this auxiliary data local avoids expanding the quota-constrained synced `networksInfo` item.
 - `src/lib/chains.ts` is the required merge layer for runtime code. It normalizes `networksInfo`, keeps built-in chains keyed by their registry name, and exposes helpers like `getVisibleChains`, `getResolvedChainById`, and `getStoredRpcUrl`
-- `src/chrome/network/networkRepository.ts` alone reads and writes `networksInfo`/`chainName`; `rpcHistoryRepository.ts` owns `networkRpcUrls`; and `networkMutations.ts` owns locked service-worker mutations and composes pure `customNetworkValidation.ts` and `networkPolicy.ts`. Every saved endpoint URL and optional name is validated before persistence. Missing history is the normal legacy shape and Edit Network resolves it as a one-item list containing the active `rpcUrl`, so no eager migration is required. Settings UI and dapp `wallet_addEthereumChain` confirmations call extension-only background messages (`addNetwork`, `updateNetwork`, `setNetworkHidden`, `deleteNetwork`, `confirmAddChain`) instead of writing a full popup snapshot back to storage.
+- `src/chrome/network/networkRepository.ts` owns the network-configuration repository; shared `chainName` context also has renderer/content-script readers and writers (see Chain State and Switching); `rpcHistoryRepository.ts` owns `networkRpcUrls`; and `networkMutations.ts` owns locked service-worker mutations and composes pure `customNetworkValidation.ts` and `networkPolicy.ts`. Every saved endpoint URL and optional name is validated before persistence. Missing history is the normal legacy shape and Edit Network resolves it as a one-item list containing the active `rpcUrl`, so no eager migration is required. Settings UI and dapp `wallet_addEthereumChain` confirmations call extension-only background messages (`addNetwork`, `updateNetwork`, `setNetworkHidden`, `deleteNetwork`, `confirmAddChain`) instead of writing a full popup snapshot back to storage.
 - `src/chrome/network/rpcClient.ts` is the final configured-RPC egress boundary. Direct JSON-RPC calls and every viem HTTP transport are request/streamed-response/timeout/concurrency bounded; the viem adapter also pins the validated URL against request-hook retargeting. All paths reject redirects and omit ambient credentials/referrers. New public RPC writes require HTTPS, while existing synced public-HTTP entries remain readable for upgrade compatibility and local/private Settings RPCs may use HTTP. URL userinfo and non-HTTP(S) schemes fail closed even when malformed legacy sync state reaches a read path.
 - Remote dapps cannot propose or proxy a private-network RPC unless the dapp is itself local: loopback dapps may use loopback RPCs, while LAN dapps are restricted to another port on the exact same hostname. Settings remains the explicit escape hatch for user-owned localhost/LAN RPC development and accepts local host-and-port shorthand such as `localhost:8545`, canonicalizing it to HTTP before probing and storage.
 - Edit Network exposes `This RPC allows sending txs from impersonated accounts` inside each endpoint's Add/Edit form, and manual Add Network exposes the same developer option under Advanced details. Send and Swap remain visible for impersonator accounts and stage their normal review screens. Without the selected endpoint's opt-in, confirmation stays disabled/reject-only. When enabled, a pinned single transaction or each reviewed sequential built-in-swap leg uses the standard `eth_sendTransaction` object (`from`, optional `to`, `data`, `value`, and reviewed gas fields) without a signature. The same exact selected-endpoint opt-in admits the existing bounded read-only provider proxy methods against that private RPC so dapp gas estimation and other transaction preflight can complete; it does not expand the proxy method allowlist. The fork RPC must already unlock or impersonate that address (for example Anvil auto/manual impersonation or a Tenderly Virtual TestNet admin RPC). The background rechecks the pinned account, active RPC, exact endpoint flag, provider authorization when applicable, and reset/effect lease at the irreversible boundary; endpoint changes are serialized against submission. Signatures, ERC-5792/cross-dapp batches, fee-token gas, EIP-7702/ERC-7715 authority, and normal public-RPC impersonator sends remain blocked.
@@ -4630,66 +4630,101 @@ loopback origin. Serialized requests are capped at 524,288 characters,
 responses are streamed under 8,000,000 bytes, concurrency is capped at 16, and
 each request has a 15-second timeout.
 
-## Chain Switching
+## Chain State and Switching
 
-The extension supports dapp-initiated chain switching via `wallet_switchEthereumChain`. Each tab maintains its own selected chain, and the popup/sidepanel reflects the chain for the currently active tab.
+There is no wallet-wide selected network in the current product UI. Network
+selection belongs to the relevant context: an injected dapp tab, a Send/Swap
+flow, or WalletConnect. Do not describe the persisted `chainName` field as a
+single global network governing all wallet activity.
 
-### Dapp-Initiated Chain Switch
+### Current state ownership
 
-When a dapp calls `wallet_switchEthereumChain`:
+- **Injected provider:** each loaded content script owns
+  `bridgeState.chainName` / `bridgeState.chainId`. This is per loaded tab/document,
+  not a durable per-origin chain preference. The inpage provider holds the
+  corresponding public chain ID.
+- **Dapp UI:** the connected-site `HomeDappDock` selects the active tab's network.
+  `App.tsx` queries the tab with `getInfo` on activation and sends `setChainId`
+  when its chain context changes. This renderer state is not a wallet-wide
+  transaction-network authority.
+- **Wallet flows:** Send and Swap have their own network selection and request
+  pinning. Swap owns `sellChainId` / `buyChainId`; its `onChainChange` prop is
+  currently unused. Some launch paths in `App.tsx` still update `chainName`
+  while seeding a flow, so do not assume all legacy state coupling is removed.
+- **WalletConnect:** `walletConnect/chainState.ts` owns the separate local
+  `walletConnectChainId`, shared across WC sessions. If missing/invalid, it
+  consults the shared saved `chainName`, then an eligible visible-chain fallback.
+- **Shared saved context:** `chrome.storage.sync.chainName` remains a
+  compatibility/initialization value. Provider switches and renderer context
+  updates still write it. Already-connected pages read it to initialize their own chain; unconnected
+  pages always start on Ethereum mainnet. The shared value can still carry
+  context between connected pages; live tab state is not durable per-origin
+  chain persistence.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      Dapp Chain Switch Flow                                  │
-│                                                                             │
-│  1. Dapp calls wallet_switchEthereumChain({ chainId: "0x2105" })            │
-│  2. Impersonator sends i_switchEthereumChain to content script              │
-│  3. Content script looks up chainId in networksInfo:                        │
-│     - If FOUND: Save chainName to storage, send switchEthereumChain         │
-│     - If NOT FOUND: Send switchEthereumChainError with error message        │
-│  4. If the chain actually changed, content script asks background to show   │
-│     a browser notification using the resolved chain icon when available     │
-│  5. Impersonator receives response:                                         │
-│     - Success: Updates provider chainId, emits chainChanged event           │
-│     - Error: Rejects promise with error (dapp can catch and handle)         │
-│  6. Popup/sidepanel storage listener detects chainName change               │
-│  7. Network dropdown updates to reflect new chain                           │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+### Same-origin embedded dapps
 
-### Unsupported Chain Handling
+Etherscan's Write Contract panel discovers providers inside a same-origin
+iframe. Inpage `sameOriginFrame.ts` reuses the top document's WalletChan provider
+through EIP-6963 discovery, exposes that exact object locally, and skips the
+child's independent result router. Its bound methods therefore use the top
+content-script transport and existing tab chain/account state. Discovery works
+whether the top provider is already ready or announces later. Other wallets'
+announcements are ignored. Cross-origin/opaque frames cannot access this path,
+and all direct background iframe requests remain rejected. This does not add a
+cross-frame postMessage forwarding channel or weaken sender authorization.
 
-If the dapp requests an unsupported chain ID:
+### Pre-connection privacy and switch approval
 
-- Content script checks `networksInfo` for the chain
-- If not found, sends `switchEthereumChainError` message
-- Impersonator rejects the promise with EIP-1193 error code `4902` and
-  message: `"Chain {chainId} is not supported"`
-- Dapps/libraries such as viem can then follow up with
-  `wallet_addEthereumChain`; the add-chain confirmation persists arbitrary
-  custom EVM chains into `networksInfo` and auto-switches only when the active
-  account type can use that chain
+`provider/contentBridge/initialization.ts` exposes Ethereum mainnet (`0x1`) to
+unconnected sites, independently of saved `chainName`, and keeps account
+addresses hidden. `eth_chainId` and `net_version` remain readable and use that
+public provider state. Trusted-UI `setChainId` forwarding now checks account
+permission for the target chain before publishing an update; unconnected pages
+retain mainnet. Revocation resets the public chain to mainnet and invalidates
+pending switch continuations. Chain revisions discard stale asynchronous UI
+updates that would overwrite a newer switch.
 
-### Per-Tab Chain State
+`accountChainRoutes.ts` validates the switch target before opening approval.
+Unknown/hidden chains return `4902`; malformed IDs return `-32602`. A known
+switch from an unconnected site queues the existing `requestDappConnection`
+flow with the requested chain ID and waits for its durable result. This works
+also when the target is the public mainnet default. Rejection retains `4001`;
+concurrent switch requests return `-32002`. Connection approval uses the normal
+exact-origin/top-frame checks and existing request-surface opening path.
 
-Each browser tab maintains its own chain selection:
+After approval the bridge reloads network metadata and account type, checks
+Bankr network support, and rechecks connected accounts on the exact requested
+chain (including Safe deployment eligibility). It checks revocation again after
+the shared renderer-context write before publishing the switch. A request ID
+correlates each switch response, so unrelated add-chain or switch responses
+cannot resolve it. No signing or transaction submission is part of this flow.
 
-- **Content script store**: `store.chainName` holds the chain for that tab
-- **Storage sync**: When chain changes, `chainName` is saved to `chrome.storage.sync`
-- **Tab switching**: Popup listens for `chrome.tabs.onActivated` events
-- **State query**: On tab switch, popup queries new tab via `getInfo` message
-- **UI update**: Network dropdown updates to show the active tab's chain
+`wallet_addEthereumChain` retains its existing connected-site requirement and
+separate network approval; this change does not add pre-connection add-chain
+support. Regression coverage lives in `tests/provider/connectionBoundary.test.ts`
+and `tests/provider/inpageRouting.test.ts`.
 
-### Popup/Sidepanel Chain Sync
+### Connected dapp switch flow
 
-The extension UI stays in sync with chain changes through multiple mechanisms:
+1. `wallet_switchEthereumChain` sends `i_switchEthereumChain` to the content
+   script through `provider/inpage/accountChainRequests.ts`.
+2. The content script validates the configured target, connects if necessary,
+   then rechecks permission and account support on that target.
+3. Success updates that content script's chain and writes shared saved
+   `chainName`, then posts `switchEthereumChain` back to the page.
+4. The inpage provider resolves the request with `null`, updates its chain ID,
+   and emits `chainChanged` only when the value changes.
+5. When the chain name changes, the content script requests a background browser
+   notification. The background independently checks connected-site authority.
 
-| Trigger             | Mechanism                  | Description                          |
-| ------------------- | -------------------------- | ------------------------------------ |
-| Dapp switches chain | `chrome.storage.onChanged` | Detects `chainName` storage updates  |
-| User switches tabs  | `chrome.tabs.onActivated`  | Queries new tab's content script     |
-| User selects chain  | `useUpdateEffect`          | Sends `setChainId` to content script |
-| Popup opens         | `init()`                   | Queries current tab via `getInfo`    |
+`wallet_addEthereumChain` also requires an existing connection. Existing visible
+chains can take the fast path; hidden/new networks use the approval path.
+Successful additions switch only when supported for the account type. See
+`accountChainRoutes.ts` and `background/chainPromptRouter.ts` for those branches.
+
+For debugging, inspect initialization, page request handling, runtime event
+forwarding, and `App.tsx` together. A shared storage key or a variable named
+`globalChain` is not evidence of a current global network selector.
 
 ## Sensitive Data Encryption
 
@@ -6509,7 +6544,7 @@ The Swap surface doubles as a Bridge surface when `sellChainId !== buyChainId`. 
 ### Architecture
 
 ```
-SwapView (internal sellChainId, buyChainId — never updates the global chain)
+SwapView (flow-owned sellChainId and buyChainId; selector does not update dapp chain)
   │
   ├─ same chain → existing 0x swap (fetchSwapPrice / Quote)
   │

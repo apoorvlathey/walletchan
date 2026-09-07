@@ -27,12 +27,27 @@ test("provider bridge exposes account state and network mutation only to connect
   let runtimeListener: RuntimeListener | undefined;
   let injectedScript: any;
   let connected = false;
+  let accountType = "privateKey";
+  let connectionDecision: "approve" | "reject" | "hold" = "approve";
+  let deniedChainId: number | undefined;
+  let revokeOnTargetRead = false;
+  const storageListeners = new Set<(changes: any, area: string) => void>();
+  const completeConnection = (requestId: string, approve: boolean) => {
+    connected = approve;
+    const key = `dappConnectionResult:${requestId}`;
+    const newValue = { result: approve
+      ? { success: true, accounts: [ACTUAL_ADDRESS] }
+      : { success: false, error: "User rejected the connection request", code: 4001 } };
+    localState[key] = newValue;
+    for (const listener of storageListeners) listener({ [key]: { newValue } }, "local");
+  };
   const localState: Record<string, unknown> = { dappPermissions: {} };
   const syncState = {
     address: ACTUAL_ADDRESS,
     displayAddress: "Main",
-    chainName: "Ethereum",
+    chainName: "Base",
     networksInfo: {
+      Base: { chainId: 8453, rpcUrl: "https://base.example" },
       Ethereum: {
         chainId: 1,
         rpcUrl: "https://rpc.example",
@@ -119,15 +134,24 @@ test("provider bridge exposes account state and network mutation only to connect
         if (message.type === "getActiveAccount") {
           return {
             id: "account-1",
-            type: "privateKey",
+            type: accountType,
             address: ACTUAL_ADDRESS,
             displayName: "Main",
           };
         }
+        if (message.type === "requestDappConnection") {
+          if (connectionDecision !== "hold") completeConnection(message.requestId, connectionDecision === "approve");
+          return;
+        }
         if (message.type === "getDappAccounts") {
+          if (revokeOnTargetRead && message.chainId !== undefined) {
+            revokeOnTargetRead = false;
+            connected = false;
+            runtimeListener?.({ type: "dappPermissionRevoked" }, {}, () => {});
+          }
           return {
             success: true,
-            accounts: connected ? [ACTUAL_ADDRESS] : [],
+            accounts: connected && (deniedChainId === undefined || message.chainId !== deniedChainId) ? [ACTUAL_ADDRESS] : [],
           };
         }
         return { success: true };
@@ -147,11 +171,11 @@ test("provider bridge exposes account state and network mutation only to connect
         async get(keys?: string | string[] | null) {
           return select(localState, keys);
         },
-        async remove() {},
+        async remove(key: string) { delete localState[key]; },
       },
       onChanged: {
-        addListener() {},
-        removeListener() {},
+        addListener(listener: any) { storageListeners.add(listener); },
+        removeListener(listener: any) { storageListeners.delete(listener); },
       },
     },
   };
@@ -207,8 +231,18 @@ test("provider bridge exposes account state and network mutation only to connect
       await flush();
 
       const initMessage = posts.find((message) => message.type === "init");
+      assert.equal(initMessage?.msg.chainId, 1);
       assert.equal(initMessage?.msg.address, UNCONNECTED_ADDRESS);
       assert.notEqual(initMessage?.msg.address, ACTUAL_ADDRESS);
+    });
+
+    await t.test("unconnected initialization does not require a saved chain", async () => {
+      syncState.chainName = "";
+      connected = false;
+      posts.length = 0;
+      await injectedScript.onload.call(injectedScript);
+      assert.equal(posts.find((m) => m.type === "init")?.msg.chainId, 1);
+      syncState.chainName = "Base";
     });
 
     await t.test("setAddress stays hidden until the site is connected", async () => {
@@ -232,28 +266,89 @@ test("provider bridge exposes account state and network mutation only to connect
       assert.equal(exposed?.msg.address, ACTUAL_ADDRESS);
     });
 
-    await t.test("network switch fails with 4100 until connected", async () => {
-      posts.length = 0;
-      syncWrites.length = 0;
+    await t.test("unconnected chain updates stay mainnet; revoke resets a connected chain", async () => {
       connected = false;
-      await dispatchWindowMessage({
-        type: "i_switchEthereumChain",
-        msg: { chainId: 1 },
-      });
-      const denied = posts.find(
-        (message) => message.type === "switchEthereumChainError",
-      );
-      assert.equal(denied?.msg.code, 4100);
-      assert.equal(syncWrites.length, 0);
-
       posts.length = 0;
+      await dispatchRuntimeMessage({ type: "setChainId", msg: { chainId: 8453, chainName: "Base" } });
+      assert.equal(posts.at(-1)?.msg.chainId, 1);
       connected = true;
-      await dispatchWindowMessage({
-        type: "i_switchEthereumChain",
-        msg: { chainId: 1 },
+      await dispatchRuntimeMessage({ type: "setChainId", msg: { chainId: 8453, chainName: "Base" } });
+      assert.equal(posts.at(-1)?.msg.chainId, 8453);
+      await dispatchRuntimeMessage({ type: "dappPermissionRevoked" });
+      assert.ok(posts.some((p) => p.type === "setChainId" && p.msg.chainId === 1));
+    });
+
+    for (const type of ["privateKey", "seedPhrase", "ledger", "bankr", "impersonator", "safe"]) {
+      await t.test(`${type}: switch-before-connect preserves target and synchronizes renderer context`, async () => {
+        accountType = type;
+        connected = false;
+        connectionDecision = "approve";
+        posts.length = 0;
+        runtimeMessages.length = 0;
+        syncWrites.length = 0;
+        await dispatchWindowMessage({ type: "i_switchEthereumChain", msg: { id: type, chainId: 8453 } });
+        assert.equal(runtimeMessages.find((m) => m.type === "requestDappConnection")?.chainId, 8453);
+        assert.ok(posts.some((m) => m.type === "switchEthereumChain" && m.msg.chainId === 8453 && m.msg.id === type));
+        assert.deepEqual(syncWrites, [{ chainName: "Base" }]);
+        assert.ok(runtimeMessages.some((m) => m.type === "getDappAccounts" && m.chainId === 8453));
+        assert.equal(runtimeMessages.some((m) => /sign|sendTransaction/i.test(m.type)), false);
       });
-      assert.ok(posts.some((message) => message.type === "switchEthereumChain"));
-      assert.ok(syncWrites.some((values) => values.chainName === "Ethereum"));
+    }
+    accountType = "privateKey";
+
+    await t.test("rejection, unknown chain, malformed chain, and final permission loss never switch", async () => {
+      for (const scenario of ["reject", "unknown", "invalid", "revoked", "unsupported-account"]) {
+        connected = false;
+        connectionDecision = scenario === "reject" ? "reject" : "approve";
+        deniedChainId = scenario === "unsupported-account" ? 8453 : undefined;
+        revokeOnTargetRead = scenario === "revoked";
+        posts.length = 0;
+        runtimeMessages.length = 0;
+        const chainId = scenario === "unknown" ? 999999999 : scenario === "invalid" ? {} : 8453;
+        await dispatchWindowMessage({ type: "i_switchEthereumChain", msg: { id: scenario, chainId } });
+        assert.equal(posts.some((m) => m.type === "switchEthereumChain"), false);
+        const failure = posts.find((m) => m.type === "switchEthereumChainError");
+        assert.equal(failure?.msg.code, scenario === "reject" ? 4001 : scenario === "unknown" ? 4902 : scenario === "invalid" ? -32602 : 4100);
+        if (scenario === "unknown" || scenario === "invalid") {
+          assert.equal(runtimeMessages.some((m) => m.type === "requestDappConnection"), false);
+        }
+      }
+      deniedChainId = undefined;
+    });
+
+    await t.test("connected switch skips approval and Bankr rejects custom networks", async () => {
+      connected = true;
+      runtimeMessages.length = 0;
+      posts.length = 0;
+      await dispatchWindowMessage({ type: "i_switchEthereumChain", msg: { id: "connected", chainId: 1 } });
+      assert.equal(runtimeMessages.some((m) => m.type === "requestDappConnection"), false);
+      assert.ok(posts.some((m) => m.type === "switchEthereumChain" && m.msg.id === "connected"));
+      (syncState.networksInfo as Record<string, any>).Custom = {
+        chainId: 123456789, rpcUrl: "https://custom.example", isCustom: true,
+      };
+      accountType = "bankr";
+      posts.length = 0;
+      await dispatchWindowMessage({ type: "i_switchEthereumChain", msg: { id: "unsupported", chainId: 123456789 } });
+      assert.equal(posts.find((m) => m.type === "switchEthereumChainError")?.msg.code, 4200);
+      accountType = "privateKey";
+    });
+
+    await t.test("pending switches reject duplicates and retain the original target through UI updates", async () => {
+      connected = false;
+      connectionDecision = "hold";
+      runtimeMessages.length = 0;
+      posts.length = 0;
+      const pending = dispatchWindowMessage({ type: "i_switchEthereumChain", msg: { id: "first", chainId: 8453 } });
+      await flush();
+      await dispatchWindowMessage({ type: "i_switchEthereumChain", msg: { id: "second", chainId: 1 } });
+      assert.ok(posts.some((m) => m.msg.id === "second" && m.msg.code === -32002));
+      await dispatchRuntimeMessage({ type: "setChainId", msg: { chainName: "Ethereum", chainId: 1 } });
+      const request = runtimeMessages.find((m) => m.type === "requestDappConnection");
+      assert.ok(request);
+      completeConnection(request.requestId, true);
+      await pending;
+      assert.ok(posts.some((m) => m.type === "switchEthereumChain" && m.msg.id === "first" && m.msg.chainId === 8453));
+      connectionDecision = "approve";
     });
 
     await t.test("add-chain fails with 4100 until connected", async () => {

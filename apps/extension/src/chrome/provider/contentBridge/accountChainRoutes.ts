@@ -1,10 +1,13 @@
 import type { NetworksInfo } from "@/types";
 import { getResolvedChainById } from "@/lib/chains";
+import { parseProviderChainId } from "../chainBoundary";
 import { waitForStorageResult } from "../../storageResultWaiter";
 import {
   bridgeState,
   notifyDappChainSwitch,
   pageFaviconUrl,
+  getPermissionRevision,
+  setProviderChain,
 } from "./bridgeState";
 
 function post(type: string, msg: Record<string, unknown>): void {
@@ -85,44 +88,72 @@ async function hasConnectedAccount(): Promise<boolean> {
   return Array.isArray(permission?.accounts) && permission.accounts.length > 0;
 }
 
+let switchPending = false;
+
 async function handleSwitchChain(msg: any): Promise<void> {
-  const chainId = msg.chainId as number;
-  if (!(await hasConnectedAccount())) {
-    post("switchEthereumChainError", {
-      chainId,
-      error: "Connect this site before switching networks",
-      code: 4100,
-    });
-    return;
+  const chainId = parseProviderChainId(msg?.chainId);
+  const fail = (error: string, code: number) => post("switchEthereumChainError", {
+    id: msg?.id, chainId: msg?.chainId, error, code,
+  });
+  if (!chainId) { fail("Invalid chainId", -32602); return; }
+  if (switchPending) { fail("A network switch is already pending", -32002); return; }
+  switchPending = true;
+  const revision = getPermissionRevision();
+  try {
+    const readChain = async () => {
+      const { networksInfo } = await chrome.storage.sync.get("networksInfo") as { networksInfo?: NetworksInfo };
+      return getResolvedChainById(chainId, networksInfo);
+    };
+    let resolved = await readChain();
+    if (!resolved?.rpcUrl || resolved.hidden) {
+      fail(`Chain ${chainId} is not supported`, 4902); return;
+    }
+    const permission = await chrome.runtime.sendMessage({ type: "getDappAccounts" });
+    if (permission?.success !== true) { fail("Unable to verify site permission", 4100); return; }
+    if (!permission.accounts?.length) {
+      const requestId = crypto.randomUUID();
+      await chrome.runtime.sendMessage({
+        type: "requestDappConnection", requestId, chainId,
+        title: document.title?.trim().slice(0, 120) || undefined,
+        favicon: pageFaviconUrl(),
+      });
+      // Durable storage also covers a result published before this listener starts.
+      const result = await waitForStorageResult<{
+        success: boolean; accounts?: string[]; error?: string; code?: number;
+      }>(`dappConnectionResult:${requestId}`, null);
+      if (!result.success || !result.accounts?.length) {
+        fail(result.error || "Connection was not approved", result.code ?? 4100); return;
+      }
+    }
+    // Re-read both target and account after user review; never switch to a UI default.
+    resolved = await readChain();
+    if (!resolved?.rpcUrl || resolved.hidden) {
+      fail(`Chain ${chainId} is not supported`, 4902); return;
+    }
+    const account = await chrome.runtime.sendMessage({ type: "getActiveAccount" });
+    if (!account?.id) { fail("No active account", 4100); return; }
+    if (account?.type === "bankr" && !resolved.isBankrSupported) {
+      fail("This network is not supported by Bankr accounts", 4200); return;
+    }
+    const authorized = await chrome.runtime.sendMessage({ type: "getDappAccounts", chainId });
+    if (revision !== getPermissionRevision() || authorized?.success !== true || !authorized.accounts?.length) {
+      fail("Site permission or account support changed during the request", 4100); return;
+    }
+    // Keep existing renderer synchronization; unconnected documents no longer inherit this value.
+    await chrome.storage.sync.set({ chainName: resolved.name });
+    if (revision !== getPermissionRevision()) {
+      fail("Site permission changed during the request", 4100); return;
+    }
+    const previousChainName = bridgeState.chainName;
+    bridgeState.dappConnected = true;
+    setProviderChain(resolved.name, chainId);
+    if (previousChainName !== resolved.name) notifyDappChainSwitch(chainId, resolved.name);
+    post("switchEthereumChain", { id: msg?.id, chainId });
+  } catch (error) {
+    fail(error instanceof Error ? error.message : "Network switch failed", 4100);
+  } finally {
+    switchPending = false;
   }
-  const { networksInfo } = (await chrome.storage.sync.get(
-    "networksInfo",
-  )) as { networksInfo?: NetworksInfo };
-  if (!networksInfo) {
-    post("switchEthereumChainError", {
-      chainId,
-      error: "Networks not configured",
-      code: 4902,
-    });
-    return;
-  }
-  const resolved = getResolvedChainById(chainId, networksInfo);
-  if (!resolved?.rpcUrl || !resolved.name) {
-    post("switchEthereumChainError", {
-      chainId,
-      error: `Chain ${chainId} is not supported`,
-      code: 4902,
-    });
-    return;
-  }
-  const previousChainName = bridgeState.chainName;
-  bridgeState.chainName = resolved.name;
-  bridgeState.chainId = chainId;
-  await chrome.storage.sync.set({ chainName: resolved.name });
-  if (previousChainName !== resolved.name) {
-    notifyDappChainSwitch(chainId, resolved.name);
-  }
-  post("switchEthereumChain", { chainId });
 }
 
 interface AddChainMessage {

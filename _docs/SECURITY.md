@@ -1564,7 +1564,7 @@ accessible resources.
 | ------------------------------------------------------ | ------------------------------------ |
 | `address`                                              | Current wallet address               |
 | `displayAddress`                                       | Display-friendly address             |
-| `chainName`                                            | Active chain name                    |
+| `chainName`                                            | Shared saved chain context; initializes already-connected injected providers; unconnected pages use mainnet, not a wallet-wide network selector |
 | `networksInfo`                                         | Runtime active RPC plus hidden/custom metadata; service-worker-owned mutations |
 | `activeAccountId`                                      | Active account ID                    |
 | `autoLockTimeout`                                      | Auto-lock timeout (ms)               |
@@ -2672,3 +2672,25 @@ These are security characteristics that have been reviewed and accepted:
    concurrency bounded, but HTTP cannot provide server authenticity or traffic
    confidentiality. Editing that chain requires replacing the endpoint with
    HTTPS. Local/private development RPCs may continue using HTTP explicitly.
+
+### Injected chain visibility and connection-first switching
+
+Unconnected injected pages receive Ethereum mainnet as public chain state, not
+saved UI chain context. Runtime chain updates require connected account access
+on the target chain; revocation resets public chain state and invalidates pending
+switch continuations. `wallet_switchEthereumChain` validates its target before
+using the existing exact-origin/top-frame connection approval. After approval it
+rechecks target metadata, Bankr support, and exact-chain account visibility
+(including Safe eligibility). View-only connections never authorize signing.
+Switch results are request-ID correlated and duplicate switches are rejected.
+No new message type, permission grant mechanism, secret, or storage key is added.
+Add-chain retains its existing connection and network-approval requirements.
+
+Same-origin embedded dapp compatibility reuses the exact top-page provider in
+`provider/inpage/sameOriginFrame.ts`. Access to `top.location.origin` must pass
+browser same-origin enforcement and match a non-opaque child origin before any
+listener is installed. Requests use the top object's bound methods; direct
+iframe connection/signing requests retain the existing rejection gates. No
+cross-origin forwarding, origin override, or background permission exception is
+introduced. The child result router is not installed, so child init/account
+messages cannot mutate the top provider state.

@@ -5,7 +5,8 @@ and extension runtime/storage messages.
 
 - `messagePolicy.ts` is the exact bidirectional message allowlist and source check.
 - `initialization.ts` injects the manifest-built inpage script and publishes the
-  connected-site-scoped initial account.
+  connected-site-scoped initial account. Unconnected sites start on mainnet; already-connected sites
+  still initialize from shared saved `chrome.storage.sync.chainName`.
 - `runtimeForwarding.ts` forwards only account/chain/revocation events and never
   leaks configured RPC URLs or unrelated wallet activity.
 - `pageRouter.ts` dispatches accepted page messages to focused account/chain,
@@ -31,4 +32,9 @@ and extension runtime/storage messages.
 
 Every effectful request creates its extension-owned correlation id before it is
 persisted. State-changing routes retain exact chain pinning and connected-site
-privacy. `inject.ts` is only the Vite/manifest entrypoint.
+account privacy. Chain reads remain available with a public mainnet default before connection.
+Switch requests validate the target, use normal connection approval if needed,
+then recheck permission and target account support. Add-chain still requires an
+existing connection. Runtime chain updates are permission-gated; revocation
+resets to mainnet and invalidates pending switch continuations. See `_docs/IMPLEMENTATION.md` → "Chain State and Switching" for
+state ownership and the known initialization coupling. `inject.ts` is only the Vite/manifest entrypoint.

@@ -164,6 +164,17 @@ behavior with Node tests under `apps/extension/tests/ui/`.
 - `theme/primitives/` owns token-driven visual atoms, not application state.
 - `src/hooks/` contains only hooks used across feature domains.
 
+### Network selection scope
+
+The home account controls pass `showNetworkSelector={false}`; there is no
+wallet-wide network selector. `HomeDappDock` owns the connected active-tab
+network control, while Send/Swap and WalletConnect retain their respective
+selection contexts. Do not infer a global product selection from the remaining
+`App.tsx` `chainName` state or shared saved `chrome.storage.sync.chainName`.
+Those still couple renderer updates and already-connected provider initialization. See
+`IMPLEMENTATION.md` → "Chain State and Switching" for the current runtime
+behavior, including the unconnected mainnet default and connection-first switch flow.
+
 ## Dependency direction
 
 ```text

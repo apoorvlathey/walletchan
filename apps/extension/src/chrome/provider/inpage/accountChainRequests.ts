@@ -72,13 +72,15 @@ export async function requestSwitchEthereumChain(
   params: any[],
 ): Promise<null> {
   const chainId = Number(params[0].chainId as string);
+  const id = crypto.randomUUID();
   const result = new Promise<null>((resolve, reject) => {
-    window.postMessage({ type: "i_switchEthereumChain", msg: { chainId } }, "*");
+    window.postMessage({ type: "i_switchEthereumChain", msg: { id, chainId } }, "*");
     const controller = new AbortController();
     window.addEventListener(
       "message",
       (event: any) => {
         if (event.source !== window || !event.data?.type) return;
+        if (event.data.msg?.id !== id) return;
         if (event.data.type === "switchEthereumChain") {
           context.setChainId(event.data.msg.chainId as number);
           controller.abort();
