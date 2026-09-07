@@ -33,6 +33,21 @@ This document describes the core architecture and transaction handling implement
 - [PRIVACY_POOLS_MAINNET_TEST.md](./PRIVACY_POOLS_MAINNET_TEST.md) - Production deployment pins, live read-only evidence, build-profile checks, and value-bearing smoke gates
 - [PRIVACY_POOLS_HANDOFF.md](./PRIVACY_POOLS_HANDOFF.md) - Current dual-profile progress, recent proof-signal correction, automated baseline, and ordered next steps
 
+## Arbitrum delayed-inclusion recovery
+
+The signed `sendL2Message` path validates the Bridge event sender against
+Nitro's L1-to-L2 address alias (addition modulo 160 bits), including for EOAs.
+`arbitrumForceInclusion/receiptValidation.ts` shares that check between initial
+submission and recovery and preserves kind, data-hash, message-index, signed
+prefix, and child-hash validation. The stored sender remains the exact emitted
+alias required by the force-inclusion preimage.
+Successful history entries with L1 gas already accounted for are skipped during
+startup; successful entries missing gas only backfill that gas and never reopen
+force-message validation or downgrade success. Each failed recovery is isolated
+so other entries and bundles continue, with a local warning containing history
+ID, transaction hashes, and the failed check. Startup catches scan-level failures.
+No transaction bytes, credentials, or new storage keys are logged or introduced.
+
 ## Theme Engine
 
 As of v3.2.0 the extension ships a token-driven theme engine. Current themes:

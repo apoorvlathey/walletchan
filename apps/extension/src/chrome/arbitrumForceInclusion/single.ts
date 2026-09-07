@@ -1,6 +1,6 @@
+import { validateDelayedMessage } from "./receiptValidation";
 import {
   createWalletClient,
-  keccak256,
   type Hash,
   type TransactionReceipt,
 } from "viem";
@@ -167,13 +167,7 @@ export async function processArbitrumForceInclusionLocal(
     }
     try {
       const delivered = decodeDeliveredMessage(receipt, contracts.bridge, contracts.inbox);
-      if (
-        delivered.kind !== 3 ||
-        delivered.sender.toLowerCase() !== viemAccount.address.toLowerCase() ||
-        delivered.messageDataHash.toLowerCase() !== keccak256(messageData).toLowerCase()
-      ) {
-        throw new Error("Arbitrum delayed-message receipt did not match the submitted payload");
-      }
+      validateDelayedMessage(delivered, viemAccount.address, messageData);
       const deadline = await l1Client.readContract({
         address: contracts.sequencerInbox,
         abi: ARBITRUM_SEQUENCER_INBOX_ABI,

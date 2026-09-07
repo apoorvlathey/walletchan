@@ -1,7 +1,8 @@
-import { keccak256, slice, type Hash } from "viem";
+import { validateRecoveredMessage } from "./receiptValidation";
+import { type Hash } from "viem";
 import type { CompletedTransaction, ForceInclusionMeta } from "../txHistoryStorage";
 import { updateTxInHistory } from "../txHistoryStorage";
-import { buildForceInclusionL1GasData } from "../forceInclusion/l1GasData";
+import { buildForceInclusionL1GasData, isForceInclusionL1GasData } from "../forceInclusion/l1GasData";
 import { createL1PublicClient, getL1RpcUrl } from "../forceInclusion/l1Client";
 import { startReceiptPolling } from "../forceInclusion/receiptPoller";
 import {
@@ -13,6 +14,7 @@ import {
 export async function recoverArbitrumForceInclusion(tx: CompletedTransaction) {
   const meta = tx.forceInclusionMeta;
   if (!meta || meta.protocol !== "arbitrum") return;
+  if (tx.status === "success" && isForceInclusionL1GasData(tx.gasData)) return;
   const childHash = meta.l2TxHash || (tx.txHash !== meta.l1TxHash ? tx.txHash : undefined);
   if (tx.status === "failed" || tx.status === "dropped") {
     if (tx.status === "dropped" && childHash) {
@@ -32,11 +34,19 @@ export async function recoverArbitrumForceInclusion(tx: CompletedTransaction) {
     .catch(() => null);
   if (!receipt) return;
   if (receipt.status === "reverted") {
+    if (tx.status === "success") return;
     await updateTxInHistory(tx.id, {
       status: "failed",
       broadcastUncertain: false,
       error: "L1 delayed-inbox transaction reverted onchain",
       completedAt: Date.now(),
+    });
+    return;
+  }
+  // Completed L2 transactions only need missing L1 gas accounting, not a force preimage.
+  if (tx.status === "success") {
+    await updateTxInHistory(tx.id, {
+      gasData: buildForceInclusionL1GasData(receipt, meta.l1ChainId),
     });
     return;
   }
@@ -49,16 +59,7 @@ export async function recoverArbitrumForceInclusion(tx: CompletedTransaction) {
   ) {
     const delivered = decodeDeliveredMessage(receipt, meta.bridge, meta.inbox);
     const inboxMessage = decodeInboxMessage(receipt, meta.inbox);
-    if (
-      delivered.kind !== 3 ||
-      delivered.sender.toLowerCase() !== tx.tx.from.toLowerCase() ||
-      inboxMessage.messageNum !== delivered.messageIndex ||
-      !inboxMessage.data.startsWith("0x04") ||
-      (childHash && keccak256(slice(inboxMessage.data, 1)).toLowerCase() !== childHash.toLowerCase()) ||
-      keccak256(inboxMessage.data).toLowerCase() !== delivered.messageDataHash.toLowerCase()
-    ) {
-      throw new Error("Arbitrum delayed-message receipt did not match transaction history");
-    }
+    validateRecoveredMessage(delivered, inboxMessage, tx.tx.from, childHash);
     const deadline = await client.readContract({
       address: meta.sequencerInbox,
       abi: ARBITRUM_SEQUENCER_INBOX_ABI,
@@ -85,7 +86,7 @@ export async function recoverArbitrumForceInclusion(tx: CompletedTransaction) {
     gasData: buildForceInclusionL1GasData(receipt, meta.l1ChainId),
     forceInclusionMeta: recoveredMeta,
   });
-  if (childHash && tx.status !== "success") {
+  if (childHash) {
     startReceiptPolling(tx.id, childHash, meta.l2ChainId);
   }
 }

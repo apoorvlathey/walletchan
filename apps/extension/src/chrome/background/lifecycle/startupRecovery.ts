@@ -31,7 +31,8 @@ export function startRecoveryLifecycle(
     .then(() => dependencies.resumePendingBridgePollers())
     .catch((error) => dependencies.warn("[bridge] resume failed", error));
 
-  dependencies.recoverStuckForceInclusionTxs();
+  void Promise.resolve(dependencies.recoverStuckForceInclusionTxs())
+    .catch((error) => dependencies.warn("[ForceInclusion Recovery] Startup failed", error));
   void dependencies
     .initEnsBrowsing()
     .catch((error) => dependencies.warn("[ens] init failed", error));

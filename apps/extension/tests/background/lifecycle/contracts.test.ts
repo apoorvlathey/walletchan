@@ -334,3 +334,23 @@ test("action fallback, trusted ports, and notification clicks retain behavior", 
     "notification:clear:walletchan-fullscreen-request-5",
   ]);
 });
+
+test("force-inclusion startup rejection is handled without stopping other recovery", async () => {
+  const warnings: unknown[][] = [];
+  let initialized = false;
+  startRecoveryLifecycle({
+    initSidePanel: () => {}, cleanupStaleProcessingTxs: () => {},
+    resumePendingPollers: () => {}, resumePrivacyShieldTracking: () => {},
+    resumePrivacyUnshieldTracking: () => {}, resumePrivacyRagequitTracking: () => {},
+    prunePendingBridges: async () => {}, resumePendingBridgePollers: () => {},
+    recoverStuckForceInclusionTxs: async () => { throw new Error("History unavailable"); },
+    initEnsBrowsing: async () => {},
+    initWalletConnect: async () => { initialized = true; },
+    startupEvent: { addListener: () => {} },
+    warn: (...args) => { warnings.push(args); },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(initialized, true);
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0][0], "[ForceInclusion Recovery] Startup failed");
+});

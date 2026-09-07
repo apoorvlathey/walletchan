@@ -15,7 +15,20 @@ import { extractL2Hash } from "./singleOutcome";
 
 export async function recoverStuckForceInclusionTxs(): Promise<void> {
   const history = await getTxHistory();
-  for (const tx of history) await recoverSingleEntry(tx);
+  for (const tx of history) {
+    try {
+      await recoverSingleEntry(tx);
+    } catch (error) {
+      // A malformed receipt must not abort recovery of the rest of the history.
+      console.warn("[ForceInclusion Recovery] Could not recover transaction", {
+        txId: tx.id,
+        protocol: tx.forceInclusionMeta?.protocol,
+        l1TxHash: tx.forceInclusionMeta?.l1TxHash,
+        l2TxHash: tx.forceInclusionMeta?.l2TxHash,
+        reason: error instanceof Error ? error.message : "Unknown recovery error",
+      });
+    }
+  }
   await recoverStuckForceInclusionBundles(await getTxHistory());
 }
 
