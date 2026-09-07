@@ -1,4 +1,5 @@
 import { Button, VStack } from "@chakra-ui/react";
+import { WarningTwoIcon } from "@chakra-ui/icons";
 import { memo, useCallback, useMemo, useState } from "react";
 import type { PortfolioToken } from "@/chrome/portfolio/api";
 import { FromAccountDisplay } from "@/components/FromAccountDisplay";
@@ -17,6 +18,8 @@ import { DeploymentBanner } from "./DeploymentBanner";
 import { NetworkPicker } from "./NetworkPicker";
 import { RecipientPicker } from "./RecipientPicker";
 import { RecipientSection } from "./RecipientSection";
+import { RecipientSafetyNotice } from "./RecipientSafetyNotice";
+import { useSendRecipientSafety } from "./hooks/useSendRecipientSafety";
 import { SponsorshipEligibilityNotice, TransferNotices } from "./TransferNotices";
 import { TokenSelectionSection } from "./TokenSelectionSection";
 import { useSponsoredTransfer } from "./hooks/useSponsoredTransfer";
@@ -54,6 +57,12 @@ function TokenTransfer({
     fromAddress,
     recipient: recipientState.recipient,
     resolvedAddress: recipientState.resolvedAddress,
+  });
+  const recipientSafety = useSendRecipientSafety({
+    recipient: recipientState.recipient,
+    resolvedAddress: recipientState.isValid && !recipientState.isResolving ? recipientState.resolvedAddress : null,
+    fromAddress,
+    chainId: catalog.selectedChainId,
   });
 
   const allChains = useMemo(() => {
@@ -128,6 +137,7 @@ function TokenTransfer({
     trimmedHexData: preparation.trimmedHexData,
     isContractDeployment: preparation.isContractDeployment,
     sponsored,
+    recipientSafetyPasses: preparation.isContractDeployment || recipientSafety.canProceed,
     onTransferInitiated,
   });
   const isBusy = submission.isSubmitting || sponsored.isCheckingStatus;
@@ -137,6 +147,7 @@ function TokenTransfer({
     : recipientState.isValid &&
       !recipientState.isResolving &&
       !recipientState.isCheckingRecipientKind &&
+      recipientSafety.canProceed &&
       (!recipientState.isRecipientContract ||
         recipientState.acknowledgeContract);
   const canSubmit = Boolean(
@@ -258,6 +269,7 @@ function TokenTransfer({
             <RecipientSection
               recipientState={recipientState}
               explorerUrl={explorerUrl}
+              hasPoisoningWarning={Boolean(recipientSafety.match) && recipientState.isValid && !recipientState.isResolving}
             />
           )}
           <AmountSection token={catalog.selectedToken} preparation={preparation} />
@@ -274,12 +286,17 @@ function TokenTransfer({
             accountType={accountType}
             sponsored={sponsored}
             isBusy={isBusy}
+            canFallbackSend={canSubmit}
             onFallbackSend={submission.sendFallback}
           />
         </VStack>
       </ScreenBody>
 
       <StickyActionBar
+        notice={!preparation.isContractDeployment && recipientState.isValid && !recipientState.isResolving
+          && recipientState.resolvedAddress && (recipientSafety.status !== "ready" || recipientSafety.match) ? (
+            <RecipientSafetyNotice safety={recipientSafety} address={recipientState.resolvedAddress} />
+          ) : undefined}
         secondaryAction={(
           <Button variant="secondary" onClick={onBack} isDisabled={isBusy}>
             Cancel
@@ -291,6 +308,8 @@ function TokenTransfer({
             onClick={() => submission.submit(canSubmit)}
             isLoading={isBusy}
             isDisabled={!canSubmit}
+            leftIcon={!preparation.isContractDeployment && recipientSafety.match && !recipientSafety.canProceed
+              ? <WarningTwoIcon aria-hidden="true" /> : undefined}
             fontSize={sponsored.isSponsoredFlow ? "sm" : undefined}
           >
             {sponsored.isSponsoredFlow

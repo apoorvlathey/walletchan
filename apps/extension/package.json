@@ -21,6 +21,7 @@
     "build:sepolia": "VITE_PRIVACY_POOLS_PROFILE=sepolia pnpm build",
     "build:preview": "vite build -c vite.config.preview.ts",
     "qa:preview": "pnpm build:preview && tsx scripts/preview-ui-qa.ts",
+    "qa:preview:send-safety": "node scripts/send-recipient-safety-qa.mjs",
     "qa:preview:full": "PREVIEW_QA_MODE=full pnpm qa:preview",
     "qa:extension:transaction": "tsx scripts/extension-runtime-qa.ts",
     "qa:extension:signing": "EXTENSION_QA_WALLETS=bankr tsx scripts/extension-signing-qa.ts && EXTENSION_QA_WALLETS=privateKey tsx scripts/extension-signing-qa.ts && EXTENSION_QA_WALLETS=seedPhrase tsx scripts/extension-signing-qa.ts",

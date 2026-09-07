@@ -16,6 +16,7 @@ interface UseTransferSubmissionOptions {
   trimmedHexData: string;
   isContractDeployment: boolean;
   sponsored: SponsoredTransferState;
+  recipientSafetyPasses: boolean;
   onTransferInitiated: (sponsored?: boolean) => void;
 }
 
@@ -29,6 +30,7 @@ export function useTransferSubmission({
   trimmedHexData,
   isContractDeployment,
   sponsored,
+  recipientSafetyPasses,
   onTransferInitiated,
 }: UseTransferSubmissionOptions) {
   const toast = useThemedToast();
@@ -81,7 +83,7 @@ export function useTransferSubmission({
   };
 
   const submit = async (canSubmit: boolean) => {
-    if (!canSubmit || !token) return;
+    if (!canSubmit || !token || !recipientSafetyPasses) return;
     setIsSubmitting(true);
     try {
       if (sponsored.isSponsoredFlow) {
@@ -117,7 +119,7 @@ export function useTransferSubmission({
   };
 
   const sendFallback = async () => {
-    if (!token || !resolvedAddress || !tokenAmount) return;
+    if (!token || !resolvedAddress || !tokenAmount || !recipientSafetyPasses) return;
     setIsSubmitting(true);
     sponsored.clearFailure();
     try {

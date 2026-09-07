@@ -6,6 +6,7 @@ export const BACKGROUND_TRANSACTION_STATUS_MESSAGE_TYPES = [
   "clearFailedTxResult",
   "getTxHistory",
   "getTxHistoryPage",
+  "getSendRecipientReferences",
   "getTxHistoryItem",
   "getTransactionCalldata",
   "resolveHistoryNftMetadata",
@@ -29,6 +30,7 @@ type Dependencies = {
   removeLocalStorage: (key: string) => void;
   getTxHistory: () => Promise<any>;
   getTxHistoryPage: (options: any) => Promise<any>;
+  getSendRecipientReferences: () => Promise<any>;
   getTxHistoryItem: (txId: string) => Promise<any>;
   getTransactionCalldata: (txId: string) => Promise<any>;
   resolveHistoryNftMetadata: (options: any) => Promise<any>;
@@ -89,6 +91,13 @@ export function createBackgroundTransactionStatusMessageRouter(
 
       case "getTxHistory": {
         dependencies.getTxHistory().then(sendResponse);
+        return HANDLED_ASYNC;
+      }
+
+      case "getSendRecipientReferences": {
+        dependencies.getSendRecipientReferences()
+          .then((references) => sendResponse({ success: true, references }))
+          .catch(() => sendResponse({ success: false, error: "Could not check local recipients" }));
         return HANDLED_ASYNC;
       }
 

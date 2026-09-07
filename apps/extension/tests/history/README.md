@@ -9,6 +9,9 @@ These tests mirror `src/chrome/history/`:
   policy, and case-insensitive per-account cleanup.
 - `assetExtraction.test.ts` protects fungible Transfer-log filtering, numeric
   coercion, the narrow ERC-5792 receipt projection, and backfill eligibility.
+- `sendRecipient.test.ts` covers native/token/sponsored payee capture for all
+  four signers, history compaction, conservative legacy backfill, success-only
+  comparison references, excluded logs/approvals/impersonators, and deletion.
 
 RPC retry timing and upstream token metadata are intentionally kept behind the
 domain boundaries; tests here focus on deterministic policy and persistence.

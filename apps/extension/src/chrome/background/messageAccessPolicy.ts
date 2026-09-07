@@ -156,6 +156,7 @@ export const WALLET_UI_MESSAGE_TYPES = [
   "getPendingAddChainRequests",
   "getTxHistory",
   "getTxHistoryPage",
+  "getSendRecipientReferences",
   "getTxHistoryItem",
   "getTransactionCalldata",
   "resolveHistoryNftMetadata",

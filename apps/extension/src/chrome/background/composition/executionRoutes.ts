@@ -2,6 +2,7 @@
 import { clearAllNonces } from "../../forceInclusion/nonceManager";
 import { checkPendingTxReceipt as checkPendingTxReceiptFn } from "../../forceInclusion/receiptPoller";
 import { queueAssetChangesBackfill } from "../../receiptEnrichment";
+import { getSendRecipientReferences } from "../../history/sendRecipientReferences";
 import {
   getTransactionCalldata,
   resolveHistoryNftMetadata,
@@ -105,6 +106,7 @@ export function composeExecutionRoutes(
       },
       getTxHistory,
       getTxHistoryPage,
+      getSendRecipientReferences,
       getTxHistoryItem: getTxById,
       getTransactionCalldata,
       resolveHistoryNftMetadata,

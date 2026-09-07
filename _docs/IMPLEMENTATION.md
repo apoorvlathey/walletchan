@@ -4003,6 +4003,41 @@ Important constraints:
 
 ### Token Transfer Flow
 
+Send checks resolved recipients locally for possible address poisoning. The
+Send-only `useSendRecipientSafety` hook calls the wallet-UI-only
+`getSendRecipientReferences` route, which returns saved contact labels/addresses
+and actual payees from successful, hash-bearing local Send history. References
+span retained accounts and chains; incoming transfers and receipt counterparties
+never populate the list. The read scans at most 10,000 recent rows and returns
+at most 1,500 unique references, with contacts first. No network request or new
+storage key is introduced. Clearing/evicting history or removing contacts also
+removes their references.
+
+`history/recordCodec.ts` captures additive `sendRecipient` metadata before
+discarding settled calldata. The pure policy accepts native sends and canonical
+ERC-20 transfer payees from explicit Send entries, plus coordinator-authored
+sponsored recipient metadata; approvals, arbitrary calldata, impersonators,
+cancellations, swaps, bridges and batch/executor rows are excluded. Released
+compact rows can contribute only when their local native/transfer snapshot
+agrees with the recorded target and selector. Missing evidence is not guessed
+from `tx.to` or receipt logs. Processing, pending and failed rows never enter
+the comparison list, even when they retain recipient metadata.
+
+The renderer compares valid EVM addresses case-insensitively, excludes exact
+matches and `0x`, and flags at least eight matching characters combined at the
+two ends (including asymmetric matches). A collapsed notice above the sticky Send
+actions expands to show the comparison and acknowledgement; Review send carries
+a warning icon while this check blocks it. It shows full checksummed addresses
+with differing characters underlined and requires an explicit full-address
+acknowledgement before Review send. Recipient, sender, chain or reference
+changes reset acknowledgement; stale asynchronous reads are ignored. Loading
+and unavailable checks disable proceeding, with Retry for failures. The
+sponsored-send fallback shares this gate. Contract deployments are exempt.
+This protection is mounted only in Send: dapp, WalletConnect, batch, Safe
+confirmation and Unshield screens keep their existing behavior. The warning
+also appears when entering Send with a Safe account, but does not alter Safe
+proposal approval/execution or infer payees from its outer execution history.
+
 #### Address Contact Book
 
 More → Address book manages the optional local-only `addressContacts` list.

@@ -43,6 +43,19 @@ function export identities remain stable for existing callers.
 
 ## Compatibility invariants
 
+- `sendRecipient.ts` captures only explicit Send native/ERC-20 payees (or the
+  sponsored coordinator's recipient metadata), before settled calldata is
+  discarded by `recordCodec.ts`. No receipt log establishes recipient intent.
+  Missing raw calldata can be backfilled from a consistent local native/transfer
+  snapshot; arbitrary contract calls, approvals, cancellations, impersonators,
+  swaps, bridges and batch/executor rows are excluded.
+- `sendRecipientReferences.ts` returns saved contacts plus successful,
+  hash-bearing Send payees across locally retained accounts/chains. It scans at
+  most 100 pages of 100 rows and returns at most 1,500 unique references, with
+  contacts taking priority. This read-only projection owns no independent cache
+  or storage key: history retention/clear/reset and contact deletion apply
+  automatically. The wallet-UI-only route reports storage errors explicitly.
+
 - IndexedDB database `walletchan-history` is authoritative. On first access,
   the legacy local `txHistory` array is compactly imported and removed only
   after every valid row commits.

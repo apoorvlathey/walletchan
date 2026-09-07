@@ -30,6 +30,22 @@
 
 ## Context (from discovery)
 
+Send's address-poisoning notice uses the existing warning border/foreground,
+raised surface, body text and monospace address tokens in both themes. Two
+stacked, fully wrapping checksummed addresses expose the actual comparison;
+underlining accompanies color so differences remain legible without color
+perception. Entered-address differences use red error emphasis; saved or previous
+address differences use green success emphasis on the neutral surface. The copy
+reads: “This address looks similar to one you've used before, and might be malicious.”
+The notice sits above the sticky action buttons, collapsed to its heading and
+subtext by default. Expanding reveals the comparison and a checkbox with slightly
+rounded square corners. The recipient field uses a yellow warning border and
+subtle tint while its current value triggers the warning; editing clears the
+old highlight as the new value is checked. A warning icon marks Review send while acknowledgement
+is required. One keyboard-accessible checkbox acknowledges the full address,
+while the existing Review send button remains the sole primary action. Loading
+and retry stay inline. No animation or alternate warning theme is introduced.
+
 - Artifact type: mobile-first browser wallet and financial application.
 - Positioning: trustworthy consumer finance with expert transaction tooling.
 - Audience: crypto newcomers and power users. Primary action: understand and safely approve the next wallet action.

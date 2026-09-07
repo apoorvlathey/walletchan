@@ -21,6 +21,7 @@ interface RecipientSectionProps {
   explorerUrl: string;
   label?: string;
   chooserLabel?: string;
+  hasPoisoningWarning?: boolean;
 }
 
 export function RecipientSection({
@@ -28,6 +29,7 @@ export function RecipientSection({
   explorerUrl,
   label = "Recipient",
   chooserLabel = "My contacts",
+  hasPoisoningWarning = false,
 }: RecipientSectionProps) {
   const { tokens } = useTheme();
   const [activeSuggestion, setActiveSuggestion] = useState(0);
@@ -145,6 +147,14 @@ export function RecipientSection({
           fontSize="md"
           autoComplete="off"
           spellCheck={false}
+          sx={hasPoisoningWarning ? {
+            bg: "status.warning.tint",
+            borderColor: "status.warning.emphasis",
+            _hover: { bg: "status.warning.tint", borderColor: "status.warning.emphasis" },
+            _focus: { bg: "status.warning.tint", borderColor: "status.warning.emphasis" },
+            _focusVisible: { bg: "status.warning.tint", borderColor: "status.warning.emphasis",
+              boxShadow: "0 0 0 1px var(--chakra-colors-status-warning-emphasis)" },
+          } : undefined}
           isInvalid={Boolean(recipient) && !isResolving && !isValid}
           role="combobox"
           aria-label="Recipient address, name service, wallet, or contact"

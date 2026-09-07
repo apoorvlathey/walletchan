@@ -9,6 +9,7 @@ import { PRIVACY_POOLS_DEPLOYMENT } from "@/chrome/privacy/deployment/manifest";
 import { formatEther } from "viem";
 import extensionPackage from "../../package.json";
 import { previewAssets } from "./previewAssets";
+import { previewHistoryPage, previewSendRecipientReferences } from "./previewHistory";
 import { previewSafeAccountRecords, previewSafeProposals } from "./safeHomePreview";
 import { PREVIEW_EPOCH_MS, previewCustomToken } from "./fixtures";
 import { getPreviewFeePaymentOptions, getPreviewFeePaymentQuote } from "./feePaymentFixtures";
@@ -296,27 +297,10 @@ export function responseForPreviewMessage(
       return { success: true, result: structuredClone(previewSafeProposals) };
     case "getTxHistory":
       return environment.txHistory;
-    case "getTxHistoryPage": {
-      const history = environment.txHistory as CompletedTransaction[];
-      const filtered = history.filter((tx) =>
-        (!message.ownerAddress || tx.tx.from.toLowerCase() === String(message.ownerAddress).toLowerCase()) &&
-        (message.chainId == null || tx.chainId === message.chainId),
-      );
-      const start = message.cursor
-        ? Math.max(0, filtered.findIndex((tx) => tx.id === message.cursor.id) + 1)
-        : 0;
-      const limit = typeof message.limit === "number" ? message.limit : 30;
-      const items = filtered.slice(start, start + limit);
-      const hasMore = start + items.length < filtered.length;
-      const last = items.at(-1);
-      return {
-        items,
-        hasMore,
-        nextCursor: hasMore && last
-          ? { createdAt: last.createdAt, id: last.id }
-          : null,
-      };
-    }
+    case "getTxHistoryPage":
+      return previewHistoryPage(environment, message);
+    case "getSendRecipientReferences":
+      return previewSendRecipientReferences(environment);
     case "getTxHistoryItem":
       return (environment.txHistory as CompletedTransaction[])
         .find((tx) => tx.id === message.txId) ?? null;

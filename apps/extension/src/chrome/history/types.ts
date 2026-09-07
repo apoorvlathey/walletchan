@@ -137,6 +137,7 @@ export interface CompletedTransaction {
   completedAt?: number;
   txHash?: string;
   calldataSelector?: string;
+  sendRecipient?: string; // Actual Send payee retained before compaction; usable only on success.
   detailsIncomplete?: boolean;
   /** ERC-4337 operation hash while a token-funded transaction is pending. */
   userOperationHash?: string;

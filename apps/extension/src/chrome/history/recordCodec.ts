@@ -1,4 +1,5 @@
 import type { AssetChangeLeg } from "./queryTypes";
+import { getRecordedSendRecipient } from "./sendRecipient";
 import type {
   AssetChangeRecord,
   AssetTransferRecord,
@@ -80,6 +81,9 @@ export function compactHistoryTransaction(transaction: CompletedTransaction): {
   transfers: StoredTransfer[];
 } {
   const cloned = structuredClone(transaction);
+  const sendRecipient = getRecordedSendRecipient(cloned);
+  if (sendRecipient) cloned.sendRecipient = sendRecipient;
+  else delete cloned.sendRecipient;
   const data = cloned.tx.data;
   if (data && data !== "0x") cloned.calldataSelector = data.slice(0, 10);
   if (!(cloned.status === "processing" && !cloned.txHash)) delete cloned.tx.data;

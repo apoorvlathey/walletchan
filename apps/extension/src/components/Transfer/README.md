@@ -11,6 +11,9 @@ existing direct and lazy imports retain the same default-export contract.
 - `TokenSelectionSection.tsx` renders the chain/token card and adaptive balance.
 - `RecipientSection.tsx` renders address resolution, copy/explorer actions, and
   the contract-recipient acknowledgement.
+- `RecipientSafetyNotice.tsx` renders Send-only lookalike warnings, complete
+  checksummed address comparisons with underlined differences, loading/retry,
+  and the explicit full-address acknowledgement. It never substitutes an address.
 - `AmountSection.tsx` renders amount mode, MAX, conversion, and the sound-aware
   percentage slider.
 - `CalldataSection.tsx` renders native calldata, deployment mode, and decoding.
@@ -46,6 +49,20 @@ existing direct and lazy imports retain the same default-export contract.
 
 ## Hooks and effects
 
+- `hooks/useSendRecipientSafety.ts` reads the trusted-UI local recipient
+  projection, refreshes on contact/history events, discards stale reads, and
+  resets acknowledgement synchronously on recipient, sender, chain, or reference
+  changes. Only `TokenTransfer` mounts it; shared `RecipientSection` consumers
+  such as Unshield and all transaction confirmation screens are unaffected.
+- `model/addressPoisoning.ts` owns the case-insensitive, eight-total-prefix/suffix
+  heuristic, bounded response validation, and the loading/error/acknowledgement
+  gate. No match is a heuristic result, never a guarantee of recipient safety.
+  Tests: `tests/ui/addressPoisoning.test.ts` and `tests/history/sendRecipient.test.ts`.
+  With `dev:preview` running, `qa:preview:send-safety` exercises the real Send
+  component for all four signer props in both themes, keyboard acknowledgement,
+  recipient changes, exact matches, unavailable reads and stale responses.
+  Ledger renderer coverage does not replace real-device signing QA.
+
 - `hooks/useTransferCatalog.ts` owns portfolio/catalog loading, selected-token
   balance and price fallbacks, custom-token lookup, and chain/token selection.
   It retains a 200-asset interaction projection, pins
@@ -74,6 +91,8 @@ existing direct and lazy imports retain the same default-export contract.
   remains in the background transaction domains for private-key, seed-phrase,
   and Bankr accounts; impersonators use the same review intake and can only
   submit through the selected RPC's explicit developer opt-in.
+  Both ordinary submission and the sponsored-send fallback respect the Send
+  recipient gate; signing and confirmation handlers retain their existing policy.
 
 ## Dependency direction
 

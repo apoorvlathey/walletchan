@@ -21,6 +21,7 @@ function dependencies(overrides: Record<string, unknown> = {}): any {
     failedTxResults: new Map(),
     removeLocalStorage: () => {},
     getTxHistory: async () => [],
+    getSendRecipientReferences: async () => [],
     getTxHistoryPage: async () => ({ items: [], hasMore: false, nextCursor: null }),
     getTxHistoryItem: async () => null,
     getTransactionCalldata: async () => ({ success: true, data: "0x" }),
@@ -36,6 +37,23 @@ function dependencies(overrides: Record<string, unknown> = {}): any {
     ...overrides,
   };
 }
+
+test("Send recipient reads distinguish empty history from unavailable checks", async () => {
+  for (const fails of [false, true]) {
+    const capture = responseCapture();
+    const route = createBackgroundTransactionStatusMessageRouter(dependencies({
+      getSendRecipientReferences: async () => {
+        if (fails) throw new Error("storage unavailable");
+        return [];
+      },
+    }));
+    assert.deepEqual(route({ type: "getSendRecipientReferences" }, capture.sendResponse),
+      { handled: true, keepChannelOpen: true });
+    assert.deepEqual(await capture.response, fails
+      ? { success: false, error: "Could not check local recipients" }
+      : { success: true, references: [] });
+  }
+});
 
 test("transaction status transport stays focused and declares every route", async () => {
   const source = await readFile(

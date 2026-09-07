@@ -443,6 +443,25 @@ not forward an inpage message for it.
 
 ### Transaction History Enrichment Handlers
 
+`getSendRecipientReferences` is a read-only `wallet-ui` route behind the exact
+trusted top-level document gate. It returns at most 1,500 local contact/history
+address references after scanning at most 10,000 history rows; errors are
+explicit, not an empty successful check. No secrets, signing capabilities,
+provider exposure, network call or independent storage key is introduced.
+The additive IndexedDB `sendRecipient` field is derived from explicit Send
+transaction contents before calldata compaction, not from renderer-supplied
+recipient labels or token Transfer logs. Only successful hash-bearing records
+contribute; pending/failed/impersonator/cancel/batch/protocol entries do not.
+Consistent local transfer/native snapshots provide conservative legacy read
+backfill. History clearing, retention, account-history deletion and reset
+remove these references with their parent records.
+
+The lookalike acknowledgement is deliberately a Send-screen UX gate, including
+the sponsored fallback. It is not a new background signing authorization and
+does not gate dapp/WC/Safe/batch confirmation routes. It resets when the entered
+or resolved recipient, sender, chain or local reference generation changes.
+Unknown/failed reads remain visibly unavailable and disable Send until retried.
+
 | Handler | Effect | Guard |
 | --- | --- | --- |
 | `backfillAssetChanges` | Extension UI asks the service worker to re-fetch a confirmed tx receipt and populate missing `assetChanges` on an existing history entry. Does not expose secrets or create transactions. | `wallet-ui` audience policy |
