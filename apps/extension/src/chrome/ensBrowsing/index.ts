@@ -13,13 +13,16 @@ import {
 import {
   installEthGatewayRedirectRule,
   installEthRedirectRule,
+  installWeiGatewayRedirectRule,
   installGweiDomainsRedirectRule,
   installW3linkRedirectRule,
   installW3ethRedirectRule,
   removeEthGatewayBypassForTab,
   removeEthGatewayRedirectRule,
   removeEthRedirectRule,
+  removeWeiGatewayBypassForTab,
   removeGweiDomainsBypassForTab,
+  removeWeiGatewayRedirectRule,
   removeGweiDomainsRedirectRule,
   removeW3linkRedirectRule,
   removeW3ethBypassForTab,
@@ -48,24 +51,20 @@ function shouldInterceptEthGateway(s: EnsBrowsingSettings): boolean {
 
 async function syncRules(settings: EnsBrowsingSettings): Promise<void> {
   if (settings.enabled) {
-    await Promise.all([
-      installEthRedirectRule(),
-      installW3linkRedirectRule(),
-    ]);
+    await Promise.all([installEthRedirectRule(), installW3linkRedirectRule()]);
   } else {
-    await Promise.all([
-      removeEthRedirectRule(),
-      removeW3linkRedirectRule(),
-    ]);
+    await Promise.all([removeEthRedirectRule(), removeW3linkRedirectRule()]);
   }
   if (shouldInterceptEthGateway(settings)) {
     await Promise.all([
       installEthGatewayRedirectRule(),
+      installWeiGatewayRedirectRule(),
       installGweiDomainsRedirectRule(),
     ]);
   } else {
     await Promise.all([
       removeEthGatewayRedirectRule(),
+      removeWeiGatewayRedirectRule(),
       removeGweiDomainsRedirectRule(),
     ]);
   }
@@ -100,6 +99,7 @@ export async function initEnsBrowsing(): Promise<void> {
   chrome.tabs.onRemoved.addListener((tabId) => {
     chrome.storage.session.remove(`tab:${tabId}`).catch(() => undefined);
     removeEthGatewayBypassForTab(tabId).catch(() => undefined);
+    removeWeiGatewayBypassForTab(tabId).catch(() => undefined);
     removeGweiDomainsBypassForTab(tabId).catch(() => undefined);
     removeW3ethBypassForTab(tabId).catch(() => undefined);
   });

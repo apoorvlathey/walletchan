@@ -3,6 +3,7 @@ import path from "path";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { sharedConfig, sharedBuildConfig, buildDir } from "./vite.config";
+import { compactBackground } from "./scripts/build/compactBackground";
 
 const isFirefox = process.env.BROWSER === "firefox";
 
@@ -106,6 +107,7 @@ export default defineConfig(({ mode }) => {
           process: true,
         },
       }),
+      ...(mode === "production" ? [compactBackground()] : []),
       privacySdkServiceWorkerBoundary(),
     ],
     build: {

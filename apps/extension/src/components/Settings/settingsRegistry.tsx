@@ -102,12 +102,14 @@ export const LEAF_ENTRIES: readonly LeafEntry[] = [
   {
     id: "ensBrowsing",
     title: "WalletChan Browser",
-    subtitle: "Visit .eth and .gwei sites directly from the address bar",
+    subtitle: "Visit .eth, .wei, and .gwei sites directly from the address bar",
     keywords: [
       "dapp3",
       "ens",
       "eth",
       "gwei",
+      "wei",
+      "wei.limo",
       "gns",
       "ipfs",
       "ipns",
@@ -379,7 +381,7 @@ export function renderLeafRow(id: LeafId, ctx: RowContext) {
         <SettingsRow
           key={id}
           title="WalletChan Browser"
-          subtitle="Visit .eth and .gwei sites directly from the address bar"
+          subtitle="Visit .eth, .wei, and .gwei sites directly from the address bar"
           icon={<GlobeIcon boxSize={5} />}
           iconBg="chart.positive"
           iconColor="surface.base"

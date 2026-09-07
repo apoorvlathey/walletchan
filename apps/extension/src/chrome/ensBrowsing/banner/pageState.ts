@@ -4,8 +4,7 @@ export interface PageMetadata {
 }
 
 export function currentPagePath(pageLocation: Location = location): string {
-  const path =
-    pageLocation.pathname + pageLocation.search + pageLocation.hash;
+  const path = pageLocation.pathname + pageLocation.search + pageLocation.hash;
   return path === "/" ? "" : path;
 }
 
@@ -28,7 +27,9 @@ export function scrapePageMetadata(
   ];
   let favicon: string | undefined;
   for (const selector of selectors) {
-    const element = pageDocument.querySelector(selector) as HTMLLinkElement | null;
+    const element = pageDocument.querySelector(
+      selector,
+    ) as HTMLLinkElement | null;
     const href = element?.getAttribute("href");
     if (!href) continue;
     try {
@@ -56,7 +57,7 @@ export function parseEnsAddressInput(raw: string): string | null {
   if (/^0x[a-f0-9]{40}$/.test(host)) {
     return `https://${host}.w3eth.io${path}`;
   }
-  if (!/^(?:[a-z0-9-]+\.)+(?:eth|gwei)$/.test(host)) return null;
+  if (!/^(?:[a-z0-9-]+\.)+(?:eth|gwei|wei)$/.test(host)) return null;
   return `http://${host}${path}`;
 }
 
@@ -64,7 +65,7 @@ export function splitEnsDisplayUrl(text: string): {
   host: string;
   path: string;
 } {
-  const match = text.match(/^(.+?\.(?:eth|gwei))(.*)$/i);
+  const match = text.match(/^(.+?\.(?:eth|gwei|wei))(.*)$/i);
   if (!match) return { host: text, path: "" };
   return { host: match[1]!, path: match[2]! };
 }

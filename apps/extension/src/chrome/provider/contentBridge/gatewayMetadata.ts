@@ -17,6 +17,10 @@ function redirectW3linkToInterstitial(): void {
 
 function parseEnsGatewayName(hostname: string): string | null {
   const lower = hostname.toLowerCase().replace(/\.$/, "");
+  const weiGateway = lower.match(
+    /^((?:[a-z0-9-]+\.)+wei)\.(?:limo|domains)\.?$/,
+  );
+  if (weiGateway?.[1]) return weiGateway[1];
   const ethGateway = lower.match(/^((?:[a-z0-9-]+\.)+eth)\.(?:limo|link)$/);
   if (ethGateway?.[1]) return ethGateway[1];
   const w3eth = lower.match(/^([a-z0-9-]+(?:\.[a-z0-9-]+)*)\.w3eth\.io$/);

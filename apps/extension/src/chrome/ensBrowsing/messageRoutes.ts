@@ -72,19 +72,21 @@ export function handleEnsBrowsingMessage(
   }
 
   if (message.type === "ens-cache-metadata") {
-    const name = String(message.name ?? "").toLowerCase().slice(0, 255);
+    const name = String(message.name ?? "")
+      .toLowerCase()
+      .slice(0, 255);
     const title =
       typeof message.title === "string"
         ? message.title.trim().slice(0, 120) || undefined
         : undefined;
     const favicon =
       typeof message.favicon === "string"
-        ? sanitizeUntrustedImageUrl(message.favicon) ??
+        ? (sanitizeUntrustedImageUrl(message.favicon) ??
           sanitizeTrustedBrowserFaviconSrc(message.favicon) ??
-          undefined
+          undefined)
         : undefined;
     if (
-      !/^(?:[a-z0-9-]+\.)+(?:eth|gwei)$/.test(name) &&
+      !/^(?:[a-z0-9-]+\.)+(?:eth|gwei|wei)$/.test(name) &&
       !/^0x[a-f0-9]{40}$/.test(name)
     ) {
       sendResponse({ ok: false, error: "invalid name" });
@@ -131,9 +133,10 @@ export function handleEnsBrowsingMessage(
         sendResponse({ ctx: null });
         return;
       }
-      const hit = await findCachedByGatewayLabel(parsed.kind, parsed.label).catch(
-        () => null,
-      );
+      const hit = await findCachedByGatewayLabel(
+        parsed.kind,
+        parsed.label,
+      ).catch(() => null);
       if (!hit) {
         sendResponse({ ctx: null });
         return;

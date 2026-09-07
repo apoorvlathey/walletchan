@@ -69,9 +69,16 @@ function parseTarget(): ParsedTarget | null {
       hash: u.hash,
     };
   }
-  const gweiDomainsMatch = host.match(
-    /^((?:[a-z0-9-]+\.)+gwei)\.domains$/i,
-  );
+  const weiGateway = host.match(/^((?:[a-z0-9-]+\.)+wei)\.(?:limo|domains)$/);
+  if (weiGateway?.[1]) {
+    return {
+      ensName: weiGateway[1],
+      path: u.pathname || "/",
+      search: u.search,
+      hash: u.hash,
+    };
+  }
+  const gweiDomainsMatch = host.match(/^((?:[a-z0-9-]+\.)+gwei)\.domains$/i);
   if (gweiDomainsMatch?.[1]) {
     return {
       ensName: gweiDomainsMatch[1].toLowerCase(),
@@ -80,7 +87,7 @@ function parseTarget(): ParsedTarget | null {
       hash: u.hash,
     };
   }
-  if (!/^(?:[a-z0-9-]+\.)+(?:eth|gwei)$/.test(host)) return null;
+  if (!/^(?:[a-z0-9-]+\.)+(?:eth|gwei|wei)$/.test(host)) return null;
   return {
     ensName: host,
     path: u.pathname || "/",
@@ -89,9 +96,7 @@ function parseTarget(): ParsedTarget | null {
   };
 }
 
-type ResolveResult =
-  | { ok: true }
-  | { ok: false; error: string; code?: string };
+type ResolveResult = { ok: true } | { ok: false; error: string; code?: string };
 
 // Raw-address gateway URLs arrive here as `0x<addr>.eth` either because a DNR
 // gateway rewrite tacks `.eth` on or because the manual dapp3 launcher
@@ -117,7 +122,9 @@ export default function EnsInterstitial() {
 
   useEffect(() => {
     if (!target) {
-      setError("Couldn't parse the .eth / .gwei URL from this navigation.");
+      setError(
+        "Couldn't parse the .eth / .wei / .gwei URL from this navigation.",
+      );
       return;
     }
     document.title = `Resolving ${displayName(target.ensName)}…`;
@@ -185,7 +192,8 @@ export default function EnsInterstitial() {
             </Text>
             <Text color="fg.muted" fontSize="sm">
               The name browsing interstitial expects a fragment containing the
-              original navigation URL. Try typing the `.eth` or `.gwei` name again.
+              original navigation URL. Try typing the `.eth`, `.wei`, or `.gwei`
+              name again.
             </Text>
           </VStack>
         </ThemedPanel>
@@ -271,7 +279,11 @@ export default function EnsInterstitial() {
               </VStack>
             )}
 
-            <Box borderTop={tokens.borders.thin} borderColor="border.subtle" pt={3}>
+            <Box
+              borderTop={tokens.borders.thin}
+              borderColor="border.subtle"
+              pt={3}
+            >
               <Text fontSize="xs" color="fg.muted">
                 Manage in{" "}
                 <Text as="span" fontWeight={700} color="fg.secondary">

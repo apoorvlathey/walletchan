@@ -1,5 +1,6 @@
 import { decode as decodeContentHash, getCodec } from "@ensdomains/content-hash";
 import { namehash } from "viem";
+import { resolveGweiContract } from "./gweiContract";
 
 import { getStoredRpcUrl } from "@/lib/chains";
 import { fetchPinAndCacheErc4804, resolveContractAddress } from "./erc4804Resolver";
@@ -160,48 +161,20 @@ export async function resolveGwei(
     };
   }
   const client = getDirectClient(rpcUrl);
-  const trustedDirectly = true;
-
-  let raw: `0x${string}`;
   try {
-    raw = await client.readContract({
+    const raw = await client.readContract({
       address: GWEI_NAMENFT,
       abi: RESOLVER_ABI,
       functionName: "contenthash",
       args: [namehash(stripped)],
     });
+    if (!raw || raw === "0x") return resolveGweiContract(client, stripped);
+    const kind = getCodec(raw);
+    if (kind !== "ipfs" && kind !== "ipns") {
+      return { ok: false, error: `Unsupported GNS contenthash codec "${kind}".` };
+    }
+    return { ok: true, kind, value: decodeContentHash(raw), ensName: stripped, trustedDirectly: true };
   } catch (error) {
-    return {
-      ok: false,
-      error: `Failed to read contenthash for ${stripped}: ${describeResolverError(error)}`,
-    };
+    return { ok: false, error: `Failed to resolve ${stripped}: ${describeResolverError(error)}` };
   }
-  if (!raw || raw === "0x") {
-    return { ok: false, error: `${stripped} has no website contenthash set.` };
-  }
-
-  let codec: string | undefined;
-  let decoded: string | undefined;
-  try {
-    codec = getCodec(raw);
-    decoded = decodeContentHash(raw);
-  } catch (error) {
-    return {
-      ok: false,
-      error: `Failed to decode contenthash for ${stripped}: ${describeResolverError(error)}`,
-    };
-  }
-  if (decoded != null && (codec === "ipfs" || codec === "ipns")) {
-    return {
-      ok: true,
-      kind: codec,
-      value: decoded,
-      ensName: stripped,
-      trustedDirectly,
-    };
-  }
-  return {
-    ok: false,
-    error: `Unsupported contenthash codec "${codec ?? "unknown"}" for ${stripped}. .gwei sites serve ipfs / ipns.`,
-  };
 }

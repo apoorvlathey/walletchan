@@ -11,10 +11,7 @@
 // Ported from dapp3 `src/lib/gateway.ts`; the hosted-gateway builder is new.
 
 import type { ResolveKind } from "./types";
-import {
-  DEFAULT_GATEWAY_HOST,
-  DEFAULT_GATEWAY_PORT,
-} from "./settingsStorage";
+import { DEFAULT_GATEWAY_HOST, DEFAULT_GATEWAY_PORT } from "./settingsStorage";
 
 const ETH_LIMO_HOST = "eth.limo";
 const GWEI_DOMAINS_HOST = "domains";
@@ -56,7 +53,11 @@ export function buildHostedGatewayUrl(
   hash = "",
 ): string {
   const lower = ensName.toLowerCase();
-  if (kind !== "web3" && lower.endsWith(".gwei")) {
+  if (lower.endsWith(".wei")) {
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return `https://${lower}.limo${normalizedPath}${search}${hash}`;
+  }
+  if (lower.endsWith(".gwei")) {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     return `https://${lower}.${GWEI_DOMAINS_HOST}${normalizedPath}${search}${hash}`;
   }
@@ -65,7 +66,9 @@ export function buildHostedGatewayUrl(
   // eth.limo and w3eth.io route on the full label chain in front of `.eth`.
   const trimmed = lower.endsWith(".eth") ? lower.slice(0, -4) : lower;
   const host =
-    kind === "web3" ? `${trimmed}.${W3ETH_IO_HOST}` : `${trimmed}.${ETH_LIMO_HOST}`;
+    kind === "web3"
+      ? `${trimmed}.${W3ETH_IO_HOST}`
+      : `${trimmed}.${ETH_LIMO_HOST}`;
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `https://${host}${normalizedPath}${search}${hash}`;
 }

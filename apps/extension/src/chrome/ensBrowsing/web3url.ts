@@ -10,7 +10,7 @@
 // v1 scope: manual / 5219 mode only, index route only, HTML responses only.
 // Auto mode + path routing + non-HTML are deferred.
 
-import { parseAbi, type PublicClient } from "viem";
+import { decodeAbiParameters, hexToBytes, parseAbi, type PublicClient } from "viem";
 
 export type Web3FetchResult = {
   status: number;
@@ -79,6 +79,8 @@ export type FetchErc4804Options = {
   // (potentially expensive) request() call and returns immediately after the
   // resolveMode() check.
   probeOnly?: boolean;
+  /** GNS uses raw manual calldata and rejects incomplete/encoded snapshots. */
+  gnsGateway?: boolean;
 };
 
 export async function fetchErc4804(
@@ -113,6 +115,14 @@ export async function fetchErc4804(
     return { status: 200, body: new Uint8Array(0), contentType: null };
   }
 
+  if (opts.gnsGateway && mode === "manual") {
+    const result = await client.call({ to: address, data: "0x2f" });
+    if (!result.data) throw new Error("Empty contract response.");
+    const body = hexToBytes(decodeAbiParameters([{ type: "bytes" }], result.data)[0]);
+    if (!body.length || body.length > MAX_BODY_BYTES) throw new Error("Invalid HTML body size.");
+    return { status: 200, body, contentType: "text/html" };
+  }
+
   let result: readonly [number, string, ReadonlyArray<readonly [string, string]>];
   try {
     result = (await client.readContract({
@@ -129,6 +139,9 @@ export async function fetchErc4804(
   }
 
   const [status, bodyStr, headers] = result;
+  if (opts.gnsGateway && headers.some(([key]) => /^(web3-next-chunk|content-encoding)$/i.test(key))) {
+    throw new Error("Encoded/chunked GNS HTML is unsupported.");
+  }
   if (status !== 200) {
     throw new Web3FetchError({ kind: "bad-status", status });
   }

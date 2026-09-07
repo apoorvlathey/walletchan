@@ -16,12 +16,16 @@ const W3ETH_BYPASS_RULE_ID = 1005;
 const W3LINK_REDIRECT_RULE_ID = 1006;
 const GWEI_DOMAINS_REDIRECT_RULE_ID = 1009;
 const GWEI_DOMAINS_BYPASS_RULE_ID = 1010;
+const WEI_GATEWAY_REDIRECT_RULE_ID = 1011;
+const WEI_GATEWAY_BYPASS_RULE_ID = 1012;
+const WEI_GATEWAY_REGEX =
+  "^https?://(?:[a-z0-9-]+\\.)+wei\\.(?:limo|domains)\\.?(?::\\d+)?(?:/.*)?$";
 
 // Any host ending in `.eth` or `.gwei` (first-level or arbitrary subdomain).
 // Excludes hosted gateways by construction: those hosts end in `.limo`,
 // `.domains`, or `.io`, not `.eth` / `.gwei`.
 const NAME_REGEX =
-  "^https?://(?:[a-z0-9-]+\\.)+(?:eth|gwei)\\.?(?::\\d+)?(?:/.*)?$";
+  "^https?://(?:[a-z0-9-]+\\.)+(?:eth|gwei|wei)\\.?(?::\\d+)?(?:/.*)?$";
 
 // Match `<label>.eth.limo` / `<label>.eth.link` and capture the label + path.
 // We rewrite to `http://<label>.eth<path>` so the base name rule catches
@@ -52,313 +56,128 @@ const W3ETH_REGEX =
 const W3LINK_MAINNET_REGEX =
   "^https?://(0x[a-f0-9]{40})\\.1\\.w3link\\.io\\.?(?::\\d+)?(/.*)?$";
 
-export async function installEthRedirectRule(): Promise<void> {
-  // The interstitial is a web-accessible resource, so DNR can redirect to it.
-  // We use `regexSubstitution` to stash the entire original URL into the
-  // fragment of the redirect target. Fragments tolerate arbitrary chars
-  // (including further `#` and `?`), so the interstitial can recover the
-  // original URL verbatim via `location.hash.slice(1)` — no encoding needed.
-  const interstitial = chrome.runtime.getURL("interstitial.html");
+// Keep each released rule ID and pattern stable while sharing rule construction.
+async function installRedirect(
+  id: number,
+  regexFilter: string,
+  regexSubstitution = `${chrome.runtime.getURL("interstitial.html")}#\\0`,
+  priority = 1,
+): Promise<void> {
   await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [ETH_REDIRECT_RULE_ID],
+    removeRuleIds: [id],
     addRules: [
       {
-        id: ETH_REDIRECT_RULE_ID,
-        priority: 2,
+        id,
+        priority,
         action: {
           type: chrome.declarativeNetRequest.RuleActionType.REDIRECT,
-          redirect: { regexSubstitution: `${interstitial}#\\0` },
+          redirect: { regexSubstitution },
         },
         condition: {
-          regexFilter: NAME_REGEX,
+          regexFilter,
           resourceTypes: [chrome.declarativeNetRequest.ResourceType.MAIN_FRAME],
         },
       },
     ],
   });
-  console.log("[ens] DNR redirect rule installed");
 }
 
-export async function removeEthRedirectRule(): Promise<void> {
+async function removeRedirect(id: number): Promise<void> {
   await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [ETH_REDIRECT_RULE_ID],
+    removeRuleIds: [id],
   });
-  console.log("[ens] DNR redirect rule removed");
+}
+
+// Priority 3 ALLOW applies only to the chosen gateway family and tab. It wins
+// over the gateway redirect (1) and native-name redirect (2).
+async function updateBypass(
+  id: number,
+  regexFilter: string,
+  tabId: number,
+  add: boolean,
+): Promise<void> {
+  const rules = await chrome.declarativeNetRequest.getSessionRules();
+  const current = rules.find((rule) => rule.id === id)?.condition.tabIds ?? [];
+  if (current.includes(tabId) === add) return;
+  const tabIds = add
+    ? [...current, tabId]
+    : current.filter((value) => value !== tabId);
+  await chrome.declarativeNetRequest.updateSessionRules({
+    removeRuleIds: [id],
+    addRules: tabIds.length
+      ? [
+          {
+            id,
+            priority: 3,
+            action: { type: chrome.declarativeNetRequest.RuleActionType.ALLOW },
+            condition: {
+              regexFilter,
+              tabIds,
+              resourceTypes: [
+                chrome.declarativeNetRequest.ResourceType.MAIN_FRAME,
+              ],
+            },
+          },
+        ]
+      : [],
+  });
 }
 
 export async function hasEthRedirectRule(): Promise<boolean> {
   const rules = await chrome.declarativeNetRequest.getDynamicRules();
-  return rules.some((r) => r.id === ETH_REDIRECT_RULE_ID);
+  return rules.some((rule) => rule.id === ETH_REDIRECT_RULE_ID);
 }
 
-export async function installEthGatewayRedirectRule(): Promise<void> {
-  // Rewrites `https?://<label>.eth.(limo|link)[:port][/path]` → `http://<label>.eth[/path]`.
-  // Lower priority than the base name rule (priority 2). They don't compete on
-  // the same request; the base name rule fires on the second pass after this
-  // rewrite. Keeping priorities distinct makes the chain easier to reason about.
-  await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [ETH_GATEWAY_REDIRECT_RULE_ID],
-    addRules: [
-      {
-        id: ETH_GATEWAY_REDIRECT_RULE_ID,
-        priority: 1,
-        action: {
-          type: chrome.declarativeNetRequest.RuleActionType.REDIRECT,
-          redirect: { regexSubstitution: "http://\\1.eth\\2" },
-        },
-        condition: {
-          regexFilter: ETH_GATEWAY_REGEX,
-          resourceTypes: [chrome.declarativeNetRequest.ResourceType.MAIN_FRAME],
-        },
-      },
-    ],
-  });
-  console.log("[ens] DNR eth.limo/link redirect rule installed");
-}
+export const installEthRedirectRule = (): Promise<void> =>
+  installRedirect(ETH_REDIRECT_RULE_ID, NAME_REGEX, undefined, 2);
+export const removeEthRedirectRule = (): Promise<void> =>
+  removeRedirect(ETH_REDIRECT_RULE_ID);
 
-export async function removeEthGatewayRedirectRule(): Promise<void> {
-  await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [ETH_GATEWAY_REDIRECT_RULE_ID],
-  });
-  console.log("[ens] DNR eth.limo/link redirect rule removed");
-}
+export const installEthGatewayRedirectRule = (): Promise<void> =>
+  installRedirect(
+    ETH_GATEWAY_REDIRECT_RULE_ID,
+    ETH_GATEWAY_REGEX,
+    "http://\\1.eth\\2",
+  );
+export const removeEthGatewayRedirectRule = (): Promise<void> =>
+  removeRedirect(ETH_GATEWAY_REDIRECT_RULE_ID);
+export const addEthGatewayBypassForTab = (tabId: number): Promise<void> =>
+  updateBypass(ETH_GATEWAY_BYPASS_RULE_ID, ETH_GATEWAY_REGEX, tabId, true);
+export const removeEthGatewayBypassForTab = (tabId: number): Promise<void> =>
+  updateBypass(ETH_GATEWAY_BYPASS_RULE_ID, ETH_GATEWAY_REGEX, tabId, false);
 
-export async function installGweiDomainsRedirectRule(): Promise<void> {
-  // Rewrites `https?://<label>.gwei.domains[:port][/path]` →
-  // `http://<label>.gwei[/path]`. Lower priority than the base name rule
-  // so the rewritten request flows through the interstitial on the next pass.
-  await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [GWEI_DOMAINS_REDIRECT_RULE_ID],
-    addRules: [
-      {
-        id: GWEI_DOMAINS_REDIRECT_RULE_ID,
-        priority: 1,
-        action: {
-          type: chrome.declarativeNetRequest.RuleActionType.REDIRECT,
-          redirect: { regexSubstitution: "http://\\1.gwei\\2" },
-        },
-        condition: {
-          regexFilter: GWEI_DOMAINS_REGEX,
-          resourceTypes: [chrome.declarativeNetRequest.ResourceType.MAIN_FRAME],
-        },
-      },
-    ],
-  });
-  console.log("[ens] DNR gwei.domains redirect rule installed");
-}
+export const installGweiDomainsRedirectRule = (): Promise<void> =>
+  installRedirect(
+    GWEI_DOMAINS_REDIRECT_RULE_ID,
+    GWEI_DOMAINS_REGEX,
+    "http://\\1.gwei\\2",
+  );
+export const removeGweiDomainsRedirectRule = (): Promise<void> =>
+  removeRedirect(GWEI_DOMAINS_REDIRECT_RULE_ID);
+export const addGweiDomainsBypassForTab = (tabId: number): Promise<void> =>
+  updateBypass(GWEI_DOMAINS_BYPASS_RULE_ID, GWEI_DOMAINS_REGEX, tabId, true);
+export const removeGweiDomainsBypassForTab = (tabId: number): Promise<void> =>
+  updateBypass(GWEI_DOMAINS_BYPASS_RULE_ID, GWEI_DOMAINS_REGEX, tabId, false);
 
-export async function removeGweiDomainsRedirectRule(): Promise<void> {
-  await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [GWEI_DOMAINS_REDIRECT_RULE_ID],
-  });
-  console.log("[ens] DNR gwei.domains redirect rule removed");
-}
+export const installW3linkRedirectRule = (): Promise<void> =>
+  installRedirect(W3LINK_REDIRECT_RULE_ID, W3LINK_MAINNET_REGEX);
+export const removeW3linkRedirectRule = (): Promise<void> =>
+  removeRedirect(W3LINK_REDIRECT_RULE_ID);
 
-export async function installW3linkRedirectRule(): Promise<void> {
-  // Send `https?://<addr>.1.w3link.io[:port][/path]` straight to the
-  // interstitial. Avoid a two-hop `w3link -> <addr>.eth -> interstitial`
-  // redirect because Chromium does not reliably re-run DNR on the rewritten
-  // main-frame URL before DNS/navigation handling.
-  const interstitial = chrome.runtime.getURL("interstitial.html");
-  await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [W3LINK_REDIRECT_RULE_ID],
-    addRules: [
-      {
-        id: W3LINK_REDIRECT_RULE_ID,
-        priority: 1,
-        action: {
-          type: chrome.declarativeNetRequest.RuleActionType.REDIRECT,
-          redirect: { regexSubstitution: `${interstitial}#\\0` },
-        },
-        condition: {
-          regexFilter: W3LINK_MAINNET_REGEX,
-          resourceTypes: [chrome.declarativeNetRequest.ResourceType.MAIN_FRAME],
-        },
-      },
-    ],
-  });
-  console.log("[ens] DNR w3link.io redirect rule installed");
-}
+export const installW3ethRedirectRule = (): Promise<void> =>
+  installRedirect(W3ETH_REDIRECT_RULE_ID, W3ETH_REGEX, "http://\\1.eth\\2");
+export const removeW3ethRedirectRule = (): Promise<void> =>
+  removeRedirect(W3ETH_REDIRECT_RULE_ID);
+export const addW3ethBypassForTab = (tabId: number): Promise<void> =>
+  updateBypass(W3ETH_BYPASS_RULE_ID, W3ETH_REGEX, tabId, true);
+export const removeW3ethBypassForTab = (tabId: number): Promise<void> =>
+  updateBypass(W3ETH_BYPASS_RULE_ID, W3ETH_REGEX, tabId, false);
 
-export async function removeW3linkRedirectRule(): Promise<void> {
-  await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [W3LINK_REDIRECT_RULE_ID],
-  });
-  console.log("[ens] DNR w3link.io redirect rule removed");
-}
-
-// Per-tab session ALLOW rule that punches through the gateway redirect for a
-// specific set of tabs — used when the user clicks "Open on eth.limo" so that
-// navigation actually reaches the public gateway instead of getting rewritten
-// back to local. Priority 3 wins over both the .eth (2) and gateway (1) rules.
-
-async function getEthGatewayBypassTabs(): Promise<number[]> {
-  const rules = await chrome.declarativeNetRequest.getSessionRules();
-  const rule = rules.find((r) => r.id === ETH_GATEWAY_BYPASS_RULE_ID);
-  return (rule?.condition.tabIds as number[] | undefined) ?? [];
-}
-
-async function setEthGatewayBypassTabs(tabIds: number[]): Promise<void> {
-  if (tabIds.length === 0) {
-    await chrome.declarativeNetRequest.updateSessionRules({
-      removeRuleIds: [ETH_GATEWAY_BYPASS_RULE_ID],
-    });
-    return;
-  }
-  await chrome.declarativeNetRequest.updateSessionRules({
-    removeRuleIds: [ETH_GATEWAY_BYPASS_RULE_ID],
-    addRules: [
-      {
-        id: ETH_GATEWAY_BYPASS_RULE_ID,
-        priority: 3,
-        action: { type: chrome.declarativeNetRequest.RuleActionType.ALLOW },
-        condition: {
-          regexFilter: ETH_GATEWAY_REGEX,
-          resourceTypes: [chrome.declarativeNetRequest.ResourceType.MAIN_FRAME],
-          tabIds,
-        },
-      },
-    ],
-  });
-}
-
-export async function addEthGatewayBypassForTab(tabId: number): Promise<void> {
-  const current = await getEthGatewayBypassTabs();
-  if (current.includes(tabId)) return;
-  await setEthGatewayBypassTabs([...current, tabId]);
-}
-
-export async function removeEthGatewayBypassForTab(
-  tabId: number,
-): Promise<void> {
-  const current = await getEthGatewayBypassTabs();
-  if (!current.includes(tabId)) return;
-  await setEthGatewayBypassTabs(current.filter((id) => id !== tabId));
-}
-
-// Per-tab session ALLOW rule for "Open on gwei.domains gateway".
-
-async function getGweiDomainsBypassTabs(): Promise<number[]> {
-  const rules = await chrome.declarativeNetRequest.getSessionRules();
-  const rule = rules.find((r) => r.id === GWEI_DOMAINS_BYPASS_RULE_ID);
-  return (rule?.condition.tabIds as number[] | undefined) ?? [];
-}
-
-async function setGweiDomainsBypassTabs(tabIds: number[]): Promise<void> {
-  if (tabIds.length === 0) {
-    await chrome.declarativeNetRequest.updateSessionRules({
-      removeRuleIds: [GWEI_DOMAINS_BYPASS_RULE_ID],
-    });
-    return;
-  }
-  await chrome.declarativeNetRequest.updateSessionRules({
-    removeRuleIds: [GWEI_DOMAINS_BYPASS_RULE_ID],
-    addRules: [
-      {
-        id: GWEI_DOMAINS_BYPASS_RULE_ID,
-        priority: 3,
-        action: { type: chrome.declarativeNetRequest.RuleActionType.ALLOW },
-        condition: {
-          regexFilter: GWEI_DOMAINS_REGEX,
-          resourceTypes: [chrome.declarativeNetRequest.ResourceType.MAIN_FRAME],
-          tabIds,
-        },
-      },
-    ],
-  });
-}
-
-export async function addGweiDomainsBypassForTab(
-  tabId: number,
-): Promise<void> {
-  const current = await getGweiDomainsBypassTabs();
-  if (current.includes(tabId)) return;
-  await setGweiDomainsBypassTabs([...current, tabId]);
-}
-
-export async function removeGweiDomainsBypassForTab(
-  tabId: number,
-): Promise<void> {
-  const current = await getGweiDomainsBypassTabs();
-  if (!current.includes(tabId)) return;
-  await setGweiDomainsBypassTabs(current.filter((id) => id !== tabId));
-}
-
-// w3eth.io gateway interception. Mirrors the eth.limo/link rule above but only
-// installs when both `useLocalGateway` and `pinOnchainHtml` settings are on —
-// the resolver only routes ERC-4804 traffic to local Kubo under that combo, so
-// installing the rule otherwise would just bounce w3eth.io → interstitial →
-// w3eth.io indefinitely.
-
-export async function installW3ethRedirectRule(): Promise<void> {
-  await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [W3ETH_REDIRECT_RULE_ID],
-    addRules: [
-      {
-        id: W3ETH_REDIRECT_RULE_ID,
-        priority: 1,
-        action: {
-          type: chrome.declarativeNetRequest.RuleActionType.REDIRECT,
-          redirect: { regexSubstitution: "http://\\1.eth\\2" },
-        },
-        condition: {
-          regexFilter: W3ETH_REGEX,
-          resourceTypes: [chrome.declarativeNetRequest.ResourceType.MAIN_FRAME],
-        },
-      },
-    ],
-  });
-  console.log("[ens] DNR w3eth.io redirect rule installed");
-}
-
-export async function removeW3ethRedirectRule(): Promise<void> {
-  await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [W3ETH_REDIRECT_RULE_ID],
-  });
-  console.log("[ens] DNR w3eth.io redirect rule removed");
-}
-
-// Per-tab session ALLOW rule for "Open on w3eth.io gateway" — mirrors the
-// eth.limo bypass infra. Priority 3 wins over the w3eth.io redirect (1).
-
-async function getW3ethBypassTabs(): Promise<number[]> {
-  const rules = await chrome.declarativeNetRequest.getSessionRules();
-  const rule = rules.find((r) => r.id === W3ETH_BYPASS_RULE_ID);
-  return (rule?.condition.tabIds as number[] | undefined) ?? [];
-}
-
-async function setW3ethBypassTabs(tabIds: number[]): Promise<void> {
-  if (tabIds.length === 0) {
-    await chrome.declarativeNetRequest.updateSessionRules({
-      removeRuleIds: [W3ETH_BYPASS_RULE_ID],
-    });
-    return;
-  }
-  await chrome.declarativeNetRequest.updateSessionRules({
-    removeRuleIds: [W3ETH_BYPASS_RULE_ID],
-    addRules: [
-      {
-        id: W3ETH_BYPASS_RULE_ID,
-        priority: 3,
-        action: { type: chrome.declarativeNetRequest.RuleActionType.ALLOW },
-        condition: {
-          regexFilter: W3ETH_REGEX,
-          resourceTypes: [chrome.declarativeNetRequest.ResourceType.MAIN_FRAME],
-          tabIds,
-        },
-      },
-    ],
-  });
-}
-
-export async function addW3ethBypassForTab(tabId: number): Promise<void> {
-  const current = await getW3ethBypassTabs();
-  if (current.includes(tabId)) return;
-  await setW3ethBypassTabs([...current, tabId]);
-}
-
-export async function removeW3ethBypassForTab(tabId: number): Promise<void> {
-  const current = await getW3ethBypassTabs();
-  if (!current.includes(tabId)) return;
-  await setW3ethBypassTabs(current.filter((id) => id !== tabId));
-}
+export const installWeiGatewayRedirectRule = (): Promise<void> =>
+  installRedirect(WEI_GATEWAY_REDIRECT_RULE_ID, WEI_GATEWAY_REGEX);
+export const removeWeiGatewayRedirectRule = (): Promise<void> =>
+  removeRedirect(WEI_GATEWAY_REDIRECT_RULE_ID);
+export const addWeiGatewayBypassForTab = (tabId: number): Promise<void> =>
+  updateBypass(WEI_GATEWAY_BYPASS_RULE_ID, WEI_GATEWAY_REGEX, tabId, true);
+export const removeWeiGatewayBypassForTab = (tabId: number): Promise<void> =>
+  updateBypass(WEI_GATEWAY_BYPASS_RULE_ID, WEI_GATEWAY_REGEX, tabId, false);

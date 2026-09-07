@@ -12,14 +12,7 @@
  */
 
 import { useMemo } from "react";
-import {
-  Box,
-  Button,
-  Center,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Center, HStack, Text, VStack } from "@chakra-ui/react";
 import { ExternalLinkIcon, WarningTwoIcon } from "@chakra-ui/icons";
 import { Decorator, IconBox, ThemedPanel, useTheme } from "@/theme";
 
@@ -46,7 +39,7 @@ function displayName(name: string): string {
 type Fallback = {
   url: string;
   label: string;
-  gateway: "eth.limo" | "gwei.domains" | "w3eth.io";
+  gateway: "wei.limo" | "eth.limo" | "gwei.domains" | "w3eth.io";
 };
 
 function hostedFallback(
@@ -72,6 +65,13 @@ function hostedFallback(
       gateway: "gwei.domains",
     };
   }
+  if (/^(?:[a-z0-9-]+\.)+wei$/.test(lower)) {
+    return {
+      url: `https://${lower}.limo${normalizedPath}${search}${hash}`,
+      label: "Try on wei.limo",
+      gateway: "wei.limo",
+    };
+  }
   if (!/^(?:[a-z0-9-]+\.)+eth$/.test(lower)) return null;
   const trimmed = lower.slice(0, -4);
   return {
@@ -85,7 +85,8 @@ export default function EnsError() {
   const { tokens } = useTheme();
   const params = useMemo(() => parseParams(), []);
   const fallback = useMemo(
-    () => hostedFallback(params.ensName, params.path, params.search, params.hash),
+    () =>
+      hostedFallback(params.ensName, params.path, params.search, params.hash),
     [params],
   );
   const displayedName = useMemo(() => displayName(params.ensName), [params]);

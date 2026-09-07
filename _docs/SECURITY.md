@@ -1175,7 +1175,7 @@ permission.
 ENS/avatar/token-logo URLs are attacker-controlled display metadata.
 The local-gateway ENS banner treats the mounted page the same way: its metadata
 scraper forwards only a title and `http(s)` or `data:image/*` favicon URL, its
-address field accepts only `.eth`, `.gwei`, or a raw 20-byte contract address,
+address field accepts only `.eth`, `.wei`, `.gwei`, or a raw 20-byte contract address,
 and hosted-gateway navigation goes through the authorized
 `ens-open-on-gateway` service-worker route. The manifest-facing
 `ensBanner.ts` is initialization-only; parsing, transport, bookmark/gateway
@@ -1185,7 +1185,7 @@ The browser launcher never assigns raw local-gateway SVG favicon metadata to
 the renderer. For resolver-backed favorites it first accepts only Chrome's
 same-extension `/_favicon/` URL at fixed size 64 for an exact
 HTTP IPFS/IPNS subdomain-gateway page, `https://*.eth.limo`,
-`https://*.eth.link`, `https://*.gwei.domains`, or `https://*.w3eth.io` page;
+`https://*.eth.link`, `https://*.wei.limo`, `https://*.wei.domains`, `https://*.gwei.domains`, or `https://*.w3eth.io` page;
 apexes, non-gateway host shapes, credentials, unsafe ports, and hosted-gateway
 lookalikes remain rejected. Custom Kubo hosts and ports are supported because
 the display projection constructs this URL only after matching the actual page
@@ -2713,3 +2713,28 @@ iframe connection/signing requests retain the existing rejection gates. No
 cross-origin forwarding, origin override, or background permission exception is
 introduced. The child result router is not installed, so child init/account
 messages cannot mutate the top provider state.
+
+### WNS browsing boundary
+
+Exact `.wei` / `*.wei.limo` / `*.wei.domains` browsing uses the existing
+Ethereum RPC transport and pinned WNS registry, independently of ENS. Only
+IPFS/IPNS contenthashes or the resolved contract's nonempty, at-most-1-MiB
+`html()` output are accepted. HTML is never evaluated in an extension page;
+it is served by the hosted gateway or pinned through the existing Kubo
+onchain-content cache. The new gateway allowlist retains exact suffix,
+matching top-level origin, and message-audience checks. No new secret storage
+or signing capability is introduced. DNR interception applies only to main
+frames, is disabled with local routing, and installs a tab-bound hosted
+fallback bypass to prevent loops.
+
+### GNS contract-hosted websites
+
+GNS contenthash takes precedence over an explicit `contentcontract` text
+record. Only a bare/mainnet `eth:` or Sepolia `sep:` 20-byte nonzero address
+is accepted; arbitrary URLs, paths, and other chains are rejected. No
+resolved-owner fallback is used. Local snapshots use the configured content
+chain RPC and bounded onchain HTML pinning; `5219` and raw-calldata `manual`
+modes remain distinct. Local content must be nonempty HTML of at most 1 MiB;
+non-200, encoded, and chunked responses are rejected. Hosted links preserve
+the GNS origin and existing per-tab bypass. No signing or secret access is
+introduced.

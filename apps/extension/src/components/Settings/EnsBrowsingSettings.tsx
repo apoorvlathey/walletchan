@@ -233,7 +233,7 @@ export default function EnsBrowsingSettings({ onBack }: EnsBrowsingSettingsProps
     <SettingsScreenFrame title="WalletChan Browser" onBack={onBack}>
       <VStack align="stretch" spacing={4}>
         <Text fontSize="sm" color="fg.secondary">
-          Open .eth and .gwei sites from the address bar, with an optional local IPFS gateway.
+          Open .eth, .wei, and .gwei sites from the address bar, with an optional local IPFS gateway.
         </Text>
 
       <ThemedCard p={3}>
@@ -246,10 +246,10 @@ export default function EnsBrowsingSettings({ onBack }: EnsBrowsingSettingsProps
           </HStack>
           <Text fontSize="xs" color="fg.secondary">
             {!settings?.enabled
-              ? "WalletChan does not intercept .eth or .gwei navigations."
+              ? "WalletChan does not intercept .eth, .wei, or .gwei navigations."
               : settings.useLocalGateway && kuboStatus === "online"
                 ? "Resolving via your local IPFS node."
-                : "Routing .eth/.gwei via eth.limo, gwei.domains, and w3eth.io."}
+                : "Routing .eth/.wei/.gwei via eth.limo, wei.limo, gwei.domains, and w3eth.io."}
           </Text>
         </VStack>
       </ThemedCard>
@@ -655,7 +655,7 @@ export default function EnsBrowsingSettings({ onBack }: EnsBrowsingSettingsProps
 
       <Box pt={1}>
         <Text fontSize="xs" color="fg.muted">
-          Type any .eth or .gwei name in the address bar to open it directly.
+          Type any .eth, .wei, or .gwei name in the address bar to open it directly.
           WalletChan resolves the contenthash via your mainnet RPC.
         </Text>
       </Box>

@@ -1,6 +1,8 @@
 const ERROR_PAGE = "ens-error.html";
 
-function extensionPagePath(sender: chrome.runtime.MessageSender): string | null {
+function extensionPagePath(
+  sender: chrome.runtime.MessageSender,
+): string | null {
   const senderUrl = sender.url;
   if (!senderUrl?.startsWith(chrome.runtime.getURL("/"))) return null;
   try {
@@ -49,6 +51,7 @@ function isTopLevelEnsGatewayContent(
     return (
       /\.(?:ipfs|ipns)\.localhost$/.test(host) ||
       /\.eth\.(?:limo|link)$/.test(host) ||
+      /^(?:[a-z0-9-]+\.)+wei\.(?:limo|domains)$/.test(host) ||
       /\.gwei\.domains$/.test(host) ||
       /\.w3eth\.io$/.test(host) ||
       /^0x[a-f0-9]{40}\.1\.w3link\.io$/.test(host)

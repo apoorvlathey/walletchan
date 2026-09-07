@@ -2349,7 +2349,14 @@ browsing:
    / ERC-5219 onchain HTML via the resolved address. `.gwei` names resolve
    through the GNS NameNFT resolver contract on Ethereum mainnet by reading
    `contenthash(namehash(name.gwei))` directly; `.gwei` supports IPFS/IPNS
-   contenthashes only, with no ERC-4804 fallback.
+   contenthashes first, then an explicit `contentcontract` text record.
+   `gweiContract.ts` accepts bare/mainnet (`eth:`) and Sepolia (`sep:`)
+   addresses; it never falls back to the name owner or payment address.
+   Hosted navigation retains `name.gwei.domains`. With local HTML pinning
+   enabled, the configured RPC for the content chain reads root HTML using
+   ERC-5219 `request([],[])` or manual raw `/` calldata. Local snapshots reject
+   non-200, encoded, chunked, non-HTML, empty, and over-1-MiB responses.
+   Full path-dependent sites remain available through the hosted gateway.
 5. The service worker chooses either the hosted gateway (`eth.limo`,
    `gwei.domains`, or `w3eth.io`) or the configured local Kubo gateway based on
    the existing `ensBrowsing` settings. Raw `0x` address mode follows the same split:
@@ -2371,6 +2378,28 @@ browsing:
    script evaluation. Hosted gateway navigation continues through
    `ens-open-on-gateway` so the authorized service-worker path installs the
    per-tab bypass before navigation.
+
+WNS browsing additionally accepts bare `.wei` names and exact
+`*.wei.limo` / `*.wei.domains` URLs, preserving path, query, and fragment.
+`weiResolver.ts` reads `contenthash(bytes32)` from the existing mainnet WNS
+registry (`WEI_CONTRACT`). IPFS/IPNS records use the normal gateway path; an
+empty record falls back to the registry's `addr(bytes32)` and the resolved
+contract's `html()` function. Invalid/unsupported contenthashes and failed
+registry reads fail closed. HTML reads use the bounded configured RPC and
+require nonempty output of at most 1 MiB. With both local-gateway and HTML
+pinning enabled, the existing onchain HTML cache/pinning boundary stores it
+under an isolated Kubo CID origin; otherwise the hosted target is wei.limo.
+Production Chromium background builds explicitly compact formatting with
+Terser because Vite skips its minifier for ES library output. Compression and
+name mangling remain disabled; function/class names and license comments are
+retained. Development output remains readable, and the existing privacy
+worker-boundary scan and 4 MiB background budget still run after formatting.
+Gateway DNR construction is shared across families while retaining existing
+rule IDs, priorities, patterns, and tab-scoped bypass behavior.
+WNS gateway interception is enabled only for local-gateway routing and goes
+directly to the interstitial. Hosted fallback installs a matching per-tab
+ALLOW rule, also removed on tab close. WNS names retain their own namespace
+in bookmarks, favicons, and banner gateway actions and never use ENS history.
 
 Hosted-gateway redirect rules are deliberately conditional. The base `.eth` /
 `.gwei` and w3link rules are installed whenever ENS browsing is enabled. The

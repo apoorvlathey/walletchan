@@ -3,6 +3,7 @@ const MAX_FAVICON_PAGE_URL_CHARS = 2_048;
 function isHostedGatewayHostname(hostname: string): boolean {
   return (
     /.+\.eth\.(?:limo|link)$/i.test(hostname) ||
+    /.+\.wei\.(?:limo|domains)$/i.test(hostname) ||
     /.+\.gwei\.domains$/i.test(hostname) ||
     /.+\.w3eth\.io$/i.test(hostname)
   );

@@ -25,7 +25,12 @@ function directHttpsTarget(rawInput: string): Dapp3NavigationTarget | null {
   if (trimmed.length > 2_048 || !/^https:\/\//i.test(trimmed)) return null;
   try {
     const url = new URL(trimmed);
-    if (url.protocol !== "https:" || url.username || url.password || !url.hostname) {
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      !url.hostname
+    ) {
       return null;
     }
     return { kind: "https", url: url.href };
@@ -34,7 +39,9 @@ function directHttpsTarget(rawInput: string): Dapp3NavigationTarget | null {
   }
 }
 
-export function parseDapp3Target(rawInput: string): Dapp3NavigationTarget | null {
+export function parseDapp3Target(
+  rawInput: string,
+): Dapp3NavigationTarget | null {
   const trimmed = rawInput
     .trim()
     .replace(/^https?:\/\//i, "")
@@ -61,11 +68,15 @@ export function parseDapp3Target(rawInput: string): Dapp3NavigationTarget | null
       : { kind: "ens", host: `${label}.eth`, rest };
   }
 
+  const weiGateway = head.match(
+    /^((?:[a-z0-9-]+\.)+wei)\.(?:limo|domains)\.?$/,
+  );
+  if (weiGateway?.[1]) return { kind: "ens", host: weiGateway[1], rest };
   const ethGateway = head.match(/^((?:[a-z0-9-]+\.)+eth)\.(?:limo|link)$/);
   if (ethGateway?.[1]) return { kind: "ens", host: ethGateway[1], rest };
   const gweiGateway = head.match(/^((?:[a-z0-9-]+\.)+gwei)\.domains$/);
   if (gweiGateway?.[1]) return { kind: "ens", host: gweiGateway[1], rest };
-  if (/^(?:[a-z0-9-]+\.)+(?:eth|gwei)\.?$/.test(head)) {
+  if (/^(?:[a-z0-9-]+\.)+(?:eth|gwei|wei)\.?$/.test(head)) {
     return {
       kind: "ens",
       host: head.endsWith(".") ? head.slice(0, -1) : head,
@@ -91,8 +102,8 @@ export function filterConnectedDapps(
   const needle = query.trim().toLowerCase();
   if (!needle) return dapps;
   return dapps.filter((dapp) =>
-    [dapp.hostname, dapp.title, dapp.origin, displayLabel?.(dapp)].some((value) =>
-      value?.toLowerCase().includes(needle),
+    [dapp.hostname, dapp.title, dapp.origin, displayLabel?.(dapp)].some(
+      (value) => value?.toLowerCase().includes(needle),
     ),
   );
 }
@@ -109,14 +120,14 @@ export function connectedFavoriteOrigins(
 
 function bookmarkGatewayOrigin(bookmark: EnsBookmark): string | null {
   if (bookmark.launchUrl) return null;
+  if (bookmark.ensName.endsWith(".wei"))
+    return `https://${bookmark.ensName}.limo`;
+  if (bookmark.ensName.endsWith(".gwei")) return `https://${bookmark.ensName}.domains`;
   if (bookmark.kind === "web3" || /^0x[a-f0-9]{40}$/.test(bookmark.ensName)) {
     const label = bookmark.ensName.endsWith(".eth")
       ? bookmark.ensName.slice(0, -4)
       : bookmark.ensName;
     return `https://${label}.w3eth.io`;
-  }
-  if (bookmark.ensName.endsWith(".gwei")) {
-    return `https://${bookmark.ensName}.domains`;
   }
   if (bookmark.ensName.endsWith(".eth")) {
     return `https://${bookmark.ensName}.limo`;
@@ -151,7 +162,8 @@ export function favoriteDappFaviconUrl(bookmark: EnsBookmark): string {
   const favicon = bookmark.favicon?.trim();
   if (
     favicon &&
-    (isAllowedRemoteImageUrl(favicon) || sanitizeTrustedRendererImageSrc(favicon))
+    (isAllowedRemoteImageUrl(favicon) ||
+      sanitizeTrustedRendererImageSrc(favicon))
   ) {
     return favicon;
   }
@@ -165,9 +177,7 @@ export function favoriteDappFaviconUrl(bookmark: EnsBookmark): string {
   return `${gatewayOrigin}${favicon ? gatewayAssetPath(favicon) : "/favicon.ico"}`;
 }
 
-export function favoriteDappFaviconFallbackUrl(
-  bookmark: EnsBookmark,
-): string {
+export function favoriteDappFaviconFallbackUrl(bookmark: EnsBookmark): string {
   const hostname = bookmark.launchUrl
     ? favoriteDappDisplayUrl(bookmark)
     : (() => {
@@ -183,14 +193,14 @@ export function favoriteDappBrowserFaviconPageUrl(
   bookmark: EnsBookmark,
 ): string | null {
   if (bookmark.launchUrl) return bookmark.launchUrl;
+  if (bookmark.ensName.endsWith(".wei"))
+    return `https://${bookmark.ensName}.limo/`;
+  if (bookmark.ensName.endsWith(".gwei")) return `https://${bookmark.ensName}.domains`;
   if (bookmark.kind === "web3" || /^0x[a-f0-9]{40}$/.test(bookmark.ensName)) {
     const label = bookmark.ensName.endsWith(".eth")
       ? bookmark.ensName.slice(0, -4)
       : bookmark.ensName;
     return `https://${label}.w3eth.io/`;
-  }
-  if (bookmark.ensName.endsWith(".gwei")) {
-    return `https://${bookmark.ensName}.domains/`;
   }
   if (bookmark.ensName.endsWith(".eth")) {
     return `https://${bookmark.ensName}.link/`;

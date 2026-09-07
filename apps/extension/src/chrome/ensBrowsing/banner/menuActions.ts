@@ -8,8 +8,9 @@ export function buildHostedGatewayUrl(
 ): string {
   const current = pagePath || "/";
   const path = current.startsWith("/") ? current : `/${current}`;
-  const isWeb3 = context.kind === "web3" && !!context.contractAddress;
+  const isWei = /\.wei$/i.test(context.ensName);
   const isGwei = /\.gwei$/i.test(context.ensName);
+  const isWeb3 = !isWei && !isGwei && context.kind === "web3" && !!context.contractAddress;
   return isWeb3 && context.contractAddress
     ? `https://${context.contractAddress}.w3eth.io${path}`
     : isGwei
@@ -23,20 +24,22 @@ export function wireBannerMenu(
 ): void {
   const isAddressNavigation = /^0x[a-f0-9]{40}$/i.test(context.ensName);
   const isGwei = /\.gwei$/i.test(context.ensName);
-  if (isAddressNavigation || isGwei) {
+  if (isAddressNavigation || isGwei || /\.wei$/i.test(context.ensName)) {
     refs.historyLink.style.display = "none";
   } else {
-    refs.historyLink.href =
-      `https://ens.eth.sh/history/${context.ensName.toLowerCase()}`;
+    refs.historyLink.href = `https://ens.eth.sh/history/${context.ensName.toLowerCase()}`;
   }
 
-  const isWeb3 = context.kind === "web3" && !!context.contractAddress;
-  if (isWeb3 || isGwei) {
+  const isWei = /\.wei$/i.test(context.ensName);
+  const isWeb3 = !isWei && !isGwei && context.kind === "web3" && !!context.contractAddress;
+  if (isWeb3 || isGwei || isWei) {
     const label = refs.openGatewayItem.querySelector("span");
     if (label) {
-      label.textContent = isWeb3
-        ? "Open on w3eth.io gateway"
-        : "Open on gwei.domains gateway";
+      label.textContent = isWei
+        ? "Open on wei.limo gateway"
+        : isWeb3
+          ? "Open on w3eth.io gateway"
+          : "Open on gwei.domains gateway";
     }
   }
 
@@ -60,10 +63,7 @@ export function wireBannerMenu(
   });
 }
 
-async function copyUnderlyingUrl(
-  refs: BannerRefs,
-  url: string,
-): Promise<void> {
+async function copyUnderlyingUrl(refs: BannerRefs, url: string): Promise<void> {
   const showFeedback = () => {
     refs.copyToast.classList.add("show");
     setTimeout(() => refs.copyToast.classList.remove("show"), 1200);

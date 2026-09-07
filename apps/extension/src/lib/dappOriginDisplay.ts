@@ -55,11 +55,12 @@ function cachedSiteForGatewayLabel(
 
 function hostedGatewayOrigin(site: CachedResolve): string | null {
   const name = site.ensName.toLowerCase();
+  if (name.endsWith(".wei")) return `https://${name}.limo`;
+  if (name.endsWith(".gwei")) return `https://${name}.domains`;
   if (site.kind === "web3" || /^0x[a-f0-9]{40}$/.test(name)) {
     const label = name.endsWith(".eth") ? name.slice(0, -4) : name;
     return `https://${label}.w3eth.io`;
   }
-  if (name.endsWith(".gwei")) return `https://${name}.domains`;
   if (name.endsWith(".eth")) return `https://${name}.limo`;
   return null;
 }
@@ -86,9 +87,10 @@ function faviconSources(
   const trustedCachedFavicon = cachedFavicon
     ? sanitizeTrustedRendererImageSrc(cachedFavicon)
     : null;
-  const remoteCachedFavicon = cachedFavicon && isAllowedRemoteImageUrl(cachedFavicon)
-    ? cachedFavicon
-    : null;
+  const remoteCachedFavicon =
+    cachedFavicon && isAllowedRemoteImageUrl(cachedFavicon)
+      ? cachedFavicon
+      : null;
   const projectedFavicon =
     hostedOrigin && cachedFavicon && /^https?:\/\//i.test(cachedFavicon)
       ? `${hostedOrigin}${gatewayAssetPath(cachedFavicon)}`

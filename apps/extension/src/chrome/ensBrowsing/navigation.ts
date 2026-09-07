@@ -1,15 +1,23 @@
 import { setCached } from "./cache";
 import {
   addEthGatewayBypassForTab,
+  addWeiGatewayBypassForTab,
   addGweiDomainsBypassForTab,
   addW3ethBypassForTab,
   removeEthGatewayRedirectRule,
+  removeWeiGatewayRedirectRule,
   removeGweiDomainsRedirectRule,
   removeW3ethRedirectRule,
 } from "./dnrRules";
 import { buildHostedGatewayUrl, buildSubdomainUrl } from "./gateway";
 import { probeKuboGateway } from "./kubo";
-import { isGweiName, resolveEns, resolveGwei } from "./resolver";
+import {
+  isGweiName,
+  isWeiName,
+  resolveEns,
+  resolveGwei,
+  resolveWei,
+} from "./resolver";
 import { getEnsBrowsingSettings } from "./settingsStorage";
 import type { ResolveKind, TabContext } from "./types";
 
@@ -61,10 +69,11 @@ export async function chooseGatewayUrl(
 
 export function hostedGatewayKind(
   url: string,
-): "eth" | "gwei" | "w3eth" | null {
+): "eth" | "gwei" | "wei" | "w3eth" | null {
   try {
     const host = new URL(url).hostname.toLowerCase();
     if (/\.eth\.(?:limo|link)\.?$/.test(host)) return "eth";
+    if (/^(?:[a-z0-9-]+\.)+wei\.(?:limo|domains)\.?$/.test(host)) return "wei";
     if (/\.gwei\.domains\.?$/.test(host)) return "gwei";
     if (/\.w3eth\.io\.?$/.test(host)) return "w3eth";
   } catch {
@@ -82,6 +91,8 @@ export async function prepareHostedGatewayNavigation(
   try {
     if (kind === "eth") {
       await addEthGatewayBypassForTab(tabId);
+    } else if (kind === "wei") {
+      await addWeiGatewayBypassForTab(tabId);
     } else if (kind === "gwei") {
       await addGweiDomainsBypassForTab(tabId);
     } else {
@@ -94,6 +105,8 @@ export async function prepareHostedGatewayNavigation(
     );
     if (kind === "eth") {
       await removeEthGatewayRedirectRule().catch(() => undefined);
+    } else if (kind === "wei") {
+      await removeWeiGatewayRedirectRule().catch(() => undefined);
     } else if (kind === "gwei") {
       await removeGweiDomainsRedirectRule().catch(() => undefined);
     } else {
@@ -111,7 +124,9 @@ export async function resolveAndRedirect(
 ): Promise<{ ok: true } | { ok: false; error: string; code?: string }> {
   const result = isGweiName(ensName)
     ? await resolveGwei(ensName)
-    : await resolveEns(ensName);
+    : isWeiName(ensName)
+      ? await resolveWei(ensName)
+      : await resolveEns(ensName);
   if (!result.ok) {
     if (result.code === "kubo-cors-blocked") {
       return { ok: false, error: result.error, code: result.code };
@@ -161,9 +176,13 @@ export async function refreshFromCache(
 ): Promise<void> {
   const result = isGweiName(ensName)
     ? await resolveGwei(ensName)
-    : await resolveEns(ensName);
+    : isWeiName(ensName)
+      ? await resolveWei(ensName)
+      : await resolveEns(ensName);
   if (!result.ok) {
-    console.log(`[ens] background refresh of ${ensName} failed: ${result.error}`);
+    console.log(
+      `[ens] background refresh of ${ensName} failed: ${result.error}`,
+    );
     return;
   }
   await setCached({

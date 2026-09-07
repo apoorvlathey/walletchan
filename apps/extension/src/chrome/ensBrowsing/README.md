@@ -10,6 +10,10 @@
   and Universal Resolver call.
 - `nameResolvers.ts` resolves ENS/GNS contenthash records and ENS address
   fallbacks.
+- `gweiContract.ts` validates explicit GNS contentcontract records and reads
+  bounded root HTML in 5219/manual mode through the configured chain RPC.
+- `weiResolver.ts` reads WNS contenthash/address records and bounded `html()`
+  content, reusing the existing onchain pin/cache boundary.
 - `erc4804Resolver.ts` probes, fetches, pins, and caches onchain HTML.
 - `web3url.ts` and `kubo.ts` enforce bounded onchain/Kubo content reads.
 - `gateway.ts`, `dnrRules.ts`, and `settingsStorage.ts` own gateway/network policy.

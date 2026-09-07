@@ -5,7 +5,7 @@ import { addToKubo, KuboPinError, removeMfsPath, unpinFromKubo } from "./kubo";
 import { describeResolverError, getDirectClient } from "./resolverSupport";
 import { getEnsBrowsingSettings } from "./settingsStorage";
 import type { ResolveResponse } from "./types";
-import { fetchErc4804, Web3FetchError } from "./web3url";
+import { fetchErc4804, Web3FetchError, type Web3FetchResult } from "./web3url";
 import {
   bumpWeb3LastAccess,
   getWeb3Budgets,
@@ -41,7 +41,10 @@ export async function resolveContractAddress(
       await fetchErc4804(client, lower as `0x${string}`, { probeOnly: true });
     } catch (error) {
       if (error instanceof Web3FetchError) {
-        return { ok: false, error: `web3-${error.detail.kind}: ${error.message}` };
+        return {
+          ok: false,
+          error: `web3-${error.detail.kind}: ${error.message}`,
+        };
       }
       return {
         ok: false,
@@ -57,12 +60,7 @@ export async function resolveContractAddress(
       contractAddress: lower as `0x${string}`,
     };
   }
-  return fetchPinAndCacheErc4804(
-    client,
-    lower as `0x${string}`,
-    lower,
-    true,
-  );
+  return fetchPinAndCacheErc4804(client, lower as `0x${string}`, lower, true);
 }
 
 export async function fetchPinAndCacheErc4804(
@@ -70,16 +68,23 @@ export async function fetchPinAndCacheErc4804(
   address: `0x${string}`,
   ensName: string,
   trustedDirectly: boolean,
+  fetchHtml: (
+    client: PublicClient,
+    address: `0x${string}`,
+  ) => Promise<Web3FetchResult> = fetchErc4804,
 ): Promise<ResolveResponse> {
   let body: Uint8Array;
   let contentType: string | null;
   try {
-    const fetched = await fetchErc4804(client, address);
+    const fetched = await fetchHtml(client, address);
     body = fetched.body;
     contentType = fetched.contentType;
   } catch (error) {
     if (error instanceof Web3FetchError) {
-      return { ok: false, error: `web3-${error.detail.kind}: ${error.message}` };
+      return {
+        ok: false,
+        error: `web3-${error.detail.kind}: ${error.message}`,
+      };
     }
     return {
       ok: false,
@@ -123,7 +128,10 @@ export async function fetchPinAndCacheErc4804(
     const plan = await planEviction(body.byteLength, budgets);
     for (const stale of plan.toEvict) {
       await evictWeb3(stale).catch((error) =>
-        console.warn(`[ens] eviction failed for ${stale.contractAddress}`, error),
+        console.warn(
+          `[ens] eviction failed for ${stale.contractAddress}`,
+          error,
+        ),
       );
     }
     if (existing && existing.cid !== "") {
