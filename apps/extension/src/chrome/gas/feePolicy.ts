@@ -4,7 +4,8 @@ export const CUSTOM_TIER_BASE_FEE_MULT_NUM = 150n;
 export const CUSTOM_TIER_BASE_FEE_MULT_DEN = 100n;
 
 const PRIORITY_FEE_FLOOR_WEI: Record<number, bigint> = {
-  1: 50_000_000n,
+  // 0.0001 gwei: positive dust floor, not a target or an inclusion guarantee.
+  1: 100_000n,
   42161: 1_000_000n,
   10: 1_000_000n,
   8453: 1_000_000n,
@@ -25,6 +26,11 @@ const TIER_BASE_FEE_MULT_DEN = 100n;
 
 export function getPriorityFeeFloor(chainId: number): bigint {
   return PRIORITY_FEE_FLOOR_WEI[chainId] ?? DEFAULT_PRIORITY_FEE_FLOOR_WEI;
+}
+
+/** Missing fee evidence must not be interpreted as a quiet Ethereum market. */
+export function getFallbackPriorityFeeFloor(chainId: number): bigint {
+  return chainId === 1 ? 50_000_000n : getPriorityFeeFloor(chainId);
 }
 
 export function tierFromTip(

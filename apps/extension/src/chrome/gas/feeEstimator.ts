@@ -2,6 +2,7 @@ import type { PublicClient } from "viem";
 import {
   applyPriorityFloor,
   enforceTierGap,
+  getFallbackPriorityFeeFloor,
   getPriorityFeeFloor,
   percentile,
   predictNextBaseFee,
@@ -35,7 +36,7 @@ export async function estimateFeeTiers(
     // Legacy gas-price fallback below remains authoritative for this failure.
   }
   if (baseFee === null || nextBaseFee === null) {
-    return legacyGasPriceTiers(client, floor);
+    return legacyGasPriceTiers(client, getFallbackPriorityFeeFloor(chainId));
   }
 
   const samples = await collectPriorityFeeSamples(client);
@@ -47,7 +48,11 @@ export async function estimateFeeTiers(
     priorityP60 = percentile(samples, STANDARD_PERCENTILE);
     priorityP90 = percentile(samples, FAST_PERCENTILE);
   } else {
-    const fallback = (await tryMaxPriorityFeePerGas(client)) ?? 0n;
+    const rpcTip = await tryMaxPriorityFeePerGas(client);
+    const fallback =
+      rpcTip !== null && rpcTip > 0n
+        ? rpcTip
+        : getFallbackPriorityFeeFloor(chainId);
     priorityP25 = fallback;
     priorityP60 = fallback;
     priorityP90 = fallback;

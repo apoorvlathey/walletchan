@@ -8,6 +8,12 @@ import type { EstimatedFeeTiers } from "./types";
 const FEE_HISTORY_BLOCK_COUNT = 10;
 const FEE_HISTORY_REWARD_PERCENTILE = 50;
 
+function parseTip(value: unknown): bigint | null {
+  return typeof value === "string" && /^0x[0-9a-fA-F]{1,64}$/.test(value)
+    ? BigInt(value)
+    : null;
+}
+
 export async function legacyGasPriceTiers(
   client: PublicClient,
   floor: bigint,
@@ -54,11 +60,15 @@ export async function collectPriorityFeeSamples(
     return null;
   }
   const rewards = history?.reward as string[][] | undefined;
-  if (!Array.isArray(rewards) || rewards.length === 0) return null;
+  if (
+    !Array.isArray(rewards) || rewards.length === 0 ||
+    rewards.length > FEE_HISTORY_BLOCK_COUNT
+  ) return null;
   const samples: bigint[] = [];
   for (const entry of rewards) {
-    if (!entry?.length) continue;
-    const value = BigInt(entry[0] ?? "0x0");
+    if (!Array.isArray(entry) || entry.length !== 1) return null;
+    const value = parseTip(entry[0]);
+    if (value === null) return null;
     if (value > 0n) samples.push(value);
   }
   if (samples.length === 0) return null;
@@ -73,7 +83,7 @@ export async function tryMaxPriorityFeePerGas(
     const hex = await client.request({
       method: "eth_maxPriorityFeePerGas" as any,
     } as any);
-    return typeof hex === "string" ? BigInt(hex) : null;
+    return parseTip(hex);
   } catch {
     return null;
   }
