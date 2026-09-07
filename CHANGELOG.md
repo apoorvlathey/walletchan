@@ -12,6 +12,46 @@ To regenerate the `[Unreleased]` section from git diffs, invoke the `/changelog`
 
 _Nothing yet._
 
+## [4.1.0] - 2026-09-08
+
+### Added
+
+- **Block explorer transaction decoding.** An opt-in WalletChan tab in supported
+  explorers' Input Data sections shows decoded transaction details and clear
+  signing information.
+- **Address-poisoning warnings.** Send checks recipients against contacts and
+  previous send recipients, highlights lookalike addresses, and requires an
+  acknowledgement before proceeding with a match.
+- **WNS and GNS website support.** dapp3 Browser resolves WNS websites through
+  wei.limo and wei.domains and supports GNS contentcontract records for onchain
+  HTML.
+
+### Changed
+
+- Eligible Bankr accounts can now include atomic approval cleanup alongside
+  Private Key and Seed Phrase accounts.
+- Ethereum fee estimates can use lower priority fees when supported by RPC fee
+  evidence, while retaining conservative fallbacks when that evidence is missing.
+- Approval reviews, token amounts, and transaction details have clearer layouts;
+  Swap uses simpler labels.
+
+### Fixed
+
+- Improved compatibility with legacy wallet provider proxies, pre-connection
+  network switching, and same-origin dapp frames.
+- Name-service identities resolve for the relevant network while preserving
+  account profiles, and Send retains the recipient name entered by the user.
+- Hidden networks no longer trigger portfolio RPC checks and related alerts.
+- Corrected Arbitrum delayed-transaction receipt validation and recovery.
+
+### Security
+
+- External EIP-712 requests cannot use wallet-owned direct-signing accounts as
+  the verifying contract. Protection applies at request intake, confirmation,
+  and final signature release across all four signing account types, while
+  preserving supported Safe owner approvals.
+- Stale requests using deprecated signing methods are rejected.
+
 ## [4.0.0] - 2026-07-27
 
 ### Added
@@ -788,7 +828,8 @@ This release is a full rebuild of the wallet — multiple account types, a real 
 - View address on Debank from the homepage.
 - Lock-wallet button and footer attribution.
 
-[Unreleased]: https://github.com/apoorvlathey/walletchan/compare/v4.0.0...HEAD
+[Unreleased]: https://github.com/apoorvlathey/walletchan/compare/v4.1.0...HEAD
+[4.1.0]: https://github.com/apoorvlathey/walletchan/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/apoorvlathey/walletchan/compare/v3.19.0...v4.0.0
 [3.19.0]: https://github.com/apoorvlathey/walletchan/compare/v3.18.0...v3.19.0
 [3.18.0]: https://github.com/apoorvlathey/walletchan/compare/v3.17.0...v3.18.0
