@@ -31,6 +31,7 @@ export function AddressParam({
 
   return (
     <LabeledAddressPopover
+      chainId={chainId}
       address={address}
       contextLabel={contextLabel}
       explorer={getChainConfig(chainId).explorer}

@@ -452,3 +452,16 @@ test("signer-owned privacy transactions remain visible in Public Activity", () =
     "Unshield ETH",
   );
 });
+
+test("history names require verification on the transaction network", () => {
+  const meta = {
+    kind: "transfer" as const,
+    counterparty: "0x1111111111111111111111111111111111111111",
+    counterpartyEns: "onshow.eth",
+    amount: "1",
+    tokenSymbol: "USDC",
+  };
+  assert.equal(getActivityPresentation(transaction({clearSignedMeta: meta})).context, "To 0x1111...1111 · app.example.com");
+  assert.equal(getActivityPresentation(transaction({clearSignedMeta: {...meta, counterpartyEnsChainId: 1}})).context, "To 0x1111...1111 · app.example.com");
+  assert.equal(getActivityPresentation(transaction({clearSignedMeta: {...meta, counterpartyEnsChainId: 8453}})).context, "To onshow.eth · app.example.com");
+});

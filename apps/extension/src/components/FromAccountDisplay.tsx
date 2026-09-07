@@ -10,9 +10,10 @@ import { LedgerAvatar } from "@/components/Ledger/LedgerAvatar";
 
 interface FromAccountDisplayProps {
   address: string;
+  chainId?: number;
 }
 
-export function FromAccountDisplay({ address }: FromAccountDisplayProps) {
+export function FromAccountDisplay({ address, chainId: _chainId = 1 }: FromAccountDisplayProps) {
   const [fromAccount, setFromAccount] = useState<Account | null>(null);
   const addresses = useMemo(() => [address], [address]);
   const { identities } = useEnsIdentities(addresses);

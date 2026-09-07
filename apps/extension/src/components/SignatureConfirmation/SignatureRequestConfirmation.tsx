@@ -366,6 +366,7 @@ function SignatureRequestConfirmation({
       actionSummary={
         signerAddress ? (
           <SignatureDecisionSummary
+            chainId={signature.chainId}
             address={signerAddress}
             unsafeSiweDecision={
               siweOverrideRequired && canSign && siweBlockingError

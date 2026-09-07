@@ -1531,7 +1531,7 @@ accessible resources.
 | `accounts`                 | No               | Account metadata (addresses, names, types)              |
 | `ledgerDevices`            | No               | Public Ledger label/model metadata keyed by the canonical public address at `m/44'/60'/0'/0/0`; no transport secret or private key |
 | `addressContacts`          | No               | Local-only user labels for public EVM addresses         |
-| `ensIdentityCache`         | No               | Six-hour public name/avatar cache; optional `needsAvatar` marks a forward-resolved name awaiting batched avatar lookup |
+| `ensIdentityCache`         | No               | Six-hour public name/avatar cache keyed by `chainId:lowercaseAddress`; legacy address-only entries are ignored. `needsAvatar` hints require forward verification before display |
 | `networkRpcUrls`           | No               | Bounded Settings-only RPC history keyed by chain ID, including optional display names and an exact per-endpoint `allowImpersonatedTransactions` developer flag. It never changes runtime routing until the selected endpoint is validated and promoted to `networksInfo[*].rpcUrl` through the service worker. |
 | `onboardingInitialization` | No               | Temporary `{ version, id, startedAt }` transaction marker for one fresh-wallet setup. Missing is normal; unmarked authoritative key/account state fails closed, disposable residue is cleared before begin, and complete wallets cannot be rolled back because marker cleanup failed. |
 | `pendingTxRequests`        | No               | Pending transaction queue                               |
@@ -2738,3 +2738,31 @@ modes remain distinct. Local content must be nonempty HTML of at most 1 MiB;
 non-200, encoded, and chunked responses are rejected. Hosted links preserve
 the GNS origin and existing per-tab bypass. No signing or secret access is
 introduced.
+
+
+### ENS multichain identity boundary
+
+Forward recipient resolution requests the selected network's ENSIP-11 coin type
+through Ethereum L1. Missing/malformed records and RPC failures never authorize
+an Ethereum-address fallback. ENSIP-19 default handling belongs to the resolver.
+Reverse names and service fallback candidates must forward-match the actual
+address on that network before display. Network changes invalidate both pending
+Send lookups and displayed identity state; cache entries are network-qualified.
+Chain IDs outside the 31-bit ENSIP-11 range are not truncated.
+History `ClearSignedMeta.counterpartyEnsChainId` binds newly verified name
+snapshots to the transaction network. Unqualified legacy snapshots remain
+readable but cannot supply a verified ENS label. These changes add no secret
+storage, message audience, signing capability, or submission path.
+
+Network-independent account management retains verified Ethereum mainnet profiles
+for compatibility with existing ENS primary names. This is the no-network API
+default only: Send and transaction surfaces always pass their network explicitly.
+Explicit chain 0 still requests the default EVM record, and its cached misses
+cannot suppress an account profile cached under chain 1.
+
+Known wallet accounts and saved contacts use their established mainnet profile
+for display across all networks, including transaction detail pills and signing
+account rows. The shared renderer identity hook partitions profile lookups from
+unknown-address network lookups and keeps their caches separate. A known profile
+is an address-book identity, not proof of that name's payment destination on the
+transaction network. Forward name-to-recipient resolution remains chain-specific.

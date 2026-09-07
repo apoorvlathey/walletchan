@@ -15,7 +15,7 @@ test("Address Book and Send share contact identity enrichment and contact-list c
   assert.match(addressBook, /useAddressContactIdentities/u);
   assert.match(addressBook, /AddressContactList/u);
   assert.match(recipientHook, /useAddressContactIdentities/u);
-  assert.match(recipientHook, /useAddressResolver\(localRecipientIdentity \? "" : recipient\)/u);
+  assert.match(recipientHook, /useAddressResolver\(localRecipientIdentity \? "" : recipient, 500, chainId\)/u);
   assert.match(recipientHook, /isResolving: false/u);
   assert.match(recipientPicker, /AddressContactList/u);
   assert.match(recipientPicker, /import \{ AccountAvatar \} from "@\/components\/AccountIdentity"/u);
@@ -38,7 +38,7 @@ test("Address Book and Send share contact identity enrichment and contact-list c
   assert.match(recipientSection, /onClick=\{\(\) => setSuggestionsOpen\(true\)\}/u);
   assert.match(
     recipientSection,
-    /label = "Recipient"[\s\S]*?chooserLabel = "My contacts"/u,
+    /label = "Recipient"[\s\S]*?chooserLabel = "Contacts"/u,
   );
   assert.match(recipientSection, /<HStack spacing=\{1\}>[\s\S]*?\{label\}[\s\S]*?hasRecipientChoices && \([\s\S]*?\{chooserLabel\}/u);
   assert.match(recipientSection, /<LabeledAddressPopover[\s\S]*?maxW="180px"/u);

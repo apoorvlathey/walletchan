@@ -73,6 +73,7 @@ export default function ClearSigningSummary({
 
       {hasDelegation && delegationMeta && (
         <DelegationReceipt
+          chainId={tx.chainId}
           target={delegationMeta.targetDelegate}
           kind={delegationMeta.kind}
           explorer={explorerBase}

@@ -100,7 +100,7 @@ export default function RawTransactionDetails({
       )}
 
       <DetailRow label="From">
-        <FromAccountDisplay address={tx.tx.from} />
+        <FromAccountDisplay chainId={tx.chainId} address={tx.tx.from} />
       </DetailRow>
 
       <DetailRow label={isContractDeploy ? "Type" : "To"}>

@@ -177,7 +177,7 @@ export default function TransactionMeta({
           role="group"
           aria-label={`Signing account ${tx.tx.from}`}
         >
-          <FromAccountDisplay address={tx.tx.from} />
+          <FromAccountDisplay chainId={tx.chainId} address={tx.tx.from} />
         </Box>
       </HStack>
 

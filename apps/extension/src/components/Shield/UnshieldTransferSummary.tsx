@@ -1,3 +1,4 @@
+import { SHIELDED_ETH_CHAIN_ID } from "./model/shieldedAsset";
 import { ArrowDownIcon } from "@chakra-ui/icons";
 import { Box, HStack, Image, Text, VStack } from "@chakra-ui/react";
 import { LabeledAddressPopover } from "@/components/shared/LabeledAddressPopover";
@@ -135,6 +136,7 @@ export default function UnshieldTransferSummary({
           To address
         </Text>
         <LabeledAddressPopover
+          chainId={SHIELDED_ETH_CHAIN_ID}
           address={operation.recipient}
           contextLabel="unshield recipient"
           explorer={SHIELDED_ETH_EXPLORER_URL}

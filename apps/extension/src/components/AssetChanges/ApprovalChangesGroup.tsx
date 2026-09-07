@@ -48,9 +48,11 @@ function expirationLabel(expiration: number | null): string | null {
 function ApprovalRow({
   change,
   explorerUrl,
+  chainId,
 }: {
   change: ApprovalChange;
   explorerUrl: string;
+  chainId: number;
 }) {
   const unverified = change.verification === "unverified";
   const expiration = expirationLabel(change.expiration);
@@ -128,6 +130,7 @@ function ApprovalRow({
             Spender
           </Text>
           <LabeledAddressPopover
+            chainId={chainId}
             account={null}
             address={change.spender}
             contextLabel="spender"
@@ -181,10 +184,12 @@ export function ApprovalChangesGroup({
   changes,
   detectionIncomplete,
   explorerUrl,
+  chainId,
 }: {
   changes: ApprovalChange[];
   detectionIncomplete: boolean;
   explorerUrl: string;
+  chainId: number;
 }) {
   if (changes.length === 0) return null;
   const hasUnlimited = changes.some((change) => change.isUnlimited);
@@ -226,6 +231,7 @@ export function ApprovalChangesGroup({
       >
         {changes.map((change) => (
           <ApprovalRow
+            chainId={chainId}
             key={[
               change.system,
               change.tokenAddress,

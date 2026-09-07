@@ -50,6 +50,7 @@ function AddressValue({
 
   return (
     <LabeledAddressPopover
+      chainId={chainId ?? 0}
       address={address}
       contextLabel="typed-data address"
       explorer={explorer}

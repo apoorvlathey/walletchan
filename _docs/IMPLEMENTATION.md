@@ -4544,9 +4544,43 @@ Transaction confirmation includes a "Simulate on Tenderly" button:
 
 Accounts in the dropdown automatically resolve ENS names, Basenames, WNS `.wei` names, GNS `.gwei` names, MegaNames `.mega` names, and avatars. Results are cached in `chrome.storage.local` for 6 hours.
 
+### Network-qualified resolution
+
+`ensUtils.ts` owns ENSIP-11 coin-type selection: Ethereum uses 60, other
+supported EVM chain IDs use `0x80000000 + chainId`, and chain 0 explicitly
+selects ENS's default EVM record. Resolution always starts on Ethereum L1.
+The resolver supplies ENSIP-19 default-address behavior; WalletChan never
+substitutes the Ethereum record when a network record is missing or fails.
+Chain IDs outside the 31-bit ENSIP-11 range fail closed instead of wrapping.
+
+Send passes its selected chain into `useAddressResolver` and clears old results
+on input/network changes, including already-running asynchronous lookups.
+Transaction, batch, signature, Safe, approval, typed-data, Shield, and staking
+identity surfaces use their pinned network for unknown external addresses.
+The shared `useEnsIdentities` hook partitions known wallet accounts and saved
+contacts into Ethereum-mainnet profile lookups, preserving the same name/avatar
+as the account selector even in Send, recipient pills, and Signing with.
+Account and contact selectors request this profile directly. Membership updates
+refresh that partition without changing forward resolution or transaction bytes.
+Network-independent account lists,
+onboarding, and the address book retain Ethereum mainnet profile resolution
+when no network is supplied, preserving existing primary names. Explicit chain 0
+still selects the new default EVM record; it is not the default API argument.
+Account profiles never supply a fallback for an explicitly network-bound lookup.
+Every displayed reverse-name candidate (including Basename/WNS/GNS/Mega fallbacks
+and contact name hints) must forward-resolve to the same address in that scope.
+The shared address pill requires an explicit chain ID from its caller.
+
+The existing `ensIdentityCache` storage key now holds entries keyed by
+`chainId:lowercaseAddress`. Legacy address-only entries are not reused. Expired
+entries and unverified name hints are hidden while fresh resolution runs.
+Transaction history snapshots add `counterpartyEnsChainId`; old unqualified ENS
+labels are not used as verified history labels. User-authored contact/account
+labels remain fixed labels for their stored addresses, not payment resolution.
+
 ### Resolution Priority
 
-ENS (Ethereum mainnet) takes precedence over Basename (Base L2), which takes precedence over WNS (Wei Name Service), then GNS (Gwei Name Service), then MegaNames (MegaETH):
+ENS (for the requested network, resolved through Ethereum mainnet) takes precedence over Basename (Base L2), which takes precedence over WNS (Wei Name Service), then GNS (Gwei Name Service), then MegaNames (MegaETH):
 
 1. **Name**: ENS name > Basename > WNS `.wei` name > GNS `.gwei` name > MegaNames `.mega` name > truncated address
 2. **Avatar**: ENS avatar (when ENS name exists) > Basename avatar (when only Basename exists) > GNS avatar text record (when only a GNS name exists) > Mega avatar (when only Mega name exists) > BankrAvatar (Bankr accounts) > BlockieAvatar (wallet-account fallback only). WNS names have no avatar support.
@@ -7022,3 +7056,16 @@ bundle ID, releases that ID to injected/WalletConnect callers only after the
 first explicit owner authorization, and attaches the execution receipt after
 success. WalletConnect retains the pre-authorization request in its durable
 terminal outbox, so a worker restart cannot turn the draft into an early ACK.
+
+
+### ENS L2 reverse lookup resilience
+
+Individual and batched identity lookups fall back to the official L2 reverse
+registrar when the mainnet Universal Resolver returns no name or its gateway
+fails. This is restricted to the documented Base, Optimism, Arbitrum, Linea,
+and Scroll mainnet deployments, uses configured RPCs with bounded transport,
+checks the registrar coin type, sanitizes the name, and requires same-chain
+forward verification. Saved account/contact mainnet profile selection is unchanged.
+Old negative cache entries on these chains expire on read; new results carry
+reverseVersion 2. Registrar deployments are pinned from the ENS reverse registrar
+documentation and must be reviewed if ENS changes them.

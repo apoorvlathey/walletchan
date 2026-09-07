@@ -38,6 +38,7 @@ function SummaryRow({
 }
 
 export default function DelegationReceipt({
+  chainId,
   target,
   kind,
   explorer,
@@ -46,6 +47,7 @@ export default function DelegationReceipt({
   target: string;
   kind: "revoke" | "setDelegate";
   explorer?: string;
+  chainId: number;
   resolvedLabel?: string | null;
 }) {
   const isRevoke = kind === "revoke";
@@ -91,6 +93,7 @@ export default function DelegationReceipt({
           <>
             <SummaryRow label="Delegate">
               <LabeledAddressPopover
+                chainId={chainId}
                 address={target}
                 contextLabel="smart account delegate"
                 explorer={explorer}

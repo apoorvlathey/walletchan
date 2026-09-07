@@ -107,6 +107,7 @@ export function TransactionInfoCard({
                   Interacting with
                 </Text>
                 <LabeledAddressPopover
+                  chainId={tx.chainId}
                   address={tx.to}
                   contextLabel="interacting address"
                   explorer={explorer}

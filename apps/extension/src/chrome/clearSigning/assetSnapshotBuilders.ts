@@ -33,6 +33,7 @@ export async function buildApproveMeta(
     counterparty: parsed.spender,
     counterpartyLabel: counterparty.label,
     counterpartyEns: counterparty.ens,
+    counterpartyEnsChainId: counterparty.ens ? chainId : undefined,
   };
 }
 
@@ -59,6 +60,7 @@ export async function buildTransferMeta(
     counterparty: parsed.recipient,
     counterpartyLabel: counterparty.label,
     counterpartyEns: counterparty.ens,
+    counterpartyEnsChainId: counterparty.ens ? chainId : undefined,
   };
 }
 
@@ -89,5 +91,6 @@ export async function buildNativeSendMeta(
     counterparty: to,
     counterpartyLabel: counterparty.label,
     counterpartyEns: counterparty.ens,
+    counterpartyEnsChainId: counterparty.ens ? chainId : undefined,
   };
 }

@@ -54,7 +54,7 @@ function AddressValue({
     };
   }, [address, chainId]);
 
-  return <LabeledAddressPopover address={address} contextLabel="delegation address" explorer={resolvedChain?.explorer} label={label || truncateHex(address, 6, 4)} maxW="190px" />;
+  return <LabeledAddressPopover chainId={chainId} address={address} contextLabel="delegation address" explorer={resolvedChain?.explorer} label={label || truncateHex(address, 6, 4)} maxW="190px" />;
 }
 
 function InfoRow({

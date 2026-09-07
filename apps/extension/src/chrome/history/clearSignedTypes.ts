@@ -16,6 +16,8 @@ export interface ClearSignedMeta {
   counterparty?: string;
   counterpartyLabel?: string;
   counterpartyEns?: string;
+  /** Network used to verify this name; absent on legacy mainnet-only snapshots. */
+  counterpartyEnsChainId?: number;
   /** ERC-7730 descriptor intent and contract label. */
   intent?: string;
   contractName?: string;

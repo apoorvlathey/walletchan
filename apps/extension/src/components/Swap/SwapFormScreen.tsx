@@ -73,7 +73,7 @@ export function SwapFormScreen(props: SwapFormScreenProps) {
         onBack={props.onBack}
         trailing={
           props.fromAddress ? (
-            <FromAccountDisplay address={props.fromAddress} />
+            <FromAccountDisplay chainId={props.sellChainId} address={props.fromAddress} />
           ) : undefined
         }
       />

@@ -1,3 +1,4 @@
+import { useEnsIdentities } from "@/hooks/useEnsIdentities";
 import {
   Box,
   HStack,
@@ -123,8 +124,6 @@ export default function DelegatedPermissionGrantCard({
   nativeSymbol,
   tokenMetadata,
   delegateAccount,
-  delegateName,
-  delegateAvatar,
   onRevoke,
   hasDivider = false,
 }: {
@@ -134,11 +133,11 @@ export default function DelegatedPermissionGrantCard({
   nativeSymbol: string;
   tokenMetadata: TokenDisplayMetadata | null | undefined;
   delegateAccount?: Account;
-  delegateName: string | null;
-  delegateAvatar: string | null;
   onRevoke: () => void;
   hasDivider?: boolean;
 }) {
+  const { identities } = useEnsIdentities(delegateAccount ? [grant.request.to] : []);
+  const identity = identities.get(grant.request.to.toLowerCase());
   const tokenAddress = tokenAddressFromGrant(grant);
   const formattedAmount = formatGrantAmount(grant, tokenMetadata, nativeSymbol);
   const isNative = isErc7715NativePermissionType(grant.permissionType);
@@ -230,8 +229,8 @@ export default function DelegatedPermissionGrantCard({
             <DelegateIdentity
               address={grant.request.to}
               account={delegateAccount}
-              resolvedName={delegateName}
-              resolvedAvatar={delegateAvatar}
+              resolvedName={identity?.name ?? null}
+              resolvedAvatar={identity?.avatar ?? null}
               explorer={explorer}
             />
           </HStack>

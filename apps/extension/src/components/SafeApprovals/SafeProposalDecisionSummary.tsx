@@ -30,6 +30,7 @@ import type {
 type DecisionAccount = SafeOwnerAccount | SafeExecutorAccount;
 
 export function SafeProposalDecisionSummary({
+  chainId,
   actionKind,
   accounts,
   selectedAccount,
@@ -51,6 +52,7 @@ export function SafeProposalDecisionSummary({
   safeOwnerAccountIds: ReadonlySet<string>;
   executionRequest: PendingTxRequest | null;
   proposalId: string;
+  chainId: number;
   onSelect: (accountId: string) => void;
   onGasOverrides: (overrides: GasOverrides | null) => void;
   onGasValidityChange: (valid: boolean) => void;
@@ -85,7 +87,7 @@ export function SafeProposalDecisionSummary({
             : "Choose signing account"
         }
       >
-        <FromAccountDisplay address={selectedAccount.address} />
+        <FromAccountDisplay chainId={chainId} address={selectedAccount.address} />
       </MenuButton>
       <Portal>
         <MenuList
@@ -103,7 +105,7 @@ export function SafeProposalDecisionSummary({
               aria-current={account.id === selectedAccount.id ? "true" : undefined}
             >
               <HStack w="full" minW={0} justify="space-between" spacing={3}>
-                <FromAccountDisplay address={account.address} />
+                <FromAccountDisplay chainId={chainId} address={account.address} />
                 {actionKind === "execute" && safeOwnerAccountIds.has(account.id) && (
                   <Badge variant="subtle" fontSize="2xs" flexShrink={0}>
                     Owner
@@ -116,7 +118,7 @@ export function SafeProposalDecisionSummary({
       </Portal>
     </Menu>
   ) : (
-    <FromAccountDisplay address={selectedAccount.address} />
+    <FromAccountDisplay chainId={chainId} address={selectedAccount.address} />
   );
 
   return (

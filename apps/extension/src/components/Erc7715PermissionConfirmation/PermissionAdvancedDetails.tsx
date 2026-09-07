@@ -15,6 +15,7 @@ import { shortAddress } from "@/lib/erc7715PermissionDisplay";
 const DELEGATION_MANAGER = "0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3";
 
 export function PermissionAdvancedDetails({
+  chainId,
   permissionType,
   caveats,
   rawRequest,
@@ -24,6 +25,7 @@ export function PermissionAdvancedDetails({
   caveats: PendingErc7715PermissionRequest["caveats"];
   rawRequest: string;
   explorer?: string;
+  chainId: number;
 }) {
   return (
     <VStack align="stretch" spacing={4}>
@@ -51,6 +53,7 @@ export function PermissionAdvancedDetails({
           </ListItemContent>
           <ListItemActions>
             <LabeledAddressPopover
+              chainId={chainId}
               address={DELEGATION_MANAGER}
               contextLabel="delegation manager"
               explorer={explorer}
@@ -87,6 +90,7 @@ export function PermissionAdvancedDetails({
               </ListItemContent>
               <ListItemActions>
                 <LabeledAddressPopover
+                  chainId={chainId}
                   address={caveat.enforcer}
                   contextLabel={`${caveat.enforcerName} enforcer`}
                   explorer={explorer}

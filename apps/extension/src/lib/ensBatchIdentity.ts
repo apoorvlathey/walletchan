@@ -15,6 +15,9 @@ import {
   getMainnetNameServiceClient,
   getMegaNameServiceClient,
   sanitizeResolvedName,
+  ensCoinType,
+  isNameForAddress,
+  getL2EnsName,
 } from "@/lib/ensUtils";
 import { GWEI_CONTRACT, WEI_CONTRACT } from "@/utils/wei";
 import { MEGA_NAMES_CONTRACT, megaNamesAbi } from "@/utils/mega";
@@ -153,6 +156,7 @@ function decodeEnsAvatarRecord(value: unknown): string | null {
 async function resolvePrimaryNames(
   addresses: Address[],
   knownNames: ReadonlyMap<string, string>,
+  chainId: number,
 ): Promise<Map<string, string | null>> {
   const names = new Map<string, string | null>();
   const unresolved = addresses.filter((address) => {
@@ -172,7 +176,7 @@ async function resolvePrimaryNames(
       address: ENS_UNIVERSAL_RESOLVER_ADDRESS,
       abi: ENS_REVERSE_ABI,
       functionName: "reverseWithGateways" as const,
-      args: [address, 60n, [LOCAL_BATCH_GATEWAY_URL]] as const,
+      args: [address, ensCoinType(chainId), [LOCAL_BATCH_GATEWAY_URL]] as const,
     },
     { address: WEI_CONTRACT as Address, abi: REVERSE_RESOLVER_ABI, functionName: "reverseResolve" as const, args: [address] as const },
     { address: GWEI_CONTRACT as Address, abi: REVERSE_RESOLVER_ABI, functionName: "reverseResolve" as const, args: [address] as const },
@@ -196,9 +200,18 @@ async function resolvePrimaryNames(
     megaClient.multicall({ contracts: megaCalls, allowFailure: true, multicallAddress: MULTICALL3_ADDRESS }).catch(() => []),
   ]) as [BatchResult[], BatchResult[], BatchResult[]];
 
+  const l2Names = new Map<string, string | null>();
+  const missingEns = unresolved.filter((_, index) => !ensReverseName(mainnetResults, index * 3));
+  for (let offset = 0; offset < missingEns.length; offset += 4) {
+    await Promise.all(missingEns.slice(offset, offset + 4).map(async (address) => {
+      l2Names.set(address.toLowerCase(), await getL2EnsName(address, chainId));
+    }));
+  }
+
   unresolved.forEach((address, index) => {
     const mainnetOffset = index * 3;
     const name = ensReverseName(mainnetResults, mainnetOffset)
+      || l2Names.get(address.toLowerCase())
       || sanitizeResolvedName(stringResult(baseResults, index))
       || sanitizeResolvedName(stringResult(mainnetResults, mainnetOffset + 1))
       || sanitizeResolvedName(stringResult(mainnetResults, mainnetOffset + 2))
@@ -266,9 +279,18 @@ async function resolveAvatars(names: Map<string, string | null>): Promise<Map<st
 export async function resolveEnsIdentitiesBatch(
   addresses: Address[],
   knownNames: ReadonlyMap<string, string> = new Map(),
+  chainId = 1,
 ): Promise<Map<string, BatchEnsIdentity>> {
   const unique = [...new Map(addresses.map((address) => [address.toLowerCase(), address])).values()];
-  const names = await resolvePrimaryNames(unique, knownNames);
+  const names = await resolvePrimaryNames(unique, knownNames, chainId);
+  // Bounded verification includes service fallbacks and untrusted contact hints.
+  for (let offset = 0; offset < unique.length; offset += 4) {
+    await Promise.all(unique.slice(offset, offset + 4).map(async (address) => {
+      const key = address.toLowerCase();
+      const name = names.get(key);
+      if (name && !await isNameForAddress(name, address, chainId)) names.set(key, null);
+    }));
+  }
   const avatars = await resolveAvatars(names);
   return new Map(unique.map((address) => {
     const key = address.toLowerCase();

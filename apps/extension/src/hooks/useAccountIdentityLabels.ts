@@ -7,7 +7,9 @@ import {
   getAccountPickerSecondaryIdentity,
 } from "@/lib/accountIdentityPresentation";
 
-export function useAccountIdentityLabels(accounts: Account[]) {
+// Account management has no payment network: retain the established L1 profile.
+// Selected networks never change this account-management identity.
+export function useAccountIdentityLabels(accounts: Account[], _chainId = 1) {
   const addresses = useMemo(() => accounts.map((account) => account.address), [accounts]);
   const { identities } = useEnsIdentities(addresses);
   const { contacts } = useAddressContacts();

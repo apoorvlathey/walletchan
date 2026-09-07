@@ -1,3 +1,4 @@
+import { SHIELDED_ETH_CHAIN_ID } from "./model/shieldedAsset";
 import { useEffect, useRef } from "react";
 import { Button, Center, Spinner, Text, VStack } from "@chakra-ui/react";
 
@@ -25,7 +26,7 @@ export default function PublicRecoveryStatusScreen({
   onUnlockRequired,
 }: PublicRecoveryStatusScreenProps) {
   const requestedRef = useRef(false);
-  const accountIdentity = useAccountIdentityLabels(accounts);
+  const accountIdentity = useAccountIdentityLabels(accounts, SHIELDED_ETH_CHAIN_ID);
   const { initialization, retry } = useShieldInitialization();
   const recovery = usePublicRecovery(() => {}, onUnlockRequired);
   const { inspect: inspectRecovery } = recovery;

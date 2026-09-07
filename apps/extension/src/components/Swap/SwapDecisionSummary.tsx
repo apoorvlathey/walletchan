@@ -75,7 +75,7 @@ export function SwapDecisionSummary({
           Signing with
         </Text>
         <HStack minW={0} justify="flex-end">
-          <FromAccountDisplay address={fromAddress} />
+          <FromAccountDisplay chainId={chainId} address={fromAddress} />
         </HStack>
       </HStack>
 

@@ -172,6 +172,7 @@ function Erc7715PermissionConfirmation({
       }
       advancedDetails={
         <PermissionAdvancedDetails
+          chainId={permissionRequest.chainId}
           permissionType={presentation.permissionTypeLabel}
           caveats={displayedCaveats}
           rawRequest={rawRequest}
@@ -179,7 +180,7 @@ function Erc7715PermissionConfirmation({
         />
       }
       actionSummary={
-        <PermissionDecisionSummary address={editedRequest.from} />
+        <PermissionDecisionSummary chainId={permissionRequest.chainId} address={editedRequest.from} />
       }
       actionNotice={
         accountType === "impersonator" ? <ViewOnlySigningNotice /> : undefined

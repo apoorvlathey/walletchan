@@ -26,6 +26,7 @@ export function AddressInline({
 
   return (
     <LabeledAddressPopover
+      chainId={chainId}
       address={address}
       contextLabel="decoded address"
       explorer={getChainConfig(chainId).explorer}

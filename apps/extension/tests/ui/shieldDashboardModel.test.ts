@@ -598,7 +598,7 @@ test("Shield deposit form stays concise and does not repeat the private balance"
   assert.doesNotMatch(pickerSource, /SHIELDED_ETH_NETWORK_NAME|Ethereum|Sepolia/);
   assert.match(pickerSource, /Safe accounts cannot shield/);
   assert.match(pickerSource, /account\.type === "ledger"\) return "Ledger"/);
-  assert.match(pickerSource, /useAccountIdentityLabels\(accounts\)/);
+  assert.match(pickerSource, /useAccountIdentityLabels\(accounts, SHIELDED_ETH_CHAIN_ID\)/);
   assert.match(pickerSource, /getDisplayName\(selected\)/);
   assert.match(pickerSource, /getEnsAvatar\(selected\)/);
   assert.match(pickerSource, /getDisplayName\(candidate\)/);

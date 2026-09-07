@@ -50,7 +50,7 @@ export default function DappConnectionAccountSelector({
   const seedGroupMap = useSeedGroupMap(accounts);
   const accountTriggerRef = useRef<HTMLDivElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
-  const { getDisplayName, getEnsAvatar, getSecondaryIdentity } = useAccountIdentityLabels(accounts);
+  const { getDisplayName, getEnsAvatar, getSecondaryIdentity } = useAccountIdentityLabels(accounts, chainId);
   useEffect(() => {
     chrome.runtime.sendMessage({ type: "getSafeAccounts" }, (records: SafeAccountRecord[]) => setSafeRecords(records || []));
   }, []);

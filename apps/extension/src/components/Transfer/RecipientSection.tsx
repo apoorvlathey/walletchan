@@ -5,7 +5,7 @@ import {
   Checkbox,
   HStack,
   Input,
-  Spinner,
+  Image,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -14,6 +14,7 @@ import { useTheme } from "@/theme";
 import { isResolvableName } from "@/lib/ensUtils";
 import { AddressContactAvatar } from "@/components/shared/AddressContactAvatar";
 import { LabeledAddressPopover } from "@/components/shared/LabeledAddressPopover";
+import LoadingDots from "@/components/LoadingDots";
 import type { TransferRecipient } from "./hooks/useTransferRecipient";
 
 interface RecipientSectionProps {
@@ -28,7 +29,7 @@ export function RecipientSection({
   recipientState,
   explorerUrl,
   label = "Recipient",
-  chooserLabel = "My contacts",
+  chooserLabel = "Contacts",
   hasPoisoningWarning = false,
 }: RecipientSectionProps) {
   const { tokens } = useTheme();
@@ -53,6 +54,8 @@ export function RecipientSection({
     suggestions,
     selectRecipientAddress,
   } = recipientState;
+  const isNameInput = isResolvableName(recipient);
+  const inputAvatar = isNameInput && isValid && recipientState.avatar ? recipientState.cachedRecipientAvatar : null;
   const hasRecipientChoices = otherAccounts.length + recipientContacts.length > 0;
   const showSuggestions = isSuggestionsOpen && suggestions.length > 0;
 
@@ -93,26 +96,45 @@ export function RecipientSection({
           )}
         </HStack>
         {recipient && (isResolving || isLoadingExtras) && (
-          <HStack spacing={1} minW={0}>
-            <Spinner size="xs" color="accent.secondary" />
-            <Text fontSize="xs" color="text.tertiary" fontWeight="700">
-              Resolving...
-            </Text>
+          <HStack spacing={1.5} flexShrink={0} role="status">
+            <LoadingDots />
+            {isResolving && (
+              <Text fontSize="xs" color="text.tertiary" fontWeight="700">
+                Resolving...
+              </Text>
+            )}
           </HStack>
         )}
         {recipient && !isResolving && isValid && resolvedAddress && (
           <LabeledAddressPopover
+            chainId={recipientState.chainId}
             address={resolvedAddress}
-            preferredLabel={isResolvableName(recipient) ? recipient : undefined}
+            addressOnly={isNameInput}
             contextLabel="recipient address"
             explorer={explorerUrl}
-            label={resolvedName || `${resolvedAddress.slice(0, 6)}...${resolvedAddress.slice(-4)}`}
+            label={!isNameInput && resolvedName ? resolvedName : `${resolvedAddress.slice(0, 6)}...${resolvedAddress.slice(-4)}`}
             maxW="180px"
           />
         )}
       </HStack>
       <Box position="relative">
+        {inputAvatar && (
+          <Image
+            src={inputAvatar}
+            alt=""
+            position="absolute"
+            left="12px"
+            top="50%"
+            transform="translateY(-50%)"
+            boxSize="24px"
+            borderRadius="full"
+            objectFit="cover"
+            pointerEvents="none"
+            zIndex={2}
+          />
+        )}
         <Input
+          pl={inputAvatar ? "48px" : undefined}
           id="send-recipient"
           placeholder="0x, contacts, .eth, .gwei"
           value={recipient}

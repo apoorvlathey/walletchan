@@ -16,7 +16,7 @@ export async function resolveCounterpartyLabels(
   if (contact) return { label: contact.label };
   const [labels, ens] = await Promise.all([
     getEthShLabels(address, chainId).catch(() => [] as string[]),
-    resolveAddressToName(address).catch(() => null),
+    resolveAddressToName(address, chainId).catch(() => null),
   ]);
   return { label: labels[0], ens: ens || undefined };
 }

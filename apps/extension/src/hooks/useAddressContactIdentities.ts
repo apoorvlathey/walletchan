@@ -11,7 +11,7 @@ export interface AddressContactIdentity {
   secondaryIsAddress: boolean;
 }
 
-export function useAddressContactIdentities(contacts: AddressContact[]) {
+export function useAddressContactIdentities(contacts: AddressContact[], _chainId = 1) {
   const addresses = useMemo(
     () => contacts.map((contact) => contact.address),
     [contacts],

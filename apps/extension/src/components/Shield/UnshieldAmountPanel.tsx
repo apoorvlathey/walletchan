@@ -1,3 +1,4 @@
+import { SHIELDED_ETH_CHAIN_ID } from "./model/shieldedAsset";
 import { InfoOutlineIcon } from "@chakra-ui/icons";
 import {
   Box,
@@ -196,6 +197,7 @@ export default function UnshieldAmountPanel({
             >
               <Text fontSize="xs" color="fg.muted">Original deposit account</Text>
               <LabeledAddressPopover
+                chainId={SHIELDED_ETH_CHAIN_ID}
                 address={publicExit.depositAccountAddress}
                 contextLabel="public exit recipient"
                 explorer={explorerUrl}

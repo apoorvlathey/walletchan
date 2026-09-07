@@ -72,7 +72,7 @@ export default function PrivateWithdrawalScreen({
   const [isAddingRecipientAccount, setIsAddingRecipientAccount] = useState(false);
   const [recipientAccountToReveal, setRecipientAccountToReveal] = useState<string | null>(null);
   const copy = getUnshieldCopy();
-  const accountIdentity = useAccountIdentityLabels(accounts);
+  const accountIdentity = useAccountIdentityLabels(accounts, SHIELDED_ETH_CHAIN_ID);
   const { initialization, retry } = useShieldInitialization();
   const activity = useShieldOperations();
   const recordWithdrawal = activity.recordWithdrawal;

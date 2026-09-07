@@ -1,3 +1,4 @@
+import { SHIELDED_ETH_CHAIN_ID } from "./model/shieldedAsset";
 import {
   Box,
   Button,
@@ -43,7 +44,7 @@ export default function ShieldSourceAccountPicker({
   account,
   onChange,
 }: ShieldSourceAccountPickerProps) {
-  const { getDisplayName, getEnsAvatar } = useAccountIdentityLabels(accounts);
+  const { getDisplayName, getEnsAvatar } = useAccountIdentityLabels(accounts, SHIELDED_ETH_CHAIN_ID);
   const selected = account
     ? accounts.find((candidate) => candidate.id === account.id) ?? null
     : null;

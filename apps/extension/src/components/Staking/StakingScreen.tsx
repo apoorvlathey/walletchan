@@ -1,3 +1,4 @@
+import { STAKING_CHAIN_ID } from "./constants";
 import { useMemo, useState } from "react";
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { FromAccountDisplay } from "@/components/FromAccountDisplay";
@@ -105,7 +106,7 @@ export default function StakingScreen(props: StakingScreenProps) {
       <AppHeader
         title="Stake WCHAN"
         onBack={props.onBack}
-        trailing={props.fromAddress ? <FromAccountDisplay address={props.fromAddress} /> : undefined}
+        trailing={props.fromAddress ? <FromAccountDisplay chainId={STAKING_CHAIN_ID} address={props.fromAddress} /> : undefined}
       />
       <ScreenBody pt={4}>
         <VStack align="stretch" spacing={4}>

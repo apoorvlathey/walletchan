@@ -99,6 +99,7 @@ export async function buildErc7730Meta(
     counterparty: to,
     counterpartyLabel: counterparty.label,
     counterpartyEns: counterparty.ens,
+    counterpartyEnsChainId: counterparty.ens ? chainId : undefined,
     intent,
     contractName,
   };

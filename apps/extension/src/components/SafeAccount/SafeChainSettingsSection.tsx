@@ -109,6 +109,7 @@ function SafeChainDetails({
               return (
                 <HStack key={owner} spacing={2} justify="space-between">
                   <LabeledAddressPopover
+                    chainId={snapshot.chainId}
                     account={linkedAccount ?? null}
                     address={owner}
                     contextLabel="Safe owner address"

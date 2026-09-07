@@ -355,6 +355,7 @@ export function SafeProposalConfirmation({
       )}
       actionSummary={displayRequestView ? (
         <SafeProposalDecisionSummary
+          chainId={proposal.chainId}
           actionKind={primaryActionKind}
           accounts={actionAccounts}
           selectedAccount={selectedAccount}

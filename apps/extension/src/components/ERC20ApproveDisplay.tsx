@@ -26,7 +26,7 @@ import {
   encodeApproveCalldata,
   INFINITE_THRESHOLD,
 } from "@/lib/erc20Approve";
-import { resolveAddressToName } from "@/lib/ensUtils";
+import { useEnsIdentities } from "@/hooks/useEnsIdentities";
 import { getEthShLabels } from "@/lib/ethShLabelsCache";
 import { isDarkThemeId, useTheme } from "@/theme";
 import { useNetworks } from "@/contexts/NetworksContext";
@@ -198,7 +198,8 @@ export default function ERC20ApproveDisplay({
       ? "surface.raisedHover"
       : "status.warning.tint";
   const [spenderLabels, setSpenderLabels] = useState<string[]>([]);
-  const [resolvedSpenderName, setResolvedSpenderName] = useState<string | null>(null);
+  const { identities: resolvedNames } = useEnsIdentities(approval.spender ? [approval.spender] : [], chainId);
+  const resolvedSpenderName = resolvedNames.get(approval.spender?.toLowerCase() ?? "")?.name ?? null;
   const [copiedToken, setCopiedToken] = useState(false);
   const spenderLabel = spenderLabels[0] ?? resolvedSpenderName;
 
@@ -252,18 +253,6 @@ export default function ERC20ApproveDisplay({
       cancelled = true;
     };
   }, [approval.spender, chainId]);
-
-  // Reverse resolve the spender address to ENS/Basename/WNS/GNS. Shown as a
-  // separate badge so an onchain name and an eth.sh label can coexist
-  // (same pattern as the outer "To" row).
-  useEffect(() => {
-    setResolvedSpenderName(null);
-    resolveAddressToName(approval.spender)
-      .then((name) => {
-        if (name) setResolvedSpenderName(name);
-      })
-      .catch(() => {});
-  }, [approval.spender]);
 
   const formattedAmount =
     token && !isInfinite
@@ -722,6 +711,7 @@ export default function ERC20ApproveDisplay({
               Spender
             </Text>
             <LabeledAddressPopover
+              chainId={chainId}
               address={approval.spender}
               contextLabel="spender address"
               explorer={explorerUrl}

@@ -166,12 +166,13 @@ export default function ClearSignedSummaryCard({
               {counterpartyLabel(meta)}
             </Text>
             <LabeledAddressPopover
+              chainId={chainId}
               address={meta.counterparty}
               contextLabel={counterpartyLabel(meta).toLowerCase()}
               explorer={explorer}
               label={
                 meta.counterpartyLabel ||
-                meta.counterpartyEns ||
+                (meta.counterpartyEnsChainId === chainId ? meta.counterpartyEns : undefined) ||
                 fallbackCounterparty
               }
               maxW="220px"

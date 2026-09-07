@@ -226,7 +226,7 @@ export function SafeProposalRequestDetails({
                 borderColor="border.subtle"
               >
                 {account ? (
-                  <FromAccountDisplay address={account.address} />
+                  <FromAccountDisplay chainId={proposal.chainId} address={account.address} />
                 ) : (
                   <Text fontFamily="mono" fontSize="xs">{short(owner)}</Text>
                 )}

@@ -233,7 +233,7 @@ function TokenTransfer({
         title="Send"
         onBack={onBack}
         trailing={
-          fromAddress ? <FromAccountDisplay address={fromAddress} /> : undefined
+          fromAddress ? <FromAccountDisplay chainId={catalog.selectedChainId} address={fromAddress} /> : undefined
         }
       />
       <ScreenBody pt={4} pb={4}>

@@ -32,7 +32,7 @@ export function useTransferRecipient({
     excluded.add(fromAddress.toLowerCase());
     return contacts.filter((contact) => !excluded.has(contact.address.toLowerCase()));
   }, [accounts, contacts, fromAddress]);
-  const { contactIdentities: recipientContactIdentities } = useAddressContactIdentities(eligibleRecipientContacts);
+  const { contactIdentities: recipientContactIdentities } = useAddressContactIdentities(eligibleRecipientContacts, chainId);
   const contactIdentitiesByAddress = useMemo(
     () => new Map(recipientContactIdentities.map((identity) => [identity.contact.address.toLowerCase(), identity])),
     [recipientContactIdentities],
@@ -94,7 +94,7 @@ export function useTransferRecipient({
       avatar: identities.get(key)?.avatar ?? null,
     };
   }, [accountsByAddress, contactIdentitiesByAddress, getAccountDisplayName, identities, recipient]);
-  const remoteResolver = useAddressResolver(localRecipientIdentity ? "" : recipient);
+  const remoteResolver = useAddressResolver(localRecipientIdentity ? "" : recipient, 500, chainId);
   const resolver = localRecipientIdentity
     ? {
         resolvedAddress: localRecipientIdentity.address,
@@ -195,6 +195,7 @@ export function useTransferRecipient({
   };
 
   return {
+    chainId,
     recipient,
     setRecipient: (value: string) => setRecipient(value.trim()),
     ...resolver,

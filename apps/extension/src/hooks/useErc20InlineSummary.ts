@@ -311,7 +311,7 @@ export function useErc20InlineSummary(
     () => (decoded ? [decoded.counterparty] : []),
     [decoded],
   );
-  const { identities } = useEnsIdentities(counterpartyAddresses);
+  const { identities } = useEnsIdentities(counterpartyAddresses, chainId);
 
   const [account, setAccount] = useState<Account | null>(null);
   useEffect(() => {

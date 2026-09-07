@@ -452,6 +452,7 @@ export function CallCard({
                   To
                 </Text>
                 <LabeledAddressPopover
+                  chainId={chainId}
                   address={call.to}
                   contextLabel="batch call target"
                   explorer={config.explorer}
@@ -574,6 +575,7 @@ function CalldataCallContent({
             To
           </Text>
           <LabeledAddressPopover
+            chainId={chainId}
             address={call.to}
             contextLabel="batch call target"
             explorer={config.explorer}

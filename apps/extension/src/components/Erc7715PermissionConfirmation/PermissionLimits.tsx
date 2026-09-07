@@ -159,6 +159,7 @@ export function PermissionLimits({
             Delegate
           </Text>
           <LabeledAddressPopover
+            chainId={permissionRequest.chainId}
             address={delegate}
             contextLabel="delegate"
             explorer={explorer}

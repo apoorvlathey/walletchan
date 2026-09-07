@@ -163,7 +163,7 @@ function formatActivityValueLabel(
 }
 
 function getCounterpartyDisplay(
-  meta: ClearSignedMeta,
+  meta: ClearSignedMeta, chainId: number,
   addressLabels?: ReadonlyMap<string, string>,
 ): string {
   if (meta.counterparty) {
@@ -174,7 +174,7 @@ function getCounterpartyDisplay(
     if (liveLabel) return liveLabel;
   }
   if (meta.counterpartyLabel) return meta.counterpartyLabel;
-  if (meta.counterpartyEns) return meta.counterpartyEns;
+  if (meta.counterpartyEnsChainId === chainId && meta.counterpartyEns) return meta.counterpartyEns;
   const address = meta.counterparty;
   if (!address) return "";
   return formatActivityAddress(address);
@@ -244,10 +244,10 @@ function getPrivacyShieldValue(
 }
 
 function getClearSignedContext(
-  meta: ClearSignedMeta,
+  meta: ClearSignedMeta, chainId: number,
   addressLabels?: ReadonlyMap<string, string>,
 ): string | null {
-  const counterparty = getCounterpartyDisplay(meta, addressLabels);
+  const counterparty = getCounterpartyDisplay(meta, chainId, addressLabels);
   if (!counterparty) return null;
   if (meta.kind === "approve") {
     return meta.isRevoke
@@ -373,7 +373,7 @@ export function getActivityPresentation(
 
   const contextParts: string[] = [];
   const clearSignedContext = tx.clearSignedMeta
-    ? getClearSignedContext(tx.clearSignedMeta, addressLabels)
+    ? getClearSignedContext(tx.clearSignedMeta, tx.chainId, addressLabels)
     : null;
   if (clearSignedContext) contextParts.push(clearSignedContext);
   if (!clearSignedContext && tx.transferMeta?.recipient) {

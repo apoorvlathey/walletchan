@@ -74,6 +74,7 @@ export function NativeCalldataDecodeModal({
               <HStack spacing={3} justify="space-between" minW={0} align="center">
                 <Text fontSize="xs" color="fg.secondary">Recipient</Text>
                 <LabeledAddressPopover
+                  chainId={chainId}
                   address={to}
                   contextLabel="recipient address"
                   explorer={explorer}

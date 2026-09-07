@@ -21,6 +21,7 @@ function AssetChangesDisplay(props: AssetChangesDisplayProps) {
 
   return (
     <AssetChangesPanel
+      chainId={txRequest.tx.chainId}
       explorerUrl={explorerUrl}
       loading={loading}
       result={result}

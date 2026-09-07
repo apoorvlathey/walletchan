@@ -1,3 +1,4 @@
+import { withStorageLock } from "@/chrome/storage/lock";
 import { getAddress, isAddress, type Address } from "viem";
 import { resolveEnsIdentitiesBatch } from "./ensBatchIdentity";
 import { resolveEnsIdentity, sanitizeResolvedName } from "./ensUtils";
@@ -12,6 +13,7 @@ export interface EnsIdentityCacheEntry {
   resolvedAt: number; // Date.now()
   /** A forward-resolved contact name was cached, but its avatar still needs lookup. */
   needsAvatar?: boolean;
+  reverseVersion?: number;
 }
 
 export type EnsIdentityCache = Record<string, EnsIdentityCacheEntry>;
@@ -19,6 +21,10 @@ export type EnsIdentityCache = Record<string, EnsIdentityCacheEntry>;
 // ============================================================================
 // Constants
 // ============================================================================
+
+export function ensIdentityKey(address: string, chainId = 1): string {
+  return `${chainId}:${address.toLowerCase()}`;
+}
 
 const CACHE_KEY = "ensIdentityCache";
 const CACHE_DURATION = 6 * 60 * 60 * 1000; // 6 hours
@@ -39,30 +45,37 @@ export async function getEnsIdentityCache(): Promise<EnsIdentityCache> {
   // can't bypass the new guard until the 6h TTL expires.
   for (const addr of Object.keys(raw)) {
     raw[addr] = { ...raw[addr], name: sanitizeResolvedName(raw[addr].name) };
+    // Retry L2 misses cached before direct registrar fallback was available.
+    if (!raw[addr].name && raw[addr].reverseVersion !== 2 && /^(10|8453|42161|59144|534352):/.test(addr)) {
+      raw[addr].resolvedAt = 0;
+    }
   }
   return raw;
 }
 
-async function saveEnsIdentityCache(cache: EnsIdentityCache): Promise<void> {
-  await chrome.storage.local.set({ [CACHE_KEY]: cache });
+async function saveEnsIdentityCache(entries: EnsIdentityCache): Promise<void> {
+  await withStorageLock("local:ensIdentityCache", async () => {
+    const cache = await getEnsIdentityCache();
+    await chrome.storage.local.set({ [CACHE_KEY]: { ...cache, ...entries } });
+  });
 }
 
 export async function resolveAndCacheIdentity(
-  address: string
+  address: string,
+  chainId = 1,
 ): Promise<{ name: string | null; avatar: string | null }> {
-  const lowerAddress = address.toLowerCase();
+  const lowerAddress = ensIdentityKey(address, chainId);
 
-  const { name, avatar } = await resolveEnsIdentity(address);
+  const { name, avatar } = await resolveEnsIdentity(address, chainId);
 
-  const cache = await getEnsIdentityCache();
-  cache[lowerAddress] = { name, avatar, resolvedAt: Date.now() };
-  await saveEnsIdentityCache(cache);
+  await saveEnsIdentityCache({ [lowerAddress]: { name, avatar, reverseVersion: 2, resolvedAt: Date.now() } });
 
   return { name, avatar };
 }
 
 export async function resolveAndCacheIdentities(
   addresses: string[],
+  chainId = 1,
 ): Promise<Map<string, { name: string | null; avatar: string | null }>> {
   const validAddresses = addresses
     .filter((address) => isAddress(address, { strict: false }))
@@ -72,32 +85,33 @@ export async function resolveAndCacheIdentities(
   const cache = await getEnsIdentityCache();
   const knownNames = new Map<string, string>();
   for (const address of validAddresses) {
-    const entry = cache[address.toLowerCase()];
+    const entry = cache[ensIdentityKey(address, chainId)];
     if (!entry?.needsAvatar) continue;
     const name = sanitizeResolvedName(entry.name);
     if (name) knownNames.set(address.toLowerCase(), name);
   }
 
-  const resolved = await resolveEnsIdentitiesBatch(validAddresses, knownNames);
+  const resolved = await resolveEnsIdentitiesBatch(validAddresses, knownNames, chainId);
   const resolvedAt = Date.now();
+  const entries: EnsIdentityCache = {};
   for (const [address, identity] of resolved) {
-    cache[address] = { ...identity, resolvedAt };
+    entries[ensIdentityKey(address, chainId)] = { ...identity, reverseVersion: 2, resolvedAt };
   }
-  await saveEnsIdentityCache(cache);
+  await saveEnsIdentityCache(entries);
   return resolved;
 }
 
-export async function cacheIdentityNameHint(address: string, name: string): Promise<void> {
+export async function cacheIdentityNameHint(address: string, name: string, chainId = 1): Promise<void> {
   const sanitizedName = sanitizeResolvedName(name.trim().toLowerCase());
   if (!isAddress(address, { strict: false }) || !sanitizedName) return;
-  const lowerAddress = getAddress(address).toLowerCase();
+  const lowerAddress = ensIdentityKey(getAddress(address), chainId);
   const cache = await getEnsIdentityCache();
   const existing = cache[lowerAddress];
   cache[lowerAddress] = {
     name: sanitizedName,
     avatar: existing?.name === sanitizedName ? existing.avatar : null,
     resolvedAt: Date.now(),
-    needsAvatar: !existing?.avatar || existing.name !== sanitizedName,
+    needsAvatar: true,
   };
-  await saveEnsIdentityCache(cache);
+  await saveEnsIdentityCache({ [lowerAddress]: cache[lowerAddress] });
 }

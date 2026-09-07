@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   cacheIdentityNameHint,
+  ensIdentityKey,
   isCacheValid,
   type EnsIdentityCache,
 } from "../../src/lib/ensIdentityCache";
@@ -29,7 +30,7 @@ test("forward-resolved contact names seed a partial cache entry", async () => {
   const storage = installStorage();
   try {
     await cacheIdentityNameHint(ADDRESS, "john.eth");
-    const entry = storage.read()[ADDRESS];
+    const entry = storage.read()[ensIdentityKey(ADDRESS)];
     assert.equal(entry.name, "john.eth");
     assert.equal(entry.avatar, null);
     assert.equal(entry.needsAvatar, true);
@@ -41,7 +42,7 @@ test("forward-resolved contact names seed a partial cache entry", async () => {
 
 test("a matching cached avatar survives a repeated name hint", async () => {
   const storage = installStorage({
-    [ADDRESS]: {
+    [ensIdentityKey(ADDRESS)]: {
       name: "john.eth",
       avatar: "https://example.com/john.png",
       resolvedAt: 1,
@@ -49,10 +50,10 @@ test("a matching cached avatar survives a repeated name hint", async () => {
   });
   try {
     await cacheIdentityNameHint(ADDRESS, "john.eth");
-    const entry = storage.read()[ADDRESS];
+    const entry = storage.read()[ensIdentityKey(ADDRESS)];
     assert.equal(entry.avatar, "https://example.com/john.png");
-    assert.equal(entry.needsAvatar, false);
-    assert.equal(isCacheValid(entry), true);
+    assert.equal(entry.needsAvatar, true);
+    assert.equal(isCacheValid(entry), false);
   } finally {
     storage.restore();
   }

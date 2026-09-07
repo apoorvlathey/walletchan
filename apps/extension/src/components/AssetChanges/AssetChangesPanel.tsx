@@ -81,6 +81,7 @@ function EmbeddedAssetGroup({
 }
 
 export function AssetChangesPanel({
+  chainId,
   explorerUrl,
   loading,
   result,
@@ -90,6 +91,7 @@ export function AssetChangesPanel({
   explorerUrl: string;
   loading: boolean;
   result: SimulationResult | null;
+  chainId: number;
   embedded?: boolean;
   approvalCleanup?: AssetChangesDisplayProps["approvalCleanup"];
 }) {
@@ -158,6 +160,7 @@ export function AssetChangesPanel({
         pb={residualApprovals.length > 0 ? 0 : 2}
       >
         <ApprovalChangesGroup
+          chainId={chainId}
           changes={approvals}
           detectionIncomplete={result.approvalDetectionIncomplete}
           explorerUrl={explorerUrl}
@@ -267,6 +270,8 @@ export function AssetChangesPanel({
             <Box h="1px" bg="border.subtle" />
 
             <ApprovalChangesGroup
+
+              chainId={chainId}
               changes={approvals}
               detectionIncomplete={result.approvalDetectionIncomplete}
               explorerUrl={explorerUrl}

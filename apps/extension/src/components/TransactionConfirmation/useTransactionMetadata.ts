@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { PendingTxRequest } from "@/chrome/requests/pendingTxStorage";
 import { getStoredNativeCurrencySymbol } from "@/lib/chains";
 import { getEthShLabels } from "@/lib/ethShLabelsCache";
-import { resolveAddressToName } from "@/lib/ensUtils";
+import { useEnsIdentities } from "@/hooks/useEnsIdentities";
 import { useDappOriginFormatter } from "@/hooks/useDappOriginDisplay";
 
 function getOriginHostname(origin: string): string | null {
@@ -42,7 +42,8 @@ export function useTransactionMetadata(
   );
   const [toLabels, setToLabels] = useState<string[]>([]);
   const [delegateLabels, setDelegateLabels] = useState<string[]>([]);
-  const [resolvedToName, setResolvedToName] = useState<string | null>(null);
+  const { identities: resolvedNames } = useEnsIdentities(tx.to ? [tx.to] : [], tx.chainId);
+  const resolvedToName = resolvedNames.get(tx.to?.toLowerCase() ?? "")?.name ?? null;
 
   useEffect(() => {
     if (resolvedNativeSymbol) {
@@ -81,15 +82,6 @@ export function useTransactionMetadata(
       cancelled = true;
     };
   }, [delegation, isSetDelegate, tx.chainId]);
-
-  useEffect(() => {
-    if (!tx.to) return;
-    resolveAddressToName(tx.to)
-      .then((name) => {
-        if (name) setResolvedToName(name);
-      })
-      .catch(() => {});
-  }, [tx.to]);
 
   return {
     delegateLabels,

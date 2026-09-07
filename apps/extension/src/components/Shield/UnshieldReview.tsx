@@ -17,7 +17,7 @@ import type { ReturnTypeUseUnshield } from "./hooks/useUnshield.types";
 import type { ReturnTypeUseDirectUnshield } from "./hooks/useDirectUnshield.types";
 import { useAutoRefreshUnshieldQuote } from "./hooks/useAutoRefreshUnshieldQuote";
 import {
-  SHIELDED_ETH_LOGO_URL,
+  SHIELDED_ETH_CHAIN_ID, SHIELDED_ETH_LOGO_URL,
   SHIELDED_ETH_NETWORK_NAME,
 } from "./model/shieldedAsset";
 import { formatShieldUsdValue, formatShieldWei } from "./model/shieldQuote";
@@ -243,6 +243,7 @@ export default function UnshieldReview({
             <HStack mt={4} pt={3} borderTopWidth="1px" borderColor="border.subtle" justify="space-between" spacing={3}>
               <Text fontSize="xs" color="fg.secondary">To address</Text>
               <LabeledAddressPopover
+                chainId={SHIELDED_ETH_CHAIN_ID}
                 address={recipient}
                 contextLabel={copy.recipientContextLabel}
                 explorer={explorerUrl}

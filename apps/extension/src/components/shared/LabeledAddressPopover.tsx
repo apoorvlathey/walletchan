@@ -222,6 +222,9 @@ function isRawAddressLabel(label: string, address: string): boolean {
 }
 
 interface LabeledAddressPopoverProps {
+  /** Display the address without identity enrichment (for an already named input). */
+  addressOnly?: boolean;
+  chainId: number;
   account?: Account | null;
   address: string;
   contextLabel?: string;
@@ -234,6 +237,8 @@ interface LabeledAddressPopoverProps {
 }
 
 export function LabeledAddressPopover({
+  addressOnly = false,
+  chainId,
   account: suppliedAccount,
   address,
   contextLabel = "address",
@@ -247,10 +252,10 @@ export function LabeledAddressPopover({
   const isDarkTheme = isDarkThemeId(themeId);
   const isAddress = ADDRESS_REGEX.test(address);
   const identityAddresses = useMemo(
-    () => (isAddress ? [address] : []),
-    [address, isAddress],
+    () => (isAddress && !addressOnly ? [address] : []),
+    [address, isAddress, addressOnly],
   );
-  const { identities } = useEnsIdentities(identityAddresses);
+  const { identities } = useEnsIdentities(identityAddresses, chainId);
   const identity = identities.get(address.toLowerCase());
   const cachedIdentityAvatar = useCachedAvatarSrc(identity?.avatar);
   const [fetchedAccount, setFetchedAccount] = useState<Account | null>(null);
@@ -258,7 +263,7 @@ export function LabeledAddressPopover({
 
   useEffect(() => {
     setFetchedAccount(null);
-    if (!isAddress || suppliedAccount !== undefined) return;
+    if (addressOnly || !isAddress || suppliedAccount !== undefined) return;
 
     let cancelled = false;
     chrome.runtime.sendMessage(
@@ -278,7 +283,7 @@ export function LabeledAddressPopover({
     return () => {
       cancelled = true;
     };
-  }, [address, isAddress, suppliedAccount]);
+  }, [address, isAddress, suppliedAccount, addressOnly]);
 
   const account = suppliedAccount === undefined ? fetchedAccount : suppliedAccount;
 
@@ -295,7 +300,7 @@ export function LabeledAddressPopover({
     ?? identity?.name
     ?? (isRawAddressLabel(label, address) ? undefined : label.trim() || undefined);
 
-  const avatar =
+  const avatar = addressOnly ? null :
     presentation.avatarKind === "resolved" && identity?.avatar ? (
       <Image
         src={cachedIdentityAvatar || identity.avatar}
@@ -329,9 +334,9 @@ export function LabeledAddressPopover({
         fontSize="2xs"
         fontWeight="700"
         noOfLines={1}
-        title={presentation.label}
+        title={addressOnly ? address : presentation.label}
       >
-        {presentation.label}
+        {addressOnly ? label : presentation.label}
       </Text>
 
       <AddressActionsPopover

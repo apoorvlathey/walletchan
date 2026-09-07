@@ -47,7 +47,6 @@ import {
   type TokenDisplayMetadata,
 } from "@/lib/tokenMetadataClient";
 import { useThemedToast } from "@/hooks/useThemedToast";
-import { useEnsIdentities } from "@/hooks/useEnsIdentities";
 import { useTheme } from "@/theme";
 
 type GrantsResponse =
@@ -157,20 +156,6 @@ export default function DelegatedPermissionsSection({
   const accountsByAddress = useMemo(
     () => new Map(accounts.map((account) => [account.address.toLowerCase(), account])),
     [accounts],
-  );
-  const recognizedDelegateAddresses = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          grants
-            .map((grant) => grant.request.to)
-            .filter((address) => accountsByAddress.has(address.toLowerCase())),
-        ),
-      ),
-    [accountsByAddress, grants],
-  );
-  const { identities: delegateIdentities } = useEnsIdentities(
-    recognizedDelegateAddresses,
   );
   const activeSummary = `${grants.length} active permission${grants.length === 1 ? "" : "s"} · ${groupedGrants.length} site${groupedGrants.length === 1 ? "" : "s"}`;
 
@@ -349,7 +334,6 @@ export default function DelegatedPermissionsSection({
                       : null;
                     const delegateAddress = grant.request.to.toLowerCase();
                     const delegateAccount = accountsByAddress.get(delegateAddress);
-                    const delegateIdentity = delegateIdentities.get(delegateAddress);
 
                     return (
                       <DelegatedPermissionGrantCard
@@ -360,8 +344,6 @@ export default function DelegatedPermissionsSection({
                         nativeSymbol={chain?.nativeCurrency?.symbol || "ETH"}
                         tokenMetadata={tokenMetadata}
                         delegateAccount={delegateAccount}
-                        delegateName={delegateIdentity?.name || null}
-                        delegateAvatar={delegateIdentity?.avatar || null}
                         onRevoke={() => setSelectedGrant(grant)}
                         hasDivider
                       />

@@ -60,7 +60,7 @@ export function TransactionDecisionSummary({
           Signing with
         </Text>
         <HStack minW={0} justify="flex-end">
-          <FromAccountDisplay address={txRequest.tx.from} />
+          <FromAccountDisplay chainId={txRequest.tx.chainId} address={txRequest.tx.from} />
         </HStack>
       </HStack>
 

@@ -134,6 +134,7 @@ export function SafeVerificationCard({
                 borderColor="border.subtle"
               >
                 <LabeledAddressPopover
+                  chainId={snapshot.chainId}
                   account={linked[0] ?? null}
                   address={owner}
                   contextLabel="Safe owner address"

@@ -41,7 +41,7 @@ interface RecipientPickerProps {
 }
 
 export function RecipientPicker({
-  title = "My contacts",
+  title = "Contacts",
   accounts,
   contacts,
   allContacts,

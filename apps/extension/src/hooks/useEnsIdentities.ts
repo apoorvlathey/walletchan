@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useAddressContacts } from "@/hooks/useAddressContacts";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   getEnsIdentityCache,
+  ensIdentityKey,
   isCacheValid,
   resolveAndCacheIdentities,
   resolveAndCacheIdentity,
@@ -18,10 +20,14 @@ interface UseEnsIdentitiesReturn {
   refreshAddress: (address: string) => Promise<void>;
 }
 
-export function useEnsIdentities(addresses: string[]): UseEnsIdentitiesReturn {
+function useNetworkEnsIdentities(addresses: string[], chainId = 1): UseEnsIdentitiesReturn {
   const [identities, setIdentities] = useState<Map<string, EnsIdentity>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
   const resolvedRef = useRef<Set<string>>(new Set());
+
+  const [resolvedChain, setResolvedChain] = useState(chainId);
+  const chainRef = useRef(chainId);
+  chainRef.current = chainId;
 
   // Stable serialized key for addresses array
   const addressesKey = addresses
@@ -45,12 +51,13 @@ export function useEnsIdentities(addresses: string[]): UseEnsIdentitiesReturn {
         | undefined;
       if (!newCache) return;
 
+      if (chainRef.current !== chainId) return;
       setIdentities((prev) => {
         const updated = new Map(prev);
         let mutated = false;
         for (const lower of lowerAddresses) {
-          const entry = newCache[lower];
-          if (!entry) continue;
+          const entry = newCache[ensIdentityKey(lower, chainId)];
+          if (!entry || !isCacheValid(entry)) continue;
           const existing = prev.get(lower);
           if (
             !existing ||
@@ -67,29 +74,30 @@ export function useEnsIdentities(addresses: string[]): UseEnsIdentitiesReturn {
 
     chrome.storage.onChanged.addListener(listener);
     return () => chrome.storage.onChanged.removeListener(listener);
-  }, [addressesKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [addressesKey, chainId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let cancelled = false;
+    resolvedRef.current.clear();
+    setIsLoading(false);
+    setIdentities(new Map());
+    setResolvedChain(chainId);
 
     async function loadAndResolve() {
       if (addresses.length === 0) return;
 
       const cache = await getEnsIdentityCache();
+      if (cancelled) return;
       const newIdentities = new Map<string, EnsIdentity>();
       const staleAddresses: string[] = [];
 
       for (const addr of addresses) {
         const lower = addr.toLowerCase();
-        const cached = cache[lower];
+        const cached = cache[ensIdentityKey(lower, chainId)];
 
         if (cached && isCacheValid(cached)) {
           newIdentities.set(lower, { name: cached.name, avatar: cached.avatar });
         } else {
-          // Return whatever we have in cache (even if stale) while we re-resolve
-          if (cached) {
-            newIdentities.set(lower, { name: cached.name, avatar: cached.avatar });
-          }
           // Only resolve if we haven't already started resolving in this session
           if (!resolvedRef.current.has(lower)) {
             staleAddresses.push(addr);
@@ -109,7 +117,7 @@ export function useEnsIdentities(addresses: string[]): UseEnsIdentitiesReturn {
           resolvedRef.current.add(addr.toLowerCase());
         }
 
-        const results = await resolveAndCacheIdentities(staleAddresses).catch(() => new Map());
+        const results = await resolveAndCacheIdentities(staleAddresses, chainId).catch(() => new Map());
 
         if (!cancelled) {
           setIdentities((prev) => {
@@ -131,13 +139,14 @@ export function useEnsIdentities(addresses: string[]): UseEnsIdentitiesReturn {
     return () => {
       cancelled = true;
     };
-  }, [addressesKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [addressesKey, chainId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshAddress = useCallback(async (address: string) => {
     const lower = address.toLowerCase();
     setIsLoading(true);
     try {
-      const result = await resolveAndCacheIdentity(address);
+      const result = await resolveAndCacheIdentity(address, chainId);
+      if (chainRef.current !== chainId) return;
       setIdentities((prev) => {
         const updated = new Map(prev);
         updated.set(lower, result);
@@ -146,7 +155,73 @@ export function useEnsIdentities(addresses: string[]): UseEnsIdentitiesReturn {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [chainId]);
 
-  return { identities, isLoading, refreshAddress };
+  return { identities: resolvedChain === chainId ? identities : new Map(), isLoading, refreshAddress };
+}
+
+
+/** Known wallets and saved contacts retain their mainnet profile on every network.
+ * This is display-only; forward payment resolution still uses the selected chain.
+ */
+export function useEnsIdentities(addresses: string[], chainId = 1): UseEnsIdentitiesReturn {
+  const { contacts, isLoading: contactsLoading } = useAddressContacts();
+  const [accountAddresses, setAccountAddresses] = useState<string[] | null>(null);
+  const needsMembership = chainId !== 1;
+  useEffect(() => {
+    if (!needsMembership) return;
+    let cancelled = false;
+    let generation = 0;
+    const load = async () => {
+      const current = ++generation;
+      try {
+        const accounts = await chrome.runtime.sendMessage({ type: "getAccounts" });
+        if (!cancelled && current === generation) setAccountAddresses(
+          Array.isArray(accounts) ? accounts.map((account) => account.address.toLowerCase()) : [],
+        );
+      } catch {
+        if (!cancelled && current === generation) setAccountAddresses([]);
+      }
+    };
+    const listener = (message: { type?: string }) => {
+      if (message.type === "accountsUpdated") void load();
+    };
+    void load();
+    chrome.runtime.onMessage.addListener(listener);
+    return () => { cancelled = true; chrome.runtime.onMessage.removeListener(listener); };
+  }, [needsMembership]);
+  const known = useMemo(() => new Set([
+    ...(accountAddresses ?? []), ...contacts.map((contact) => contact.address.toLowerCase()),
+  ]), [accountAddresses, contacts]);
+  const ready = !needsMembership || (accountAddresses !== null && !contactsLoading);
+  const addressesKey = addresses.map((address) => address.toLowerCase()).join(",");
+  const [profiles, external] = useMemo(() => {
+    const requested = addressesKey ? addressesKey.split(",") : [];
+    return [
+      requested.filter((address) => chainId === 1 || (ready && known.has(address))),
+      requested.filter((address) => chainId !== 1 && ready && !known.has(address)),
+    ];
+  }, [addressesKey, chainId, ready, known]);
+  const profile = useNetworkEnsIdentities(profiles, 1);
+  const network = useNetworkEnsIdentities(external, chainId);
+  const identities = useMemo(() => {
+    const identities = new Map<string, EnsIdentity>();
+    for (const address of profiles) {
+      const key = address.toLowerCase();
+      const identity = profile.identities.get(key);
+      if (identity) identities.set(key, identity);
+    }
+    for (const address of external) {
+      const key = address.toLowerCase();
+      const identity = network.identities.get(key);
+      if (identity) identities.set(key, identity);
+    }
+    return identities;
+  }, [profiles, external, profile.identities, network.identities]);
+  return {
+    identities,
+    isLoading: !ready || profile.isLoading || network.isLoading,
+    refreshAddress: (address) => (chainId === 1 || known.has(address.toLowerCase())
+      ? profile.refreshAddress(address) : network.refreshAddress(address)),
+  };
 }

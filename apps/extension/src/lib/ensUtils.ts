@@ -1,5 +1,6 @@
 import {
   createPublicClient,
+  isAddress,
   Hex,
   Address,
   encodePacked,
@@ -190,6 +191,14 @@ export const convertReverseNodeToBytes = (
 // Forward Resolution (Name → Address)
 // ============================================================================
 
+/** Zero selects ENS's explicit default EVM identity, never Ethereum's record. */
+export function ensCoinType(chainId: number): bigint {
+  if (!Number.isSafeInteger(chainId) || chainId < 0 || chainId > 0x7fffffff) {
+    throw new Error("Chain ID is outside the ENSIP-11 range");
+  }
+  return chainId === 1 ? 60n : BigInt(chainId) + 0x80000000n;
+}
+
 const resolveMegaName = async (
   name: string
 ): Promise<Address | null> => {
@@ -244,7 +253,8 @@ const getMegaName = async (
 };
 
 export const resolveNameToAddress = async (
-  name: string
+  name: string,
+  chainId = 1,
 ): Promise<Address | null> => {
   // Handle .wei/.gwei names via WNS/GNS. Missing mainnet RPC still surfaces
   // from getUserRpcUrl; service-level misses/timeouts resolve as null.
@@ -271,7 +281,8 @@ export const resolveNameToAddress = async (
 
   // Let RPC errors (429, timeouts, etc.) propagate so callers can show actionable feedback
   const client = await getMainnetNameServiceClient();
-  return await client.getEnsAddress({ name: normalizedName });
+  const address = await client.getEnsAddress({ name: normalizedName, coinType: ensCoinType(chainId) });
+  return address && isAddress(address, { strict: false }) ? address : null;
 };
 
 // ============================================================================
@@ -298,16 +309,50 @@ const getBasename = async (address: Address): Promise<string | null> => {
   }
 };
 
-const getEnsName = async (address: string): Promise<string | null> => {
+// Official ENS mainnet L2 deployments: https://docs.ens.domains/registry/reverse/
+// Used only when the Universal Resolver cannot return a name. Never probe
+// arbitrary custom chains at this address; check the deployed coin type too.
+const ENS_L2_REVERSE_CHAINS = new Set([10, 8453, 42161, 59144, 534352]);
+const ENS_L2_REVERSE_REGISTRAR = "0x0000000000D8e504002cC26E3Ec46D81971C1664";
+const ENS_L2_REVERSE_ABI = [
+  { type: "function", name: "coinType", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "nameForAddr", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "string" }] },
+] as const;
+
+/** Direct L2 fallback, always forward-verified on the requested network. */
+export async function getL2EnsName(address: Address, chainId: number): Promise<string | null> {
+  if (!ENS_L2_REVERSE_CHAINS.has(chainId)) return null;
+  try {
+    const rpcUrl = await getUserRpcUrl(chainId);
+    const client = createPublicClient({
+      transport: secureHttpTransport(rpcUrl, { timeout: 8_000, retryCount: 0 }),
+    });
+    const coinType = await client.readContract({
+      address: ENS_L2_REVERSE_REGISTRAR, abi: ENS_L2_REVERSE_ABI, functionName: "coinType",
+    });
+    if (coinType !== ensCoinType(chainId)) return null;
+    const name = sanitizeResolvedName(await client.readContract({
+      address: ENS_L2_REVERSE_REGISTRAR, abi: ENS_L2_REVERSE_ABI,
+      functionName: "nameForAddr", args: [address],
+    }));
+    return name && await isNameForAddress(name, address, chainId) ? name : null;
+  } catch {
+    return null;
+  }
+}
+
+const getEnsName = async (address: string, chainId: number): Promise<string | null> => {
   try {
     const client = await getMainnetNameServiceClient();
     const name = await client.getEnsName({
       address: address as Hex,
+      coinType: ensCoinType(chainId),
     });
-    return sanitizeResolvedName(name);
+    if (name) return sanitizeResolvedName(name);
   } catch {
-    return null;
+    // L1 gateway/proof failures must not hide a verified live L2 record.
   }
+  return getL2EnsName(address as Address, chainId);
 };
 
 const getWeiName = async (
@@ -329,18 +374,22 @@ const getGweiName = async (address: string): Promise<string | null> => {
 };
 
 export const resolveAddressToName = async (
-  address: string
+  address: string,
+  chainId = 1,
 ): Promise<string | null> => {
   try {
     const [ensName, basename, weiName, gweiName, megaName] = await Promise.all([
-      getEnsName(address),
+      getEnsName(address, chainId),
       getBasename(address as Address),
       getWeiName(address),
       getGweiName(address),
       getMegaName(address),
     ]);
     // Priority: ENS > Basename > WNS > GNS > Mega
-    return ensName || basename || weiName || gweiName || megaName || null;
+    for (const name of [ensName, basename, weiName, gweiName, megaName]) {
+      if (name && await isNameForAddress(name, address, chainId)) return name;
+    }
+    return null;
   } catch (error) {
     console.error("Error resolving address to name:", error);
     return null;
@@ -452,58 +501,21 @@ export const getNameAvatar = async (
 // Combined Identity Resolution (ENS > Basename > WNS > GNS > Mega)
 // ============================================================================
 
-/**
- * Resolves name + avatar for an address with explicit priority:
- * ENS > Basename > WNS > GNS > Mega
- * - Resolves all name services in parallel for speed
- * - If ENS name exists, uses ENS name + ENS avatar
- * - Falls back to Basename name + Basename avatar
- * - Falls back to WNS name (no avatar support for .wei names)
- * - Falls back to GNS name + its avatar text record
- * - Falls back to Mega name + Mega avatar (via text record)
- */
-export const resolveEnsIdentity = async (
-  address: string
-): Promise<{ name: string | null; avatar: string | null }> => {
+/** Verify every fallback service and name hint before using it as an identity. */
+export async function isNameForAddress(name: string, address: string, chainId: number): Promise<boolean> {
   try {
-    const [ensName, basename, weiName, gweiName, megaName] = await Promise.all([
-      getEnsName(address),
-      getBasename(address as Address),
-      getWeiName(address),
-      getGweiName(address),
-      getMegaName(address),
-    ]);
-
-    // ENS takes priority
-    if (ensName) {
-      const avatar = await getEnsAvatar(ensName);
-      return { name: ensName, avatar };
-    }
-
-    // Fall back to Basename
-    if (basename) {
-      const avatar = await getBasenameAvatar(basename);
-      return { name: basename, avatar };
-    }
-
-    // Fall back to WNS (no avatar support)
-    if (weiName) {
-      return { name: weiName, avatar: null };
-    }
-    if (gweiName) {
-      const avatar = await getGweiAvatar(gweiName);
-      return { name: gweiName, avatar };
-    }
-
-    // Fall back to Mega
-    if (megaName) {
-      const avatar = await getMegaAvatar(megaName);
-      return { name: megaName, avatar };
-    }
-
-    return { name: null, avatar: null };
-  } catch (error) {
-    console.error("Error resolving identity for", address, error);
-    return { name: null, avatar: null };
+    const resolved = await resolveNameToAddress(name, chainId);
+    return Boolean(resolved && resolved.toLowerCase() === address.toLowerCase());
+  } catch {
+    return false;
   }
+}
+
+/** Resolve a verified name, then its avatar, using the shared service priority. */
+export const resolveEnsIdentity = async (
+  address: string,
+  chainId = 1,
+): Promise<{ name: string | null; avatar: string | null }> => {
+  const name = await resolveAddressToName(address, chainId);
+  return { name, avatar: name ? await getNameAvatar(name) : null };
 };

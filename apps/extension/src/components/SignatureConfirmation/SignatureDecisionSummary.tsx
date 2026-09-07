@@ -160,10 +160,12 @@ function UnsafeSiweDecisionPopover({
 }
 
 export function SignatureDecisionSummary({
+  chainId,
   address,
   unsafeSiweDecision,
 }: {
   address: string;
+  chainId: number;
   unsafeSiweDecision?: UnsafeSiweDecisionProps;
 }) {
   return (
@@ -178,7 +180,7 @@ export function SignatureDecisionSummary({
           Signing with
         </Text>
         <HStack minW={0} justify="flex-end">
-          <FromAccountDisplay address={address} />
+          <FromAccountDisplay chainId={chainId} address={address} />
         </HStack>
       </HStack>
       {unsafeSiweDecision && (
