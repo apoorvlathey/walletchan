@@ -227,6 +227,8 @@ interface LabeledAddressPopoverProps {
   contextLabel?: string;
   explorer?: string;
   label: string;
+  /** Preserve a successfully resolved input name over address-based identities. */
+  preferredLabel?: string;
   maxW?: string;
   showFallbackAvatar?: boolean;
 }
@@ -237,6 +239,7 @@ export function LabeledAddressPopover({
   contextLabel = "address",
   explorer,
   label,
+  preferredLabel,
   maxW = "220px",
   showFallbackAvatar = false,
 }: LabeledAddressPopoverProps) {
@@ -283,6 +286,7 @@ export function LabeledAddressPopover({
     account,
     contactLabel: contact?.label,
     fallbackLabel: label,
+    preferredLabel,
     resolvedAvatar: identity?.avatar,
     resolvedName: identity?.name,
   });

@@ -8,6 +8,7 @@ export type AddressIdentityAvatarKind =
 interface AddressIdentityPresentationInput {
   account: Account | null;
   fallbackLabel: string;
+  preferredLabel?: string | null;
   contactLabel?: string | null;
   resolvedAvatar: string | null | undefined;
   resolvedName: string | null | undefined;
@@ -21,6 +22,7 @@ function nonEmpty(value: string | null | undefined): string | null {
 export function getAddressIdentityPresentation({
   account,
   fallbackLabel,
+  preferredLabel,
   contactLabel,
   resolvedAvatar,
   resolvedName,
@@ -29,6 +31,7 @@ export function getAddressIdentityPresentation({
   label: string;
 } {
   const label =
+    nonEmpty(preferredLabel) ??
     nonEmpty(contactLabel) ??
     nonEmpty(account?.displayName) ??
     nonEmpty(resolvedName) ??

@@ -13,6 +13,21 @@ const walletAccount: Account = {
   createdAt: 1,
 };
 
+test("a resolved input name wins over reverse names, contacts, and wallet labels", () => {
+  for (const account of [null, walletAccount]) {
+    for (const contactLabel of [null, "Apoorv"]) {
+      assert.equal(getAddressIdentityPresentation({
+        account,
+        contactLabel,
+        preferredLabel: "apoorv.gwei",
+        fallbackLabel: "0x1111...1111",
+        resolvedAvatar: null,
+        resolvedName: "apoorv.eth",
+      }).label, "apoorv.gwei");
+    }
+  }
+});
+
 test("wallet display names take priority over resolved and fallback labels when no contact exists", () => {
   assert.deepEqual(
     getAddressIdentityPresentation({

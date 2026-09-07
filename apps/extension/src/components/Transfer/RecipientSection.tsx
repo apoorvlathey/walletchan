@@ -11,6 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useId, useState } from "react";
 import { useTheme } from "@/theme";
+import { isResolvableName } from "@/lib/ensUtils";
 import { AddressContactAvatar } from "@/components/shared/AddressContactAvatar";
 import { LabeledAddressPopover } from "@/components/shared/LabeledAddressPopover";
 import type { TransferRecipient } from "./hooks/useTransferRecipient";
@@ -100,6 +101,7 @@ export function RecipientSection({
         {recipient && !isResolving && isValid && resolvedAddress && (
           <LabeledAddressPopover
             address={resolvedAddress}
+            preferredLabel={isResolvableName(recipient) ? recipient : undefined}
             contextLabel="recipient address"
             explorer={explorerUrl}
             label={resolvedName || `${resolvedAddress.slice(0, 6)}...${resolvedAddress.slice(-4)}`}
