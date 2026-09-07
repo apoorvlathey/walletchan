@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.3.1] - 2026-09-03
+
 ### Fixed
 
 - Preserved Foundry/Alloy contract calldata by normalizing the `input` transaction alias to wallet-facing `data` before forwarding `eth_sendTransaction` requests.
