@@ -69,7 +69,7 @@ export function SwapFormScreen(props: SwapFormScreenProps) {
   return (
     <AppScreen>
       <AppHeader
-        title="Swap or Bridge"
+        title="Swap"
         onBack={props.onBack}
         trailing={
           props.fromAddress ? (

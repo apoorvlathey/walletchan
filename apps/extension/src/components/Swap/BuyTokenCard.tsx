@@ -75,7 +75,7 @@ export function BuyTokenCard({
       <HStack justify="space-between" mb={2} align="center" spacing={1}>
         <HStack minW={0} flex="1 1 auto" spacing={1}>
           <Text fontSize="sm" fontWeight="600" color="fg.secondary" flexShrink={0}>
-            You get on
+            You receive
           </Text>
           <SwapChainTrigger chainId={buyChainId} onClick={onOpenChainPicker} />
         </HStack>

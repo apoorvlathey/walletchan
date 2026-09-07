@@ -101,7 +101,7 @@ export function SellTokenCard({
       <HStack justify="space-between" mb={2} align="center" spacing={1}>
         <HStack minW={0} flex="1 1 auto" spacing={1}>
           <Text fontSize="sm" fontWeight="600" color="fg.secondary" flexShrink={0}>
-            You pay on
+            You pay
           </Text>
           <SwapChainTrigger chainId={sellChainId} onClick={onOpenChainPicker} />
         </HStack>
