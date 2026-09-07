@@ -183,6 +183,7 @@ export function AssetChangesPanel({
           approvals={residualApprovals}
           cleanup={approvalCleanup}
           explorerUrl={explorerUrl}
+          standalone={!hasAssetChanges && approvals.length === 0}
         />
       </VStack>
     );

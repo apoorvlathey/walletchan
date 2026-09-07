@@ -115,12 +115,20 @@ export function FieldRow({
     );
   }
 
-  // Always render label-left / value-right. Addresses display as a short
-  // 0x….0x form plus copy + explorer icons — narrow enough to live on the
-  // right; long ENS labels wrap inside the value column without breaking
-  // the layout because `minW={0}` lets the flex column shrink.
+  // Amounts get the full width beneath their label; other values retain
+  // the compact label-left / value-right layout.
+  const hasAmount = field.values.some(
+    (value) => value.kind === "tokenAmount" || value.kind === "amount",
+  );
   return (
-    <HStack align="start" spacing={3} justify="space-between" w="full">
+    <HStack
+      align="start"
+      flexDirection={hasAmount ? "column" : "row"}
+      spacing={0}
+      gap={hasAmount ? 1 : 3}
+      justify="space-between"
+      w="full"
+    >
       <Text
         fontSize="xs"
         color="fg.secondary"
@@ -130,7 +138,7 @@ export function FieldRow({
       >
         {field.label || "—"}
       </Text>
-      <Box flex="1" minW={0} textAlign="right">
+      <Box flex="1" minW={0} w={hasAmount ? "full" : undefined} textAlign="right">
         {field.values.length === 0 ? (
           <Text fontSize="xs" color="fg.muted">
             —

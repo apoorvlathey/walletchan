@@ -34,11 +34,13 @@ export function ResidualApprovalBanner({
   cleanup,
   explorerUrl,
   flushBottom = false,
+  standalone = false,
 }: {
   approvals: ResidualApproval[];
   cleanup?: ApprovalCleanup;
   explorerUrl: string;
   flushBottom?: boolean;
+  standalone?: boolean;
 }) {
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [allPending, setAllPending] = useState(false);
@@ -56,12 +58,12 @@ export function ResidualApprovalBanner({
       align="stretch"
       spacing={2}
       mx={-3}
-      mt={3}
+      mt={standalone ? 0 : 3}
       mb={flushBottom ? -3 : 0}
       px={3}
       py={2}
       bg="status.warning.tint"
-      borderTop="1px solid"
+      borderTop={standalone ? "none" : "1px solid"}
       borderColor="status.warning.border"
     >
       <HStack align="center" spacing={2}>

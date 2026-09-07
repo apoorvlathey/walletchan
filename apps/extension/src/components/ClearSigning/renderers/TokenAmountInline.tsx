@@ -49,7 +49,16 @@ function AmountText({
     ? thresholdMessage
     : formatUnit(amountRaw, decimals);
   const text = (
-    <Text fontSize="lg" color="fg.primary" fontWeight="700" lineHeight="1.1">
+    <Text
+      fontSize="lg"
+      color="fg.primary"
+      fontWeight="700"
+      lineHeight="1.2"
+      minW={0}
+      maxW="full"
+      overflowWrap="anywhere"
+      fontVariantNumeric="tabular-nums"
+    >
       {displayText}
     </Text>
   );
@@ -63,7 +72,7 @@ function AmountText({
     >
       {/* Box wrapper so the tooltip can fire on touch / focus without
           requiring the Text itself to forward refs. */}
-      <Box as="span" cursor="help" borderBottom="1px dotted" borderColor="fg.muted">
+      <Box as="span" minW={0} maxW="full" cursor="help" borderBottom="1px dotted" borderColor="fg.muted">
         {text}
       </Box>
     </Tooltip>
@@ -201,8 +210,16 @@ export function TokenAmountInline({
       nativeInfo?.decimals ?? entry?.nativeCurrency.decimals ?? 18;
     const usd = formatUsdValue(amountRaw, decimals, priceUsd);
     return (
-      <VStack spacing={0} align="flex-end">
-        <HStack spacing={2} justify="flex-end" align="center">
+      <VStack spacing={0} align="flex-end" minW={0} maxW="full">
+        <HStack
+          spacing={0}
+          gap={2}
+          justify="flex-end"
+          align="center"
+          flexWrap="wrap"
+          minW={0}
+          maxW="full"
+        >
           <AmountText
             amountRaw={amountRaw}
             decimals={decimals}
@@ -226,6 +243,8 @@ export function TokenAmountInline({
             color="fg.secondary"
             fontWeight="700"
             lineHeight="1.2"
+            maxW="full"
+            overflowWrap="anywhere"
             mt={0.5}
           >
             {usd}
@@ -237,7 +256,7 @@ export function TokenAmountInline({
 
   if (!info) {
     return (
-      <Text fontSize="sm" fontFamily="mono" color="fg.muted">
+      <Text fontSize="sm" fontFamily="mono" color="fg.muted" maxW="full" overflowWrap="anywhere">
         {amountRaw}
       </Text>
     );
@@ -245,8 +264,16 @@ export function TokenAmountInline({
 
   const usd = formatUsdValue(amountRaw, info.decimals, priceUsd);
   return (
-    <VStack spacing={0} align="flex-end">
-      <HStack spacing={2} justify="flex-end" align="center">
+    <VStack spacing={0} align="flex-end" minW={0} maxW="full">
+      <HStack
+        spacing={0}
+        gap={2}
+        justify="flex-end"
+        align="center"
+        flexWrap="wrap"
+        minW={0}
+        maxW="full"
+      >
         <AmountText
           amountRaw={amountRaw}
           decimals={info.decimals}
@@ -287,7 +314,7 @@ export function TokenAmountInline({
         )}
       </HStack>
       {usd && (
-        <Text fontSize="xs" color="fg.muted" fontWeight="500">
+        <Text fontSize="xs" color="fg.muted" fontWeight="500" maxW="full" overflowWrap="anywhere">
           {usd}
         </Text>
       )}

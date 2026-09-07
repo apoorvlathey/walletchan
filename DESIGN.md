@@ -267,6 +267,12 @@
 
 ## Slop audit
 
+- 2026-09-07 transaction amount layout audit: clear-signing amount labels sit
+  above a full-width, right-aligned value with tabular numerals and wrapping
+  for long amounts. Approval-only estimated changes omit the empty lead-in
+  spacing and divider; mixed asset/approval sections retain their separation.
+  Existing Warm Midnight and Bauhaus tokens and controls are preserved.
+
 - 2026-08-01 block-explorer preference audit: placed the **Enhance Block
   Explorers** destination immediately after Security in the established
   Settings list. Its dedicated screen follows the Sounds preference grammar,
