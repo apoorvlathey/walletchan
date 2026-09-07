@@ -3887,6 +3887,11 @@ API portfolio data is shown immediately, while onchain balances are verified in 
 - Account/network reloads abort the previous portfolio HTTP request. Aborted
   provider work is not converted into the native-only API fallback and cannot
   publish stale state after account selection changes.
+- Portfolio balance RPC clients recheck current network visibility before use,
+  including cached clients, queued chain work, fallbacks, and health probes.
+  Hidden networks are skipped; already-dispatched requests may finish. The home
+  alert removes hidden/deleted chains immediately and ignores their late reports.
+  Explicit chain-bound operations retain their existing RPC access.
 - Cached RPC issue IDs are display metadata only and are not replayed into the
   home warning. Live issue reports wait three seconds before rendering, so a
   normal cache-to-live refresh or short-lived RPC failure clears without a

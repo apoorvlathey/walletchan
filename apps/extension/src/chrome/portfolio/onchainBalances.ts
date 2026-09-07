@@ -6,7 +6,7 @@ import {
 } from "viem";
 import { PortfolioToken } from "./api";
 import { getPortfolioTokenKey } from "./hiddenTokens";
-import { getStoredRpcUrl } from "@/lib/chains";
+import { getStoredResolvedChainById } from "@/lib/chains";
 import { secureHttpTransport } from "../network/rpcClient";
 import { chainHasNativeToken } from "@/constants/chainRegistry";
 import type { RpcHealthReport } from "@/types";
@@ -36,8 +36,11 @@ const RPC_HEALTH_CONFIRMATION_DELAY_MS = 2_000;
 const clientCache = new Map<number, { rpcUrl: string; client: PublicClient }>();
 
 async function getClient(chainId: number): Promise<PublicClient | null> {
-  const rpcUrl = await getStoredRpcUrl(chainId);
-  if (!rpcUrl) return null;
+  const chain = await getStoredResolvedChainById(chainId);
+  // Check current visibility before using even a cached client. Queued portfolio
+  // work must not start RPC requests after the user hides its network.
+  if (!chain || chain.hidden || !chain.rpcUrl) return null;
+  const rpcUrl = chain.rpcUrl;
 
   const cached = clientCache.get(chainId);
   if (cached && cached.rpcUrl === rpcUrl) {
@@ -143,6 +146,7 @@ export async function fetchOnchainBalances(
 
       // Process in chunks to avoid oversized RPC requests
       for (let i = 0; i < calls.length; i += MULTICALL_BATCH_SIZE) {
+        if (!(await getClient(chainId))) return;
         const chunk = calls.slice(i, i + MULTICALL_BATCH_SIZE);
         try {
           const results = await client.multicall({
@@ -163,6 +167,7 @@ export async function fetchOnchainBalances(
                 getPortfolioTokenKey(chainId, chunk[j].token.contractAddress),
               );
             } else {
+              if (!(await getClient(chainId))) return;
               const succeeded = await fetchSingleBalanceDirectly(
                 client,
                 updated,
@@ -181,6 +186,7 @@ export async function fetchOnchainBalances(
             }
           }));
         } catch (err) {
+          if (!(await getClient(chainId))) return;
           const results = await fetchChunkBalancesIndividually(
             client,
             updated,
@@ -204,7 +210,7 @@ export async function fetchOnchainBalances(
       }
 
       if (successfulBalanceReads === 0 && failedBalanceReads > 0) {
-        if (await confirmRpcUnavailable(client)) {
+        if (await confirmRpcUnavailable(client, chainId)) {
           rpcIssueChainIds.add(chainId);
         }
       }
@@ -242,7 +248,8 @@ export async function fetchOnchainBalances(
   };
 }
 
-async function confirmRpcUnavailable(client: PublicClient): Promise<boolean> {
+async function confirmRpcUnavailable(client: PublicClient, chainId: number): Promise<boolean> {
+  if (!(await getClient(chainId))) return false;
   try {
     await client.getBlockNumber();
     return false;
@@ -250,6 +257,7 @@ async function confirmRpcUnavailable(client: PublicClient): Promise<boolean> {
     await new Promise<void>((resolve) => {
       setTimeout(resolve, RPC_HEALTH_CONFIRMATION_DELAY_MS);
     });
+    if (!(await getClient(chainId))) return false;
     try {
       await client.getBlockNumber();
       return false;
