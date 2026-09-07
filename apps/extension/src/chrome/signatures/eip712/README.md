@@ -4,6 +4,8 @@
   count caps, raw ERC-7710 rejection, and validation ordering.
 - `delegationPolicy.ts` identifies raw ERC-7710 `Delegation` typed data that
   must use WalletChan's reviewed execution-permission flow instead.
+- `accountDomainPolicy.ts` rejects external account-domain signatures using
+  caller-supplied protected addresses; it performs no storage or RPC reads.
 - `schemaValidation.ts` owns prototype-safe identifiers, type references,
   circular references, schema depth, and iterative object depth checks.
 - `sanitization.ts` projects domain/message values onto declared schema fields

@@ -2,10 +2,7 @@ import type { TransactionParams } from "../bankr/submission";
 import { CHAIN_NAMES } from "../../constants/networks";
 import { CHAIN_REGISTRY } from "../../constants/chainRegistry";
 import { getActiveAccount, getTabAccount } from "../accountStorage";
-import {
-  isRawErc7710DelegationSignatureRequest,
-  RAW_ERC7710_DELEGATION_SIGNATURE_ERROR,
-} from "../eip712Validator";
+import { validateExternalSignatureTypedData } from "../signatures/externalTypedData";
 import { openExtensionPopup } from "../extensionPopup";
 import {
   type SignatureParams,
@@ -241,18 +238,15 @@ export function handleSignatureRequest(
         }
       }
 
-      if (
-        isRawErc7710DelegationSignatureRequest(
-          signature.method,
-          signature.params?.[1],
-        )
-      ) {
+      const validation = await validateExternalSignatureTypedData(signature, activeAccount.address);
+      if (!validation.valid) {
         await writeResultToStorage(`sigResult:${sigId}`, {
           success: false,
-          error: RAW_ERC7710_DELEGATION_SIGNATURE_ERROR,
+          error: validation.error,
         });
         return;
       }
+      if (validation.sanitized) signature.params[1] = validation.sanitized;
     }
 
     const pendingRequest = pinnedSignatureRequest(activeAccount, {

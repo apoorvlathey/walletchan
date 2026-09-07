@@ -1,4 +1,5 @@
 import { makeProviderError } from "../errors";
+import { INTERNAL_ACCOUNT_TYPED_DATA_ERROR } from "../../signatures/eip712/accountDomainPolicy";
 import { announceProvider, setWindowEthereum } from "./announcement";
 import { logProviderError } from "./consoleErrors";
 import {
@@ -85,6 +86,7 @@ function handleSignatureResult(message: any): void {
   const error = message.error || "Signature request rejected";
   const lower = error.toLowerCase();
   const rejected =
+    error === INTERNAL_ACCOUNT_TYPED_DATA_ERROR ||
     lower.includes("rejected") ||
     lower.includes("cancelled") ||
     lower.includes("denied");

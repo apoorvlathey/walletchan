@@ -1,6 +1,11 @@
 import type { WalletConnectSessionSummary } from "@/types/walletConnect";
 import { getAccounts } from "../accountStorage";
-import type { Account } from "../types";
+import {
+  isDirectSigningAccount as isSigningAccount,
+  type DirectSigningAccount as SigningAccount,
+} from "../accounts/accountTypePolicy";
+
+export { isSigningAccount, type SigningAccount };
 import { parseProviderChainId } from "../provider/chainBoundary";
 import type { SignatureMethod } from "../requests/pendingSignatureStorage";
 import { sanitizeUntrustedImageUrl } from "@/lib/remoteImagePolicy";
@@ -35,11 +40,6 @@ export function sanitizeWalletConnectMetadataUrl(value: unknown): string {
     return "";
   }
 }
-
-export type SigningAccount = Extract<
-  Account,
-  { type: "bankr" | "privateKey" | "seedPhrase" | "ledger" }
->;
 
 export const WALLETCONNECT_SUPPORTED_METHODS = [
   "eth_sendTransaction",
@@ -86,17 +86,6 @@ export const WALLETCONNECT_SAFE_RPC_METHODS = new Set([
   "eth_getTransactionReceipt",
   "eth_maxPriorityFeePerGas",
 ]);
-
-export function isSigningAccount(
-  account: Account | null,
-): account is SigningAccount {
-  return !!account && (
-    account.type === "bankr" ||
-    account.type === "privateKey" ||
-    account.type === "seedPhrase" ||
-    account.type === "ledger"
-  );
-}
 
 export function chainIdFromCaip2(value: string | undefined): number | null {
   const match = typeof value === "string" ? value.match(/^eip155:([1-9][0-9]*)$/) : null;

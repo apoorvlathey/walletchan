@@ -1,4 +1,6 @@
 import { getAccountById } from "../accountStorage";
+import { validateExternalSignatureTypedData } from "../signatures/externalTypedData";
+import type { SignatureParams } from "./pendingSignatureStorage";
 import {
   enforcePendingRequestAuthorizationAtConfirmation,
   type PendingRequestLifecycleContext,
@@ -9,6 +11,7 @@ import {
 } from "../storageLock";
 
 type PendingSignatureReleaseContext = PendingRequestLifecycleContext & {
+  signature: SignatureParams;
   accountId?: string;
   accountAddress?: string;
   accountType?: string;
@@ -30,6 +33,12 @@ export async function revalidatePendingSignatureBeforeRelease(
       account.address.toLowerCase() !== pending.accountAddress.toLowerCase()
     ) {
       return { authorized: false, error: "Pending request is no longer valid" };
+    }
+    const validation = await validateExternalSignatureTypedData(
+      pending.signature, account.address,
+    );
+    if (!validation.valid) {
+      return { authorized: false, error: validation.error ?? "Invalid typed data" };
     }
     // Keep transport + Bankr credential binding as the final await. Account
     // and credential mutations are excluded by the operation lock, while the

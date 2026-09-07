@@ -2,6 +2,7 @@
  * Account types and vault structures for multi-account support
  */
 
+/** New types also require an explicit row in accounts/accountTypePolicy.ts. */
 export type AccountType =
   | "bankr"
   | "privateKey"

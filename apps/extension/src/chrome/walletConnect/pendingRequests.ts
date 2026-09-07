@@ -27,6 +27,7 @@ import { resolveSessionAccount } from "./sessionAccountPolicy";
 import type { WalletKitLike } from "./protocol";
 import { createReviewedSafeProposal } from "../safe/proposalLifecycle";
 import { requireSafeFeature } from "../safe/featurePolicy";
+import { validateExternalSignatureTypedData } from "../signatures/externalTypedData";
 
 export async function createPendingTransactionRequest(
   kit: WalletKitLike,
@@ -185,6 +186,9 @@ export async function createPendingSignatureRequest(
     chainId,
     requestSignerAddress(method, params),
   );
+  const validation = await validateExternalSignatureTypedData({ method, params, chainId }, account.address);
+  if (!validation.valid) throw new Error(validation.error);
+  if (validation.sanitized) params[1] = validation.sanitized;
   const sigId = crypto.randomUUID();
   const peer = getSessionMetadata(kit.getActiveSessions()?.[args.topic]);
   const chainName = await getStoredChainName(chainId);

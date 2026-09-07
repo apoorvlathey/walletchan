@@ -43,6 +43,26 @@ linked eligible owner account and the owner path must be tested independently.
 **Common mistake**: Fixing something only for Bankr API accounts and forgetting
 that private key/seed phrase/Ledger accounts have separate handlers.
 
+### Adding a future account type
+
+- Define the account in `apps/extension/src/chrome/types.ts` and explicitly set
+  its capabilities in `apps/extension/src/chrome/accounts/accountTypePolicy.ts`.
+  The exhaustive `ACCOUNT_TYPE_CAPABILITIES` table must cover every `AccountType`;
+  do not weaken its type check or replace it with a partial/defaulting map.
+- Reuse `isDirectSigningAccount` and its derived types for general signer
+  eligibility. Pending requests, WalletConnect, and external EIP-712 verifier
+  protection share this policy; do not add independent signer-type lists there.
+  Direct signing EOAs (including hardware and remotely signed EOAs) use
+  `directSigner: true`; imported Safes and view-only records use `false`.
+- A capability declaration does not implement signing or authorize a request.
+  Review transport/device dispatch, persisted request types, auth/session and
+  release checks, chain/method support, and `safe/accountTypePolicy.ts` separately.
+- Run `tests/accounts/accountTypePolicy.test.ts` and the signature, request,
+  WalletConnect, and Safe regressions, including all existing signer types.
+  Preserve self/other-EOA verifier blocking and imported-Safe owner signing.
+  Hardware additions also need real-device QA. See the account-type extension
+  checklist in `_docs/IMPLEMENTATION.md`.
+
 ## AI Session Workflow
 
 **At the start of each session**, before writing any code:

@@ -1,9 +1,6 @@
 import { validateSiwePersonalSignRequest } from "@/lib/siwe";
-import type { Account } from "../types";
-import {
-  isRawErc7710DelegationSignatureRequest,
-  RAW_ERC7710_DELEGATION_SIGNATURE_ERROR,
-} from "../eip712Validator";
+import type { DirectSigningAccount } from "../accounts/accountTypePolicy";
+import { validateExternalSignatureTypedData } from "./externalTypedData";
 import {
   getPendingSignatureRequestById,
   removePendingSignatureRequest,
@@ -15,14 +12,9 @@ import {
 } from "../transactions/runtime";
 import { extractSignerParam } from "./requestSigner";
 
-type SignatureSigningAccount = Extract<
-  Account,
-  { type: "bankr" | "privateKey" | "seedPhrase" | "ledger" }
->;
-
 export type PreparedSignatureConfirmation = {
   pending: PendingSignatureRequest;
-  account: SignatureSigningAccount;
+  account: DirectSigningAccount;
 };
 
 export type SignatureConfirmationPreflight =
@@ -31,7 +23,7 @@ export type SignatureConfirmationPreflight =
 
 /**
  * Applies the shared, side-effect-ordered signature checks before either the
- * local or Bankr signer is selected.
+ * local, Ledger, or Bankr signer is selected.
  */
 export async function prepareSignatureConfirmation(
   sigId: string,
@@ -61,20 +53,22 @@ export async function prepareSignatureConfirmation(
     };
   }
 
-  if (
-    isRawErc7710DelegationSignatureRequest(
-      pending.signature.method,
-      pending.signature.params?.[1],
-    )
-  ) {
+  const typedDataValidation = await validateExternalSignatureTypedData(
+    pending.signature,
+    account.address,
+  );
+  if (!typedDataValidation.valid) {
     await removePendingSignatureRequest(sigId);
     return {
       ok: false,
       result: {
         success: false,
-        error: RAW_ERC7710_DELEGATION_SIGNATURE_ERROR,
+        error: typedDataValidation.error,
       },
     };
+  }
+  if (typedDataValidation.sanitized) {
+    pending.signature.params[1] = typedDataValidation.sanitized;
   }
 
   const signerParam = extractSignerParam(

@@ -23,23 +23,12 @@ import type {
 } from "./pendingSignatureStorage";
 import type { PinnedBatchTxRequest, PendingBatchTxRequest } from "../erc5792Types";
 
-export type SigningAccount = Extract<
-  Account,
-  { type: "bankr" | "privateKey" | "seedPhrase" | "ledger" }
->;
+export {
+  isDirectSigningAccount as isRequestSigningAccount,
+  type DirectSigningAccount as SigningAccount,
+} from "../accounts/accountTypePolicy";
 
 export type ProviderRequestAccount = Exclude<Account, { type: "safe" }>;
-
-export function isRequestSigningAccount(
-  account: Account,
-): account is SigningAccount {
-  return (
-    account.type === "bankr" ||
-    account.type === "privateKey" ||
-    account.type === "seedPhrase" ||
-    account.type === "ledger"
-  );
-}
 
 type TxBase = Omit<
   PendingTxRequest,

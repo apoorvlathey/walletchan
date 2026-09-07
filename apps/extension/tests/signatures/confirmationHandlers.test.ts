@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { accountExecutionTypedData, safeTransactionTypedData } from "./accountDomainFixture";
+import { INTERNAL_ACCOUNT_TYPED_DATA_ERROR } from "../../src/chrome/eip712Validator";
 import { Buffer } from "node:buffer";
 import path from "node:path";
 import test from "node:test";
@@ -9,7 +11,8 @@ type StorageRecord = Record<string, unknown>;
 type SigningHook = {
   local: () => Promise<string>;
   bankr: () => Promise<{ signature: string }>;
-  prepared: unknown;
+  ledger: () => Promise<string>;
+  ledgerSession: () => Promise<void>;
   privateKey: string | null;
   apiKey: string | null;
 };
@@ -82,9 +85,10 @@ test("confirmation preserves all wallet authorities and final release races", as
     async bankr() {
       return { signature: `0x${"bb".repeat(65)}` };
     },
-    prepared: null,
     privateKey: null,
     apiKey: null,
+    ledger: async () => { throw new Error("Ledger device must not run"); },
+    ledgerSession: async () => { throw new Error("Ledger session must not run"); },
   };
   Object.assign(globalThis, { __walletchanSignatureTestHooks: hooks });
 
@@ -108,6 +112,10 @@ test("confirmation preserves all wallet authorities and final release races", as
           name: "signature-confirmation-signers",
           enforce: "pre",
           resolveId(source, importer) {
+            if (importer?.split("?", 1)[0].endsWith("/chrome/ledger/signatureConfirmation.ts")) {
+              if (source === "./session") return "\0signature-ledger-session";
+              if (source === "./signing") return "\0signature-ledger-signing";
+            }
             if (
               !importer
                 ?.split("?", 1)[0]
@@ -116,19 +124,17 @@ test("confirmation preserves all wallet authorities and final release races", as
             return ({
               "../localSigner": "\0signature-confirmation-local-signer",
               "../bankr/signing": "\0signature-confirmation-bankr-signer",
-              "./confirmationPolicy": "\0signature-confirmation-policy",
               "../sessionCache": "\0signature-confirmation-session",
             } as Record<string, string>)[source] ?? null;
           },
           load(id) {
+            if (id === "\0signature-ledger-session") return `export const ensureLedgerSigningSession = (...args) => globalThis.__walletchanSignatureTestHooks.ledgerSession(...args);`;
+            if (id === "\0signature-ledger-signing") return `export const signLedgerSignatureRequest = (...args) => globalThis.__walletchanSignatureTestHooks.ledger(...args);`;
             if (id === "\0signature-confirmation-local-signer") {
               return `export const handleSignatureRequest = (...args) => globalThis.__walletchanSignatureTestHooks.local(...args);`;
             }
             if (id === "\0signature-confirmation-bankr-signer") {
               return `export const signMessageViaApi = (...args) => globalThis.__walletchanSignatureTestHooks.bankr(...args);`;
-            }
-            if (id === "\0signature-confirmation-policy") {
-              return `export const prepareSignatureConfirmation = async () => ({ ok: true, value: globalThis.__walletchanSignatureTestHooks.prepared });`;
             }
             if (id === "\0signature-confirmation-session") {
               return `
@@ -151,6 +157,7 @@ test("confirmation preserves all wallet authorities and final release races", as
     const handlers = await viteServer.ssrLoadModule(
       "/src/chrome/signatures/confirmationHandlers.ts",
     );
+    const ledgerHandlers = await viteServer.ssrLoadModule("/src/chrome/ledger/signatureConfirmation.ts");
     const pendingStorage = await viteServer.ssrLoadModule(
       "/src/chrome/requests/pendingSignatureStorage.ts",
     );
@@ -167,13 +174,14 @@ test("confirmation preserves all wallet authorities and final release races", as
       local.pendingSignatureRequests = [];
       hooks.local = async () => `0x${"aa".repeat(65)}`;
       hooks.bankr = async () => ({ signature: `0x${"bb".repeat(65)}` });
-      hooks.prepared = null;
       hooks.privateKey = null;
       hooks.apiKey = null;
+      hooks.ledger = async () => { throw new Error("Ledger device must not run"); };
+      hooks.ledgerSession = async () => { throw new Error("Ledger session must not run"); };
     };
 
     const queue = async (
-      type: "bankr" | "privateKey" | "seedPhrase",
+      type: "bankr" | "privateKey" | "seedPhrase" | "ledger" | "impersonator",
       id: string,
       options: {
         signature?: {
@@ -238,7 +246,6 @@ test("confirmation preserves all wallet authorities and final release races", as
           `${type}-success`,
         );
         assert.equal(preflight.ok, true, JSON.stringify(preflight));
-        hooks.prepared = preflight.value;
 
         const result = type === "bankr"
           ? await handlers.handleConfirmSignatureRequestBankr(
@@ -261,15 +268,145 @@ test("confirmation preserves all wallet authorities and final release races", as
       });
     }
 
+    for (const type of ["privateKey", "seedPhrase", "ledger", "bankr"] as const) {
+      for (const method of ["eth_signTypedData_v3", "eth_signTypedData_v4"] as const) {
+        await t.test(`${type} blocks already-pending ${method} execution signatures before signing`, async () => {
+          reset();
+          const id = `blocked-${type}-${method}`;
+          await queue(type, id, { signature: { method, params: [address, accountExecutionTypedData(address)], chainId: 1 }, origin: "WalletChan" });
+          // Even a forged internal-looking label and SIWE override cannot bypass this policy.
+          hooks.local = async () => { assert.fail("local signer must not run"); };
+          hooks.bankr = async () => { assert.fail("Bankr API must not run"); };
+          const result = type === "ledger"
+            ? await ledgerHandlers.handleConfirmLedgerSignatureRequest(id, "agent-password", undefined, true)
+            : type === "bankr"
+              ? await handlers.handleConfirmSignatureRequestBankr(id, "agent-password", true)
+              : await handlers.handleConfirmSignatureRequest(id, "agent-password", undefined, true);
+          assert.equal(result.success, false);
+          assert.equal(result.error, INTERNAL_ACCOUNT_TYPED_DATA_ERROR);
+          assert.equal(await pendingStorage.getPendingSignatureRequestById(id), null);
+        });
+      }
+    }
+
+    await t.test("ordinary third-party typed data remains reviewable for every signing account", async () => {
+      for (const type of ["privateKey", "seedPhrase", "ledger", "bankr"] as const) {
+        reset();
+        await queue(type, "ordinary", { signature: { method: "eth_signTypedData_v4", params: [address, accountExecutionTypedData("0x3333333333333333333333333333333333333333")], chainId: 1 } });
+        assert.equal((await confirmationPolicy.prepareSignatureConfirmation("ordinary")).ok, true);
+      }
+    });
+
+    await t.test("old pending deprecated methods cannot bypass the external signature policy", async () => {
+      for (const type of ["privateKey", "seedPhrase", "ledger", "bankr"] as const) {
+        for (const method of ["eth_signTypedData", "eth_sign"] as const) {
+          reset();
+          await queue(type, "deprecated", { signature: { method, params: [address, accountExecutionTypedData(address)], chainId: 1 } });
+          hooks.local = async () => { assert.fail("local signer must not run"); };
+          hooks.bankr = async () => { assert.fail("Bankr API must not run"); };
+          const result = type === "ledger"
+            ? await ledgerHandlers.handleConfirmLedgerSignatureRequest("deprecated", "agent-password", undefined, true)
+            : type === "bankr"
+              ? await handlers.handleConfirmSignatureRequestBankr("deprecated", "agent-password", true)
+              : await handlers.handleConfirmSignatureRequest("deprecated", "agent-password", undefined, true);
+          assert.equal(result.success, false);
+          assert.match(result.error, /deprecated/);
+          assert.equal(await pendingStorage.getPendingSignatureRequestById("deprecated"), null);
+        }
+      }
+    });
+
+    await t.test("imported SafeTx remains reviewable and releasable through all four signer handlers", async () => {
+      const safeAddress = "0x3333333333333333333333333333333333333333";
+      for (const type of ["privateKey", "seedPhrase", "ledger", "bankr"] as const) {
+        for (const method of ["eth_signTypedData_v3", "eth_signTypedData_v4"] as const) {
+          reset();
+          const data = safeTransactionTypedData(safeAddress);
+          await queue(type, "safe-owner", { signature: { method, params: [address, JSON.stringify(data)], chainId: 1 } });
+          (local.accounts as unknown[]).push({ id: "safe", type: "safe", address: safeAddress, createdAt: 1 });
+          const prepared = await confirmationPolicy.prepareSignatureConfirmation("safe-owner");
+          assert.equal(prepared.ok, true, JSON.stringify(prepared));
+          // Only device I/O is mocked; the Ledger confirmation/release policy is real.
+          hooks.ledgerSession = async () => {};
+          hooks.ledger = async () => `0x${"dd".repeat(65)}`;
+          hooks.privateKey = privateKey;
+          hooks.apiKey = "bankr-api-key";
+          const result = type === "ledger"
+            ? await ledgerHandlers.handleConfirmLedgerSignatureRequest("safe-owner", "master-password")
+            : type === "bankr"
+            ? await handlers.handleConfirmSignatureRequestBankr("safe-owner", "master-password")
+            : await handlers.handleConfirmSignatureRequest("safe-owner", "master-password");
+          assert.equal(result.success, true, JSON.stringify(result));
+          assert.match(result.signature, /^0x[0-9a-f]+$/);
+        }
+      }
+    });
+
+    await t.test("SafeTx type cannot exempt a protected EOA and view-only verifiers are not signers", async () => {
+      const target = "0x3333333333333333333333333333333333333333";
+      const externalPolicy = await viteServer!.ssrLoadModule("/src/chrome/signatures/externalTypedData.ts");
+      for (const type of ["privateKey", "seedPhrase", "ledger", "bankr", "safe", "impersonator"] as const) {
+        local.accounts = [{ id: "target", type, address: target, createdAt: 1 }];
+        const result = await externalPolicy.validateExternalSignatureTypedData({ method: "eth_signTypedData_v4", params: [address, safeTransactionTypedData(target)], chainId: 1 }, address);
+        assert.equal(result.valid, type === "safe" || type === "impersonator", type);
+      }
+      local.accounts = [{ id: "safe", type: "safe", address, createdAt: 1 }];
+      const self = await externalPolicy.validateExternalSignatureTypedData({ method: "eth_signTypedData_v4", params: [address, safeTransactionTypedData(address)], chainId: 1 }, address);
+      assert.equal(self.valid, false, "the pinned signer always remains protected");
+    });
+
+    await t.test("view-only and Safe accounts cannot reach generic signature approval", async () => {
+      for (const type of ["impersonator", "safe"] as const) {
+        reset();
+        await queue("privateKey", "non-signer");
+        (local.accounts as Array<{ type: string }>)[0].type = type;
+        const result = await handlers.handleConfirmSignatureRequest("non-signer", "master-password");
+        assert.equal(result.success, false);
+        assert.equal(result.signature, undefined);
+      }
+    });
+
+    await t.test("changing the selected account cannot change a pending request's protected signer", async () => {
+      reset();
+      await queue("privateKey", "selection-change", { signature: { method: "eth_signTypedData_v4", params: [address, accountExecutionTypedData(address)], chainId: 1 } });
+      (local.accounts as unknown[]).push({ id: "other", type: "ledger", address: "0x3333333333333333333333333333333333333333", createdAt: 1 });
+      sync.activeAccountId = "other";
+      const result = await confirmationPolicy.prepareSignatureConfirmation("selection-change");
+      assert.equal(result.ok, false);
+      assert.equal(result.result.error, INTERNAL_ACCOUNT_TYPED_DATA_ERROR);
+    });
+
+    await t.test("an account imported while signing prevents release for every signer transport", async () => {
+      for (const type of ["privateKey", "seedPhrase", "ledger", "bankr"] as const) {
+        reset();
+        const target = "0x3333333333333333333333333333333333333333";
+        await queue(type, "import-race", { signature: { method: "eth_signTypedData_v4", params: [address, accountExecutionTypedData(target)], chainId: 1 } });
+        hooks.privateKey = privateKey;
+        hooks.apiKey = "bankr-api-key";
+        const sign = async () => {
+          (local.accounts as unknown[]).push({ id: "imported", type: "ledger", address: target, createdAt: 1 });
+          return `0x${"cc".repeat(65)}`;
+        };
+        hooks.local = sign;
+        hooks.bankr = async () => ({ signature: await sign() });
+        hooks.ledgerSession = async () => {};
+        hooks.ledger = sign;
+        const result = type === "ledger"
+          ? await ledgerHandlers.handleConfirmLedgerSignatureRequest("import-race", "master-password")
+          : type === "bankr"
+            ? await handlers.handleConfirmSignatureRequestBankr("import-race", "master-password")
+            : await handlers.handleConfirmSignatureRequest("import-race", "master-password");
+        assert.equal(result.success, false, type);
+        assert.equal(result.signature, undefined, type);
+        assert.equal(result.error, INTERNAL_ACCOUNT_TYPED_DATA_ERROR, type);
+        assert.equal(await pendingStorage.getPendingSignatureRequestById("import-race"), null, type);
+      }
+    });
+
     await t.test(
-      "shared preflight preserves eth_sign and typed-data signer positions",
+      "shared preflight preserves typed-data signer positions",
       async () => {
         for (const signature of [
-          {
-            method: "eth_sign" as const,
-            params: [address, `0x${"12".repeat(32)}`],
-            chainId: 1,
-          },
           {
             method: "eth_signTypedData_v4" as const,
             params: [
@@ -295,8 +432,8 @@ test("confirmation preserves all wallet authorities and final release races", as
         reset();
         await queue("privateKey", "policy-eth-sign-mismatch", {
           signature: {
-            method: "eth_sign",
-            params: [`0x${"22".repeat(20)}`, `0x${"12".repeat(32)}`],
+            method: "eth_signTypedData_v4",
+            params: [`0x${"22".repeat(20)}`, safeTransactionTypedData("0x3333333333333333333333333333333333333333")],
             chainId: 1,
           },
         });
@@ -356,9 +493,8 @@ test("confirmation preserves all wallet authorities and final release races", as
 
     await t.test("account replacement during signing suppresses release", async () => {
       reset();
-      const { account, pending } = await queue("privateKey", "local-race");
+      const { account } = await queue("privateKey", "local-race");
       hooks.privateKey = privateKey;
-      hooks.prepared = { pending, account };
 
       let beginSigning!: () => void;
       let releaseSigning!: () => void;

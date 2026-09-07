@@ -6,7 +6,7 @@ const readChromeModule = (name: string) =>
   readFile(new URL(`../../src/chrome/${name}`, import.meta.url), "utf8");
 
 test("EIP-712 parsing delegates to a focused pure audit domain", async () => {
-  const [facade, validator, policy, schema, sanitization, types] =
+  const [facade, validator, policy, schema, sanitization, types, accountDomain] =
     await Promise.all([
       readChromeModule("eip712Validator.ts"),
       readChromeModule("signatures/eip712/validator.ts"),
@@ -14,6 +14,7 @@ test("EIP-712 parsing delegates to a focused pure audit domain", async () => {
       readChromeModule("signatures/eip712/schemaValidation.ts"),
       readChromeModule("signatures/eip712/sanitization.ts"),
       readChromeModule("signatures/eip712/types.ts"),
+      readChromeModule("signatures/eip712/accountDomainPolicy.ts"),
     ]);
 
   assert.match(facade, /from ["'].\/signatures\/eip712\/validator["']/);
@@ -22,7 +23,7 @@ test("EIP-712 parsing delegates to a focused pure audit domain", async () => {
   assert.match(validator, /from ["'].\/delegationPolicy["']/);
   assert.match(validator, /from ["'].\/schemaValidation["']/);
   assert.match(validator, /from ["'].\/sanitization["']/);
-  for (const moduleSource of [validator, policy, schema, sanitization, types]) {
+  for (const moduleSource of [validator, policy, schema, sanitization, types, accountDomain]) {
     assert.doesNotMatch(
       moduleSource,
       /chrome\.|fetch\(|sessionCache|accountStorage|localSigner|bankr(?:Api|\/)/,

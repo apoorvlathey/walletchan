@@ -150,6 +150,11 @@ test("a signature is discarded when credential authority changes while signing",
   const tag = await binding.getCurrentBankrCredentialTag();
   const pending = {
     id: "signature-race",
+    signature: {
+      method: "personal_sign" as const,
+      params: ["0x1234", account.address],
+      chainId: 1,
+    },
     origin: "internal:signature-race",
     trustedInternal: true as const,
     accountId: "bankr-signature",

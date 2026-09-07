@@ -44,3 +44,16 @@ test("methods outside the bounded v3/v4 parser retain their pass-through", () =>
     valid: true,
   });
 });
+
+test("malformed field definitions reject cleanly before graph or delegation inspection", () => {
+  for (const primaryType of ["Message", "Delegation"]) {
+    for (const field of [null, 1, "field", { name: "x", type: 1 }, { name: "x", type: {} }]) {
+      const data = { types: { EIP712Domain: [], [primaryType]: [field] }, domain: {}, primaryType, message: {} };
+      for (const method of ["eth_signTypedData_v3", "eth_signTypedData_v4"]) {
+        for (const input of [data, JSON.stringify(data)]) {
+          assert.equal(validateEIP712TypedData(method, input).valid, false);
+        }
+      }
+    }
+  }
+});

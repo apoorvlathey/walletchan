@@ -4,6 +4,15 @@
 metadata. This directory also owns the small compatibility, tab-scope, and
 local-signing boundaries whose decisions are pinned to an account identity.
 
+`accountTypePolicy.ts` owns pure general signer classification in an exhaustive
+`ACCOUNT_TYPE_CAPABILITIES` table. Every new `AccountType` needs an explicit row.
+Pending requests and WalletConnect alias its guard; external EIP-712 protection
+and signature confirmation use the same guard/derived types. Reuse these instead
+of adding signer-name lists. Safe and view-only records are not direct signers.
+Feature capabilities, signing dispatch, and runtime authorization remain separate;
+see the account-type extension checklist in `_docs/IMPLEMENTATION.md` and the
+Safe-specific exhaustive matrix in `../safe/accountTypePolicy.ts`.
+
 Review in dependency order:
 
 1. `authorization.ts` — optional master-epoch assertion at commit boundaries.

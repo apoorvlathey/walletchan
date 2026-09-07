@@ -30,7 +30,9 @@ export function signaturePassesSurfacePreflight(
   }
   if (!Array.isArray(params)) return false;
 
-  const validation = validateEIP712TypedData(method, params[1]);
+  const validation = validateEIP712TypedData(
+    method, params[1], typeof params[0] === "string" ? [params[0]] : [],
+  );
   if (!validation.valid) return false;
 
   const typedData = parsedTypedData(validation.sanitized ?? params[1]);

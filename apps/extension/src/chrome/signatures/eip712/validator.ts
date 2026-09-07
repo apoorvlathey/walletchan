@@ -12,6 +12,12 @@ import {
 } from "./schemaValidation";
 import { sanitizeEip712TypedData } from "./sanitization";
 import type { EIP712ValidationResult } from "./types";
+import {
+  INTERNAL_ACCOUNT_TYPED_DATA_ERROR,
+  usesInternalAccountDomain,
+} from "./accountDomainPolicy";
+
+export { INTERNAL_ACCOUNT_TYPED_DATA_ERROR } from "./accountDomainPolicy";
 
 export type { EIP712ValidationResult } from "./types";
 export {
@@ -27,6 +33,7 @@ const MAX_FIELDS_PER_TYPE = 32;
 export function validateEIP712TypedData(
   method: string,
   typedData: any,
+  protectedAddresses: readonly string[] = [],
 ): EIP712ValidationResult {
   if (method !== "eth_signTypedData_v3" && method !== "eth_signTypedData_v4") {
     return { valid: true };
@@ -51,7 +58,7 @@ export function validateEIP712TypedData(
   } catch {
     return { valid: false, error: "Invalid JSON in typed data" };
   }
-  if (!data.types || typeof data.types !== "object") {
+  if (!data || !data.types || typeof data.types !== "object") {
     return { valid: false, error: "Missing or invalid 'types' field" };
   }
 
@@ -80,16 +87,22 @@ export function validateEIP712TypedData(
   if (!data.message || typeof data.message !== "object") {
     return { valid: false, error: "Missing or invalid 'message' field" };
   }
+  // Graph traversal and delegation inspection assume well-formed field objects.
+  const typeDefinitions = validateEip712TypeDefinitions(data.types);
+  if (!typeDefinitions.valid) return typeDefinitions;
   if (isRawErc7710DelegationSignatureRequest(method, data)) {
     return { valid: false, error: RAW_ERC7710_DELEGATION_SIGNATURE_ERROR };
   }
+  if (usesInternalAccountDomain(data.domain, protectedAddresses)) {
+    return { valid: false, error: INTERNAL_ACCOUNT_TYPED_DATA_ERROR };
+  }
 
-  for (const result of [
-    validateEip712ObjectDepth(data, MAX_NESTING_DEPTH),
-    detectEip712CircularReferences(data.types),
-    validateEip712NestingDepth(data.types, MAX_NESTING_DEPTH),
-    validateEip712TypeDefinitions(data.types),
+  for (const validate of [
+    () => validateEip712ObjectDepth(data, MAX_NESTING_DEPTH),
+    () => detectEip712CircularReferences(data.types),
+    () => validateEip712NestingDepth(data.types, MAX_NESTING_DEPTH),
   ]) {
+    const result = validate();
     if (!result.valid) return result;
   }
 

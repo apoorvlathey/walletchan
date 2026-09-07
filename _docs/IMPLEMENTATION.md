@@ -18,6 +18,40 @@ account models:
 
 This document describes the core architecture and transaction handling implementation.
 
+### Account-type extension checklist
+
+`chrome/accounts/accountTypePolicy.ts` owns general direct-signer classification.
+Its `ACCOUNT_TYPE_CAPABILITIES` table uses `satisfies Record<AccountType, ...>`:
+adding a type in `chrome/types.ts` fails typechecking until its capability row is
+declared. `DirectSigningAccountType` and `DirectSigningAccount` derive from the
+literal table, rather than maintaining another union of signer names.
+
+`requests/pinnedRequest.ts:isRequestSigningAccount` and
+`walletConnect/sessionPolicy.ts:isSigningAccount` are compatibility aliases of
+the same `isDirectSigningAccount` guard. Pending-account resolution, shared
+signature confirmation types, and `signatures/externalTypedData.ts` use this
+classification. Thus declaring a future hardware EOA as a direct signer also
+includes its stored address in external V3/V4 verifier protection. The request's
+pinned signer remains protected independently. Safe and impersonator records
+are not direct signers; imported-Safe owner signatures remain available.
+
+When adding an account type (for example Trezor):
+
+1. Add its `AccountType` and `Account` model and choose its core capability row.
+   Reuse the shared guard/types; do not duplicate the general signer list.
+2. Implement and review signer transport, device binding, session/master/agent
+   authorization, persisted request shapes, method/chain support, and final
+   signature/transaction release gates. Classification alone grants none of these.
+3. Choose Safe owner/executor/fee-token capabilities in the separate exhaustive
+   `safe/accountTypePolicy.ts` matrix and review other feature-specific limits.
+4. Run account-capability, signature, pending-request, WalletConnect, and Safe
+   tests for every signer type; verify self/other-EOA rejection and imported-Safe
+   acceptance. Add hardware QA where applicable and rebuild the full extension.
+
+`tests/accounts/accountTypePolicy.test.ts` compiles isolated copies of the real
+account model and policy with a synthetic future type: a missing capability row
+must fail, and its declared capability determines the derived signer type.
+
 **Related Documentation:**
 
 - [SECURITY.md](./SECURITY.md) - Security audit guide, threat model, and pre-commit checklists
@@ -3394,6 +3428,41 @@ Before storing or displaying EIP-712 signature requests, typed data is validated
 2. Circular reference detection (DFS traversal)
 3. Nesting depth limit (50 levels maximum)
 4. Type definition conformance (all referenced types exist and are valid)
+5. External requests cannot use the signer or any stored direct signing EOA as
+   `domain.verifyingContract` (case-insensitive), regardless of primary type,
+   calldata, delegation settings, or request origin labels.
+
+`signatures/externalTypedData.ts` follows MetaMask's EOA-only internal-account
+filter: it supplies stored PK, seed, Ledger, and Bankr addresses plus the pinned
+signer to the pure validator. Imported Safe and view-only records do not add
+protected addresses. Injected intake and WalletConnect
+both enforce this before persistence. Shared confirmation repeats it for PK,
+seed, Ledger, and Bankr, including requests persisted by older builds; the SIWE
+override cannot bypass it. Final signature release rechecks under the wallet
+operation lock to catch another account imported during signing. The content
+bridge also suppresses early request-surface opening for a signer-domain match,
+without receiving the wallet's other account addresses.
+
+The external confirmation/release policy also rejects deprecated `eth_sign` and
+unversioned `eth_signTypedData` requests persisted by older builds, matching
+current provider intake. This prevents the legacy typed-data alias accepted by
+low-level signers from bypassing V3/V4 protection. EIP-712 field definitions are
+validated before delegation inspection or graph traversal so malformed fields
+produce a normal rejection rather than throwing from the validator.
+If Ledger signing completes but final authority validation rejects release,
+the pending request is removed so the background publishes the rejection to
+the dapp. Pre-sign device/session failures retain the existing retry behavior.
+The injected provider classifies the account-domain policy error as an expected
+signature rejection (fallback code 4001), reusing its existing quiet rejection
+logging path. Genuine signer/transport failures continue to produce warnings.
+
+This blocks `PackedUserOperation` execution-signature phishing against imported
+or already-delegated EOAs, along with other self-verifying account formats.
+External owner signatures with an imported Safe as the verifier remain supported;
+there is no primary-type exemption, so `SafeTx` cannot bypass a protected EOA
+match. Internal fee-token UserOperation construction and Safe-owner approvals
+use their separate signing paths and remain available. No origin string or `trustedInternal` flag
+bypasses this policy on the generic signature-request path.
 
 **On validation failure**:
 
@@ -3405,7 +3474,8 @@ Before storing or displaying EIP-712 signature requests, typed data is validated
 
 `eip712Validator.ts` is the stable policy-free facade. Validation ownership is
 split under `signatures/eip712/` across `validator.ts` (bounded orchestration),
-`delegationPolicy.ts` (raw delegation rejection), `schemaValidation.ts` (pure
+`delegationPolicy.ts` (raw delegation rejection), `accountDomainPolicy.ts`
+(internal-account verifying-contract rejection), `schemaValidation.ts` (pure
 graph/type checks), and `sanitization.ts` (schema-only projection). Request
 intake owns only the integration and durable rejection result.
 

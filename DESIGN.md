@@ -3,6 +3,15 @@
 > Screen-by-screen implementation decisions and current review status live in
 > [`_docs/WARM_MIDNIGHT.md`](./_docs/WARM_MIDNIGHT.md).
 
+## Wallet test playground
+
+The account-domain regression controls in `/test#signatures` extend the existing
+test-page components and tokens. This is a precise, direct, inspectable developer
+tool: one Run action per case, labeled encoding/address inputs, and explicit
+PASS, FAIL, or INCONCLUSIVE text. Expected policy rejection is a passing result;
+manual rejection is not. No new palette, typography, motion, or card treatment
+is introduced. Controls retain keyboard labels and visible disabled/loading states.
+
 ## Docs site projection
 
 - Artifact type: searchable end-user documentation and product reference.

@@ -1268,12 +1268,51 @@ All `eth_signTypedData_v3` and `eth_signTypedData_v4` requests are validated bef
 | Circular references | None allowed                                  | Prevent infinite recursion in type resolution           |
 | Schema structure    | Must have domain, types, primaryType, message | EIP-712 conformance                                     |
 | Type definitions    | All referenced types must exist               | Prevent undefined type errors                           |
+| Account domain | External V3/V4 verifying contract cannot equal the signer or any stored direct signing EOA | Prevent account execution signatures disguised as messages |
 
 ### Attack Scenarios Blocked
 
 1. **Deep nesting DoS**: 60,825 nested types attempting to crash extension
 2. **Circular reference DoS**: Types referencing themselves causing infinite loops
 3. **Malformed schemas**: Invalid JSON or missing required fields
+4. **Account execution-signature phishing**: `PackedUserOperation` and other
+   account-domain typed data cannot be signed via generic dapp requests. The
+   check is independent of local delegation settings: imported keys retain
+   onchain EIP-7702 authority. It covers PK, seed, Ledger, and Bankr EOAs and V3/V4,
+   without requiring particular primary types, calldata fields, or RPC probes.
+
+`signatures/externalTypedData.ts` loads the current account list only in the
+background and filters to direct signing accounts, matching MetaMask's EOA-only
+policy. Safe and view-only records do not add protected addresses; the pinned
+signer is always protected. An imported Safe can remain a verifier for external
+owner `SafeTx` signatures. There is no `SafeTx` primary-type exemption for EOAs.
+General signer classification comes from the exhaustive
+`accounts/accountTypePolicy.ts:ACCOUNT_TYPE_CAPABILITIES` table, shared by
+pending-account resolution and WalletConnect. A new `AccountType` must declare
+its capability row; derived signer types must not be replaced with handwritten
+unions or fallback-to-true logic. Direct signing EOAs, including hardware and
+remote signers, must enter this protection through the shared guard. A capability
+row is classification only: keep auth/session, signer dispatch, and final-release
+authorization checks. Review Safe's separate capability matrix when extending
+account support. The compiler regression in `tests/accounts/accountTypePolicy.test.ts`
+protects missing-row detection and signer-type derivation.
+Injected and WalletConnect intake enforce the policy before pending
+storage; shared confirmation enforces it for all four signer types and old
+pending records, before credential access or device/API calls. Final release
+rechecks under the wallet-secret operation lock for account-import races.
+Deprecated `eth_sign` and unversioned `eth_signTypedData` are rejected at this
+shared boundary too, including old pending records; low-level compatibility
+signers must not turn the unversioned alias into a policy bypass. Malformed
+field definitions are rejected before delegation/graph inspection, and graph
+checks short-circuit on failure.
+Ledger final-release authorization failures discard the signature and remove
+the pending record, allowing the background to publish a terminal rejection;
+pre-sign device/session failures remain retryable.
+Neither a spoofed origin/internal label nor the SIWE override grants an exemption.
+The content bridge checks the supplied signer only for early surface suppression;
+the complete account list is never disclosed to it. Reviewed internal UserOperation
+and Safe-owner signing remain separate from this external-request boundary.
+No storage keys, secret formats, or signing capabilities are added.
 
 ### Validation Flow
 
