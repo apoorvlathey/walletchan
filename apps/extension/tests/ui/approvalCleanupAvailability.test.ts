@@ -7,7 +7,7 @@ import {
 } from "../../src/components/AssetChanges/approvalCleanupAvailability";
 import { approvalCleanupEvidence } from "../../src/components/AssetChanges/approvalCleanupTransport";
 
-test("only atomic PK and seed requests can add an EOA cleanup call", () => {
+test("atomic Bankr, PK and seed requests can add an EOA cleanup call", () => {
   for (const accountType of ["privateKey", "seedPhrase"] as const) {
     assert.equal(
       getApprovalCleanupDisabledReason({
@@ -25,7 +25,6 @@ test("only atomic PK and seed requests can add an EOA cleanup call", () => {
     );
   }
   for (const accountType of [
-    "bankr",
     "ledger",
     "impersonator",
   ] as const) {
@@ -33,7 +32,7 @@ test("only atomic PK and seed requests can add an EOA cleanup call", () => {
       getApprovalCleanupDisabledReason({
         accountType,
         batchStrategy:
-          accountType === "bankr" ? "atomic-bankr" : "auto-sequential",
+          "auto-sequential",
       }),
       null,
       accountType,
@@ -93,4 +92,10 @@ test("cleanup transport accepts only one complete opaque evidence set", () => {
     approvalCleanupEvidence([{ detectionId: "a" }]),
     null,
   );
+});
+
+test("Bankr cleanup requires its atomic strategy and respects request locks", () => {
+  assert.equal(getApprovalCleanupDisabledReason({ accountType: "bankr", batchStrategy: "atomic-bankr" }), null);
+  assert.notEqual(getApprovalCleanupDisabledReason({ accountType: "bankr", batchStrategy: "auto-sequential" }), null);
+  assert.equal(getApprovalCleanupDisabledReason({ accountType: "bankr", batchStrategy: "atomic-bankr", requestBlockedReason: "Request is locked." }), "Request is locked.");
 });

@@ -57,7 +57,7 @@ test("bulk approval cleanup validates and deduplicates token-spender pairs", () 
 test("background cleanup policy covers every wallet type", () => {
   assert.equal(supportsAtomicEoaApprovalCleanup("privateKey"), true);
   assert.equal(supportsAtomicEoaApprovalCleanup("seedPhrase"), true);
-  assert.equal(supportsAtomicEoaApprovalCleanup("bankr"), false);
+  assert.equal(supportsAtomicEoaApprovalCleanup("bankr"), true);
   assert.equal(supportsAtomicEoaApprovalCleanup("ledger"), false);
   assert.equal(supportsAtomicEoaApprovalCleanup("impersonator"), false);
   assert.equal(supportsAtomicEoaApprovalCleanup(undefined), false);

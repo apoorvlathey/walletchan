@@ -8,7 +8,7 @@ import {
 } from "../crossDappBatch/accountPolicy";
 import { supportsAtomicEoaApprovalCleanup } from "../approvalCleanup/accountPolicy";
 
-/** Add a reducing-authority call only to a pinned, atomic local batch. */
+/** Add a reducing-authority call only to a pinned, atomic local or Bankr batch. */
 export async function handleAppendApprovalRevokeToPendingBatch(
   bundleId: string,
   tokenAddress: unknown,

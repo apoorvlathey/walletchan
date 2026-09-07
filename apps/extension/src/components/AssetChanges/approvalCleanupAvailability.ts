@@ -17,7 +17,9 @@ export function getApprovalCleanupDisabledReason(input: {
     return "Checking atomic batch support…";
   }
   if (input.accountType === "bankr") {
-    return "Bankr requests cannot add an approval cleanup yet.";
+    return input.batchStrategy === "atomic-bankr"
+      ? null
+      : "This network does not support atomic cleanup for this account.";
   }
   if (input.accountType === "ledger") {
     return "Ledger requests cannot add an atomic cleanup call yet.";

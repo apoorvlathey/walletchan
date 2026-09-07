@@ -7,6 +7,6 @@ export type ApprovalCleanupEoaAccountType =
 
 export function supportsAtomicEoaApprovalCleanup(
   accountType: unknown,
-): accountType is "privateKey" | "seedPhrase" {
-  return accountType === "privateKey" || accountType === "seedPhrase";
+): accountType is "privateKey" | "seedPhrase" | "bankr" {
+  return accountType === "privateKey" || accountType === "seedPhrase" || accountType === "bankr";
 }

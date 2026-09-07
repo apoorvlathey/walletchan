@@ -6,5 +6,5 @@ effect boundaries, non-expiring confirmation, completion fan-out, and
 facade/dependency architecture.
 
 `approvalCleanup.test.ts` freezes source-linked wallet-generated append,
-duplicate protection, Bankr rejection, and the rule that cleanup entries never
+duplicate protection, Bankr cleanup and Ledger rejection, and the rule that cleanup entries never
 receive their own dapp result route.

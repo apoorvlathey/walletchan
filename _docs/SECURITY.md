@@ -2550,6 +2550,12 @@ Quick reference for which files to examine based on what area of security you're
    code at the Safe necessarily replaces the proxy runtime and makes Safe
    self-calls unrepresentative. The composite route is read-only and carries
    no credential or signing capability.
+   EOA residual-approval cleanup also supports Bankr on Bankr-supported
+   chains through the existing atomic executor. Single-request conversion
+   retains the original Bankr credential tag, and generated revokes share
+   their parent source authorization without an independent dapp result.
+   Account/chain validation, opaque evidence checks, request claims, and
+   exact-call fee-quote binding remain mandatory for every mutation.
    Residual-approval cleanup is a separate trusted-UI mutation. It is allowed
    only for a zero-signature editable proposal. The route accepts only opaque
    token/spender evidence bound to the exact proposal fingerprint; it never

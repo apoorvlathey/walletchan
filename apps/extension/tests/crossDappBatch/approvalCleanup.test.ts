@@ -16,12 +16,13 @@ const SPENDER = "0x4444444444444444444444444444444444444444";
 const TOKEN_TWO = "0x5555555555555555555555555555555555555555";
 const SPENDER_TWO = "0x6666666666666666666666666666666666666666";
 
-test("an assembled batch appends a wallet-only cleanup linked to its provider source", async () => {
+for (const accountType of ["privateKey", "seedPhrase", "bankr"] as const) {
+test(`an assembled ${accountType} batch appends a wallet-only cleanup linked to its provider source`, async () => {
   const batch = {
     fromAddress: WALLET,
     chainId: 8453,
     chainName: "Base",
-    accountType: "privateKey",
+    accountType,
     accountId: "pk-1",
     createdAt: 1,
     entries: [{
@@ -42,7 +43,7 @@ test("an assembled batch appends a wallet-only cleanup linked to its provider so
         callIndex: 0,
         totalCalls: 1,
       },
-      accountType: "privateKey",
+      accountType,
       tabId: 7,
       frameId: 0,
     }],
@@ -56,7 +57,7 @@ test("an assembled batch appends a wallet-only cleanup linked to its provider so
         ok: true as const,
         account: {
           id: "pk-1",
-          type: "privateKey",
+          type: accountType,
           address: WALLET,
         } as any,
       }),
@@ -103,14 +104,16 @@ test("an assembled batch appends a wallet-only cleanup linked to its provider so
   }
 });
 
-test("assembled cleanup fails closed for Bankr and stale source indexes", async () => {
+}
+
+test("assembled cleanup fails closed for Ledger", async () => {
   const harness = createChromeStorageHarness({
     local: {
       crossDappBatch: {
         fromAddress: WALLET,
         chainId: 8453,
         chainName: "Base",
-        accountType: "bankr",
+        accountType: "ledger",
         accountId: "bankr-1",
         createdAt: 1,
         entries: [],

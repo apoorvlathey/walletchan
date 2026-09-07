@@ -2901,8 +2901,12 @@ WalletChan EIP-7702 atomic-batch capability is available. Safe proposals expose
 it on supported Safe chains only while the proposal is unsigned and editable;
 the background rebuilds the same-nonce proposal with the exact final
 zero-value Safe CALL set after re-verifying the live Safe configuration and
-version. Bankr,
-Ledger, and impersonator reviews remain informational because none has a
+version. Bankr requests expose cleanup on Bankr-supported chains through
+the existing atomic Bankr batch path, including single-transaction conversion
+and staged cross-dapp batches. Original source entries retain their pinned
+credential tags; generated cleanup inherits source authorization and creates
+no independent provider result. Changed calls invalidate exact-call fee quotes.
+Ledger and impersonator reviews remain informational because neither has a
 released atomic request-mutation path. The renderer's disabled state is
 presentation only: every background handler independently rechecks the pinned
 account, chain capability, request phase, aggregate call limit, duplicate
