@@ -59,7 +59,7 @@ export const AccountPickerRow = forwardRef<HTMLElement, AccountPickerRowProps>(
         data-dragging={isDragging ? "" : undefined}
         style={style}
         zIndex={isDragging ? 2 : 0}
-        bg={isDragging ? "surface.raisedHover" : undefined}
+        bg={isDragging || isSelected ? "surface.raisedHover" : undefined}
         boxShadow={isDragging ? "0 8px 20px rgba(0, 0, 0, 0.28)" : undefined}
         transitionProperty="background-color, box-shadow"
         transitionDuration="fast"
@@ -91,18 +91,18 @@ export const AccountPickerRow = forwardRef<HTMLElement, AccountPickerRowProps>(
             <AccountAvatar account={account} ensAvatar={ensAvatar} size={36} />
           </ListItemMedia>
           <ListItemContent>
+            <ListItemTitle noOfLines={1}>{displayName}</ListItemTitle>
+            <ListItemDescription fontFamily="mono" noOfLines={1}>
+              {secondaryIdentity}
+            </ListItemDescription>
             <HStack spacing={1.5} minW={0}>
-              <ListItemTitle noOfLines={1}>{displayName}</ListItemTitle>
+              <Text as="span" color="fg.muted" fontSize="xs" lineHeight="1.4">
+                {statusLabel || walletTypeLabel}
+              </Text>
               {isSelected && (
                 <CheckIcon boxSize={3} color="accent.secondary" flexShrink={0} />
               )}
             </HStack>
-            <ListItemDescription fontFamily="mono" noOfLines={1}>
-              {secondaryIdentity}
-            </ListItemDescription>
-            <Text as="span" color="fg.muted" fontSize="xs" lineHeight="1.4">
-              {statusLabel || walletTypeLabel}
-            </Text>
           </ListItemContent>
         </Flex>
         {actions && (

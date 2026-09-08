@@ -28,7 +28,6 @@ import {
 import { useAccountIdentityLabels } from "@/hooks/useAccountIdentityLabels";
 import { useSeedGroupMap } from "@/hooks/useSeedGroupMap";
 import { truncateAddress } from "@/lib/addressUtils";
-import type { SafeAccountRecord } from "@/chrome/safe/types";
 
 interface DappConnectionAccountSelectorProps {
   accounts: Account[];
@@ -46,20 +45,10 @@ export default function DappConnectionAccountSelector({
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(null);
   const [switchError, setSwitchError] = useState<string | null>(null);
-  const [safeRecords, setSafeRecords] = useState<SafeAccountRecord[]>([]);
   const seedGroupMap = useSeedGroupMap(accounts);
   const accountTriggerRef = useRef<HTMLDivElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const { getDisplayName, getEnsAvatar, getSecondaryIdentity } = useAccountIdentityLabels(accounts, chainId);
-  useEffect(() => {
-    chrome.runtime.sendMessage({ type: "getSafeAccounts" }, (records: SafeAccountRecord[]) => setSafeRecords(records || []));
-  }, []);
-  const safeCanConnect = (candidate: Account) => {
-    if (candidate.type !== "safe") return true;
-    const record = safeRecords.find((item) => item.accountId === candidate.id);
-    const snapshots = chainId ? [record?.chains[String(chainId)]] : Object.values(record?.chains || {});
-    return snapshots.some((snapshot) => !!snapshot && ["approve", "quorumAvailable", "readyToExecute"].includes(snapshot.capability));
-  };
 
   const closePicker = useCallback((restoreFocus = true) => {
     setIsPickerOpen(false);
@@ -92,7 +81,6 @@ export default function DappConnectionAccountSelector({
   }, [closePicker, isPickerOpen]);
 
   const selectAccount = async (nextAccount: Account) => {
-    if (!safeCanConnect(nextAccount)) return;
     if (nextAccount.id === account.id) {
       closePicker();
       return;
@@ -184,14 +172,10 @@ export default function DappConnectionAccountSelector({
                     secondaryIdentity={getSecondaryIdentity(candidate)}
                     walletTypeLabel={getWalletTypeLabel(candidate, seedGroupMap)}
                     statusLabel={
-                      candidate.type === "safe" && !safeCanConnect(candidate)
-                        ? "Observe-only Safe"
-                        : switchingAccountId === candidate.id
-                          ? "Switching…"
-                          : undefined
+                      switchingAccountId === candidate.id ? "Switching…" : undefined
                     }
                     isSelected={candidate.id === account.id}
-                    isDisabled={!safeCanConnect(candidate) || switchingAccountId !== null}
+                    isDisabled={switchingAccountId !== null}
                     onSelect={() => void selectAccount(candidate)}
                     actions={
                       <>

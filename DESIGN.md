@@ -292,6 +292,11 @@ and retry stay inline. No animation or alternate warning theme is introduced.
 
 ## Slop audit
 
+- 2026-09-08 account-picker placement review: the selected check now groups
+  with bottom metadata using existing spacing and color tokens. Name truncation
+  has more room; the selected row keeps the same subtle background as hovered
+  rows. Focus, disabled states, and action targets are retained.
+
 - 2026-09-07 transaction amount layout audit: clear-signing amount labels sit
   above a full-width, right-aligned value with tabular numerals and wrapping
   for long amounts. Approval-only estimated changes omit the empty lead-in
@@ -1124,6 +1129,11 @@ and retry stay inline. No animation or alternate warning theme is introduced.
   intent stays compact. Deterministic preview scenarios cover the full matrix.
 
 ## Changelog
+
+- 2026-09-08: moved the shared account-picker selection check beside the
+  bottom wallet-type/status label, freeing the name line while retaining the
+  existing typography, blue selection token, and interaction targets. Selected
+  rows also retain the hover background across their full width.
 
 - 2026-08-01: added a compact, theme-aware decoded-transaction panel to
   configured block explorer `/tx/<hash>` pages. It reuses WalletChan clear

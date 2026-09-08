@@ -53,17 +53,14 @@ async function accountForTab(tabId?: number) {
 }
 async function isProviderSupportedAccount(
   account: Awaited<ReturnType<typeof accountForTab>>,
-  chainId?: number,
 ): Promise<boolean> {
   if (!account) return false;
   if (account.type !== "safe") return true;
   if (!isSafeFeatureEnabled("injectedDapp")) return false;
-  const safe = await getSafeAccountRecord(account.id);
-  const snapshots = chainId && Number.isSafeInteger(chainId)
-    ? [safe?.chains[String(chainId)]].filter(Boolean)
-    : Object.values(safe?.chains || {});
-  return snapshots.some((snapshot) => !!snapshot &&
-    ["approve", "quorumAvailable", "readyToExecute"].includes(snapshot.capability));
+  // Connecting grants address visibility, not Safe signing authority. A missing
+  // deployment on the current network or unavailable owner must not hide the
+  // account; proposal intake re-verifies the exact chain and live capability.
+  return !!(await getSafeAccountRecord(account.id));
 }
 
 async function writeConnectionResult(
@@ -85,7 +82,7 @@ function broadcastPermissionsChanged(origin?: string) {
 }
 
 export async function handleGetDappAccounts(
-  message: { chainId?: unknown },
+  _message: { chainId?: unknown },
   sender: chrome.runtime.MessageSender,
 ) {
   if (sender.frameId !== undefined && sender.frameId !== 0) {
@@ -98,7 +95,7 @@ export async function handleGetDappAccounts(
   const account = await accountForTab(sender.tab?.id);
   return {
     success: true,
-    accounts: account && await isProviderSupportedAccount(account, Number(message.chainId)) ? [account.address] : [],
+    accounts: account && await isProviderSupportedAccount(account) ? [account.address] : [],
   };
 }
 
@@ -136,10 +133,10 @@ export async function handleRequestDappConnection(
     return;
   }
   const requestChainId = Number(message.chainId);
-  if (!(await isProviderSupportedAccount(account, requestChainId))) {
+  if (!(await isProviderSupportedAccount(account))) {
     await writeResultToStorage(`dappConnectionResult:${requestId}`, {
       success: false,
-      error: "Safe dapp support is not available yet",
+      error: "Safe account is unavailable for connection",
       code: 4200,
     });
     return;
@@ -226,16 +223,16 @@ async function confirmDappConnectionUnderBindingLock(requestId: string) {
     });
     return { success: false, error: "No active account" };
   }
-  if (!(await isProviderSupportedAccount(account, pending.chainId))) {
+  if (!(await isProviderSupportedAccount(account))) {
     await removePendingDappConnectionRequests(
       (request) => request.origin === pending.origin,
     );
     await writeConnectionResult(pending, {
       success: false,
-      error: "Safe dapp support is not available yet",
+      error: "Safe account is unavailable for connection",
       code: 4200,
     });
-    return { success: false, error: "Safe dapp support is not available yet" };
+    return { success: false, error: "Safe account is unavailable for connection" };
   }
 
   await grantDappPermission(pending);
@@ -247,7 +244,7 @@ async function confirmDappConnectionUnderBindingLock(requestId: string) {
       const requestAccount = await accountForTab(request.tabId);
       await writeConnectionResult(request, {
         success: true,
-        accounts: requestAccount && await isProviderSupportedAccount(requestAccount, request.chainId) ? [requestAccount.address] : [],
+        accounts: requestAccount && await isProviderSupportedAccount(requestAccount) ? [requestAccount.address] : [],
       });
     }),
   );

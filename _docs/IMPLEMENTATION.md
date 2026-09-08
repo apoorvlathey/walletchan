@@ -7117,8 +7117,14 @@ detail was opened from Activity; its Back action then returns directly to the
 Activity tab through the same tab-precedence action used by ordinary transaction
 details, while the screen stack restores the saved Activity scroll position.
 
-Injected dapps and WalletConnect expose a Safe only on an exact verified,
-actionable chain. Safe message signing/EIP-1271 remains disabled. Transaction
+Injected dapp connection and account reads expose the selected imported Safe
+after the ordinary origin permission grant, independently of cached signing
+capability or the connection request's network. The connection picker therefore
+allows Safe selection just like the ordinary account switcher; it does not label
+a missing chain snapshot as observe-only or block address sharing. The background
+still requires the imported Safe record and enabled injected-dapp feature.
+WalletConnect session negotiation retains its exact verified, actionable-chain
+requirements. Safe message signing/EIP-1271 remains disabled. Transaction
 requests reuse the durable proposal state, and `eth_sendTransaction` receives
 only the real outer transaction hash after execution; `safeTxHash` is never an
 Ethereum transaction result. ERC-5792 tracks the proposal under a WalletChan

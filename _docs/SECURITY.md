@@ -2482,6 +2482,14 @@ Quick reference for which files to examine based on what area of security you're
    delegated-permission, sponsored, swap, bridge, force-inclusion, or message-
    signature path through a default branch. Unsupported Safe features are
    centrally denied, and staged rollout can disable each effect tier.
+   Injected connection approval grants only address visibility for an imported
+   Safe. Cached owner capability and connection-network deployment do not gate
+   that visibility, matching ordinary account switching. The imported-record
+   and injected-feature checks remain in the background; exact-chain onchain
+   verification, live owner eligibility, quorum, and session authorization remain
+   mandatory at proposal/signing/execution boundaries. Connecting never promotes
+   an observe-only or blocked Safe to a signer. WalletConnect's negotiated
+   chain/method eligibility remains separate and unchanged.
 
 3. **Service data is coordination only.** Safe reads and writes go directly to
    Safe's official gateway; there is no WalletChan backend route or server
