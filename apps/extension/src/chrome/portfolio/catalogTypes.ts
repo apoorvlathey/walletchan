@@ -23,6 +23,8 @@ export interface PortfolioTokenCatalog {
 }
 
 export interface LoadPortfolioTokenCatalogOptions {
+  /** Bypass browser and server balance caches for an explicit refresh. */
+  forceRefresh?: boolean;
   /** Cancel stale portfolio egress when the selected account changes. */
   signal?: AbortSignal;
   /** Skip metadata and pricing fallback so primary holdings can paint first. */

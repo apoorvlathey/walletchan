@@ -21,7 +21,9 @@ export async function fetchZerionJson<T>(
       Accept: "application/json",
       Authorization: `Basic ${Buffer.from(`${apiKey}:`).toString("base64")}`,
     },
-    next: { revalidate },
+    ...(revalidate === 0
+      ? { cache: "no-store" as const }
+      : { next: { revalidate } }),
   });
 
   if (!res.ok) {

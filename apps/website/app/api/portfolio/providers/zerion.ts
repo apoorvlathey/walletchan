@@ -17,11 +17,11 @@ export const zerionProvider: PortfolioProvider = {
     return !!process.env.ZERION_API_KEY;
   },
 
-  async fetch(address): Promise<ProviderResult> {
+  async fetch(address, _chainIds, options): Promise<ProviderResult> {
     const apiKey = process.env.ZERION_API_KEY!;
     const [chainIds, positions] = await Promise.all([
       fetchZerionChainIds(apiKey),
-      fetchAllPositions(address, apiKey),
+      fetchAllPositions(address, apiKey, options?.forceRefresh),
     ]);
 
     return normalizeZerionPositions(positions, chainIds);
@@ -31,6 +31,7 @@ export const zerionProvider: PortfolioProvider = {
 async function fetchAllPositions(
   address: string,
   apiKey: string,
+  forceRefresh = false,
 ): Promise<ZerionPosition[]> {
   const params = new URLSearchParams({
     currency: "usd",
@@ -46,7 +47,7 @@ async function fetchAllPositions(
     const data = await fetchZerionJson<ZerionPositionsResponse>(
       url,
       apiKey,
-      60,
+      forceRefresh ? 0 : 60,
     );
     positions.push(...(data.data || []));
     url = normalizeZerionNextUrl(data.links?.next);

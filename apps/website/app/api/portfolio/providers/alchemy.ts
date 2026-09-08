@@ -51,7 +51,7 @@ export const alchemyProvider: PortfolioProvider = {
     return !!process.env.ALCHEMY_API_KEY;
   },
 
-  async fetch(address, chainIds): Promise<ProviderResult> {
+  async fetch(address, chainIds, options): Promise<ProviderResult> {
     const apiKey = process.env.ALCHEMY_API_KEY!;
     const url = `https://api.g.alchemy.com/data/v1/${apiKey}/assets/tokens/by-address`;
 
@@ -71,7 +71,9 @@ export const alchemyProvider: PortfolioProvider = {
           includeNativeTokens: true,
           includeErc20Tokens: true,
         }),
-        next: { revalidate: 60 },
+        ...(options?.forceRefresh
+          ? { cache: "no-store" as const }
+          : { next: { revalidate: 60 } }),
       });
       if (!res.ok) throw new Error(`Alchemy ${res.status}`);
       return (await res.json()) as AlchemyTokensResponse;

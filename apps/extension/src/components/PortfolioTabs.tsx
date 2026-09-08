@@ -553,10 +553,8 @@ export default function PortfolioTabs({ address, accounts = [], connectedDappCha
             </Profiler>
           </Box>
           {/*
-            Activity stays mounted for the same reason TokenHoldings does: its
-            async history load must not briefly collapse the shared scroll
-            owner when the user changes tabs. Keeping both panels warm also
-            preserves their internal state across tab changes.
+            Keep Activity mounted to preserve state and prevent async history
+            loading from collapsing the shared scroll owner on tab changes.
           */}
           <Box
             display={tabIndex === 2 ? "block" : "none"}
@@ -597,6 +595,8 @@ export default function PortfolioTabs({ address, accounts = [], connectedDappCha
         isOpen={portfolioActions.isOpen}
         onClose={portfolioActions.onClose}
         finalFocusRef={portfolioActionsButtonRef}
+        onRefresh={holdingsState?.refresh}
+        isRefreshing={holdingsState?.loading}
         onAddToken={addTokenModal.onOpen}
         onHideTokens={onHideTokens}
         unifyBalances={unifyBalances}

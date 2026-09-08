@@ -49,6 +49,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const address = searchParams.get("address");
+    const forceRefresh = searchParams.get("refresh") === "1";
+    const cacheControl = forceRefresh ? "no-store" : "public, max-age=60";
 
     if (!address) {
       return NextResponse.json(
@@ -65,7 +67,7 @@ export async function GET(request: NextRequest) {
     }
 
     const [providerOutcome, wchanResult] = await Promise.all([
-      fetchFromProviders(address, SUPPORTED_CHAIN_IDS),
+      fetchFromProviders(address, SUPPORTED_CHAIN_IDS, forceRefresh),
       fetchWchanBalance(address),
     ]);
 
@@ -124,7 +126,7 @@ export async function GET(request: NextRequest) {
     if (searchParams.get("summary") === "1") {
       return NextResponse.json(
         { totalValueUsd },
-        { headers: { "Cache-Control": "public, max-age=60" } },
+        { headers: { "Cache-Control": cacheControl } },
       );
     }
     const requestedTokenLimit = Number(searchParams.get("tokenLimit"));
@@ -143,7 +145,7 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json(result, {
-      headers: { "Cache-Control": "public, max-age=60" },
+      headers: { "Cache-Control": cacheControl },
     });
   } catch (error) {
     console.error("Portfolio API error:", error);
@@ -157,13 +159,14 @@ export async function GET(request: NextRequest) {
 
 async function fetchFromProviders(
   address: string,
-  chainIds: readonly number[]
+  chainIds: readonly number[],
+  forceRefresh = false,
 ): Promise<{ result: ProviderResult; source: string }> {
   const errors: string[] = [];
   for (const provider of PROVIDERS) {
     if (!provider.isConfigured()) continue;
     try {
-      const result = await provider.fetch(address, chainIds);
+      const result = await provider.fetch(address, chainIds, { forceRefresh });
       return { result, source: provider.name };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

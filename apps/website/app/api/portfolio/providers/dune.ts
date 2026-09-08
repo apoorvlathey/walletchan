@@ -36,7 +36,7 @@ export const duneSimProvider: PortfolioProvider = {
     return !!process.env.SIM_API_KEY;
   },
 
-  async fetch(address, chainIds): Promise<ProviderResult> {
+  async fetch(address, chainIds, options): Promise<ProviderResult> {
     const apiKey = process.env.SIM_API_KEY!;
     const params = new URLSearchParams({
       chain_ids: chainIds.join(","),
@@ -48,7 +48,9 @@ export const duneSimProvider: PortfolioProvider = {
       `https://api.sim.dune.com/v1/evm/balances/${address}?${params.toString()}`,
       {
         headers: { "X-Sim-Api-Key": apiKey },
-        next: { revalidate: 60 },
+        ...(options?.forceRefresh
+          ? { cache: "no-store" as const }
+          : { next: { revalidate: 60 } }),
       }
     );
 

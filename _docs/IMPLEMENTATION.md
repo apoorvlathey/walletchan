@@ -3975,6 +3975,15 @@ rows at a time and advance with normal pagination. Swap and bridge remote token
 catalogs are independently validated and capped at 2,000 entries with 2 MiB
 transport ceilings.
 
+Explicit Holdings refreshes propagate `forceRefresh` through the token catalog
+and request `/api/portfolio?address=…&refresh=1` with browser `cache: no-store`.
+The route returns `Cache-Control: no-store` and bypasses the Next.js balance
+cache for every active provider (including Zerion pagination and Alchemy
+fallback requests). Ordinary reads retain 60-second caching; Zerion chain
+metadata keeps its separate cache. This removes wallet-owned cache delays,
+but discovering externally received tokens still depends on provider indexing
+or a user-added token address for direct RPC verification.
+
 ### Onchain Balance Verification
 
 API portfolio data is shown immediately, while onchain balances are verified in the background via `portfolio/onchainBalances.ts`:

@@ -53,7 +53,9 @@ export async function loadPortfolioTokenCatalog(
     hiddenTokenKeys,
   ] =
     await Promise.all([
-      fetchPortfolio(address, options.signal).then(
+      fetchPortfolio(address, options.signal, {
+        forceRefresh: options.forceRefresh,
+      }).then(
         (data) => ({ ok: true as const, data }),
         (err) => ({ ok: false as const, err }),
       ),

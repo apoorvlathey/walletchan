@@ -94,6 +94,7 @@ export function usePortfolioLoader({
       try {
         const catalog = await loadPortfolioTokenCatalog(address, {
           enrich: false,
+          forceRefresh: force,
           signal: abortController.signal,
         });
         if (!isCurrentLoad()) return;
@@ -140,8 +141,7 @@ export function usePortfolioLoader({
         setOmittedTokenValueUsd(catalog.omittedTokenValueUsd);
         setOmittedTokenValueUsdByChain(catalog.omittedTokenValueUsdByChain);
 
-        // Paint catalog rows immediately; detached RPC work must never hold the
-        // first useful render behind a skeleton.
+        // Paint immediately; detached RPC work must not delay the first useful render.
         const initialDisplayTokens = applyVerifiedBalances(
           mergedTokens.filter(hasRenderablePortfolioToken),
         );
