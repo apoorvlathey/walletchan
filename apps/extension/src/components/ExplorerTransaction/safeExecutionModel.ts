@@ -12,7 +12,8 @@ export function decodeExplorerSafeExecution(input: string) {
   if (!transaction) return null;
   let calls: ERC5792Call[] | null = null;
   if (transaction.operation === 0) {
-    calls = [{ to: transaction.to, value: toHex(transaction.value), data: transaction.data }];
+    // The exact Safe ABI decoder has already validated this address.
+    calls = [{ to: transaction.to as `0x${string}`, value: toHex(transaction.value), data: transaction.data }];
   } else if (transaction.value === 0n) {
     try {
       const decoded = decodeFunctionData({ abi: MULTISEND_ABI, data: transaction.data });

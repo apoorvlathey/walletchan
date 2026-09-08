@@ -1,3 +1,4 @@
+import type { Account } from "@/chrome/types";
 import type { ThemeId } from "@/theme";
 
 export type PreviewRoute =
@@ -42,6 +43,16 @@ export type PreviewWalletType =
   | "privateKey"
   | "seedPhrase"
   | "viewOnly";
+
+export interface PreviewWallet {
+  accountId: string;
+  accountType: Exclude<Account["type"], "ledger" | "safe">;
+  address: `0x${string}`;
+  displayName: string;
+  createdAt: number;
+  seedGroupId?: string;
+  derivationIndex?: number;
+}
 
 export interface PreviewState {
   route: PreviewRoute;

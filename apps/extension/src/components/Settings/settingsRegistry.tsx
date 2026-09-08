@@ -352,10 +352,8 @@ export function renderLeafRow(id: LeafId, ctx: RowContext) {
       );
 
     case "chains":
-      // Bauhaus uses the inverted-strip pattern (BLACK chip) which is a signature
-      // look. Midnight's surface.sunken read as a dark "hole" against the card,
-      // so we lift onto border.strong for a clearly elevated neutral system chip
-      // with primary fg on top.
+      // Keep Bauhaus's inverted strip; Midnight uses border.strong and fg.primary
+      // for an elevated neutral chip instead of a recessed surface.sunken chip.
       return (
         <SettingsRow
           key={id}

@@ -21,33 +21,20 @@ import { applySafeSignatureScenario } from "./safeWarningFixtures";
 import { createDefillamaSwapData, getReadmeTxOverrides } from "./readmeScenarioFixtures";
 
 export { previewNetworks, previewNetworkRpcUrls } from "./networkFixtures";
-import type { PreviewWalletType } from "./types";
-
-export type { PreviewWalletType } from "./types";
-
+import type { PreviewWallet, PreviewWalletType } from "./types";
+export type { PreviewWallet, PreviewWalletType } from "./types";
 /** Fixed clock for deterministic preview fixtures: 2026-07-09T12:00:00.000Z. */
 export const PREVIEW_EPOCH_MS = Date.UTC(2026, 6, 9, 12, 0, 0);
 
 /** Compatibility alias for scenarios that import assets from this module. */
 export const PREVIEW_ASSETS = previewAssets;
 
-export interface PreviewWallet {
-  accountId: string;
-  accountType: Exclude<Account["type"], "ledger" | "safe">;
-  address: `0x${string}`;
-  displayName: string;
-  createdAt: number;
-  seedGroupId?: string;
-  derivationIndex?: number;
-}
-
 export const previewAddress = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
 export const previewSpender = "0x111111125421cA6dc452d289314280a0f8842A65";
 export const previewUsdc = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 export const previewBaseUsdc = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 export const previewWeth = "0x4200000000000000000000000000000000000006";
-export const previewCustomTokenAddress =
-  "0xba5ed0000e1ca9136a695f0a848012a16008b032";
+export const previewCustomTokenAddress = "0xba5ed0000e1ca9136a695f0a848012a16008b032";
 
 export const previewCustomToken: CustomToken = {
   contractAddress: previewCustomTokenAddress,
