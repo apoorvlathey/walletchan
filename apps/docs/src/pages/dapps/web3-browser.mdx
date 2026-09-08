@@ -1,6 +1,6 @@
 ---
 title: WalletChan Browser and onchain websites
-description: Search dapps and browse .eth, .gwei, IPFS, IPNS, and ERC-4804 content with WalletChan Browser on Chromium.
+description: Search dapps and browse .eth, .wei, .gwei, IPFS, IPNS, and ERC-4804 content with WalletChan Browser on Chromium.
 outline: 3
 ---
 
@@ -15,7 +15,7 @@ The launcher accepts:
 
 - Dapp names from directory search.
 - Valid HTTPS URLs.
-- `.eth` and `.gwei` names.
+- `.eth`, `.wei` (WNS), and `.gwei` names.
 - Supported GNS/onchain names and raw contract addresses.
 - Paths, queries, and fragments attached to a decentralized site.
 
@@ -24,7 +24,8 @@ without opening it.
 
 ## Decentralized content
 
-WalletChan can resolve ENS/ENSv2/CCIP-Read content hashes, GNS content, IPFS or
+WalletChan can resolve ENS/ENSv2/CCIP-Read content hashes, WNS websites through
+wei.limo and wei.domains, GNS content hashes and contentcontract records, IPFS or
 IPNS destinations, and supported ERC-4804/ERC-5219 onchain HTML. A resolution
 interstitial explains the original name and selected content route before
 navigation.
@@ -48,7 +49,7 @@ invalid settings separately. A one-time setup page helps with Kubo CORS.
 ## Security
 
 Browsing resolution does not use wallet credentials. Local IPFS pages retain
-their friendly `.eth`, `.gwei`, or onchain identity in WalletChan UI while the
+their friendly `.eth`, `.wei`, `.gwei`, or onchain identity in WalletChan UI while the
 raw resolved origin remains the actual security boundary.
 
 This feature and Private mode are hidden on Firefox.

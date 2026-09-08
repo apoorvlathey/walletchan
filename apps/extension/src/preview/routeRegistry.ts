@@ -87,6 +87,8 @@ export const PREVIEW_ROUTE_REGISTRY: Record<
     scenarios: [
       "personal-sign",
       "typed-data-long",
+      "safe-warnings",
+      "safe-no-warnings",
       "siwe-blocked",
       "submitting",
       "impersonator-disabled",
@@ -348,6 +350,8 @@ export const PREVIEW_ROUTE_REGISTRY: Record<
       "ledger-owner-approval",
       "waiting-external",
       "quorum-ready",
+      "refund-approval",
+      "refund-execution",
       "nonce-conflict",
       "configuration-changed",
       "rejection-signing",

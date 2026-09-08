@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("unsafe SIWE signing requires the sticky-bar checkbox", async () => {
-  const [implementation, decisionSummary, screen] = await Promise.all([
+  const [implementation, decisionSummary, screen, popover] = await Promise.all([
     readFile(
       new URL(
         "../../src/components/SignatureConfirmation/SignatureRequestConfirmation.tsx",
@@ -25,6 +25,7 @@ test("unsafe SIWE signing requires the sticky-bar checkbox", async () => {
       ),
       "utf8",
     ),
+    readFile(new URL("../../src/components/shared/WarningAcknowledgementPopover.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(
@@ -39,10 +40,10 @@ test("unsafe SIWE signing requires the sticky-bar checkbox", async () => {
     implementation,
     /<SignatureDecisionSummary[\s\S]*?unsafeSiweDecision=/u,
   );
-  assert.match(decisionSummary, /<Popover[\s\S]*?placement="top-end"/u);
-  assert.match(decisionSummary, /<Checkbox[\s\S]*?isChecked=\{isAcknowledged\}/u);
+  assert.match(popover, /<Popover[\s\S]*?placement="top-end"/u);
+  assert.match(popover, /<Checkbox[\s\S]*?isChecked=\{isAcknowledged\}/u);
   assert.match(
-    decisionSummary,
+    popover,
     /chakra-checkbox__control\[data-checked\][\s\S]*?accent\.highlight/u,
   );
   assert.doesNotMatch(decisionSummary, /Review required/u);

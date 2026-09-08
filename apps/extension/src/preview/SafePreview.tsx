@@ -7,6 +7,7 @@ import { SafeIcon } from "@/components/shared/AccountTypeIcons";
 import { AppHeader, AppScreen, ScreenBody, ScreenSection } from "@/components/ui";
 import { previewAccounts } from "./fixtures";
 import { previewSafeAccountRecords, previewSafeProposals } from "./safeHomePreview";
+import { applySafeRefundScenario } from "./safeWarningFixtures";
 
 const SAFE_ACCOUNT: SafeAccount = {
   id: "preview-safe",
@@ -34,7 +35,7 @@ function scenarioFixture(scenario: string): {
   proposal: SafeProposalRecord;
   snapshot: SafeChainSnapshot;
 } {
-  const ready = structuredClone(previewSafeProposals[0]);
+  const ready = applySafeRefundScenario(structuredClone(previewSafeProposals[0]), scenario);
   const snapshot = structuredClone(previewSafeAccountRecords[0].chains["8453"]);
 
   if (scenario === "nonce-conflict") {

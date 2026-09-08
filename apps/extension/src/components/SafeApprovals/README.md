@@ -128,3 +128,9 @@ signature opens a canonical same-nonce Safe rejection proposal. Back only
 navigates; it never dismisses or mutates a signed request. The original becomes
 cancelled, and its provider/ERC-5792 route becomes terminal, only after the
 rejection execution receipt is confirmed.
+
+`SafeReview/SafeRiskDecision` supplies sticky acknowledgement for approval and
+execution; `SafeTransactionWarnings` displays the notices in historical details.
+Gas reimbursement is disclosed from signed fields, including rejection proposals.
+Simulation and proposal contents are unchanged. Changing the exact transaction,
+chain, actor or action resets acknowledgement; both button and handler are gated.

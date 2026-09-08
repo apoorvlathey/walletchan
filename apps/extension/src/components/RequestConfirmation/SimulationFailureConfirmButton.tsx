@@ -25,6 +25,7 @@ interface SimulationFailureConfirmButtonProps {
   onConfirm: () => void;
   requestKind: "transaction" | "batch";
   simulationFailed: boolean;
+  acknowledgementRequired?: boolean;
 }
 
 /**
@@ -41,6 +42,7 @@ export function SimulationFailureConfirmButton({
   onConfirm,
   requestKind,
   simulationFailed,
+  acknowledgementRequired = false,
 }: SimulationFailureConfirmButtonProps) {
   const warningDialog = useDisclosure();
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -89,7 +91,7 @@ export function SimulationFailureConfirmButton({
           <Button
             variant="brand"
             w="full"
-            leftIcon={simulationFailed ? <WarningTwoIcon boxSize="15px" /> : undefined}
+            leftIcon={simulationFailed || acknowledgementRequired ? <WarningTwoIcon boxSize="15px" /> : undefined}
             onClick={handlePrimaryClick}
             isDisabled={isDisabled || isLoading}
             isLoading={isLoading}

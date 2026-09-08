@@ -13,6 +13,7 @@ import {
 } from "../constants";
 import { TestButton } from "./TestButton";
 import { AccountDomainSignatureTests } from "./AccountDomainSignatureTests";
+import { SafeSignatureTests } from "./SafeSignatureTests";
 
 const PERMIT_SPENDER = "0x0000000000000000000000000000000000000001";
 const X402_PAY_TO = "0x0000000000000000000000000000000000000402";
@@ -320,6 +321,7 @@ export function SignatureSection() {
   return (
     <>
       <AccountDomainSignatureTests />
+      <SafeSignatureTests />
       <TestButton
         label="personal_sign (text)"
         description="Signs a human-readable string after EIP-191 prefix."

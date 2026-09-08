@@ -29,3 +29,8 @@ Typed-data addresses reuse `shared/LabeledAddressPopover.tsx`.
 - Typed-data domain/types, request method, request parameters, and EIP-712
   hashes remain inside Advanced details. Human-readable meaning stays ahead of
   those technical fields; unreadable raw payloads remain visible for review.
+
+SafeTx review uses `SafeReview/SafeRiskDecision` in the sticky decision area,
+independently of generic or ERC-7730 rendering and all signer account types.
+Its shared warning popover requires acknowledgement before Sign is enabled;
+the handler also checks the gate. Changes to the reviewed data reset it.

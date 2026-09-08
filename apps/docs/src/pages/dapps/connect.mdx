@@ -40,6 +40,14 @@ global wallet account does not redirect an existing tab's pending request to a
 different signer. WalletChan emits `accountsChanged` and `chainChanged` only to
 authorized pages.
 
+Imported Safe accounts can be selected for an injected-provider connection even
+when they are observe-only. Connecting shares the address without granting an
+owner signature or permission to execute. Safe transaction actions still enforce
+their network, ownership, and quorum requirements.
+
+Sites may request a network switch before connecting. That does not expose an
+account or approve a later transaction.
+
 ## Pending connection
 
 Connection prompts are durable and have no automatic age timeout. Closing the

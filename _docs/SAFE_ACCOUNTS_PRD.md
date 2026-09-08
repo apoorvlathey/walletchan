@@ -563,6 +563,24 @@ Until the EIP-1271 phase, Safe accounts reject `personal_sign`, `eth_sign`, and
 all `eth_signTypedData*` methods with a clear unsupported smart-account error.
 No owner signature is returned as a signature from the Safe address.
 
+Before enabling EIP-1271 signing as the Safe itself, adapt both the external
+typed-data validator's unconditional signer-address protection and the
+content-script request-surface preflight. Otherwise `signer = verifier = Safe`
+would be rejected despite Safes being excluded from the stored EOA list.
+Preserve direct-EOA protection and existing Safe owner-signing flows. The
+[Safe guide's EIP-1271 guard checklist](./SAFE_ACCOUNTS.md#future-eip-1271-phase-external-signer-domain-protection)
+identifies the code boundaries, required regressions, and MetaMask #9179 context.
+
+### Transaction review risk disclosure
+
+Review must preserve imported proposal fields and require explicit acknowledgement
+of critical delegatecall or gas-reimbursement warnings before signing/execution.
+Payment details disclose asset and recipient without amount estimates. MultiSend
+is exempt only after exact-chain deployment matching and complete CALL-only batch
+validation; nested delegatecalls retain the warning. The checkbox resets with the
+reviewed payload and actor/action. See [Safe transaction review warnings](./SAFE_ACCOUNTS.md#safe-transaction-review-warnings)
+for the implementation boundaries.
+
 ## 10. Data model and storage
 
 ### 10.1 Account union

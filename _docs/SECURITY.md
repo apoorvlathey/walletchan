@@ -2742,12 +2742,15 @@ These are security characteristics that have been reviewed and accepted:
 ### Injected chain visibility and connection-first switching
 
 Unconnected injected pages receive Ethereum mainnet as public chain state, not
-saved UI chain context. Runtime chain updates require connected account access
-on the target chain; revocation resets public chain state and invalidates pending
+saved UI chain context. Runtime chain updates require connected account access;
+revocation resets public chain state and invalidates pending
 switch continuations. `wallet_switchEthereumChain` validates its target before
 using the existing exact-origin/top-frame connection approval. After approval it
-rechecks target metadata, Bankr support, and exact-chain account visibility
-(including Safe eligibility). View-only connections never authorize signing.
+rechecks target metadata, Bankr support, and connected-origin account visibility.
+An imported Safe requires a stored Safe record for visibility, not deployment or
+approval capability on that chain. Safe transaction/proposal operations separately
+enforce exact-chain deployment and authority. View-only connections never
+authorize signing.
 Switch results are request-ID correlated and duplicate switches are rejected.
 No new message type, permission grant mechanism, secret, or storage key is added.
 Add-chain retains its existing connection and network-approval requirements.
@@ -2813,3 +2816,21 @@ account rows. The shared renderer identity hook partitions profile lookups from
 unknown-address network lookups and keeps their caches separate. A known profile
 is an address-book identity, not proof of that name's payment destination on the
 transaction network. Forward name-to-recipient resolution remains chain-specific.
+
+### Safe review warning scope
+
+External exact-schema SafeTx signatures and imported proposals use the shared
+presentation-only transactionRisk analysis. Warning suppression never trusts the
+registry's global MultiSend fallback: it requires exact network aliases, a matching
+signed/request chain domain, canonical complete ABI encoding, and bounded CALL-only
+batch contents. Every inner delegatecall (including another MultiSend) retains the
+warning. Missing or ambiguous deployment/domain information cannot grant an exemption.
+These warnings do not authorize requests or replace existing background validation,
+owner/session binding, hash verification, or all-four-signer final release checks.
+
+Nonzero signed gasPrice is disclosed independent of simulation and lifecycle, including
+refund-bearing rejection proposals. Imported refund fields are never rewritten. Zero
+refundReceiver is the eventual transaction submitter; no estimate or threat verdict
+is inferred. No new storage keys or message routes exist. A UI acknowledgement
+binds to exact reviewed data and actor/action; it is not a background
+authorization capability.

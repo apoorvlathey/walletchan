@@ -71,7 +71,7 @@ export function decodeMultiSendTransactions(encoded: `0x${string}`): SafeCall[] 
     const length = Number(lengthBigInt);
     const end = offset + HEADER_BYTES + length;
     if (end > totalBytes) throw new Error("Malformed MultiSend payload length");
-    const data = sliceHex(encoded, offset + HEADER_BYTES, end);
+    const data = length === 0 ? "0x" : sliceHex(encoded, offset + HEADER_BYTES, end);
     calls.push(validateCall({ to, value: value.toString() as `${bigint}`, data, operation: operation as 0 | 1 }));
     dataBytes += length;
     if (dataBytes > MAX_TOTAL_DATA_BYTES) throw new Error("Safe batch calldata is too large");

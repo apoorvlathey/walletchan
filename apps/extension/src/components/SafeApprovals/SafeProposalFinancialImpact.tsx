@@ -30,7 +30,7 @@ export function SafeProposalFinancialImpact({
         borderRadius="lg"
       >
         <Text color="fg.secondary" fontSize="sm">
-          No Safe asset changes
+          No transfer in the rejection call
         </Text>
       </Box>
     );

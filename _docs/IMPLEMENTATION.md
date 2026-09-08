@@ -4861,9 +4861,11 @@ concurrent switch requests return `-32002`. Connection approval uses the normal
 exact-origin/top-frame checks and existing request-surface opening path.
 
 After approval the bridge reloads network metadata and account type, checks
-Bankr network support, and rechecks connected accounts on the exact requested
-chain (including Safe deployment eligibility). It checks revocation again after
-the shared renderer-context write before publishing the switch. A request ID
+Bankr network support, and rechecks connected-origin account visibility.
+Imported Safe visibility requires an existing Safe record, not deployment or
+approval capability on the requested chain. Transaction/proposal actions retain
+their own exact-chain deployment and authority checks. The bridge checks revocation
+again after the shared renderer-context write before publishing the switch. A request ID
 correlates each switch response, so unrelated add-chain or switch responses
 cannot resolve it. No signing or transaction submission is part of this flow.
 
@@ -7145,3 +7147,29 @@ forward verification. Saved account/contact mainnet profile selection is unchang
 Old negative cache entries on these chains expire on read; new results carry
 reverseVersion 2. Registrar deployments are pinned from the ENS reverse registrar
 documentation and must be reviewed if ENS changes them.
+
+### Safe transaction review warnings
+
+`chrome/safe/transactionRisk.ts` provides bounded, presentation-only analysis for
+exact-schema external SafeTx V3/V4 requests and imported Safe proposals.
+`components/SafeReview/SafeTransactionWarnings.tsx` renders warnings outside the
+clear-signing/simulation branches, shared across every owner signer type. A known
+MultiSend address only suppresses the delegatecall warning when the signed domain
+matches the request chain, the pinned deployment metadata explicitly maps that chain,
+and complete canonical ABI decoding yields exclusively CALL entries. Inner/nested
+delegatecalls, unknown chains, malformed or oversized batches retain the warning.
+This does not classify underlying calls as harmless. Zero-length batch call data
+is decoded as 0x without attempting an out-of-range viem slice at the buffer end.
+
+Every nonzero signed gasPrice produces a compact gas-reimbursement warning with
+payment asset and recipient details; zero refundReceiver is Transaction submitter.
+Imported proposals retain their original signed fields/hash. Refund-bearing rejection
+proposals no longer imply that the whole Safe execution has no asset changes.
+Warnings do not alter confirmation permissions, signatures, or existing simulations,
+and do not add amount estimates. `SafeRiskDecision` uses the shared SIWE
+`WarningAcknowledgementPopover` in the sticky decision area, with critical red
+styling and a full-trigger-width disclosure. Both the primary button and its UI
+handler require acknowledgement. `useSafeRiskDecision` synchronously resets it
+for exact payload, chain, request and actor/action changes, including A → B → A.
+The confirmation button shows a warning triangle while acknowledgement is missing.
+The `/test#safe-signatures` playground has V3/V4 controls for both warnings, nested batches and negative controls.

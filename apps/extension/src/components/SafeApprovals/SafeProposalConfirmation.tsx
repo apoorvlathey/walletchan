@@ -5,6 +5,7 @@ import { isPendingSafeProposal } from "@/chrome/safe/proposalStatus";
 import type { SafeChainSnapshot, SafeProposalRecord } from "@/chrome/safe/types";
 import type { Account, SafeAccount } from "@/chrome/types";
 import type { GasOverrides } from "@/chrome/txHandlers";
+import { SafeTransactionWarnings } from "@/components/SafeReview/SafeTransactionWarnings";
 import { CopyButton } from "@/components/CopyButton";
 import { LedgerSigningStatus } from "@/components/Ledger/LedgerSigningStatus";
 import { EstimatedChangesHeading } from "@/components/RequestConfirmation/EstimatedChangesHeading";
@@ -20,7 +21,9 @@ import { SafeProposalFinancialImpact } from "./SafeProposalFinancialImpact";
 import { useSafeExecutionRefresh } from "./hooks/useSafeExecutionRefresh";
 import { useSafeProposalActions } from "./hooks/useSafeProposalActions";
 import { createSafeApprovalCleanup } from "./approvalCleanupAdapter";
-import { sendSafeProposalMessage } from "./safeProposalTransport";
+import { useSafeProposalReviewRefresh } from "./hooks/useSafeProposalReviewRefresh";
+import { SafeRiskDecision } from "@/components/SafeReview/SafeRiskDecision";
+import { useSafeRiskDecision } from "@/components/SafeReview/useSafeRiskDecision";
 import {
   SafeProposalRequestDetails,
   SafeProposalStatusPill,
@@ -121,60 +124,10 @@ export function SafeProposalConfirmation({
     setFeePaymentQuote(null);
   }, [actionKind, executorAccountId, proposal.id, submissionLocked]);
 
-  useEffect(() => {
-    if (submissionLocked) return;
-    if (!isRequestView) {
-      setReviewFresh(true);
-      setReviewError(null);
-      setSimulationReverted(false);
-      setSimulationUnavailable(false);
-      return;
-    }
-    let active = true;
-    setReviewFresh(false);
-    setSimulationReverted(false);
-    setSimulationUnavailable(false);
-    setReviewError(null);
-    void (async () => {
-      try {
-        const refreshed = await sendSafeProposalMessage<{
-          success?: boolean;
-          record?: { chains: Record<string, SafeChainSnapshot> };
-          error?: string;
-        }>({
-          type: "refreshSafeAccount",
-          accountId: safeAccount.id,
-          chainId: proposal.chainId,
-        });
-        if (refreshed.success === false || !refreshed.record) {
-          throw new Error(refreshed.error || "Could not refresh Safe authority");
-        }
-        const live = refreshed.record.chains[String(proposal.chainId)];
-        if (!live || live.configEpoch !== proposal.safeConfigEpoch) {
-          throw new Error("Safe configuration changed; review this request again");
-        }
-        if (["publishing", "awaitingApprovals", "readyToExecute"].includes(proposal.state)) {
-          await sendSafeProposalMessage({
-            type: "reconcileSafeProposal",
-            proposalId: proposal.id,
-          }).catch(() => undefined);
-        }
-        if (active) {
-          await onReload();
-          setReviewFresh(true);
-        }
-      } catch (caught) {
-        if (active) {
-          setReviewError(caught instanceof Error ? caught.message : "Could not refresh Safe request");
-        }
-      }
-    })();
-    return () => { active = false; };
-    // The immutable proposal ID and request/detail mode are the review
-    // boundary. Reconciliation writes within one pending state must not
-    // restart the authority refresh loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRequestView, proposal.id, submissionLocked]);
+  useSafeProposalReviewRefresh({
+    isRequestView, proposal, safeAccountId: safeAccount.id, submissionLocked, onReload,
+    setReviewFresh, setReviewError, setSimulationReverted, setSimulationUnavailable,
+  });
 
   const reviewRequest = useMemo(
     () => makeSafeReviewTxRequest(proposal, chainName),
@@ -227,6 +180,11 @@ export function SafeProposalConfirmation({
     [chainName, executionBlockedReason, primaryActionKind, proposal, selectedExecutor],
   );
 
+  const safeRiskDecision = useSafeRiskDecision(
+    { transaction: proposal.transaction, chainId: proposal.chainId },
+    JSON.stringify([safeAccount.id, proposal.id, proposal.safeConfigEpoch,
+      primaryActionKind, selectedAccount?.id, selectedAccount?.address, selectedAccount?.type]),
+  );
   const approvalCleanup = createSafeApprovalCleanup({
     proposal,
     busy: busy || submissionLocked || !reviewFresh,
@@ -234,7 +192,9 @@ export function SafeProposalConfirmation({
     onOpenProposal,
   });
   const canReject = canRejectSafeProposal(proposal);
-  const disabledReason = !reviewFresh
+  const disabledReason = safeRiskDecision.blocked
+    ? "Acknowledge the Safe transaction warnings"
+    : !reviewFresh
     ? "Refreshing Safe authority"
     : executionBlockedReason
       ? executionBlockedReason
@@ -247,6 +207,7 @@ export function SafeProposalConfirmation({
           : null;
   const primaryAction = !displayRequestView ? undefined : primaryActionKind ? (
     <SimulationFailureConfirmButton
+      acknowledgementRequired={safeRiskDecision.blocked}
       disabledReason={disabledReason}
       isDisabled={!!disabledReason}
       isLoading={operation === "approve" || operation === "execute"}
@@ -254,6 +215,7 @@ export function SafeProposalConfirmation({
         ? primaryActionKind === "execute" ? "Execute rejection" : "Sign rejection"
         : primaryActionKind === "execute" ? "Execute" : "Sign offchain"}
       onConfirm={() => void (async () => {
+        if (safeRiskDecision.blocked) return;
         const executing = primaryActionKind === "execute";
         if (executing) setSubmissionLocked(true);
         const submitted = await handleConfirm({ allowSimulationFailure: simulationReverted });
@@ -266,10 +228,7 @@ export function SafeProposalConfirmation({
       })}
     />
   ) : executionPending ? (
-    <Button
-      variant="brand"
-      isDisabled
-    >
+    <Button variant="brand" isDisabled>
       Confirming onchain…
     </Button>
   ) : proposal.state === "ambiguous" ? (
@@ -327,7 +286,7 @@ export function SafeProposalConfirmation({
         <EstimatedChangesHeading chainId={proposal.chainId} chainName={chainName} />
       ) : undefined}
       context={(
-        <>
+        <SafeTransactionWarnings transaction={proposal.transaction} chainId={proposal.chainId} hideWarnings={displayRequestView}>
           <SafeProposalRequestDetails
             proposal={proposal}
             snapshot={snapshot}
@@ -338,7 +297,7 @@ export function SafeProposalConfirmation({
             showRequestLifecycle={displayRequestView}
           />
           <LedgerSigningStatus active={isLedgerWaiting} />
-        </>
+        </SafeTransactionWarnings>
       )}
       contextTitle={displayRequestView ? "Request details" : "Safe transaction"}
       contextHeaderAction={<SafeProposalStatusPill proposal={proposal} liveNonce={snapshot.nonce} />}
@@ -382,8 +341,11 @@ export function SafeProposalConfirmation({
           disabled={submissionLocked || isLedgerWaiting}
         />
       ) : undefined}
-      actionNotice={displayRequestView ? executionBlockedReason ??
-        (simulationUnavailable ? "Simulation is unavailable. Review the call details carefully." : undefined) : undefined}
+      actionNotice={displayRequestView ? <>
+        <SafeRiskDecision decision={safeRiskDecision} isDisabled={busy || submissionLocked} />
+        {executionBlockedReason ?? (simulationUnavailable
+          ? "Simulation is unavailable. Review the call details carefully." : undefined)}
+      </> : undefined}
       confirmAction={primaryAction}
       rejectAction={displayRequestView && canReject ? (
         <Button

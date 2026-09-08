@@ -1978,3 +1978,12 @@ and retry stay inline. No animation or alternate warning theme is introduced.
   receipt that confirms the Public Activity row now advances the richer Private
   Unshield row in the same finalization pass; the independent privacy poller is
   retained only for restart recovery.
+
+## Safe review warning audit — 2026-09-08
+
+Safe signature and proposal reviews extend the existing precise, approachable Warm
+Midnight/Bauhaus review system. Compact warning surfaces use status.warning bg/fg/border,
+existing body typography and spacing, icon plus explicit text, and keyboard-accessible
+Payment details disclosure. Full recipient/token addresses wrap at narrow widths. The
+warning remains separate from simulated amounts and ERC-7730 presentation. No new
+palette, motion, estimate, or confirmation action is introduced.

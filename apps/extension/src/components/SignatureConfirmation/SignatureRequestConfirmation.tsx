@@ -1,11 +1,12 @@
 import { memo, useEffect, useMemo, useState } from "react";
+import { WarningTwoIcon } from "@chakra-ui/icons";
 import { Button, Spinner, VStack } from "@chakra-ui/react";
 import type { PendingSignatureRequest } from "@/chrome/requests/pendingSignatureStorage";
-import {
-  ClearSigningView,
-} from "@/components/ClearSigning/ClearSigningView";
+import { ClearSigningView } from "@/components/ClearSigning/ClearSigningView";
 import { CopyButton } from "@/components/CopyButton";
 import { ViewOnlySigningNotice } from "@/components/shared/ViewOnlySigningNotice";
+import { SafeRiskDecision } from "@/components/SafeReview/SafeRiskDecision";
+import { useSafeRiskDecision } from "@/components/SafeReview/useSafeRiskDecision";
 import { ShapesLoader } from "@/components/Chat/ShapesLoader";
 import { Eip712DigestDisplay } from "@/components/DigestDisplay";
 import Erc7710DelegationDisplay from "@/components/Erc7710DelegationDisplay";
@@ -77,6 +78,7 @@ function SignatureRequestConfirmation({
     () => formatSignatureData(signature.method, signature.params),
     [signature.method, signature.params],
   );
+  const safeDecision = useSafeRiskDecision({ typedData: formatted.typedData, chainId: signature.chainId }, JSON.stringify([sigRequest.id, accountType, sigRequest.accountAddress, signature.method, signature.params]));
   const signerAddress =
     getSignerAddress(signature.method, signature.params) ??
     sigRequest.accountAddress ??
@@ -148,7 +150,7 @@ function SignatureRequestConfirmation({
   };
 
   const handleConfirm = async () => {
-    if (!canSign) return;
+    if (!canSign || safeDecision.blocked || (siweOverrideRequired && !siweOverrideAcknowledged)) return;
     setIsSubmitting(true);
 
     try {
@@ -279,6 +281,7 @@ function SignatureRequestConfirmation({
     <Button
       variant="brand"
       onClick={handleConfirm}
+      leftIcon={safeDecision.blocked || (siweOverrideRequired && !siweOverrideAcknowledged) ? <WarningTwoIcon boxSize="15px" /> : undefined}
       isLoading={isSubmitting}
       loadingText={isLedgerWaiting ? "Waiting" : "Signing"}
       spinner={
@@ -291,7 +294,7 @@ function SignatureRequestConfirmation({
         ) : undefined
       }
       isDisabled={
-        isRejecting ||
+        isRejecting || safeDecision.blocked ||
         (siweOverrideRequired && !siweOverrideAcknowledged)
       }
       title={
@@ -383,13 +386,10 @@ function SignatureRequestConfirmation({
           />
         ) : undefined
       }
-      actionNotice={
-        accountType === "impersonator" ? (
-          <ViewOnlySigningNotice />
-        ) : accountType === "ledger" ? (
-          <LedgerSigningStatus active={isLedgerWaiting} />
-        ) : undefined
-      }
+      actionNotice={<VStack align="stretch" spacing={2}>
+        <SafeRiskDecision decision={safeDecision} isDisabled={isSubmitting || isRejecting} />
+        {accountType === "impersonator" ? <ViewOnlySigningNotice /> : accountType === "ledger" ? <LedgerSigningStatus active={isLedgerWaiting} /> : null}
+      </VStack>}
       isInteractionLocked={isLedgerWaiting}
       confirmAction={confirmButton}
       rejectAction={canSign ? rejectButton : undefined}

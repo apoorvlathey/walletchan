@@ -9,9 +9,9 @@ import { createServer, type ViteDevServer } from "vite";
 
 type StorageRecord = Record<string, unknown>;
 type SigningHook = {
-  local: () => Promise<string>;
-  bankr: () => Promise<{ signature: string }>;
-  ledger: () => Promise<string>;
+  local: (...args: unknown[]) => Promise<string>;
+  bankr: (...args: unknown[]) => Promise<{ signature: string }>;
+  ledger: (...args: unknown[]) => Promise<string>;
   ledgerSession: () => Promise<void>;
   privateKey: string | null;
   apiKey: string | null;
@@ -338,6 +338,78 @@ test("confirmation preserves all wallet authorities and final release races", as
             : await handlers.handleConfirmSignatureRequest("safe-owner", "master-password");
           assert.equal(result.success, true, JSON.stringify(result));
           assert.match(result.signature, /^0x[0-9a-f]+$/);
+        }
+      }
+    });
+
+    await t.test("Safe delegatecall and refund warnings do not rewrite or block the exact owner signature", async () => {
+      const safeAddress = "0x3333333333333333333333333333333333333333";
+      const zeroAddress = "0x0000000000000000000000000000000000000000";
+      const tokenAddress = "0x4444444444444444444444444444444444444444";
+      for (const type of ["privateKey", "seedPhrase", "ledger", "bankr"] as const) {
+        for (const method of ["eth_signTypedData_v3", "eth_signTypedData_v4"] as const) {
+          for (const gasToken of [zeroAddress, tokenAddress]) {
+            reset();
+            const id = `safe-risk-${type}-${method}-${gasToken}`;
+            const data = safeTransactionTypedData(safeAddress);
+            Object.assign(data.message, {
+              to: "0x5555555555555555555555555555555555555555",
+              value: "0",
+              data: "0x12345678abcdef",
+              operation: 1,
+              safeTxGas: "50000",
+              baseGas: "1000000000",
+              gasPrice: "1000000000",
+              gasToken,
+              refundReceiver: gasToken === zeroAddress ? zeroAddress : tokenAddress,
+              nonce: 17,
+            });
+            const expected = clone(data);
+            await queue(type, id, {
+              signature: {
+                method,
+                params: [address, method === "eth_signTypedData_v3" ? data : JSON.stringify(data)],
+                chainId: 1,
+              },
+            });
+            // The Safe need not be imported for an owner to sign its transaction.
+            let signCount = 0;
+            const assertSignedPayload = (signedMethod: unknown, signedParams: unknown) => {
+              signCount += 1;
+              assert.equal(signedMethod, method);
+              assert.ok(Array.isArray(signedParams));
+              assert.equal(signedParams[0], address);
+              const actual = typeof signedParams[1] === "string"
+                ? JSON.parse(signedParams[1])
+                : signedParams[1];
+              assert.deepEqual(actual, expected, `${type} must preserve every signed Safe field`);
+              return `0x${"dd".repeat(65)}`;
+            };
+            hooks.local = async (_key, signedMethod, signedParams, chainId) => {
+              assert.equal(chainId, 1);
+              return assertSignedPayload(signedMethod, signedParams);
+            };
+            hooks.bankr = async (_key, signedMethod, signedParams) => ({
+              signature: assertSignedPayload(signedMethod, signedParams),
+            });
+            hooks.ledgerSession = async () => {};
+            hooks.ledger = async (request) => {
+              const signed = request as { method: unknown; params: unknown; chainId: number };
+              assert.equal(signed.chainId, 1);
+              return assertSignedPayload(signed.method, signed.params);
+            };
+            hooks.privateKey = privateKey;
+            hooks.apiKey = "bankr-api-key";
+            const result = type === "ledger"
+              ? await ledgerHandlers.handleConfirmLedgerSignatureRequest(id, "agent-password")
+              : type === "bankr"
+                ? await handlers.handleConfirmSignatureRequestBankr(id, "agent-password")
+                : await handlers.handleConfirmSignatureRequest(id, "agent-password");
+            assert.equal(result.success, true, JSON.stringify(result));
+            assert.equal(signCount, 1, `${type} must sign the reviewed payload exactly once`);
+            assert.deepEqual(data, expected, "caller payload must remain unchanged");
+            assert.equal(await pendingStorage.getPendingSignatureRequestById(id), null);
+          }
         }
       }
     });

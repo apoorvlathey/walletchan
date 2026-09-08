@@ -553,6 +553,26 @@ After the first signature, show an inline success notice:
 
 Never show the ordinary “Transaction submitted” state at this point.
 
+### Safe transaction review warnings
+
+External exact-schema owner-signed SafeTx V3/V4 requests and imported proposals
+share `chrome/safe/transactionRisk.ts`. Nonzero signed gasPrice discloses gas
+reimbursement, including on rejection proposals, without changing the signed
+fields/hash or estimating a payment. Zero refundReceiver is displayed as
+Transaction submitter. Simulation is unchanged and cannot suppress this notice.
+
+Delegatecall exemptions require exact-chain pinned MultiSend deployment metadata,
+complete canonical ABI decoding, and a bounded batch of immediate CALL entries.
+Inner/nested delegatecalls and unknown or malformed batches retain the warning.
+This is not a general safety assessment of CALL targets.
+
+`components/SafeReview` places critical red warnings in the sticky decision area.
+The shared SIWE warning popover supplies the acknowledgement checkbox; both the
+primary button and UI action handler gate signing/execution. Exact payload, chain,
+request and actor/action changes synchronously reset acknowledgement. This is a
+presentation gate, not a new background authorization capability. Existing owner,
+session, hash and final-release checks remain authoritative.
+
 ### Approvals inbox
 
 Sort requests by Safe nonce from highest to lowest. Requests that share a nonce
@@ -691,6 +711,41 @@ The first message release should:
 - treat SIWE as supported only when the relying party actually validates
   EIP-1271/ERC-6492 as applicable; and
 - never return one owner's 65-byte signature as though the Safe signed it.
+
+#### Future EIP-1271 phase: external signer-domain protection
+
+Safe message signing is currently unsupported. Existing owner-signed `SafeTx`
+requests remain compatible with the external EIP-712 guard: imported `safe`
+records have `directSigner: false` and are excluded from the protected EOA list.
+Native Safe proposal approvals use the dedicated reviewed owner-signing path.
+The signature guard does not block transaction calldata sent to a Safe.
+
+Before enabling message signing **as the Safe itself**, review both checks:
+
+- `apps/extension/src/chrome/signatures/externalTypedData.ts` unconditionally
+  includes the requested signer's address in the protected verifier list.
+- `apps/extension/src/chrome/provider/contentBridge/requestSurfaceSignaturePreflight.ts`
+  also checks the typed-data verifier against the requested signer before
+  opening the request surface.
+
+Reusing those checks unchanged would reject a legitimate Safe message with
+`signer = verifyingContract = Safe`, even though stored Safes are excluded from
+the EOA list. Route verified contract-account signing through its own reviewed
+EIP-1271 lifecycle and adapt the request-surface preflight accordingly. Preserve
+self/other-EOA verifier rejection at intake, confirmation, and final release;
+do not exempt a request merely because its primary type is `SafeTx` or
+`SafeMessage`, or because `eth_getCode` is non-empty (delegated EOAs have code).
+
+Add regressions for Safe-as-signer messages through injected and WalletConnect
+transports, threshold-valid aggregate release, request-surface behavior, and
+unchanged owner-signed Safe transactions across all four direct signer types.
+Keep the existing protected-EOA rejection tests and real-device Ledger QA.
+
+Related: [MetaMask core issue #9179](https://github.com/MetaMask/core/issues/9179)
+reports Safe incompatibility with internal-account guards. Its linked
+[LocalSafe Snap implementation](https://github.com/Cyfrin/localsafe.eth/blob/8d14403dfb0be66d6527189367c4f24a89b9f7e9/snap/src/keyring.ts)
+registers the Safe as `EthAccountType.Eoa`; WalletChan must retain its explicit
+contract-account classification rather than treating a Safe as a direct EOA.
 
 Official reference:
 

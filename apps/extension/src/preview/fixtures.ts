@@ -17,6 +17,7 @@ import { getVisibleChains } from "@/lib/chains";
 import { previewAssets } from "./previewAssets";
 import { previewNetworks } from "./networkFixtures";
 import { applyPreviewBatchScenario } from "./batchScenarioFixtures";
+import { applySafeSignatureScenario } from "./safeWarningFixtures";
 import { createDefillamaSwapData, getReadmeTxOverrides } from "./readmeScenarioFixtures";
 
 export { previewNetworks, previewNetworkRpcUrls } from "./networkFixtures";
@@ -306,9 +307,9 @@ export function createPreviewSignatureScenario(
     });
   }
 
-  return createPreviewSignatureRequest(walletType, {
+  return applySafeSignatureScenario(createPreviewSignatureRequest(walletType, {
     id: `preview-signature-${scenario}-${walletType}`,
-  });
+  }), scenario);
 }
 
 export function createPreviewBatchRequest(

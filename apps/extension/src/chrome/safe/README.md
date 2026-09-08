@@ -78,3 +78,7 @@ Safe private key or treats a Safe as an EOA.
   reconciliation, and deduplicated transitions.
 
 Mirrored tests and fixture intent are documented in `tests/safe/README.md`.
+
+`transactionRisk.ts` is presentation-only SafeTx/delegatecall/refund analysis. It
+never authorizes signing or changes imported fields; canonical batch exemptions
+require an explicit chain deployment and complete bounded CALL-only decoding.

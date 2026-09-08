@@ -30,6 +30,25 @@ recursive data and labeled addresses, with hashes/raw data under Advanced.
 Raw ERC-7710 delegation typed data from a dapp is blocked. WalletChan only
 creates supported delegation requests through its own authority flow.
 
+### Protected account domains
+
+External typed-data requests are rejected when their verifying contract is the
+signer or another direct-signing account stored in WalletChan. This applies to
+private-key, seed-phrase, Ledger, and Bankr accounts, including delegated EOAs.
+A dapp cannot bypass it by naming the request `SafeTx` or presenting it as a login.
+
+Imported Safes are contract accounts, so supported owner-signed Safe transactions
+remain possible. Signing a message as the Safe itself is a separate unsupported flow.
+
+### Safe transaction warnings
+
+Recognized Safe transactions show critical delegatecall and gas-reimbursement
+warnings in the bottom decision area. Open the warning and check **I understand**
+to enable Sign. The warning triangle beside Sign disappears after acknowledgement.
+Warnings apply independently of clear-signing descriptions or simulation results.
+See [Safe transaction warnings](/accounts/safe#transaction-warnings) for the
+payment details, MultiSend checks, and limits.
+
 ## Sign-In with Ethereum
 
 SIWE/EIP-4361 is parsed into domain, address, statement, URI, chain, nonce,

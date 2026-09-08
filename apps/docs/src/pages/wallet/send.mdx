@@ -35,6 +35,19 @@ public name. Always verify the address itself.
 Sending to a smart contract triggers an acknowledgement because contracts may
 not provide a way to return funds.
 
+### Lookalike recipient warnings
+
+WalletChan compares the destination against saved contacts and previous Send
+recipients. A suspiciously similar address triggers a comparison and requires
+acknowledgement before continuing to review. Changing the recipient or other
+review context clears that acknowledgement. Verify the full address through a
+trusted source; the absence of a match does not prove a destination is safe.
+
+Name resolution follows the transfer network. WalletChan preserves the name you
+entered, while saved account/contact profiles retain their established identity.
+A familiar label is not proof that the name resolves to that destination on every
+network.
+
 ## Enter the amount
 
 Use token units or switch to USD when a current price is available. The

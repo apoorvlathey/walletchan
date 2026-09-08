@@ -25,7 +25,8 @@ After an outgoing token action, WalletChan can detect a verified non-zero
 allowance that will remain. The **Approval remains** notice is distinct from
 the token transfer itself.
 
-For supported private-key/seed atomic paths and unsigned Safe proposals:
+For supported private-key, seed-phrase, and eligible Bankr atomic paths, and
+editable unsigned Safe proposals:
 
 - **Revoke?** appends a canonical `approve(spender, 0)` cleanup call.
 - **Revoke all** appends cleanup calls for multiple supported findings.

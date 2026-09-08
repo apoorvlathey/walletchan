@@ -10,13 +10,24 @@ To regenerate the `[Unreleased]` section from git diffs, invoke the `/changelog`
 
 ## [Unreleased]
 
-_Nothing yet._
+### Security
+
+- Safe transaction reviews disclose risky delegatecalls, including nested
+  MultiSend delegatecalls, and enabled gas reimbursement. Critical warnings in
+  the bottom decision area require acknowledgement before signing or execution;
+  imported proposals retain their original signed fields and hashes.
+
+### Fixed
+
+- Imported Safes can connect to injected-provider dapps independently of their
+  current approval/execution capability, with clearer account selection.
+- MultiSend decoding accepts zero-length calldata at the end of a batch.
 
 ## [4.1.0] - 2026-09-08
 
 ### Added
 
-- **Block explorer transaction decoding.** An opt-in WalletChan tab in supported
+- **Block explorer transaction decoding.** A default-enabled WalletChan tab in supported
   explorers' Input Data sections shows decoded transaction details and clear
   signing information.
 - **Address-poisoning warnings.** Send checks recipients against contacts and

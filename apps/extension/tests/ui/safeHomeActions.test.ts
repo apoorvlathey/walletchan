@@ -436,7 +436,7 @@ test("Safe request review uses the standard confirmation grammar without passwor
   assert.match(details, /aria-live="polite"/);
   assert.match(details, /status === "Available" \? "warning" : undefined/);
   assert.match(details, /<Text color="fg\.secondary" fontSize="sm">\s*Reject pending transaction/);
-  assert.match(financialImpact, /<Text color="fg\.secondary" fontSize="sm">\s*No Safe asset changes/);
+  assert.match(financialImpact, /<Text color="fg\.secondary" fontSize="sm">\s*No transfer in the rejection call/);
   assert.doesNotMatch(details, /This onchain Safe transaction consumes nonce/);
   assert.doesNotMatch(financialImpact, /The selected executor pays only the network fee/);
   assert.match(details, /variant="success"/);

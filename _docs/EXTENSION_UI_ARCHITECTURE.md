@@ -40,6 +40,7 @@ apps/extension/src/
 │   ├── Portfolio/Holdings/ # Portfolio loading and holdings presentation
 │   ├── SafeAccount/        # Safe import, discovery, security, and home controls
 │   ├── SafeApprovals/      # Safe proposal review, owner approval, and execution
+│   ├── SafeReview/         # Shared Safe risks and exact-review acknowledgement
 │   ├── Shield/             # Separate Shield and Unshield screens over privacy controllers
 │   ├── Settings/           # Feature domain
 │   ├── Swap/               # Feature domain

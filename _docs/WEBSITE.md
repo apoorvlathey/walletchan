@@ -899,6 +899,14 @@ section index links to every test card. Section anchors retain enough scroll
 margin to stay visible below that index, and smooth movement becomes immediate
 when the visitor prefers reduced motion.
 
+The Signatures card also includes SafeTx V3/V4 fixtures for arbitrary, inner and
+nested delegatecalls, canonical CALL-only MultiSend, malformed/unknown targets,
+native/token reimbursements, and zero-price controls. It uses a fixed fixture
+verifier and artificial nonce, never publishes proposals, and neither prints nor
+submits returned signatures. Test the sticky warning acknowledgement with all
+four signer types; Ledger completion requires a physical device. Imported Safe
+proposal approval/execution is a separate manual check described on the page.
+
 ### Privacy Pools Explorer
 
 `/privacy-pools-explorer` is an internal admin diagnostic linked only from the

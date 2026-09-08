@@ -11,15 +11,17 @@ add a network or token.
 
 ## Switch network
 
-`wallet_switchEthereumChain` asks the connected tab to use an existing visible
-network. WalletChan pins the requesting origin and chain. If the chain is
+`wallet_switchEthereumChain` asks the tab to use an existing visible network.
+If the site is not connected, WalletChan first opens connection approval; rejecting
+it leaves the site unconnected. A switch does not sign or submit a transaction.
+WalletChan pins the requesting origin and chain. If the chain is
 unknown, it returns the standard `4902` error so the dapp can follow with an add
 request.
 
 ## Add network
 
-An EIP-3085 `wallet_addEthereumChain` request shows the dapp identity and
-proposed:
+An EIP-3085 `wallet_addEthereumChain` request requires an existing connection
+and shows the dapp identity and proposed:
 
 - Network name and chain ID.
 - RPC URL.

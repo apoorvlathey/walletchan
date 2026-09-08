@@ -37,3 +37,9 @@ test("batch builder targets canonical MultiSend with outer delegatecall", () => 
   });
   assert.deepEqual(decodeMultiSendTransactions(decoded.args[0]), calls);
 });
+
+test("MultiSend codec accepts a final empty-calldata native transfer", () => {
+  for (const batch of [[calls[0]], [calls[1], calls[0]], [calls[0], calls[0]]]) {
+    assert.deepEqual(decodeMultiSendTransactions(encodeMultiSendTransactions(batch)), batch);
+  }
+});

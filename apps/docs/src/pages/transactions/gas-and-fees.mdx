@@ -13,12 +13,16 @@ network-specific headroom, and keeps the fee decision next to Confirm.
 ## Local gas tiers
 
 Private-key, seed-phrase, and eligible Ledger transactions offer **Slow**,
-**Standard**, **Fast**, and **Custom**. Custom mode exposes gas limit,
+**Normal**, **Fast**, and **Custom**. Custom mode exposes gas limit,
 priority fee, and max fee relationships with validation.
 
 A dapp-provided gas value can act as a floor where applicable. MegaETH uses the
 chain's non-standard gas estimate rather than trusting a standard-wallet gas
 value. Bankr manages gas remotely and shows a read-only explanation.
+
+On Ethereum, fee estimates can use lower priority fees when the configured RPC
+provides supporting fee evidence. Conservative fallbacks remain when that evidence
+is unavailable; a lower estimate does not guarantee inclusion time.
 
 ## Native MAX
 

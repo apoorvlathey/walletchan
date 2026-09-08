@@ -33,6 +33,42 @@ nonce, existing confirmations, threshold, and execution readiness.
 A proposal can be visible before it is executable. Refresh to reconcile
 onchain and service state when another owner acts outside WalletChan.
 
+## Transaction warnings
+
+External owner signatures and imported proposals can authorize more than the
+visible transfer. WalletChan shows a red warning in the bottom decision area for
+risky delegatecalls and enabled gas reimbursement. Open the warning and check
+**I understand** before **Sign**, **Sign offchain**, or **Execute** becomes available.
+Changing the reviewed request, payment fields, chain, owner, or action requires
+fresh acknowledgement.
+
+- **Delegatecall** lets another contract's code run with the Safe's authority.
+  An official MultiSend address alone is insufficient: its complete batch must
+  contain only ordinary CALL operations on a recognized deployment for that chain.
+  Nested delegatecalls and unverifiable batches retain the warning.
+- **Gas reimbursement** authorizes an additional execution-cost payment from the
+  Safe when its signed `gasPrice` is nonzero. **Payment details** identifies the
+  asset and recipient; a zero recipient means the eventual transaction submitter.
+  This payment is separate from the executor's network fee and can also appear
+  on a rejection proposal.
+
+Imported proposals keep their original signed fields and transaction hash.
+The warning does not estimate the payment or determine whether it is excessive.
+Simulation may omit the payment, so an apparently clean simulation does not
+remove the warning. Ordinary calls can still contain harmful approvals or Safe
+configuration changes; no warning is a guarantee of safety.
+
+## Dapp connections and owner signatures
+
+An imported Safe can connect to an injected-provider dapp even when it is
+observe-only. Connecting exposes its address; proposal approval and execution
+still require eligible owners and verified Safe state. WalletConnect has its
+own account/network eligibility checks.
+
+Signing a personal message or typed data **as the Safe itself** is not supported.
+An eligible owner can sign a dapp's Safe transaction using their own account;
+that owner signature does not by itself satisfy the Safe's threshold.
+
 ## Swaps and other actions
 
 Supported WalletChan actions can create Safe proposals instead of directly
