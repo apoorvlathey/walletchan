@@ -19,6 +19,7 @@ import { useNetworks } from "@/contexts/NetworksContext";
 import ChainIcon from "@/components/ChainIcon";
 import { SettingsScreenFrame } from "./SettingsScreenFrame";
 import { RpcEndpointManager } from "./RpcEndpointManager";
+import { NetworkExplorerField } from "./NetworkExplorerField";
 import { CustomNetworkDetails } from "./CustomNetworkDetails";
 import { NetworkIdentityFields } from "./NetworkIdentityFields";
 import { useEditChainRpcEndpoints } from "./useEditChainRpcEndpoints";
@@ -314,12 +315,17 @@ function EditChain({
             />
           )}
 
+          <NetworkExplorerField
+            chainName={chainName}
+            entry={currentEntry}
+            value={explorer}
+            onChange={setExplorer}
+          />
+
           {isCustom && (
             <CustomNetworkDetails
-              explorer={explorer}
               currencySymbol={currencySymbol}
               currencyDecimals={currencyDecimals}
-              onExplorerChange={setExplorer}
               onCurrencySymbolChange={setCurrencySymbol}
               onCurrencyDecimalsChange={setCurrencyDecimals}
             />

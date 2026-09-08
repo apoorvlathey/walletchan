@@ -61,6 +61,11 @@ interface ManualOverride {
   isTestnet: boolean;
 }
 
+// Preferred explorers override upstream metadata during regeneration.
+const EXPLORER_OVERRIDES: Record<number, string> = {
+  143: "https://monadscan.com", // Monad
+};
+
 /**
  * Per-chain RPC URLs we prefer over the viem default. Currently used to
  * route mainnet traffic through drpc.org — the same provider WalletChan
@@ -251,7 +256,7 @@ for (const chainIdStr of Object.keys(v13)) {
       name: override.name,
       nativeCurrency: override.nativeCurrency,
       defaultRpc: RPC_OVERRIDES[chainId] ?? override.rpc,
-      explorer: override.explorer,
+      explorer: EXPLORER_OVERRIDES[chainId] ?? override.explorer,
       isTestnet: override.isTestnet,
       icon: ICON_OVERRIDES[chainId],
     });
@@ -265,7 +270,7 @@ for (const chainIdStr of Object.keys(v13)) {
       name: viem.name,
       nativeCurrency: viem.nativeCurrency,
       defaultRpc: RPC_OVERRIDES[chainId] ?? viem.rpcUrls.default.http[0] ?? "",
-      explorer: viem.blockExplorers?.default?.url ?? "",
+      explorer: EXPLORER_OVERRIDES[chainId] ?? viem.blockExplorers?.default?.url ?? "",
       isTestnet: Boolean(viem.testnet),
       icon: ICON_OVERRIDES[chainId],
     });

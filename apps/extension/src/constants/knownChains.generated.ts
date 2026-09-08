@@ -38,7 +38,7 @@ export const KNOWN_CHAINS: Record<number, KnownChainMetadata> = {
     name: "Monad",
     nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
     defaultRpc: "https://monad.drpc.org",
-    explorer: "https://monadvision.com",
+    explorer: "https://monadscan.com",
     isTestnet: false,
     icon: "/chainIcons/monad.svg",
   },

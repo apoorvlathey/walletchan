@@ -320,6 +320,7 @@ test("v3.19 custom Tempo state upgrades without losing user preferences", () => 
   assert.deepEqual(normalized.Tempo, {
     chainId: 4217,
     rpcUrl: "https://tempo.drpc.org",
+    explorer: "https://explorer.tempo.fi",
     hidden: true,
   });
   assert.equal(tempo?.name, "Tempo");

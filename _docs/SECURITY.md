@@ -872,7 +872,11 @@ write full local snapshots back to storage. This prevents a stale long-lived
 sidepanel from deleting a chain that was added by a dapp confirmation in the
 background.
 
-Each entry's required `rpcUrl` remains the only endpoint used at runtime.
+Built-in explorer overrides use the same validated public-HTTPS or local
+HTTP(S), credential-free URL policy as custom explorers. RPC-only updates
+preserve the override; an explicit blank explorer restores the registry default.
+
+Each entry's required `rpcUrl` remains the only RPC endpoint used at runtime.
 `chrome.storage.local.networkRpcUrls` is separate Settings-only history keyed
 by decimal chain ID. The service worker validates every member with the same
 scheme, credential, private-network, length, and trusted-origin rules,

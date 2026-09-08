@@ -45,6 +45,7 @@ test("v3.19 Tempo settings migrate atomically without touching unrelated sync st
       {
         chainId: 4217,
         rpcUrl: "https://tempo.drpc.org",
+        explorer: "https://explorer.tempo.fi",
         hidden: true,
       },
     );

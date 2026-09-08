@@ -32,7 +32,9 @@
 - `useBuiltInRpcPersistence.ts` probes active-endpoint changes and immediately
   persists built-in-chain endpoint selection/history through `updateNetwork`;
   inactive endpoint metadata edits retain the current runtime endpoint.
-- `CustomNetworkDetails.tsx` presents custom-chain explorer and native-currency
+- `NetworkExplorerField.tsx` shows the explorer URL for every network and owns
+  built-in explorer saving through the validated updateNetwork route.
+- `CustomNetworkDetails.tsx` presents custom-chain native-currency
   fields behind the advanced disclosure.
 - `AddChainRequestSummary.tsx` presents the standard dapp identity and proposed
   network summary for provider-originated add-chain decisions.

@@ -1992,3 +1992,13 @@ existing body typography and spacing, icon plus explicit text, and keyboard-acce
 Payment details disclosure. Full recipient/token addresses wrap at narrow widths. The
 warning remains separate from simulated amounts and ERC-7730 presentation. No new
 palette, motion, estimate, or confirmation action is introduced.
+
+## Edit network explorer (2026-09-08)
+
+The network settings form exposes Block explorer URL beside the existing RPC
+controls in both themes. It reuses the form label, input, error, and amber save
+recipes; custom-chain currency metadata stays in Advanced network details.
+Built-in explorer edits have an explicit save action and default-restoration
+helper text. The existing precise, approachable Warm Midnight system remains
+unchanged; visible labels, keyboard focus, loading, and error states follow the
+shared form contract.

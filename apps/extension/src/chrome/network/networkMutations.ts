@@ -6,10 +6,7 @@ import {
 } from "@/lib/chains";
 import type { NetworkEntry } from "@/types";
 import { withStorageLock } from "../storageLock";
-import {
-  cleanChainName,
-  cleanNetworkEntry,
-} from "./customNetworkValidation";
+import { cleanChainName, cleanNetworkEntry } from "./customNetworkValidation";
 import { removeNetworkRpcUrls } from "./rpcHistoryRepository";
 import { reconcileNetworkRpcEndpoints } from "./networkRpcMutation";
 import {
@@ -25,7 +22,6 @@ import {
 } from "./networkRepository";
 
 export type { NetworkMutationResult } from "./networkPolicy";
-
 export async function ensureNetworksInfo(): Promise<NetworkMutationResult> {
   return withStorageLock(NETWORKS_INFO_LOCK_KEY, async () => {
     try {
@@ -192,6 +188,10 @@ export async function updateNetworkEntry({
         : {
             chainId: current.chainId,
             rpcUrl: cleanedEntry.rpcUrl,
+            // RPC-only updates must retain the user's explorer override.
+            explorer: Object.prototype.hasOwnProperty.call(entry, "explorer")
+              ? cleanedEntry.explorer
+              : current.explorer,
             hidden: current.hidden,
           };
 

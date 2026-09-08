@@ -507,7 +507,7 @@ export const MAINNET_CHAIN_REGISTRY: readonly ChainEntry[] = [
     testnetChainIds: [10143, 41454], // 41454 is legacy; retain existing icon coverage
     name: "Monad",
     rpcUrl: "https://rpc.monad.xyz",
-    explorer: "https://monadvision.com",
+    explorer: "https://monadscan.com",
     icon: "/chainIcons/monad.svg",
     bg: "rgba(131, 110, 249, 0.15)",
     border: "rgba(131, 110, 249, 0.4)",

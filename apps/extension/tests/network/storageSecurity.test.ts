@@ -43,6 +43,29 @@ test("custom network storage rejects unsafe or malformed metadata", async () => 
     const { allowsImpersonatedTransactions } = await import(
       "../../src/chrome/network/impersonatedRpcPolicy"
     );
+    const { getResolvedChainByName } = await import("../../src/lib/chains");
+    for (const explorer of ["https://custom-explorer.example/", "javascript:alert(1)", ""]) {
+      const result = await updateNetworkEntry({
+        chainName: "Ethereum", nextChainName: "Ethereum",
+        entry: { chainId: 1, rpcUrl: "https://ethereum-rpc.example", explorer },
+      });
+      if (explorer.startsWith("javascript:")) {
+        assert.equal(result.success, false);
+        continue;
+      }
+      assert.equal(result.success, true);
+      if (!result.success) continue;
+      const expected = explorer ? "https://custom-explorer.example" : "https://etherscan.io";
+      assert.equal(getResolvedChainByName("Ethereum", result.networksInfo)?.explorer, expected);
+      const rpcOnly = await updateNetworkEntry({
+        chainName: "Ethereum", nextChainName: "Ethereum",
+        entry: { chainId: 1, rpcUrl: "https://another-ethereum-rpc.example" },
+      });
+      assert.equal(rpcOnly.success, true);
+      if (rpcOnly.success) {
+        assert.equal(getResolvedChainByName("Ethereum", rpcOnly.networksInfo)?.explorer, expected);
+      }
+    }
     const base = {
       chainId: 12345,
       rpcUrl: "https://rpc.example/",
