@@ -9,9 +9,9 @@ const panelUrl = new URL(
 
 test("explorer view embeds clear-signing fields inside the leading summary", async () => {
   const source = await readFile(panelUrl, "utf8");
-  const summaryIndex = source.indexOf("<DecodedFunctionSummary");
+  const summaryIndex = source.lastIndexOf("<DecodedFunctionSummary");
   const clearSigningIndex = source.indexOf("<ClearSigningView");
-  const calldataIndex = source.indexOf("<CalldataDecoder");
+  const calldataIndex = source.lastIndexOf("<CalldataDecoder");
 
   assert.ok(summaryIndex >= 0);
   assert.ok(clearSigningIndex > summaryIndex);

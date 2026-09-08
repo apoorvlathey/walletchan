@@ -54,7 +54,9 @@ Safe private key or treats a Safe as an EOA.
   published markers to the latest locked confirmation set.
 - `executionData.ts`, `executionGas.ts`: pure construction of the exact outer
   `execTransaction` envelope and bounded reviewed fee validation shared by
-  renderer review and the background broadcast path.
+  renderer review and the background broadcast path. `executionData.ts` also
+  exposes bounded, canonical read-only envelope decoding for explorer display;
+  this does not verify contract identity or signatures.
 - `executorHistory.ts`: deterministic normal transaction-history publication
   for the private-key, seed-phrase, or Ledger EOA that pays Safe execution gas. It
   reuses the ordinary receipt poller and details surface rather than adding a

@@ -8,7 +8,7 @@ an alternative to the native Input Data view on recognized block explorer
 
 | File | Responsibility | Effects |
 | --- | --- | --- |
-| `ExplorerTransactionPanel.tsx` | Render decoded ERC-7821 inner calls through the shared batch summary without redundant calldata digests; otherwise lead with Action/verified-parameters/Payment and the expanded technical decoder | Decoded action state only; copy/address effects remain in shared children |
+| `ExplorerTransactionPanel.tsx` | Render decoded Safe and ERC-7821 inner calls through the shared batch summary without redundant calldata digests; otherwise lead with Action/verified-parameters/Payment and the expanded technical decoder | Decoded action state only; copy/address effects remain in shared children |
 | `useExplorerTransaction.ts` | Resolve the source explorer, verify the configured RPC chain, and fetch one matching transaction | Sync-storage read and bounded RPC calls |
 
 The page adapter in `pages/explorerTransaction.tsx` owns the iframe bootstrap,
@@ -19,3 +19,10 @@ removes an existing embed immediately when that preference changes off. The
 background explorer route exposes only
 clear-signing and public token metadata to the exact embedded extension frame;
 it grants no wallet-UI authority.
+
+`safeExecutionModel.ts` adapts the existing Safe execution ABI and bounded
+MultiSend decoder to shared call-card inputs. It owns no effects, verification,
+or signing policy. Safe risk warnings and the outer technical disclosure retain
+delegatecall and reimbursement context. The recorded Monad regression lives in
+`tests/explorerTransaction/fixtures/monadSafeTransaction.json` and is covered by
+`tests/ui/explorerSafeExecutionModel.test.ts`.

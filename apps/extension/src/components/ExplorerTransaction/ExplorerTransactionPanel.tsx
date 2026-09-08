@@ -9,6 +9,9 @@ import {
 } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 
+import { SafeTransactionWarnings } from "@/components/SafeReview/SafeTransactionWarnings";
+import { InlineDisclosure } from "@/components/ui";
+import { decodeExplorerSafeExecution } from "./safeExecutionModel";
 import CalldataDecoder from "@/components/CalldataDecoder";
 import { ClearSigningView } from "@/components/ClearSigning/ClearSigningView";
 import BatchCallsSummary from "@/components/shared/BatchCallsSummary";
@@ -120,6 +123,10 @@ export default function ExplorerTransactionPanel({
       ? decodeErc7821Batch(transaction.input)
       : null;
   }, [transaction.from, transaction.input, transaction.to]);
+  const safeExecution = useMemo(
+    () => transaction.to ? decodeExplorerSafeExecution(transaction.input) : null,
+    [transaction.input, transaction.to],
+  );
   const action = useMemo(
     () =>
       clearIntent ||
@@ -131,6 +138,26 @@ export default function ExplorerTransactionPanel({
           : "Native transfer"),
     [clearIntent, functionName, hasCalldata, transaction.to],
   );
+
+  if (safeExecution?.calls?.length) {
+    return (
+      <VStack align="stretch" spacing={3} p={3} bg="surface.base" borderRadius="lg">
+        <DecodedFunctionSummary
+          functionName="Safe transaction"
+          chainId={page.chain.chainId}
+          value={transaction.value}
+          nativeSymbol={page.chain.nativeCurrency.symbol}
+          valueUsd={null}
+        />
+        <SafeTransactionWarnings transaction={safeExecution.transaction} chainId={page.chain.chainId}>
+          <BatchCallsSummary calls={safeExecution.calls} chainId={page.chain.chainId} hideCalldataDigest />
+        </SafeTransactionWarnings>
+        <InlineDisclosure label="Safe execution details" autoScrollOnOpen>
+          <CalldataDecoder calldata={transaction.input} to={transaction.to!} chainId={page.chain.chainId} flat />
+        </InlineDisclosure>
+      </VStack>
+    );
+  }
 
   if (batchCalls?.length) {
     return (

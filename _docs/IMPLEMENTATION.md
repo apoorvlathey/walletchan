@@ -4295,7 +4295,14 @@ loading/error/retry states, and treats empty calldata and contract creation
 explicitly. ERC-7821 self-batches take the same `decodeErc7821Batch` → shared
 `BatchCallsSummary` path as Activity transaction details, replacing the opaque
 outer `execute` action and calldata with individually labeled, collapsible
-inner calls. The explorer projection suppresses each call's calldata digest
+inner calls. Safe `execTransaction` calldata now reuses the execution ABI in
+`safe/executionData.ts`, the bounded `safe/multiSend.ts` decoder, shared Safe
+risk warnings, and the same batch call cards. Single CALLs and complete CALL-only
+MultiSend payloads become individual readable actions; outer execution details
+remain available in a disclosure. This is input decoding, not proof of contract
+identity or successful execution. Unknown delegatecalls and malformed/unsupported
+batches retain the generic decoder, and decoding never grants a deployment-risk
+exemption. The explorer projection suppresses each call's calldata digest
 because the adjacent native explorer tab already owns raw-data verification;
 Activity and confirmation consumers retain the digest. Across all three
 surfaces, an expanded call is the sole bordered surface owner; its nested
