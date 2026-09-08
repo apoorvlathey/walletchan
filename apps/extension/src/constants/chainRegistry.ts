@@ -1089,7 +1089,7 @@ export function getExplorerUrlSync(chainId: number, networksInfo?: Record<string
 }
 
 // ---------------------------------------------------------------------------
-// Derived: Force Inclusion (OP Stack L1 deposit) support
+// Derived: Force Inclusion (OP Stack deposits and Arbitrum delayed inbox) support
 // ---------------------------------------------------------------------------
 
 export interface ForceInclusionChainInfo {
@@ -1105,7 +1105,7 @@ export interface ForceInclusionChainInfo {
 }
 
 /**
- * OP Stack chains that support force inclusion via L1 deposit.
+ * Verified chains that support force inclusion via their parent chain.
  * Each chain must have a sourceId (L1 chain) and portal contract in its viem
  * definition. Covers major OP Stack chains + their testnets.
  * Custom chains added by the user are also supported if their chainId matches.
@@ -1151,6 +1151,31 @@ FORCE_INCLUSION_CHAINS.set(arbitrum.id, {
     inbox: "0x4Dbd4fc535Ac27206064B68FfCf827b0A60BAB3f",
     bridge: "0x8315177aB297bA92A06054cE80a67Ed4DBd7ed3a",
     sequencerInbox: "0x1c479675ad559DC151F6Ec7ed3FbF8ceE79582B6",
+  },
+});
+
+// Robinhood's official node configs pin distinct Ethereum/Sepolia deployments.
+// Verified onchain 2026-09-08; see _docs/ARBITRUM_FORCE_INCLUSION.md.
+FORCE_INCLUSION_CHAINS.set(4663, {
+  viemChain: VIEM_CHAINS[4663],
+  l1ChainId: mainnet.id,
+  l1ChainName: "Ethereum",
+  protocol: "arbitrum",
+  arbitrumContracts: {
+    inbox: "0x1A07cc4BD17E0118BdB54D70990D2158AbAD7a2D",
+    bridge: "0xDf8755334ce7A73cCF6b581C02eA649AE3E864b3",
+    sequencerInbox: "0xBd0D173EEb87D57A09521c24388a12789F33ba96",
+  },
+});
+FORCE_INCLUSION_CHAINS.set(46630, {
+  viemChain: VIEM_CHAINS[46630],
+  l1ChainId: 11155111,
+  l1ChainName: "Sepolia",
+  protocol: "arbitrum",
+  arbitrumContracts: {
+    inbox: "0xF2939afA86F6f933A3CE17fCAB007907B6b0B7a4",
+    bridge: "0x96295BDad104eaD97cC08797b3dC68efF59CcF30",
+    sequencerInbox: "0xA0D9dB3DC9791D54b5183C1C1866eFe1eCA7D414",
   },
 });
 

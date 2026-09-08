@@ -1,12 +1,39 @@
 # Arbitrum Nitro delayed-inbox and force-inclusion implementation notes
 
-> Status: Arbitrum One implementation with verified protocol references
+> Status: Arbitrum One and Robinhood mainnet/testnet implementation with verified protocol references
 >
-> Last verified: 2026-07-19
+> Last verified: 2026-09-08 (Robinhood deployment checks)
 >
 > Scope: Arbitrum Nitro Rollup/AnyTrust chains, signed L2 messages through the
 > parent-chain delayed inbox, forced inclusion, WalletChan account types,
 > transaction tracking, and implementation risks
+
+## Enabled Robinhood deployments
+
+Robinhood mainnet (`4663`) and testnet (`46630`) reuse the signed delayed-inbox
+path for single transactions from private-key and seed-phrase accounts. Ledger,
+Bankr, Safe, impersonator, and batch force inclusion remain unsupported by this
+Arbitrum path. Testnet remains hidden by default; enable it in Settings → Chains.
+
+| Child chain | Parent | Inbox | Bridge | SequencerInbox |
+| --- | --- | --- | --- | --- |
+| 4663 | Ethereum (1) | `0x1A07cc4BD17E0118BdB54D70990D2158AbAD7a2D` | `0xDf8755334ce7A73cCF6b581C02eA649AE3E864b3` | `0xBd0D173EEb87D57A09521c24388a12789F33ba96` |
+| 46630 | Sepolia (11155111) | `0xF2939afA86F6f933A3CE17fCAB007907B6b0B7a4` | `0x96295BDad104eaD97cC08797b3dC68efF59CcF30` | `0xA0D9dB3DC9791D54b5183C1C1866eFe1eCA7D414` |
+
+Sources: Robinhood's [protocol contracts](https://docs.robinhood.com/chain/protocol-contracts/),
+[mainnet node config](https://cdn.robinhood.com/assets/generated_assets/hoodchain_docsite/chain-node-configs/robinhood-chain-info.json),
+and [testnet node config](https://cdn.robinhood.com/assets/generated_assets/hoodchain_docsite/chain-node-configs/robinhood-chain-testnet-info.json).
+Live read-only verification on 2026-09-08 confirmed both child/parent chain IDs,
+nonempty code at all six addresses, Inbox/SequencerInbox `bridge()` bindings,
+Bridge `sequencerInbox()` and `allowedDelayedInboxes(inbox) == true`,
+`allowListEnabled() == false`, `paused() == false`, and `maxDataSize() == 117964`.
+Both sequencer inboxes answered `totalDelayedMessagesRead()` and
+`forceInclusionDeadline(uint64)`; both child RPCs successfully simulated
+NodeInterface `gasEstimateComponents(address,bool,bytes)` for the gas-preparation path. Deadlines remain live onchain reads; do not
+copy Arbitrum One's delay assumptions into Robinhood.
+
+No live transaction was submitted during these checks. Browser end-to-end QA
+with funded private-key and seed-phrase accounts remains a manual check.
 
 ## Executive conclusion
 
@@ -30,7 +57,7 @@ For Arbitrum One, current onchain parameters make the ordinary upper delay
 7,200 Ethereum blocks, roughly 24 hours. The delay is governed and dynamically
 buffered, so WalletChan must read it onchain instead of hardcoding “24 hours.”
 
-The recommended first integration, if implementation proceeds, is:
+The original first-integration plan was:
 
 - Arbitrum One and Arbitrum Sepolia only;
 - single transactions for **Private Key and Seed Phrase** accounts;

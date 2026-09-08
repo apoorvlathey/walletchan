@@ -82,6 +82,13 @@ Transaction bytes are never silently repaired. See
 
 ## Arbitrum delayed-inclusion recovery
 
+The Arbitrum route is enabled for Arbitrum One and Robinhood mainnet (`4663`,
+parent Ethereum) / testnet (`46630`, parent Sepolia). Robinhood uses independent
+verified contract pins in `FORCE_INCLUSION_CHAINS`; see
+`ARBITRUM_FORCE_INCLUSION.md` for addresses and live verification. Single
+private-key/seed-phrase transactions are supported; the existing Ledger, Bankr,
+Safe, impersonator, and batch exclusions still apply.
+
 The signed `sendL2Message` path validates the Bridge event sender against
 Nitro's L1-to-L2 address alias (addition modulo 160 bits), including for EOAs.
 `arbitrumForceInclusion/receiptValidation.ts` shares that check between initial
