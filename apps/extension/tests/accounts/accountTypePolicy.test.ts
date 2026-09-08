@@ -63,11 +63,33 @@ test("adding an account type requires a capability row and updates derived signe
     assert.ok(missingRow.some((error) => error.file?.fileName === policyPath && messages([error]).includes("trezor")), messages(missingRow));
 
     await writeFile(policyPath, policy.replace("export const ACCOUNT_TYPE_CAPABILITIES = {", "export const ACCOUNT_TYPE_CAPABILITIES = {\n  trezor: { directSigner: true },"));
+    assert.ok(messages(diagnostics()).includes("forceInclusion"), "future types must explicitly decide force-inclusion capability");
+
+    await writeFile(policyPath, policy.replace("export const ACCOUNT_TYPE_CAPABILITIES = {", "export const ACCOUNT_TYPE_CAPABILITIES = {\n  trezor: { directSigner: true, forceInclusion: false, forceInclusionBatch: false },"));
     await writeFile(probePath, 'import type { DirectSigningAccountType } from "./accounts/accountTypePolicy";\nconst signer: DirectSigningAccountType = "trezor";\n');
     assert.equal(messages(diagnostics()), "", "a declared future signer enters the derived type automatically");
 
-    await writeFile(policyPath, policy.replace("export const ACCOUNT_TYPE_CAPABILITIES = {", "export const ACCOUNT_TYPE_CAPABILITIES = {\n  trezor: { directSigner: false },"));
+    await writeFile(policyPath, policy.replace("export const ACCOUNT_TYPE_CAPABILITIES = {", "export const ACCOUNT_TYPE_CAPABILITIES = {\n  trezor: { directSigner: false, forceInclusion: false, forceInclusionBatch: false },"));
     assert.ok(diagnostics().some((error) => error.file?.fileName === probePath && error.code === 2322), "a non-signer must remain outside the derived signer type");
+
+    const rawSource = await readFile(new URL("../../src/chrome/forceInclusion/rawSigner.ts", import.meta.url), "utf8");
+    const ast = ts.createSourceFile("rawSigner.ts", rawSource, ts.ScriptTarget.Latest, true);
+    let dispatch: ts.SatisfiesExpression | undefined;
+    ast.forEachChild((node) => {
+      if (ts.isVariableStatement(node)) for (const declaration of node.declarationList.declarations) {
+        if (declaration.name.getText(ast) === "RAW_FORCE_INCLUSION_SIGNERS" && declaration.initializer && ts.isSatisfiesExpression(declaration.initializer)) dispatch = declaration.initializer;
+      }
+    });
+    assert.ok(dispatch, "production dispatch must retain its satisfies check");
+    assert.equal(dispatch.type.getText(ast), "SignerFactories");
+    assert.match(rawSource, /\[Type in RawForceInclusionAccountType\]/);
+    assert.ok(ts.isObjectLiteralExpression(dispatch.expression));
+    const keys = dispatch.expression.properties.map((property) => property.name!.getText(ast));
+    await writeFile(probePath, `import type { RawForceInclusionAccountType } from "./accounts/accountTypePolicy";\nconst dispatch = { ${keys.map((key) => `${key}: true`).join(", ")} } satisfies Record<RawForceInclusionAccountType, boolean>;\n`);
+    assert.equal(messages(diagnostics()), "", "explicitly unsupported future account needs no raw signer");
+    await writeFile(policyPath, policy.replace("export const ACCOUNT_TYPE_CAPABILITIES = {", "export const ACCOUNT_TYPE_CAPABILITIES = {\n  trezor: { directSigner: true, forceInclusion: \"raw\", forceInclusionBatch: false },"));
+    assert.ok(messages(diagnostics()).includes("trezor"), "enabling a future raw signer must require a matching dispatch implementation");
+
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

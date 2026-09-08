@@ -18,3 +18,8 @@ personal signatures, and EIP-712 signatures. Repeat this matrix when Ledger
 transport/signing policy or supported device/app behavior changes.
 Ledger-backed Safe owner approval and native-gas execution were added after
 that run and still require their first real-device QA pass.
+
+Force-inclusion tests cover real signature recovery through a mocked device,
+master/agent sessions, lock/epoch/device/path/cancellation invalidation, OP Stack
+and Robinhood parent-approval ordering, safe retries, uncertain sends and
+post-send storage failure. These tests do not replace real-device QA.

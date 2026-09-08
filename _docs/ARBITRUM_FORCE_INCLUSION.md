@@ -11,7 +11,7 @@
 ## Enabled Robinhood deployments
 
 Robinhood mainnet (`4663`) and testnet (`46630`) reuse the signed delayed-inbox
-path for single transactions from private-key and seed-phrase accounts. Ledger,
+path for single transactions from private-key, seed-phrase, and Ledger accounts.
 Bankr, Safe, impersonator, and batch force inclusion remain unsupported by this
 Arbitrum path. Testnet remains hidden by default; enable it in Settings → Chains.
 
@@ -32,8 +32,10 @@ Both sequencer inboxes answered `totalDelayedMessagesRead()` and
 NodeInterface `gasEstimateComponents(address,bool,bytes)` for the gas-preparation path. Deadlines remain live onchain reads; do not
 copy Arbitrum One's delay assumptions into Robinhood.
 
-No live transaction was submitted during these checks. Browser end-to-end QA
-with funded private-key and seed-phrase accounts remains a manual check.
+No live transaction was submitted by the agent during these checks. The
+maintainer subsequently confirmed the Robinhood integration worked. Ledger
+force inclusion was added afterward and still requires real-device QA; see
+`LEDGER.md` for the approval/cancellation matrix.
 
 ## Executive conclusion
 
@@ -605,3 +607,17 @@ Deployment explorers:
 - [Arbitrum One Bridge](https://etherscan.io/address/0x8315177aB297bA92A06054cE80a67Ed4DBd7ed3a)
 - [Arbitrum Sepolia Inbox proxy](https://sepolia.etherscan.io/address/0xaAe29B0366299461418F5324a79Afc425BE5ae21)
 - [Arbitrum Sepolia SequencerInbox proxy](https://sepolia.etherscan.io/address/0x6c97864CE4bEf387dE0b3310A44230f7E3F1be0D)
+
+## Raw signer capability and hardware execution
+
+`ACCOUNT_TYPE_CAPABILITIES` explicitly declares each account's force-inclusion
+transport and batch eligibility. `RAW_FORCE_INCLUSION_SIGNERS` exhaustively
+implements every raw-capable type. Synthetic future-account compilation tests
+fail for both omitted feature decisions and omitted raw dispatch entries.
+Ledger's adapter signs the prepared child bytes without a child-chain broadcast,
+then signs the parent transaction. The later force action shares the adapter
+and rechecks consumption/deadline and canonical receipt after hardware approval.
+`ledger/forceInclusion.ts` retains the pending request until the parent signature
+has been recovered and final authority checked. Pre-send rejection stays
+retryable; initial parent hashes are persisted before publication, and subsequent
+storage failures retain recovery ownership rather than inviting a new send.

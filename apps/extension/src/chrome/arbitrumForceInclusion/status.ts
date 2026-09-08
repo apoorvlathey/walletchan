@@ -5,11 +5,9 @@ import {
   slice,
   type Hash,
 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { isRawForceInclusionAccount } from "../accounts/accountTypePolicy";
+import { createRawForceInclusionSigner } from "../forceInclusion/rawSigner";
 import { getAccountById } from "../accountStorage";
-import { assertLocalAccountEffectBinding } from "../accounts/localEffectBoundary";
-import { getLocalPrivateKeyForAccount } from "../accounts/localKeyResolver";
-import { prepareSignAndBroadcastTransaction } from "../localSigner";
 import { secureHttpTransport } from "../network/rpcClient";
 import {
   getTxById,
@@ -181,17 +179,16 @@ export async function submitArbitrumForceInclusion(txId: string) {
     return { success: false, error: "Force inclusion is not ready" };
   }
   const account = await getAccountById(tx.accountId);
-  if (!account || (account.type !== "privateKey" && account.type !== "seedPhrase")) {
+  if (!isRawForceInclusionAccount(account)) {
     return { success: false, error: "The signing account is no longer available" };
   }
-  const privateKey = await getLocalPrivateKeyForAccount(account.id, "");
-  if (!privateKey) return { success: false, error: "Unlock wallet to force inclusion" };
   if (activeForceSubmissions.has(txId)) {
     return { success: false, error: "Force inclusion is already being submitted" };
   }
   activeForceSubmissions.add(txId);
 
   try {
+    const signer = await createRawForceInclusionSigner({ account, opId: `force:${txId}` });
     const status = await getArbitrumForceInclusionStatus(txId);
     if (!status.eligible) {
       return {
@@ -221,13 +218,13 @@ export async function submitArbitrumForceInclusion(txId: string) {
       value: 0n,
     });
     const l1RpcUrl = await getL1RpcUrl(meta.l1ChainId);
-    const viemAccount = privateKeyToAccount(privateKey);
+    const viemAccount = signer.account;
     const wallet = createWalletClient({
       account: viemAccount,
       chain: getL1Chain(meta.l1ChainId),
       transport: secureHttpTransport(l1RpcUrl, { timeout: L1_RPC_TIMEOUT }),
     });
-    const broadcast = await prepareSignAndBroadcastTransaction(
+    const broadcast = await signer.broadcast(
       wallet,
       {
         account: viemAccount,
@@ -241,10 +238,11 @@ export async function submitArbitrumForceInclusion(txId: string) {
         chainId: meta.l1ChainId,
         supportsSyncSend: false,
         beforeBroadcast: async () => {
-          await assertLocalAccountEffectBinding(account);
+          await signer.assertAvailable();
           const latest = await getArbitrumForceInclusionStatus(txId);
           if (!latest.eligible) throw new Error("The message is no longer force-includable");
           await assertPreimageMatchesChain(await loadRecord(txId));
+          await signer.assertAvailable();
         },
       },
     );

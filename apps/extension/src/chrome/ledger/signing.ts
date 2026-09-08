@@ -113,6 +113,33 @@ export async function signAndBroadcastLedgerTransaction(input: {
     ...(tx.maxPriorityFeePerGas ? { maxPriorityFeePerGas: BigInt(tx.maxPriorityFeePerGas) } : {}),
   } as never);
   const serializable = stripPreparedContext(prepared as Record<string, unknown>);
+  const signedRaw = await signPreparedLedgerTransaction({
+    opId: input.opId, account: input.account, transaction: serializable,
+  });
+  await input.beforeBroadcast?.({
+    serializedTransaction: signedRaw,
+    transactionHash: keccak256(signedRaw),
+  });
+  const result = await broadcastSerializedTransaction(client as never, signedRaw, {
+    chainId: input.tx.chainId,
+    supportsSyncSend: false,
+  });
+  return { ...result, signedGasLimit: serializable.gas };
+}
+
+/** Sign exact prepared bytes without broadcasting, including an Arbitrum child tx. */
+export async function signPreparedLedgerTransaction(input: {
+  opId: string;
+  account: LedgerAccount;
+  transaction: TransactionSerializable;
+}): Promise<`0x${string}`> {
+  const serializable = input.transaction;
+  if (!Number.isSafeInteger(Number(serializable.chainId)) || Number(serializable.chainId) <= 0) {
+    throw new Error("Ledger transaction requires an explicit chain ID");
+  }
+  if (serializable.type === "eip7702" || serializable.type === "eip4844") {
+    throw new Error("Unsupported Ledger transaction type");
+  }
   const unsignedTx = serializeTransaction(serializable);
   const signature = await signLedgerTransaction({
     opId: input.opId,
@@ -123,21 +150,13 @@ export async function signAndBroadcastLedgerTransaction(input: {
   const signedRaw = serializeTransaction(serializable, {
     r: signature.r,
     s: signature.s,
-    yParity: normalizeYParity(signature.v, input.tx.chainId),
+    yParity: normalizeYParity(signature.v, Number(serializable.chainId)),
   });
   const recovered = await recoverTransactionAddress({ serializedTransaction: signedRaw });
   if (recovered.toLowerCase() !== input.account.address.toLowerCase()) {
     throw new Error("Ledger signed with a different account. Check the connected device and derivation path.");
   }
-  await input.beforeBroadcast?.({
-    serializedTransaction: signedRaw,
-    transactionHash: keccak256(signedRaw),
-  });
-  const result = await broadcastSerializedTransaction(client as never, signedRaw, {
-    chainId: input.tx.chainId,
-    supportsSyncSend: false,
-  });
-  return { ...result, signedGasLimit: serializable.gas };
+  return signedRaw;
 }
 
 export async function signLedgerSignatureRequest(input: {

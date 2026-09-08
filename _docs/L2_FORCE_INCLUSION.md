@@ -32,12 +32,18 @@ Force inclusion is available for OP Stack chains that have a portal contract def
 
 ## Supported Account Types
 
-- **Bankr API** — Deposit tx params are encoded and submitted as an L1 transaction via the Bankr API. **Restricted to L1 chains in `BANKR_SUPPORTED_CHAIN_IDS`** (currently Ethereum mainnet only). Force inclusion of testnets requires PK/Seed because Bankr API can't broadcast to Sepolia.
+- **Bankr API** — Deposit tx params are encoded and submitted as an L1 transaction via the Bankr API. **Restricted to L1 chains in `BANKR_SUPPORTED_CHAIN_IDS`** (currently Ethereum mainnet only). Force inclusion of testnets requires PK/Seed or Ledger because Bankr API can't broadcast to Sepolia.
 - **Private Key** — Deposit tx is signed locally and broadcast to L1 RPC
 - **Seed Phrase** — Same as Private Key (derived key)
+- **Ledger** — Single deposits use device-approved parent transactions; pending requests remain retryable until approval. Batch deposits remain excluded.
 - **Impersonator** — Not supported (cannot sign/submit)
 
 The gear icon visibility is gated by `isForceInclusionSupportedForAccount(l2ChainId, accountType)` in `chainRegistry.ts`, which combines the chain check with the per-account L1-reachability check. The backend confirm handlers (`handleConfirmTransactionAsync`, `handleConfirmBatchTransaction`) re-validate this server-side as defense in depth.
+
+The exhaustive `ACCOUNT_TYPE_CAPABILITIES` table now declares single transport
+and batch eligibility. Raw-capable types must implement `RAW_FORCE_INCLUSION_SIGNERS`;
+new account types cannot silently inherit a default. Batch UI passes `"batch"`
+to the shared capability gate. See `LEDGER.md` for hardware and manual QA details.
 
 ## Architecture
 

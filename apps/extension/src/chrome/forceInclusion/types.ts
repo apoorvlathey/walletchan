@@ -1,3 +1,5 @@
+import type { DirectSigningAccountType } from "../accounts/accountTypePolicy";
+
 export type ForceInclusionStage =
   | "building"
   | "submitting"
@@ -23,11 +25,18 @@ export type ForceInclusionProgressWriter = (
 export interface ForceInclusionAccount {
   id: string;
   address: string;
-  type: string;
+  type: DirectSigningAccountType;
 }
 
 export interface ForceInclusionGasOverrides {
   gasLimit: string;
   maxFeePerGas: string;
   maxPriorityFeePerGas: string;
+}
+
+/** Hardware confirmations retain the pending request until the final L1 approval. */
+export interface ForceInclusionLifecycle {
+  beforeBroadcast: () => Promise<void>;
+  submitted: () => void;
+  failed: (error: string) => void;
 }

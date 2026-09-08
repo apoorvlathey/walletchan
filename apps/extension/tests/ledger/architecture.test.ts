@@ -194,7 +194,8 @@ test("unsupported Ledger execution modes fail closed", async () => {
   ]);
   assert.match(batch, /accountType !== "ledger"/);
   assert.match(swap, /accountType === "ledger"/);
-  assert.match(transaction, /Force inclusion is not supported for Ledger accounts/);
+  assert.match(transaction, /isForceInclusionSupportedForAccount/);
+  assert.match(transaction, /processLedgerForceInclusion/);
   assert.match(transaction, /EIP-7702 delegation is not supported for Ledger accounts/);
 });
 

@@ -24,3 +24,8 @@ device error normalization, and Ledger-specific transaction/message signing.
 
 Private keys never enter the extension. Device identity is revalidated from a
 fixed public derivation path for every scan or signing session.
+
+`forceInclusion.ts` coordinates single-deposit pending-state retention and
+progress. `signPreparedLedgerTransaction` signs exact prepared bytes without
+broadcasting; the raw force-inclusion adapter handles child/parent signing and
+final epoch/device/account binding. Hardware prompts run outside the wallet lock.

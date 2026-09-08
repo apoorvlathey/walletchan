@@ -17,3 +17,6 @@
   irreversible local signing effects.
 
 Dapp disconnect-before-delete behavior lives in `../dapp/`.
+
+The synthetic future-account compile test also requires explicit force-inclusion
+capability fields and a raw-dispatch implementation for every enabled raw type.

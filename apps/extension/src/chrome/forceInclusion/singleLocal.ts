@@ -1,14 +1,17 @@
+import { writeResultToStorage } from "../transactions/runtime";
 import {
   createPublicClient,
   createWalletClient,
   type Hash,
   type TransactionReceipt,
 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { localForceInclusionSigner, type RawForceInclusionSigner } from "../forceInclusion/rawSigner";
 import { FORCE_INCLUSION_CHAINS } from "@/constants/chainRegistry";
-import { prepareSignAndBroadcastTransaction } from "../localSigner";
 import { secureHttpTransport } from "../network/rpcClient";
-import { enforcePendingRequestAuthorizationAtConfirmation } from "../requests/pendingRequestLifecycle";
+import {
+  capturePendingRequestAuthorizationCommitSnapshot,
+  enforcePendingRequestAuthorizationAtConfirmation,
+} from "../requests/pendingRequestLifecycle";
 import {
   guardPendingRequestEffectLease,
   type PendingRequestEffectLease,
@@ -36,6 +39,7 @@ import {
 } from "./singleOutcome";
 import type {
   ForceInclusionAccount,
+  ForceInclusionLifecycle,
   ForceInclusionGasOverrides,
 } from "./types";
 
@@ -43,9 +47,10 @@ export async function processForceInclusionLocal(
   txId: string,
   pending: PendingTxRequest,
   account: ForceInclusionAccount,
-  privateKey: `0x${string}`,
+  privateKey: `0x${string}` | RawForceInclusionSigner,
   gasOverrides?: ForceInclusionGasOverrides,
   effectLease?: PendingRequestEffectLease,
+  lifecycle?: ForceInclusionLifecycle,
 ): Promise<void> {
   const info = FORCE_INCLUSION_CHAINS.get(pending.tx.chainId);
   if (!info) {
@@ -53,19 +58,28 @@ export async function processForceInclusionLocal(
       txId,
       "Chain does not support force inclusion",
     );
+    lifecycle?.failed("Chain does not support force inclusion");
     effectLease?.release();
     return;
   }
   if (info.protocol !== "op-stack") {
     await writeSingleForceInclusionFailure(txId, "Invalid OP Stack force-inclusion route");
+    lifecycle?.failed("Chain does not support force inclusion");
     effectLease?.release();
     return;
   }
   const effectGuard = guardPendingRequestEffectLease(effectLease);
   const progress = createSingleProgressWriter(txId, info, pending.tx.chainId);
 
+  let historyInitialized = false;
+  let submittedHash: string | undefined;
+  let resultHash: string | undefined;
   try {
-    await initializeSingleForceInclusionHistory(txId, pending, info, account);
+    const signer = typeof privateKey === "string" ? localForceInclusionSigner(privateKey) : privateKey;
+    if (!lifecycle) {
+      await initializeSingleForceInclusionHistory(txId, pending, info, account);
+      historyInitialized = true;
+    }
     await progress("building");
     const l2RpcUrl = await getRpcUrl(pending.tx.chainId);
     if (!l2RpcUrl) throw new Error("No RPC URL for L2 chain");
@@ -93,7 +107,7 @@ export async function processForceInclusionLocal(
     await progress("submitting");
     const l1RpcUrl = await getL1RpcUrl(info.l1ChainId);
     const l1Chain = getL1Chain(info.l1ChainId);
-    const viemAccount = privateKeyToAccount(privateKey);
+    const viemAccount = signer.account;
     const l1PublicClient = createL1PublicClient(l1RpcUrl);
     const l1TxParams = await buildL1DepositTxParams(pending.tx, info, l2Gas);
     const nonce = await l1PublicClient.getTransactionCount({
@@ -111,7 +125,7 @@ export async function processForceInclusionLocal(
       pending,
     );
     if (!authorization.authorized) throw new Error(authorization.error);
-    const broadcast = await prepareSignAndBroadcastTransaction(
+    const broadcast = await signer.broadcast(
       wallet,
       {
         account: viemAccount,
@@ -136,7 +150,8 @@ export async function processForceInclusionLocal(
       {
         chainId: info.l1ChainId,
         supportsSyncSend: false,
-        beforeBroadcast: async () => {
+        beforeBroadcast: async ({ transactionHash }) => {
+          const authorizationSnapshot = await capturePendingRequestAuthorizationCommitSnapshot(pending);
           const { getAccountById } = await import("../accountStorage");
           const latest = await getAccountById(account.id);
           if (
@@ -154,11 +169,31 @@ export async function processForceInclusionLocal(
           if (!finalAuthorization.authorized) {
             throw new Error(finalAuthorization.error);
           }
+          await signer.assertAvailable();
+          if (lifecycle) {
+            await lifecycle.beforeBroadcast();
+            await initializeSingleForceInclusionHistory(txId, pending, info, account);
+            historyInitialized = true;
+          }
+          // Persist the deterministic parent hash before the irreversible send.
+          await updateTxInHistory(txId, {
+            status: "pending", broadcastUncertain: true,
+            txHash: transactionHash,
+            forceInclusionMeta: { l1TxHash: transactionHash, l1ChainId: info.l1ChainId, l2ChainId: pending.tx.chainId, l2Confirmed: false },
+          });
+          await signer.assertAvailable();
+          // A disconnect/reconnect during history or account reads invalidates
+          // this approval even if the connection is authorized again now.
+          if (!authorizationSnapshot.isCurrent()) {
+            throw new Error("Request authorization changed before broadcast");
+          }
           effectGuard.beginEffect();
         },
       },
     );
     const l1Hash = broadcast.txHash;
+    submittedHash = l1Hash;
+    resultHash = l1Hash;
     await updateTxInHistory(txId, {
       status: "pending",
       txHash: l1Hash,
@@ -172,6 +207,7 @@ export async function processForceInclusionLocal(
     });
     effectGuard.settleEffect();
     effectGuard.releaseIfSafe();
+    lifecycle?.submitted();
 
     await progress("waiting-l1", { l1Hash });
     let receipt: TransactionReceipt;
@@ -209,9 +245,19 @@ export async function processForceInclusionLocal(
     );
   } catch (error: any) {
     effectGuard.releaseIfSafe();
+    if (submittedHash) {
+      // The pre-send history already owns recovery. Never turn a bookkeeping
+      // or notification error into a retryable second send.
+      effectGuard.settleEffect();
+      effectGuard.releaseIfSafe();
+      lifecycle?.submitted();
+      await writeResultToStorage(`txResult:${txId}`, { success: true, txHash: resultHash }).catch(() => undefined);
+      return;
+    }
     const message =
       error?.shortMessage || error?.message || "Force inclusion failed";
     await progress("error", { error: message });
-    await writeSingleForceInclusionFailure(txId, message);
+    if (historyInitialized) await writeSingleForceInclusionFailure(txId, message);
+    lifecycle?.failed(message);
   }
 }

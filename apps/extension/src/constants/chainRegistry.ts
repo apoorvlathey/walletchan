@@ -11,6 +11,8 @@
  */
 
 import { type Chain } from "viem";
+import { ACCOUNT_TYPE_CAPABILITIES } from "../chrome/accounts/accountTypePolicy";
+import type { AccountType } from "../chrome/types";
 import {
   abstract,
   arbitrum,
@@ -1106,8 +1108,8 @@ export interface ForceInclusionChainInfo {
 
 /**
  * Verified chains that support force inclusion via their parent chain.
- * Each chain must have a sourceId (L1 chain) and portal contract in its viem
- * definition. Covers major OP Stack chains + their testnets.
+ * OP Stack entries require sourceId + portal in their viem definition.
+ * Arbitrum entries explicitly pin parent-chain Inbox/Bridge/SequencerInbox.
  * Custom chains added by the user are also supported if their chainId matches.
  */
 export const FORCE_INCLUSION_CHAINS: Map<number, ForceInclusionChainInfo> = new Map();
@@ -1192,32 +1194,15 @@ export function isForceInclusionSupported(chainId: number): boolean {
  */
 export function isForceInclusionSupportedForAccount(
   l2ChainId: number,
-  accountType:
-    | "bankr"
-    | "privateKey"
-    | "seedPhrase"
-    | "ledger"
-    | "impersonator"
-    | "safe"
-    | undefined,
+  accountType: AccountType | undefined,
+  mode: "single" | "batch" = "single",
 ): boolean {
-  if (
-    !accountType ||
-    accountType === "impersonator" ||
-    accountType === "ledger" ||
-    accountType === "safe"
-  ) {
-    return false;
-  }
+  if (!accountType || !Object.prototype.hasOwnProperty.call(ACCOUNT_TYPE_CAPABILITIES, accountType)) return false;
+  const capability = ACCOUNT_TYPE_CAPABILITIES[accountType];
+  if (!capability.directSigner || !capability.forceInclusion) return false;
   const info = FORCE_INCLUSION_CHAINS.get(l2ChainId);
   if (!info) return false;
-  if (info.protocol === "arbitrum") {
-    return accountType === "privateKey" || accountType === "seedPhrase";
-  }
-  // Bankr accounts can only force-include when the L1 chain is supported by Bankr
-  if (accountType === "bankr") {
-    return BANKR_SUPPORTED_CHAIN_IDS.has(info.l1ChainId);
-  }
-  // PK/Seed broadcast L1 directly — no Bankr dependency
-  return true;
+  if (mode === "batch" && (!capability.forceInclusionBatch || info.protocol !== "op-stack")) return false;
+  if (capability.forceInclusion === "raw") return true;
+  return info.protocol === "op-stack" && BANKR_SUPPORTED_CHAIN_IDS.has(info.l1ChainId);
 }

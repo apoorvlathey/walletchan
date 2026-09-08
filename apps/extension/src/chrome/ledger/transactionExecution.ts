@@ -85,7 +85,13 @@ export async function handleConfirmTransactionAsyncLedger(
     return fail("Account does not support Ledger signing");
   }
   if (forceInclusion) {
-    return fail("Force inclusion is not supported for Ledger accounts");
+    const { isForceInclusionSupportedForAccount } = await import("@/constants/chainRegistry");
+    if (!isForceInclusionSupportedForAccount(pending.tx.chainId, pinned.account.type)) {
+      return fail("Chain does not support force inclusion for this account");
+    }
+    if (pending.replacement || pending.privacyShieldMeta || pending.privacyRagequitMeta || pending.privacyUnshieldMeta) {
+      return fail("Force inclusion is unavailable for this transaction");
+    }
   }
   if (pending.delegation7702Meta) {
     return fail("EIP-7702 delegation is not supported for Ledger accounts");
@@ -97,7 +103,7 @@ export async function handleConfirmTransactionAsyncLedger(
   }
   const nonceSelection = validateTransactionNonceSelection(
     nonce,
-    "native",
+    forceInclusion ? "forceInclusion" : "native",
     pending.replacement?.nonce,
   );
   if (!nonceSelection.ok) return fail(nonceSelection.error);
@@ -123,6 +129,11 @@ export async function handleConfirmTransactionAsyncLedger(
   if (!authorization.authorized) return fail(authorization.error);
   const effectLease = beginPendingRequestEffectLease("transaction", txId);
   if (!effectLease) return fail("Wallet reset is in progress");
+
+  if (forceInclusion) {
+    const { processLedgerForceInclusion } = await import("./forceInclusion");
+    return processLedgerForceInclusion({ txId, pending, account: pinned.account, gasOverrides, effectLease });
+  }
 
   return processLedgerTransaction({
     txId,

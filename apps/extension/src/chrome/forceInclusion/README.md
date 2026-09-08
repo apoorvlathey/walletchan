@@ -62,3 +62,9 @@ Receipt ownership:
 owns bounded pending/latest RPC lookup. `splitBatchSequencer.ts` and
 `broadcastPolicy.ts` remain
 small independent units. Historical root modules are intentionally absent.
+
+`rawSigner.ts` owns the exhaustive account-to-raw-signer dispatch and Ledger
+transaction-only adapter. Single local processors accept either an already
+authorized key or this adapter. Optional hardware lifecycle callbacks defer
+pending removal/history until parent approval and return to progress once the
+parent hash is tracked. Initial raw parent hashes are persisted before sending.

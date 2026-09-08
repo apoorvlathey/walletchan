@@ -30,10 +30,10 @@ for (const deployment of deployments) {
     });
   });
   test(`Robinhood ${deployment.chainId} preserves all account capability boundaries`, () => {
-    for (const type of ["privateKey", "seedPhrase"] as const) {
+    for (const type of ["privateKey", "seedPhrase", "ledger"] as const) {
       assert.equal(isForceInclusionSupportedForAccount(deployment.chainId, type), true, type);
     }
-    for (const type of ["bankr", "ledger", "safe", "impersonator", undefined] as const) {
+    for (const type of ["bankr", "safe", "impersonator", undefined] as const) {
       assert.equal(isForceInclusionSupportedForAccount(deployment.chainId, type), false, type);
     }
   });
@@ -48,4 +48,14 @@ test("adding Robinhood preserves existing routes and excludes unknown chains", (
   assert.equal(isForceInclusionSupportedForAccount(8453, "bankr"), true);
   assert.equal(isForceInclusionSupported(46631), false);
   assert.equal(isForceInclusionSupportedForAccount(46631, "privateKey"), false);
+});
+
+test("Ledger force inclusion is single-only on OP Stack and Nitro", () => {
+  for (const id of [8453, 84532, 42161, 4663, 46630]) {
+    assert.equal(isForceInclusionSupportedForAccount(id, "ledger"), true);
+    assert.equal(isForceInclusionSupportedForAccount(id, "ledger", "batch"), false);
+  }
+  assert.equal(isForceInclusionSupportedForAccount(8453, "privateKey", "batch"), true);
+  assert.equal(isForceInclusionSupportedForAccount(8453, "bankr", "batch"), true);
+  assert.equal(isForceInclusionSupportedForAccount(4663, "privateKey", "batch"), false);
 });

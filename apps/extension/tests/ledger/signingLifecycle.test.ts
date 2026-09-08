@@ -352,6 +352,23 @@ test("Ledger pending requests cross the terminal boundary only after device appr
       "/src/chrome/ledger/signatureConfirmation.ts",
     );
 
+    await t.test("force inclusion rejects unsupported modes before hardware interaction", async () => {
+      for (const field of ["replacement", "privacyShieldMeta", "privacyRagequitMeta", "privacyUnshieldMeta", "delegation7702Meta", "customNonce", "unsupportedChain"]) {
+        reset();
+        hooks.pendingTx!.tx.chainId = field === "unsupportedChain" ? 1 : 4663;
+        if (field !== "customNonce" && field !== "unsupportedChain") hooks.pendingTx![field] = {};
+        const result = await transaction.handleConfirmTransactionAsyncLedger(
+          "ledger-tx", "", undefined, undefined, undefined, true,
+          field === "customNonce" ? 3 : undefined,
+        );
+        assert.equal(result.success, false, field);
+        assert.ok(hooks.pendingTx, field);
+        assert.equal(hooks.history.length, 0, field);
+        assert.equal(hooks.events.includes("transaction:device-start"), false, field);
+        assert.equal(hooks.processing.size, 0, field);
+      }
+    });
+
     await t.test("transaction stays pending until the device signs", async () => {
       reset();
       const resultPromise = transaction.handleConfirmTransactionAsyncLedger(

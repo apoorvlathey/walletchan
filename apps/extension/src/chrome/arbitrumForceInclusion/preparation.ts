@@ -6,15 +6,11 @@ import {
   size,
   type Hex,
 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { localForceInclusionSigner, type RawForceInclusionSigner } from "../forceInclusion/rawSigner";
 import type { ForceInclusionChainInfo } from "@/constants/chainRegistry";
 import { secureHttpTransport } from "../network/rpcClient";
 import type { PendingTxRequest } from "../requests/pendingTxStorage";
 import { getRpcUrl } from "../transactions/rpcConfig";
-import {
-  WALLET_SECRET_OPERATION_LOCK_KEY,
-  withStorageLock,
-} from "../storageLock";
 import { L1_RPC_TIMEOUT } from "../forceInclusion/l1Client";
 
 const DUMMY_SIGNATURE = {
@@ -94,19 +90,17 @@ async function prepareChildRequest(
 export async function prepareSignedArbitrumMessage(
   tx: PendingTxRequest["tx"],
   info: ForceInclusionChainInfo,
-  privateKey: Hex,
+  privateKey: Hex | RawForceInclusionSigner,
 ) {
   requireArbitrum(info);
-  const account = privateKeyToAccount(privateKey);
+  const signer = typeof privateKey === "string" ? localForceInclusionSigner(privateKey) : privateKey;
+  const account = signer.account;
   const request = await prepareChildRequest(
     tx,
     info,
     account.address as `0x${string}`,
   );
-  const serialized = await withStorageLock(
-    WALLET_SECRET_OPERATION_LOCK_KEY,
-    () => account.signTransaction(request as any),
-  );
+  const serialized = await signer.signChild(request);
   const messageData = concatHex(["0x04", serialized]);
   return {
     messageData,

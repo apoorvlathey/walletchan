@@ -86,7 +86,7 @@ The offscreen document receives only public device/path metadata and the exact u
 - Multi-commitment Privacy Pools public exits therefore run one deposit per
   Ledger transaction; the UI limits the selection and the background rejects a
   Ledger batch independently.
-- EIP-7702 authorization/delegation and force inclusion are rejected for Ledger.
+- EIP-7702 authorization/delegation and batch force inclusion are rejected for Ledger.
 - Token-funded Safe execution is rejected; native-gas Safe execution is
   supported.
 - WalletChan's direct swap shortcut is rejected; swaps initiated by dapps work through the normal single-transaction confirmation flow.
@@ -101,3 +101,32 @@ The offscreen document receives only public device/path metadata and the exact u
 - `@ledgerhq/device-transport-kit-web-hid` 1.2.4
 
 Versions are pinned exactly so transport and signer behavior does not drift between extension releases.
+
+## Single-transaction force inclusion
+
+Ledger supports single OP Stack deposits and Arbitrum signed delayed messages,
+including Robinhood mainnet/testnet. Arbitrum asks for two approvals: the exact
+child-chain transaction, then the parent-chain Inbox transaction. The signed
+child bytes stay in memory and are never broadcast to the child RPC. If the
+message remains unconsumed past its onchain deadline, Activity's force action
+asks for another parent-chain approval.
+
+`forceInclusion/rawSigner.ts` owns the exhaustive raw-account factory table.
+The Ledger factory uses `signPreparedLedgerTransaction` without broadcasting,
+then the shared exact-byte broadcaster. Device prompts do not hold the wallet
+lock; auth epoch/session, account/address/device/path, and cancellation are
+checked before and after signing and before publication. The initial request
+remains pending through both device approvals. Rejection creates no Activity
+entry and allows retry. The parent hash is durably recorded before submission;
+post-send errors cannot trigger a second signing attempt. Existing recovery
+handles uncertain results and worker restarts using public receipt metadata.
+
+Batch deposits, fee-token gas, custom nonce overrides, replacements, Privacy
+Pools, and EIP-7702 operations cannot use this Ledger force-inclusion path.
+Master and agent sessions use the same hardware flow. No keys leave the device.
+
+Real-device QA for this feature remains required: test OP Stack (one approval),
+Robinhood/Arbitrum (child then parent approvals), reject each approval and retry,
+lock/disconnect during the prompt, and the later force action when eligible.
+Run with both master and agent sessions. Automated tests mock the device; they
+cannot verify device firmware, Ethereum-app display, or blind-signing behavior.

@@ -2202,6 +2202,22 @@ These must always hold true. Violations indicate a security bug.
     and the strict on-chain deadline, and matches the saved preimage against the
     canonical L1 receipt before signing `SequencerInbox.forceInclusion`.
 
+    Ledger single force inclusion reuses these protocol processors through the
+    exhaustive raw-signer factory table. The capability table requires an
+    explicit transport and batch decision for every account type; enabling a
+    new raw signer without a factory fails compilation. The Ledger device signs
+    child/parent transactions outside the wallet-secret lock, with epoch/live
+    session, exact account/address/device/path and cancellation checks before
+    and after each device prompt. Final authorization and publication run under
+    the lock; the later force action also rechecks eligibility and receipt after
+    the prompt. The pending request remains reviewable until the parent approval.
+    The final synchronous origin/topic epoch check rejects disconnect/reconnect
+    during pre-send history writes or account reads.
+    Initial parent hashes are persisted before send; post-send bookkeeping errors
+    retain recovery ownership. Signed child bytes and hardware secrets are never
+    persisted. Master/agent signing policy and reveal restrictions are unchanged;
+    no new message route, permission, or storage key is added.
+
 14c. **Remote signer responses are bounded and proven** - Bankr sign, submit,
     and job responses have deadlines and streamed byte limits. User-facing
     remote error text is control-character stripped and capped at 1,000

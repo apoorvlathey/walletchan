@@ -34,3 +34,7 @@ The repository layer must not import mutation modules. Only
 `localKeyResolver.ts` may request decrypted signing material, and it returns one
 account-bound key rather than a bulk vault. Storage keys and record shapes are
 defined in `_docs/STORAGE.md` and are unchanged by this folder organization.
+
+The same exhaustive table declares force-inclusion transport and batch support.
+`forceInclusion/rawSigner.ts` separately requires a dispatch factory for every
+raw-capable type; a capability flag alone cannot implement signing.

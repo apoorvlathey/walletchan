@@ -38,9 +38,7 @@ export async function initializeSingleForceInclusionHistory(
     chainName: pending.chainName,
     chainId: pending.tx.chainId,
     createdAt: pending.timestamp,
-    accountType: account
-      ? (account.type as "privateKey" | "seedPhrase")
-      : "bankr",
+    accountType: account?.type ?? "bankr",
     accountId: account?.id,
     functionName: "Force Inclusion (L1 Deposit)",
     forceInclusionMeta: {

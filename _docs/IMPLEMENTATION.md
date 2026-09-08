@@ -39,6 +39,11 @@ When adding an account type (for example Trezor):
 
 1. Add its `AccountType` and `Account` model and choose its core capability row.
    Reuse the shared guard/types; do not duplicate the general signer list.
+   Explicitly set `forceInclusion` (`"raw"`, `"bankr"`, or `false`) and
+   `forceInclusionBatch`. Raw support also requires a factory in the exhaustive
+   `RAW_FORCE_INCLUSION_SIGNERS` table (`forceInclusion/rawSigner.ts`). The mapped
+   table forces a compile error for a newly enabled raw account without a
+   signer implementation; UI support follows the central capability table.
 2. Implement and review signer transport, device binding, session/master/agent
    authorization, persisted request shapes, method/chain support, and final
    signature/transaction release gates. Classification alone grants none of these.
@@ -86,8 +91,8 @@ The Arbitrum route is enabled for Arbitrum One and Robinhood mainnet (`4663`,
 parent Ethereum) / testnet (`46630`, parent Sepolia). Robinhood uses independent
 verified contract pins in `FORCE_INCLUSION_CHAINS`; see
 `ARBITRUM_FORCE_INCLUSION.md` for addresses and live verification. Single
-private-key/seed-phrase transactions are supported; the existing Ledger, Bankr,
-Safe, impersonator, and batch exclusions still apply.
+private-key/seed-phrase and Ledger transactions are supported; Bankr, Safe,
+impersonator, and batch exclusions still apply to the Arbitrum route.
 
 The signed `sendL2Message` path validates the Bridge event sender against
 Nitro's L1-to-L2 address alias (addition modulo 160 bits), including for EOAs.
@@ -1073,10 +1078,20 @@ Activity/Holdings triggers by whichever counter is newer.
   decision controls during the hardware prompt. Device approval
   is bounded to ten minutes while the separate device-discovery deadline
   remains eight seconds.
+- **Force inclusion:** Ledger uses the shared single OP Stack and Arbitrum
+  processors through a transaction-only raw signer. Arbitrum needs a child
+  transaction approval followed by the parent Inbox approval; its later
+  `forceInclusion` action uses the same hardware adapter. Device interaction
+  occurs outside the wallet-secret lock. The adapter pins auth epoch, account,
+  address, device, path, and cancellation state and rechecks them after signing
+  and at the final locked broadcast boundary. Initial pending state/history
+  crosses the boundary only after the parent approval; pre-send device failures
+  remain retryable. Parent hashes are persisted before broadcast and unknown
+  outcomes remain recoverable without a second signing attempt.
 - **Initial exclusions:** Ledger fails closed for ERC-5792/cross-dapp batches
   (including multi-commitment Privacy Pools public exits),
   EIP-7702/ERC-7715 authority, ERC-4337 token-funded gas (including addresses
-  already delegated to WalletChan), force inclusion, sponsored transfers, and
+  already delegated to WalletChan), batch force inclusion, sponsored transfers, and
   the direct in-extension swap shortcut. A dapp swap that submits one normal
   transaction uses the supported single-transaction path.
 
