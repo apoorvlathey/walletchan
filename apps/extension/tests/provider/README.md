@@ -4,6 +4,9 @@ This directory audits requests entering from dapps and the injected provider:
 
 - `externalMessageValidation.test.ts` freezes untrusted envelope, identifier,
   URL, payload, and resource limits.
+- `legacyApprovalPadding.test.ts` reproduces deferred spender decoding errors,
+  checks every high address byte against canonical controls, and verifies
+  single/batch, all-account preflight, and WalletConnect rejection.
 - `chainBoundary.test.ts` freezes exact provider-chain pinning.
 - `caps.test.ts` freezes shared resource ceilings, coercion resistance, and the
   page-facing EIP-1193 error contract.

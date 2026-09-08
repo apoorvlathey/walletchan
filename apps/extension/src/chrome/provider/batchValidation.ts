@@ -1,3 +1,4 @@
+import { detectAbiEncodingError } from "../../lib/calldataValidation";
 import {
   MAX_BATCH_CALLS,
   MAX_HEX_DATA_CHARS,
@@ -57,6 +58,13 @@ export function validateWalletSendCallsPayload(
         !HEX_BYTES_PATTERN.test(candidateCall.data))
     ) {
       return failProviderValidation("Batch transaction data is invalid or too large");
+    }
+
+    if (typeof candidateCall.data === "string") {
+      const encoding = detectAbiEncodingError(candidateCall.data);
+      if (encoding.malformed) {
+        return failProviderValidation(`Call ${index + 1}: ${encoding.reason}`);
+      }
     }
 
     if (

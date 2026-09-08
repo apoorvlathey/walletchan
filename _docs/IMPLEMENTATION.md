@@ -67,6 +67,19 @@ must fail, and its declared capability determines the derived signer type.
 - [PRIVACY_POOLS_MAINNET_TEST.md](./PRIVACY_POOLS_MAINNET_TEST.md) - Production deployment pins, live read-only evidence, build-profile checks, and value-bearing smoke gates
 - [PRIVACY_POOLS_HANDOFF.md](./PRIVACY_POOLS_HANDOFF.md) - Current dual-profile progress, recent proof-signal correction, automated baseline, and ordered next steps
 
+## Known ERC-20 calldata encoding protection
+
+`lib/calldataValidation.ts` checks exact static argument length and zero upper
+12 bytes of address slots for approve, transfer, transferFrom, increaseAllowance,
+decreaseAllowance, and legacy increaseApproval/decreaseApproval. Injected and
+WalletConnect single/batch validators apply this policy before request intake;
+contract initcode and unknown selectors remain outside this selector policy.
+The existing single/batch review guard also blocks malformed queued requests.
+Canonical legacy allowance mutations participate in simulation approval-intent
+analysis, with verified final allowance read through the existing projection.
+Transaction bytes are never silently repaired. See
+[LEGACY_APPROVAL_PADDING.md](./LEGACY_APPROVAL_PADDING.md) for reproduction and QA.
+
 ## Arbitrum delayed-inclusion recovery
 
 The signed `sendL2Message` path validates the Bridge event sender against
@@ -2874,7 +2887,7 @@ mistaken for an asset delta.
 One strict standalone ERC-20 `approve(address,uint256)` request, including
 `approve(spender, 0)`, omits the whole `Estimated changes` section because its
 editable approval card in Request details is the more complete single source
-of review truth. `increaseAllowance`, permits, opaque nested approvals,
+of review truth. `increaseAllowance`, legacy `increaseApproval`, permits, opaque nested approvals,
 multicalls, batches, and Safe requests retain the simulation section because
 they do not use that standalone editable approval presentation.
 

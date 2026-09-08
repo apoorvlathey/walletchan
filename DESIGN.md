@@ -12,6 +12,11 @@ PASS, FAIL, or INCONCLUSIVE text. Expected policy rejection is a passing result;
 manual rejection is not. No new palette, typography, motion, or card treatment
 is introduced. Controls retain keyboard labels and visible disabled/loading states.
 
+Legacy approval regression controls reuse the same TestButton layout, type,
+palette, focus, loading, and disabled states. Ethereum-only gating and explicit
+PASS/INCONCLUSIVE/FAIL copy distinguish ABI rejection from manual rejection.
+No new visual system or motion is introduced (2026-09-08).
+
 ## Docs site projection
 
 - Artifact type: searchable end-user documentation and product reference.

@@ -41,6 +41,19 @@ or balance/fee warnings. A likely revert is blocked by default and requires a
 separate acknowledgement before deliberate continuation, if continuation is
 allowed.
 
+### Malformed approval requests
+
+WalletChan rejects invalid address encoding in recognized token calls, including
+older `increaseApproval` and `decreaseApproval` methods, before opening signing
+review. A previously queued malformed request may instead show a warning with
+Confirm disabled. This protection applies before private-key, seed-phrase,
+Ledger, or Bankr signing.
+
+A generic **Could not decode calldata** message is different: a contract may
+still execute those bytes. Unknown functions and nested calls are not all
+covered by the encoding guard. Reject any request whose purpose you cannot
+verify; successful simulation does not override a malformed-calldata block.
+
 ## Account differences
 
 | Account | Final action |

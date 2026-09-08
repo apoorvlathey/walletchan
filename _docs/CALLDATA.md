@@ -4,6 +4,32 @@
 
 The calldata decoder shows decoded transaction calldata in the `TransactionConfirmation` view. It uses a local decoder (ported from swiss-knife) to recursively decode calldata, then renders each parameter with type-specific interactive components (ENS/Basename/WNS/GNS/Mega resolution for addresses, unit conversion for uints, collapsible nested calldata for bytes, etc.).
 
+## Encoding validation and signing protection
+
+Decoding is presentation, not proof that a transaction is safe or executable.
+Older contracts can accept nonzero high bytes in an address argument even when
+the decoder cannot display it. A generic "Could not decode calldata" result
+alone is not a signing block.
+
+The effect-free `lib/calldataValidation.ts` guard independently checks hex,
+exact argument length, and zero upper 12 bytes in address slots for `approve`,
+`transfer`, `transferFrom`, `increaseAllowance`, `decreaseAllowance`, and legacy
+`increaseApproval` / `decreaseApproval`. The legacy selectors are `0xd73dd623`
+and `0x66188463`, respectively.
+
+Shared injected-provider and WalletConnect single/batch ingress rejects those
+malformed known calls before signer dispatch. Existing single/batch review
+surfaces also block malformed queued calls with a banner and disabled Confirm.
+Neither decoding nor validation repairs or replaces the original bytes.
+Unknown selectors and arbitrary nested wrappers are outside this finite guard;
+contract creation is exempt from ABI-call validation at single-request ingress.
+
+Canonical legacy approval mutations participate in simulation's approval-intent
+analysis and final-allowance verification; they do not use the standalone
+editable `approve` form. See [the LINK reproduction and QA record](./LEGACY_APPROVAL_PADDING.md)
+for the distinction between dirty padding and the literal report's separate
+whitespace/numeric-value errors.
+
 ## Architecture
 
 ```

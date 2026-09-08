@@ -545,6 +545,7 @@ export function responseForPreviewMessage(
     case "simulateSafeAssetChanges":
       if (
         scenario === "simulation-error" ||
+        scenario === "legacy-approval-dirty" ||
         (route === "cross-batch" && scenario === "error")
       ) {
         return {

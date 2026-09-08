@@ -111,7 +111,7 @@ function erc20Intent(
   }
   try {
     const decoded = decodeFunctionData({ abi: ERC20_MUTATION_ABI, data });
-    if (decoded.functionName === "increaseAllowance") {
+    if (decoded.functionName === "increaseAllowance" || decoded.functionName === "increaseApproval") {
       return [{
         system: "erc20",
         tokenAddress: to,
@@ -123,7 +123,7 @@ function erc20Intent(
         order,
       }];
     }
-    if (decoded.functionName === "decreaseAllowance") {
+    if (decoded.functionName === "decreaseAllowance" || decoded.functionName === "decreaseApproval") {
       return [{
         system: "erc20",
         tokenAddress: to,

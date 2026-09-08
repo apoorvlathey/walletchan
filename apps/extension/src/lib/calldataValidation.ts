@@ -9,7 +9,7 @@
  *
  * This module performs an explicit, eager check on the few selectors that
  * appear in our structured display surfaces (approve / transfer / transferFrom
- * / increaseAllowance / decreaseAllowance). The high 12 bytes of every
+ * / increaseAllowance / decreaseAllowance / increaseApproval / decreaseApproval). The high 12 bytes of every
  * `address`-typed slot must be zero — otherwise the calldata is rejected and
  * the tx-confirmation UI blocks signing.
  *
@@ -42,6 +42,9 @@ const ADDRESS_SLOT_CONFIG: Record<string, AddressSlotConfig> = {
   "0xa9059cbb": { name: "transfer", addressSlots: [0], arity: 2 },
   // transferFrom(address from, address to, uint256 amount)
   "0x23b872dd": { name: "transferFrom", addressSlots: [0, 1], arity: 3 },
+  // Legacy OpenZeppelin allowance mutations (including mainnet LINK).
+  "0xd73dd623": { name: "increaseApproval", addressSlots: [0], arity: 2 },
+  "0x66188463": { name: "decreaseApproval", addressSlots: [0], arity: 2 },
   // increaseAllowance(address spender, uint256 addedValue)
   "0x39509351": { name: "increaseAllowance", addressSlots: [0], arity: 2 },
   // decreaseAllowance(address spender, uint256 subtractedValue)

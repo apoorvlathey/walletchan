@@ -264,3 +264,16 @@ test("opaque calls and Safe delegatecalls fail open only as an incomplete warnin
   assert.deepEqual(delegated.intents, []);
   assert.equal(delegated.incomplete, true);
 });
+
+test("legacy approval mutations retain increase/decrease semantics", () => {
+  const calls = (["increaseApproval", "decreaseApproval"] as const).map((functionName) => ({
+    to: TOKEN,
+    data: encodeFunctionData({ abi: ERC20_MUTATION_ABI, functionName, args: [SPENDER, 25n] }),
+  }));
+  const result = discoverApprovalIntents(calls, OWNER);
+  assert.equal(result.incomplete, false);
+  assert.deepEqual(result.intents.map(({ requestedAmount, grantLike }) => ({ requestedAmount, grantLike })), [
+    { requestedAmount: 25n, grantLike: true },
+    { requestedAmount: 25n, grantLike: false },
+  ]);
+});

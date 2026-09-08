@@ -3,7 +3,8 @@
 - `ethSimulateLogs.test.ts` freezes pure status/transfer-log classification,
   including native transfers, net ERC-20 deltas, and NFT exclusion.
 - `approvalIntents.test.ts` freezes bounded direct, Permit2, canonical
-  Multicall3, and Safe MultiSend discovery plus opaque/delegatecall fallback.
+  Multicall3, and Safe MultiSend discovery plus opaque/delegatecall fallback,
+  including legacy increaseApproval/decreaseApproval grant/reduction semantics.
 - `approvalLogs.test.ts` freezes successful-call ERC-20/Permit2 event
   extraction, owner/emitter binding, and malformed-status handling.
 - `approvalProjection.test.ts` freezes the persistent-risk rule: same-batch

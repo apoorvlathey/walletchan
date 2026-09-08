@@ -1,3 +1,4 @@
+import { detectAbiEncodingError } from "../../lib/calldataValidation";
 import {
   MAX_HEX_DATA_CHARS,
   MAX_UINT256_DECIMAL_CHARS,
@@ -125,6 +126,12 @@ export function validateTransactionPayload(
       !HEX_BYTES_PATTERN.test(candidate.data))
   ) {
     return failProviderValidation("Transaction data is invalid or too large");
+  }
+
+  // Contract creation contains initcode, not an ABI function call.
+  if (candidate.to && typeof candidate.data === "string") {
+    const encoding = detectAbiEncodingError(candidate.data);
+    if (encoding.malformed) return failProviderValidation(encoding.reason!);
   }
 
   const valueResult = validateQuantity(candidate.value, "value", true);

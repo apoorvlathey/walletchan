@@ -5,6 +5,7 @@ import { useAccount, useChainId } from "wagmi";
 import { encodeFunctionData, erc20Abi, maxUint256, parseUnits } from "viem";
 import { useEip1193 } from "../hooks/useEip1193";
 import { TEST_CHAINS } from "../constants";
+import { LegacyApprovalTests } from "./LegacyApprovalTests";
 import { TestButton } from "./TestButton";
 
 export function SendTxSection() {
@@ -128,6 +129,7 @@ export function SendTxSection() {
 
   return (
     <>
+      <LegacyApprovalTests />
       <TestButton
         label="Send 1 wei → self"
         description="Simple native transfer. Cheapest tx that opens the confirmation UI."
@@ -165,21 +167,21 @@ export function SendTxSection() {
       />
       <TestButton
         label={`Malformed approve (non-zero address padding) on ${chain?.name ?? "…"}`}
-        description="Bug-report payload: ERC20 approve calldata where the upper 12 bytes of the spender slot are non-zero. Wallet MUST show a red 'Malformed calldata' banner and disable Confirm."
+        description="Bug-report payload: ERC20 approve calldata where the upper 12 bytes of the spender slot are non-zero. Wallet must reject with an encoding error before signing; older queued requests must disable Confirm."
         onRun={() => sendMalformed(MALFORMED_APPROVE)}
         variant="outline"
         isDisabled={!usdc}
       />
       <TestButton
         label={`Malformed increaseAllowance on ${chain?.name ?? "…"}`}
-        description="Bug-report payload: increaseAllowance with non-canonical address encoding. Confirm must stay disabled."
+        description="Bug-report payload: increaseAllowance with non-canonical address encoding. Wallet must reject before signing."
         onRun={() => sendMalformed(MALFORMED_INCREASE_ALLOWANCE)}
         variant="outline"
         isDisabled={!usdc}
       />
       <TestButton
         label={`Malformed transfer on ${chain?.name ?? "…"}`}
-        description="Same non-zero-padding pattern applied to ERC20 transfer. Confirm must stay disabled."
+        description="Same non-zero-padding pattern applied to ERC20 transfer. Wallet must reject before signing."
         onRun={() => sendMalformed(MALFORMED_TRANSFER)}
         variant="outline"
         isDisabled={!usdc}

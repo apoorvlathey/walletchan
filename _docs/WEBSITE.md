@@ -890,14 +890,29 @@ with a 1 USDC transfer to the fixed asset-change recipient, and the Ethereum
 Standalone `approve` cases verify
 that the editable Request details card replaces the duplicate simulation
 section; `increaseAllowance` verifies the final post-simulation allowance
-without receiving the standalone editor. Test approvals name the connected
-account as spender so an accidental confirmation does not delegate token
+without receiving the standalone editor. Approval Detection card approvals name
+the connected account as spender so an accidental confirmation does not delegate token
 authority to a third party. The hidden-multicall case is Ethereum-only; the
 other cases use the active chain's configured USDC.
 Immediately below the connection status, a sticky, horizontally scrollable
 section index links to every test card. Section anchors retain enough scroll
 margin to stay visible below that index, and smooth movement becomes immediate
 when the visitor prefers reduced motion.
+
+The Send Transaction card at `/test#send-transaction` separately includes two
+Ethereum-only LINK `increaseApproval` regressions in `LegacyApprovalTests.tsx`:
+
+- **Dirty address padding** preserves the reported spender and MAX_UINT amount,
+  removes trailing whitespace, and sends `value: "0x0"`. PASS requires the
+  non-zero-high-bytes rejection naming `increaseApproval`.
+- **Literal pasted report** retains numeric `0` and trailing whitespace. Its
+  invalid-request rejection tests transport validation, not the padding guard.
+
+These two fixtures deliberately retain the reported third-party spender, unlike
+the Approval Detection card. Never confirm them against mainnet on an older
+wallet. Returned transaction results are FAIL; manual rejection and unrelated
+errors are INCONCLUSIVE. Repeat across all four signing account types, with
+physical Ledger QA still required. See [the isolated reproduction and QA steps](./LEGACY_APPROVAL_PADDING.md).
 
 The Signatures card also includes SafeTx V3/V4 fixtures for arbitrary, inner and
 nested delegatecalls, canonical CALL-only MultiSend, malformed/unknown targets,

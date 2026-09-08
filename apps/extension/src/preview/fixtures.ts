@@ -372,6 +372,20 @@ export function createPreviewTxScenario(
     });
   }
 
+  if (scenario === "legacy-approval-dirty") {
+    return createPreviewTxRequest(walletType, {
+      id: `preview-tx-legacy-approval-${walletType}`,
+      tx: {
+        to: "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+        data: "0xd73dd6230000100000000000000000009bd89d602f42724de67ce267f4b79581e719a1e3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        value: "0x0",
+        chainId: 1,
+      },
+      chainName: "Ethereum",
+      requestChainId: 1,
+    });
+  }
+
   if (scenario === "malformed-disabled") {
     return createPreviewTxRequest(walletType, {
       id: `preview-tx-malformed-${walletType}`,

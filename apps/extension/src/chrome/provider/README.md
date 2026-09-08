@@ -6,7 +6,10 @@ content script, background router, WalletConnect, and ERC-5792 intake.
 - `limits.ts` freezes shared byte/character/count ceilings and safe JSON sizing.
 - `primitives.ts` validates request ids, EVM addresses, and bounded HTTP URLs.
 - `transactionValidation.ts` validates transaction addresses, calldata, chain ids,
-  and uint256 quantities before persistence or signing.
+  and uint256 quantities before persistence or signing. Single and batch
+  validation reuse the pure `../../lib/calldataValidation.ts` known-selector
+  policy, including legacy approval mutations, to reject dirty address padding.
+  Single-request contract creation is exempt from ABI-call interpretation.
 - `signatureValidation.ts` validates supported methods, signer position, typed
   data shape, personal-message hex, and payload size.
 - `batchValidation.ts` validates every `wallet_sendCalls` call and shared caps.

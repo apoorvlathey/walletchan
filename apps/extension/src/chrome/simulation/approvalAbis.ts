@@ -21,6 +21,26 @@ export const ERC20_MUTATION_ABI = [
   },
   {
     type: "function",
+    name: "increaseApproval",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "addedValue", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "decreaseApproval",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "subtractedValue", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
     name: "permit",
     stateMutability: "nonpayable",
     inputs: [

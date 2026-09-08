@@ -501,7 +501,7 @@ facade; message dispatch and navigation live in separate modules. Resolver
 dependencies flow from the stable `resolver.ts` facade through name/ERC-4804
 resolution into shared RPC support, never back into routing or navigation.
 
-External provider policy lives entirely under `chrome/provider/`. The
+External provider ingress policy lives under `chrome/provider/`. The
 background router uses `messageValidation.ts` before any domain router; the
 thin `inject.ts` entrypoint starts `contentBridge/`, whose exact page/runtime
 allowlists, source checks, correlation IDs, reverse-event privacy boundary, and
@@ -516,6 +516,13 @@ read storage, fetch, resolve credentials, sign, or broadcast. Chain parsing
 accepts only explicit number/string representations without coercion, and every
 state-changing injected request must match the content-script-attested chain.
 The four former root implementations have no compatibility facades.
+Single/batch calldata checks also reuse the pure `lib/calldataValidation.ts`
+known-selector policy shared with review UI. It includes legacy
+`increaseApproval` / `decreaseApproval`, rejects dirty address padding before
+signer dispatch, and does not infer safety for unknown or nested calls.
+`tests/provider/legacyApprovalPadding.test.ts` covers the report, canonical
+controls, per-byte padding mutations, all account preflight paths, and
+WalletConnect. See [the reproduction record](./LEGACY_APPROVAL_PADDING.md).
 
 External provider rejection is a pure mapping from a validated request shape
 to one of:

@@ -2834,3 +2834,14 @@ refundReceiver is the eventual transaction submitter; no estimate or threat verd
 is inferred. No new storage keys or message routes exist. A UI acknowledgement
 binds to exact reviewed data and actor/action; it is not a background
 authorization capability.
+
+## Legacy ERC-20 address padding regression (2026-09-08)
+
+The known-selector calldata guard includes `increaseApproval` (`0xd73dd623`)
+and `decreaseApproval` (`0x66188463`). Shared injected/WalletConnect single and
+batch ingress rejects non-canonical known calls before signer dispatch, in
+addition to the existing review UI checks. This applies independently of account
+or password type. It does not recursively validate arbitrary wrapper calldata
+or make unknown selectors safe. Contract creation is exempt from ABI-call
+interpretation. No new secrets, permissions, storage keys, or signing transports.
+See [local evidence and manual QA](./LEGACY_APPROVAL_PADDING.md).

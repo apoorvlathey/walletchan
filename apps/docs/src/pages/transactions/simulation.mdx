@@ -40,13 +40,19 @@ Standalone ERC-20 `approve` requests show an editable allowance, including zero
 for revocation. Residual outgoing-token allowances may produce an **Approval
 remains** warning and cleanup option.
 
+Allowance increases through `increaseAllowance` or older `increaseApproval`
+methods keep the simulation section and use verified final allowances when
+available. They do not use the standalone editable `approve` form.
+
 ## Failed or unavailable simulation
 
 - **Likely to fail** means the simulation observed a revert. WalletChan blocks
   normal confirmation until you explicitly acknowledge the risk.
 - **Unavailable** means it could not get a trustworthy simulation result. Read
   the decoded/raw request, origin, recipient, value, and approvals manually.
-- **Malformed calldata** is a validation warning, not a cosmetic decode failure.
+- **Malformed calldata** in a recognized token call blocks signing. New
+  requests can be rejected before a prompt opens; older queued requests have
+  Confirm disabled. See [malformed approval requests](/transactions/review#malformed-approval-requests).
 
 WalletChan may offer a Tenderly link for a supported non-deployment
 transaction.
