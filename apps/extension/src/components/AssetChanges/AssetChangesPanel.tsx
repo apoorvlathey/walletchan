@@ -95,7 +95,7 @@ export function AssetChangesPanel({
   embedded?: boolean;
   approvalCleanup?: AssetChangesDisplayProps["approvalCleanup"];
 }) {
-  const { tokens } = useTheme();
+  const { tokens, themeId } = useTheme();
   const [expanded, setExpanded] = useState(true);
   const prefersReducedMotion = usePrefersReducedMotion();
 
@@ -166,7 +166,7 @@ export function AssetChangesPanel({
           explorerUrl={explorerUrl}
         />
         {approvals.length > 0 && hasAssetChanges && (
-          <Divider mt={2} borderColor="border.subtle" opacity={1} />
+          <Divider mt={themeId === "midnight" ? 0 : 2} borderColor="border.subtle" opacity={1} />
         )}
         {outgoing.length > 0 && (
           <EmbeddedAssetGroup
@@ -278,7 +278,7 @@ export function AssetChangesPanel({
             />
 
             {approvals.length > 0 && hasAssetChanges && (
-              <Divider mt={2} borderColor="border.subtle" opacity={1} />
+              <Divider mt={themeId === "midnight" ? 0 : 2} borderColor="border.subtle" opacity={1} />
             )}
 
             {outgoing.length > 0 && (

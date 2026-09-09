@@ -18,7 +18,9 @@ the named simulation-warning banner exports.
   verified residual allowances render in a separately divided region after
   the corresponding asset deltas.
 - `ApprovalChangesGroup.tsx` renders verified and unverified ERC-20/Permit2
-  allowance increases as a separator-led token/allowance/spender ledger,
+  allowance increases as centered token identities above aligned spending-limit
+  and spender detail rows,
+  reuses `TokenContractPopover` for token-symbol hover/focus address actions,
   promotes unlimited grants to danger styling, and discloses
   incomplete-detection state without nesting another warning card.
 - `ResidualApprovalBanner.tsx` renders one compact token-led, unboxed warning
@@ -34,7 +36,8 @@ the named simulation-warning banner exports.
   invoke its single or atomic bulk mutation without returning token/spender
   authority to the renderer.
 - `AssetRow.tsx` renders one asset delta, restores shared token-symbol contract
-  disclosure, and owns the persistent metadata-row copy/explorer effects.
+  disclosure, and keeps fungible-token copy/explorer actions in the shared symbol popover.
+  Metadata-row actions remain only for assets without that disclosure.
 - `TokenIcon.tsx` delegates fungible-token imagery and symbol fallback to the
   shared `TokenLogo`, keeping request and receipt identities synchronized.
 - `NftMedia.tsx` owns NFT tags, bounded-raster `SafeImage` rendering, and the

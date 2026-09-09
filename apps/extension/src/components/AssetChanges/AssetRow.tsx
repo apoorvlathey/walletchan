@@ -52,8 +52,10 @@ export function AssetRow({
       {change.symbol}
     </Text>
   );
+  const hasTokenPopover =
+    !isNative && !isNft && /^0x[a-fA-F0-9]{40}$/.test(change.address);
   const symbolIdentity =
-    !isNative && !isNft && /^0x[a-fA-F0-9]{40}$/.test(change.address) ? (
+    hasTokenPopover ? (
       <TokenContractPopover
         address={change.address}
         explorer={explorerUrl || undefined}
@@ -109,43 +111,47 @@ export function AssetRow({
                       ? change.name
                       : `${change.address.slice(0, 6)}...${change.address.slice(-4)}`}
                 </Text>
-                <Tooltip label="Copy address" fontSize="xs" hasArrow>
-                  <IconButton
-                    aria-label="Copy"
-                    icon={copied ? <CheckIcon /> : <CopyIcon />}
-                    size="xs"
-                    variant="ghost"
-                    minH="16px"
-                    minW="24px"
-                    w="24px"
-                    h="16px"
-                    color={copied ? "accent.highlight" : "text.tertiary"}
-                    onClick={handleCopy}
-                    _hover={{ color: "accent.secondary", bg: "transparent" }}
-                  />
-                </Tooltip>
-                {explorerUrl && (
-                  <Tooltip label="View on explorer" fontSize="xs" hasArrow>
-                    <IconButton
-                      aria-label="View on explorer"
-                      icon={<ExternalLinkIcon boxSize="9px" />}
-                      size="xs"
-                      variant="ghost"
-                      minH="16px"
-                      minW="24px"
-                      w="24px"
-                      h="16px"
-                      color="text.tertiary"
-                      onClick={() =>
-                        window.open(
-                          `${explorerUrl}/address/${change.address}`,
-                          "_blank",
-                          "noopener,noreferrer",
-                        )
-                      }
-                      _hover={{ color: "accent.secondary", bg: "transparent" }}
-                    />
-                  </Tooltip>
+                {!hasTokenPopover && (
+                  <>
+                    <Tooltip label="Copy address" fontSize="xs" hasArrow>
+                      <IconButton
+                        aria-label="Copy"
+                        icon={copied ? <CheckIcon /> : <CopyIcon />}
+                        size="xs"
+                        variant="ghost"
+                        minH="16px"
+                        minW="24px"
+                        w="24px"
+                        h="16px"
+                        color={copied ? "accent.highlight" : "text.tertiary"}
+                        onClick={handleCopy}
+                        _hover={{ color: "accent.secondary", bg: "transparent" }}
+                      />
+                    </Tooltip>
+                    {explorerUrl && (
+                      <Tooltip label="View on explorer" fontSize="xs" hasArrow>
+                        <IconButton
+                          aria-label="View on explorer"
+                          icon={<ExternalLinkIcon boxSize="9px" />}
+                          size="xs"
+                          variant="ghost"
+                          minH="16px"
+                          minW="24px"
+                          w="24px"
+                          h="16px"
+                          color="text.tertiary"
+                          onClick={() =>
+                            window.open(
+                              `${explorerUrl}/address/${change.address}`,
+                              "_blank",
+                              "noopener,noreferrer",
+                            )
+                          }
+                          _hover={{ color: "accent.secondary", bg: "transparent" }}
+                        />
+                      </Tooltip>
+                    )}
+                  </>
                 )}
               </HStack>
               {!isNft && change.valueUsd !== null && (

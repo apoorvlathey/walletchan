@@ -2021,3 +2021,19 @@ Fee errors use at most three wrapping lines beside a non-shrinking Copy/Retry
 control group. The compact copy explains known signature expiry; Copy retains
 the complete provider diagnostic. Both actions stay visible at 320px, with
 28px targets and accessible labels. No extra warning card is introduced.
+
+## Approval change hierarchy — 2026-09-09
+
+The estimated-changes approval group uses a compact permission summary in both
+themes. The token logo and hoverable symbol share one vertically centered identity
+row. Below, Spending limit and Spender form a consistent two-column detail list:
+secondary labels left, primary values right, with no internal rules or floating
+allowance caption. Unverified values explicitly read Requested limit. Unlimited
+access retains danger emphasis; finite amounts wrap, and token/spender address
+actions remain keyboard accessible. Expiration and verification warnings stay
+visible. Existing fonts, semantic colors, and spacing apply.
+
+The approval-change section uses `surface.raisedHover` in Midnight, extending
+to the parent surface edges with the existing content gutters. This lighter
+background separates approvals from the asset deltas below; Bauhaus retains
+its existing background.

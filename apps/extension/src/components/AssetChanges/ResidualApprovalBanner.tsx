@@ -63,8 +63,6 @@ export function ResidualApprovalBanner({
       px={3}
       py={2}
       bg="status.warning.tint"
-      borderTop={standalone ? "none" : "1px solid"}
-      borderColor="status.warning.border"
     >
       <HStack align="center" spacing={2}>
         <WarningTwoIcon
