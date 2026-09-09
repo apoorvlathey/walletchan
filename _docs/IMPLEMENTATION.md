@@ -4063,6 +4063,17 @@ API portfolio data is shown immediately, while onchain balances are verified in 
   portfolio response. Holdings deliberately skips ERC-20 price fallback during
   enrichment to avoid fan-out/rate limits from token-price APIs; it keeps
   Portfolio API prices until the portfolio backend indexes newer values.
+  The narrow exception is a positive Base WCHAN holding with a zero API price:
+  `portfolio/wchanPrice.ts` uses the staking screen's `fetchTokenPrice` lookup
+  before catalog totals are calculated, including when enrichment is disabled.
+  Exact chain/address matching prevents symbol lookalikes from inheriting the
+  price; positive API prices are preserved and lookup failures leave rows intact.
+  The same lookup also prices positive, zero-valued Base WCHAN assets and rewards
+  inside DeFi positions (including Uniswap liquidity), even without a wallet
+  WCHAN balance. Only the missing leg values are added to each provider position
+  total; existing asset values are preserved. Holdings and positions share one
+  lookup per catalog load, and the corrected positions feed portfolio/network
+  totals and snapshots.
 - Fresh popup/sidepanel mounts hydrate asynchronously from the reset-aware
   `chrome.storage.local.portfolioHoldingsCache` before the live fetch starts.
   Cache V3 is keyed by address plus the visible-chain reload key, capped to four

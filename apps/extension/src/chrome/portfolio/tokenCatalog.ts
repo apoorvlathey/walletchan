@@ -1,4 +1,5 @@
 import { fetchPortfolio, type PortfolioToken } from "./api";
+import { applyWchanPriceFallback } from "./wchanPrice";
 import { getCustomTokens } from "../customTokenStorage";
 import { getHiddenPortfolioTokenKeys, getPortfolioTokenKey } from "./hiddenTokens";
 import { getRecentReceivedTokens } from "./recentTokens";
@@ -171,7 +172,7 @@ export async function loadPortfolioTokenCatalog(
     ? await resolveTokenMetadataBatch(metadataRequests)
     : new Map<string, TokenMetadata>();
 
-  const mergedTokens = [
+  const { tokens: mergedTokens, defiPositions } = await applyWchanPriceFallback([
     ...data.tokens,
     ...customAsPortfolio,
     ...recentAsPortfolio,
@@ -182,7 +183,7 @@ export async function loadPortfolioTokenCatalog(
         `${token.chainId}-${token.contractAddress.toLowerCase()}`,
       ),
     ),
-  );
+  ), data.defiPositions);
   const existingNativeChainIds = new Set(
     mergedTokens
       .filter(
@@ -229,12 +230,12 @@ export async function loadPortfolioTokenCatalog(
     );
     const totalValueUsd =
       visibleTokens.reduce((sum, t) => sum + t.valueUsd, 0) +
-      (data.defiPositions || []).reduce((sum, p) => sum + p.valueUsd, 0) +
+      defiPositions.reduce((sum, p) => sum + p.valueUsd, 0) +
       data.omittedTokenValueUsd;
 
     return {
       tokens: visibleTokens,
-      defiPositions: data.defiPositions || [],
+      defiPositions,
       totalValueUsd,
       omittedTokenCount: data.omittedTokenCount,
       omittedTokenValueUsd: data.omittedTokenValueUsd,
@@ -350,12 +351,12 @@ export async function loadPortfolioTokenCatalog(
 
   const totalValueUsd =
     visibleTokens.reduce((sum, t) => sum + t.valueUsd, 0) +
-    (data.defiPositions || []).reduce((sum, p) => sum + p.valueUsd, 0) +
+    defiPositions.reduce((sum, p) => sum + p.valueUsd, 0) +
     data.omittedTokenValueUsd;
 
   return {
     tokens: visibleTokens,
-    defiPositions: data.defiPositions || [],
+    defiPositions,
     totalValueUsd,
     omittedTokenCount: data.omittedTokenCount,
     omittedTokenValueUsd: data.omittedTokenValueUsd,
