@@ -3207,7 +3207,7 @@ before applying the Safe result or returning the real transaction hash to the
 connected app.
 
 Cross-dapp confirmation uses the same batch fee row, action sheet, quote
-loading/error states, native default, and Advanced fee disclosure as an
+loading/error states, funded-token fallback, and Advanced fee disclosure as an
 ERC-5792 batch. Its `crossDappBatch` quote family binds the active batch's
 creation-derived request ID, exact ordered calls, account ID/address, chain,
 nonce, delegate, token, and paymaster state. Edited or appended calls reset the
@@ -3231,6 +3231,20 @@ native gas is never labeled as paid by the wallet. This applies equally to
 successful and reverted UserOperations and to single, atomic batch, Swap,
 bridge, and Safe executor history. Released symbol-only rows remain readable
 but are not migrated.
+
+The shared `components/FeePayment/` selector automatically chooses the first
+available catalog ERC-20 with a confirmed positive base-unit balance when the
+native estimate reports insufficient funds. Single requests (including Send,
+bridge, and dapp requests), ERC-5792 and cross-dapp batches, in-wallet Swap,
+and Safe executor reviews all use this policy. The native warning waits for
+bounded option discovery; it remains when no eligible funded token exists.
+Unknown balances never trigger automatic selection. Selection happens once per
+exact request/account/chain/call payload, and a manual choice takes precedence.
+Force-inclusion, locked reviews, and account/chain eligibility exclusions retain
+their existing policy, including native-only Ledger and view-only restrictions.
+A positive token balance is only a selection hint: the existing exact-call quote
+must cover the maximum fee before Confirm is enabled. Provider failures require explicit retry; selection and refresh never submit
+or sign a transaction.
 
 The options request reads every catalog-token balance independently of Pimlico quote
 preparation. An exact zero balance omits that catalog token before the options
@@ -3262,16 +3276,36 @@ transaction amount or choose another fee token. Other provider errors remain
 unchanged for accurate diagnosis.
 
 Fee-option discovery has a 10-second renderer deadline and quote preparation
-has a 30-second renderer deadline. A missing response invalidates that request,
-stops the loading state, and presents an explicit Retry action. Quote errors do
-not automatically retry. A per-request attempt guard prevents the renderer
-from interpreting the callback's completion render as a new idle request, and
-selector rerenders never clear a completed parent-owned quote. A valid quote
-remains usable until its actual expiry; expiry disables Confirm and presents
-explicit Retry without starting another provider request. While preparation is
-pending, the row uses the shared three-shape/dot loader with “Estimating Fees”.
-Switching back to native also cancels the renderer's pending quote state.
+has a 30-second renderer deadline. The shared `useFeePaymentQuote` hook refreshes
+valid ERC-20 quotes 15 seconds before expiry, retaining the current parent-owned
+quote and fee display while the next quote is prepared. A successful replacement
+updates the review without a loading or expiry-error flash. At most five automatic
+refresh attempts are allowed per review; after the fifth refreshed quote expires,
+Confirm is disabled and the existing expired-quote Retry action appears. Explicit
+Retry or manual token selection resets the five-refresh allowance. Request changes
+reset the lifecycle; signer/request/chain/call identity remains pinned by the
+existing quote boundary. Submission locks pause refresh and ignore in-flight replies.
+
+If a slow refresh crosses expiry, the old quote is removed from confirmation and
+the shared “Estimating Fees” loader appears until completion. A missing response
+invalidates the renderer attempt after its deadline and exposes Retry; late replies
+cannot restore it. Provider failures do not automatically retry. A failed refresh
+may retain the previous quote only while it remains valid, and never extends its
+expiry. Switching to native and unmounting cancel timers and stale responses.
 Provider calls remain independently bounded in the background transport.
+
+Gas-quote lifetime is independent of signatures/deadlines embedded in the reviewed
+calls (for example a Permit2-backed 0x maker order). Refreshing a gas quote keeps
+those calls byte-for-byte; it cannot renew their signatures. The shared fee hook
+recognizes `SignatureExpired(uint256)` simulation diagnostics and immediately
+invalidates the old fee quote even if its local 45-second lifetime remains.
+Automatic refresh stops on this failure. The footer shows short recovery copy
+with bounded wrapping and fixed Copy/Retry controls; Copy preserves the full
+provider diagnostic. For in-wallet swaps, explicit Retry stages a fresh firm swap
+quote and new request ID, remounting all review/simulation/fee state. The user must
+review and confirm the new plan. External requests instead direct the user to
+request fresh transaction data from the originating app. No signature deadline
+is edited in place and no transaction is automatically signed or submitted.
 
 Private-key and seed-phrase accounts can attach the one-time official
 authorization in the same submitted UserOperation. Bankr accounts use the

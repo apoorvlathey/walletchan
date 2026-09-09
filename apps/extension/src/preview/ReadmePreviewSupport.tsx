@@ -44,7 +44,7 @@ export function AutoSelectFeePayment({ symbol }: { symbol: "USDC" }) {
 
       if (phase.current === "settle") {
         const bodyText = document.body.innerText;
-        const quoteReady = bodyText.includes(`Maximum fee: 0.12 ${symbol}`);
+        const quoteReady = document.querySelector("[data-token-fee-summary]")?.textContent?.includes(`0.12 ${symbol}`);
         const sheetClosed = !bodyText.includes(
           "Choose the asset used only for this transaction's network fee.",
         );

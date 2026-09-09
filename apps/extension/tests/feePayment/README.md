@@ -21,8 +21,21 @@
   EntryPoint event before activity or ERC-5792 finality.
 - `selectorLifecycle.test.ts` freezes bounded option/quote loading, explicit
   retry, the no-automatic-retry error state, shared single/batch/internal-Send
-  presentation, and Swap's current native-only boundary.
+  presentation, and quote-bound Swap execution.
+- `automaticFeeToken.test.ts` covers positive/zero/unknown balances, catalog
+  ordering, locked reviews, and all direct signing account eligibility gates.
 
 Background router tests separately freeze the trusted-UI audience and exact
 fee-selection arguments for the three eligible signing-wallet paths; Ledger
 remains explicit and native-only.
+
+Run `node apps/extension/scripts/fee-payment-selection-qa.mjs` from the workspace
+root for real React/Chrome lifecycle coverage of all five request families,
+manual override, stale responses, request changes, and discovery timeouts.
+It uses isolated mocked options and never signs or submits transactions.
+
+Run `node apps/extension/scripts/fee-payment-refresh-qa.mjs` for real React/Chrome
+fake-clock coverage of five automatic pre-expiry refreshes across all request
+families, Retry allowance reset, quiet quote replacement, slow/failed/timed-out
+refresh, disabled submission, request changes and cancellation. No live funds or
+signing devices are used.

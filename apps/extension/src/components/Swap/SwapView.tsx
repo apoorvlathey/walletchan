@@ -224,7 +224,7 @@ function SwapView({
   ) {
     return (
       <SwapConfirmation
-        requestId={prepared.preparedRequestId}
+        requestId={prepared.preparedRequestId} key={prepared.preparedRequestId}
         transactions={prepared.preparedTransactions}
         sellToken={sellToken}
         sellAmount={amount.sellTokenAmount}
@@ -262,7 +262,7 @@ function SwapView({
             : undefined
         }
         onConfirm={prepared.confirm}
-        onCancel={prepared.cancel}
+        onCancel={prepared.cancel} onRefreshQuote={() => { void prepared.stagePlan(); }}
         isSubmitting={prepared.isSubmitting}
         onGasEstimates={prepared.setSwapGasEstimates}
         onValidityChange={prepared.setSwapGasValid}

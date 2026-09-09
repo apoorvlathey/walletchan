@@ -32,6 +32,8 @@ interface SwapDecisionSummaryProps {
   isBatched: boolean;
   batchedTx?: { to: string; data: string; value: string };
   eip7702Delegate?: `0x${string}`;
+  disabled?: boolean;
+  onRefreshQuote?: () => void;
   feePaymentToken: "native" | `0x${string}`;
   feePaymentQuote: FeePaymentQuoteSummary | null;
   onFeePaymentTokenChange: (token: "native" | `0x${string}`) => void;
@@ -50,6 +52,8 @@ export function SwapDecisionSummary({
   isBatched,
   batchedTx,
   eip7702Delegate,
+  disabled = false,
+  onRefreshQuote,
   feePaymentToken,
   feePaymentQuote,
   onFeePaymentTokenChange,
@@ -57,6 +61,7 @@ export function SwapDecisionSummary({
   onGasEstimates,
   onValidityChange,
 }: SwapDecisionSummaryProps) {
+  const [feeOptionsLoading, setFeeOptionsLoading] = useState(true);
   const [nativeFeeSummary, setNativeFeeSummary] =
     useState<NativeFeePaymentSummary | null>(null);
   const requestPayload = useMemo(() => ({
@@ -87,7 +92,10 @@ export function SwapDecisionSummary({
         requestPayload={requestPayload}
         value={feePaymentToken}
         quote={feePaymentQuote}
+        disabled={disabled}
+        onExpiredRequestRetry={onRefreshQuote}
         nativeSummary={nativeFeeSummary}
+        onOptionsLoadingChange={setFeeOptionsLoading}
         onChange={onFeePaymentTokenChange}
         onQuoteChange={onFeePaymentQuoteChange}
       />
@@ -105,6 +113,7 @@ export function SwapDecisionSummary({
           onGasEstimates={onGasEstimates}
           onValidityChange={onValidityChange}
           onFeeSummaryChange={setNativeFeeSummary}
+          hideInsufficientBalanceWarning={feeOptionsLoading}
         />
       )}
     </VStack>

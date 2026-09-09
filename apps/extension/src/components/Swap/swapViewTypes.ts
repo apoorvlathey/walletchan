@@ -67,6 +67,7 @@ export interface SwapConfirmationProps {
     feePaymentQuoteId: string | null,
   ) => void;
   onCancel: () => void;
+  onRefreshQuote?: () => void;
   isSubmitting: boolean;
   /**
    * Per-call gas estimates picked from the tier picker. Fired by

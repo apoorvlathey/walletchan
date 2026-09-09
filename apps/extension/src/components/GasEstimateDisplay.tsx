@@ -48,6 +48,7 @@ interface GasEstimateDisplayProps {
   forceInclusion?: boolean;
   /** Lock fee selection once a hardware-signing request is in flight. */
   isReadOnly?: boolean;
+  hideInsufficientBalanceWarning?: boolean;
   onFeeSummaryChange?: (summary: NativeFeePaymentSummary | null) => void;
 }
 
@@ -158,6 +159,7 @@ function GasEstimateDisplay({
   onValidityChange,
   forceInclusion,
   isReadOnly = false,
+  hideInsufficientBalanceWarning = false,
   onFeeSummaryChange,
 }: GasEstimateDisplayProps) {
   const { tokens } = useTheme();
@@ -734,7 +736,7 @@ function GasEstimateDisplay({
         />
       )}
 
-      {insufficientBalanceMessage && !estimate.estimationFailed && (
+      {!hideInsufficientBalanceWarning && insufficientBalanceMessage && !estimate.estimationFailed && (
         <HStack
           bg="accent.highlight"
           border={tokens.borders.medium}

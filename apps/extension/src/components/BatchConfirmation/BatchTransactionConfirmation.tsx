@@ -358,7 +358,7 @@ function BatchTransactionConfirmation(props: BatchTransactionConfirmationProps) 
           onGasEstimates={review.setCachedGasEstimates}
           onGasValidityChange={review.setGasValid}
           onAnyFailedChange={review.setAnyTxMayRevert}
-          bundleId={batchRequest.id}
+          bundleId={batchRequest.id} disabled={actions.state === "submitting" || actions.isRejecting}
           feePaymentToken={feePaymentToken}
           feePaymentQuote={feePaymentQuote}
           allowFeePaymentSelection={allowFeePaymentSelection}

@@ -83,7 +83,7 @@ function SwapConfirmation({
   eip7702Delegate,
   eip7702OnchainDelegate,
   onConfirm,
-  onCancel,
+  onCancel, onRefreshQuote,
   isSubmitting,
   onGasEstimates,
   onValidityChange,
@@ -687,7 +687,7 @@ function SwapConfirmation({
 
     <StickyActionBar
       summary={<SwapDecisionSummary
-        requestId={requestId}
+        requestId={requestId} disabled={isSubmitting} onRefreshQuote={onRefreshQuote}
         transactions={gasTransactions}
         fromAddress={fromAddress}
         accountId={accountId}

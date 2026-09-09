@@ -33,6 +33,8 @@ integration boundary, not the default home for new implementations.
 
 ## Feature domains
 
+- `FeePayment/` owns shared fee selection, funded-token fallback, and quote lifecycle.
+
 - `Activity/` owns transaction-history list presentation.
 - `AccountPicker/` owns the shared searchable and reorderable account browser;
   public-home selection and Settings management remain explicit parent modes.

@@ -320,7 +320,7 @@ function TransactionConfirmation({
           onFunctionName={setDecodedFunctionName}
           onAddToBatch={actions.handleAddToBatch}
           onForceInclusionChange={review.setForceInclusion}
-          isReadOnly={isLedgerWaiting}
+          isReadOnly={actions.state === "submitting" || actions.isRejecting}
           feePaymentToken={feePaymentToken}
           feePaymentQuote={feePaymentQuote}
           showTransactionNonce={usesEditableNonce}
@@ -345,7 +345,7 @@ function TransactionConfirmation({
           replacementGasError={review.gasOverrides ? replacementGasError : null}
           onGasOverrides={review.setGasOverrides}
           onGasValidityChange={review.setGasValid}
-          isReadOnly={isLedgerWaiting}
+          isReadOnly={actions.state === "submitting" || actions.isRejecting}
           feePaymentToken={feePaymentToken}
           feePaymentQuote={feePaymentQuote}
           onFeePaymentTokenChange={setFeePaymentToken}

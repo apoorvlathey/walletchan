@@ -318,6 +318,8 @@ export function LabeledAddressPopover({
 
   return (
     <HStack
+      display="inline-flex"
+      w="fit-content"
       spacing={1}
       minW={0}
       maxW={maxW}
@@ -333,7 +335,8 @@ export function LabeledAddressPopover({
         minW={0}
         fontSize="2xs"
         fontWeight="700"
-        noOfLines={1}
+        isTruncated
+        textAlign="left"
         title={addressOnly ? address : presentation.label}
       >
         {addressOnly ? label : presentation.label}

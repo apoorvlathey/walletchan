@@ -62,6 +62,7 @@ export function SafeProposalDecisionSummary({
   onFeePaymentQuoteChange: (quote: FeePaymentQuoteSummary | null) => void;
   disabled?: boolean;
 }) {
+  const [feeOptionsLoading, setFeeOptionsLoading] = useState(true);
   const [nativeFeeSummary, setNativeFeeSummary] =
     useState<NativeFeePaymentSummary | null>(null);
   useEffect(() => {
@@ -142,6 +143,7 @@ export function SafeProposalDecisionSummary({
             value={feePaymentToken}
             quote={feePaymentQuote}
             nativeSummary={nativeFeeSummary}
+            onOptionsLoadingChange={setFeeOptionsLoading}
             onChange={onFeePaymentTokenChange}
             onQuoteChange={onFeePaymentQuoteChange}
             disabled={disabled}
@@ -153,6 +155,7 @@ export function SafeProposalDecisionSummary({
               onGasOverrides={onGasOverrides}
               onValidityChange={onGasValidityChange}
               onFeeSummaryChange={setNativeFeeSummary}
+              hideInsufficientBalanceWarning={feeOptionsLoading && !disabled}
               isReadOnly={disabled}
             />
           )}

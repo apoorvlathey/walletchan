@@ -36,6 +36,7 @@ interface BatchDecisionSummaryProps {
   onGasValidityChange: (valid: boolean) => void;
   onAnyFailedChange: (failed: boolean) => void;
   bundleId: string;
+  disabled?: boolean;
   feePaymentToken: "native" | `0x${string}`;
   feePaymentQuote: FeePaymentQuoteSummary | null;
   allowFeePaymentSelection: boolean;
@@ -62,6 +63,7 @@ export function BatchDecisionSummary({
   onGasValidityChange,
   onAnyFailedChange,
   bundleId,
+  disabled = false,
   feePaymentToken,
   feePaymentQuote,
   allowFeePaymentSelection,
@@ -69,6 +71,7 @@ export function BatchDecisionSummary({
   onFeePaymentTokenChange,
   onFeePaymentQuoteChange,
 }: BatchDecisionSummaryProps) {
+  const [feeOptionsLoading, setFeeOptionsLoading] = useState(true);
   const [nativeFeeSummary, setNativeFeeSummary] =
     useState<NativeFeePaymentSummary | null>(null);
 
@@ -90,8 +93,9 @@ export function BatchDecisionSummary({
           requestKind={feePaymentRequestKind}
           value={feePaymentToken}
           quote={feePaymentQuote}
-          disabled={forceInclusion}
+          disabled={disabled || forceInclusion}
           nativeSummary={nativeFeeSummary}
+          onOptionsLoadingChange={setFeeOptionsLoading}
           onChange={onFeePaymentTokenChange}
           onQuoteChange={onFeePaymentQuoteChange}
         />
@@ -157,6 +161,7 @@ export function BatchDecisionSummary({
         }
         eip7702Delegate={eip7702Delegate}
         onFeeSummaryChange={setNativeFeeSummary}
+        hideInsufficientBalanceWarning={feeOptionsLoading && allowFeePaymentSelection && !forceInclusion}
       />}
     </VStack>
   );

@@ -3,8 +3,11 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const source = readFileSync(
-  new URL("../../src/components/FeePaymentSelector.tsx", import.meta.url),
+  new URL("../../src/components/FeePayment/FeePaymentSelector.tsx", import.meta.url),
   "utf8",
+);
+const quoteHookSource = readFileSync(
+  new URL("../../src/components/FeePayment/hooks/useFeePaymentQuote.ts", import.meta.url), "utf8",
 );
 const capabilitiesSource = readFileSync(
   new URL("../../src/chrome/feePayment/capabilities.ts", import.meta.url),
@@ -59,27 +62,27 @@ const swapSummarySource = readFileSync(
 );
 
 test("fee quote loading has a bounded renderer deadline and explicit retry", () => {
-  assert.match(source, /QUOTE_REQUEST_TIMEOUT_MS = 30_000/u);
-  assert.match(source, /gas quote timed out/u);
-  assert.match(source, /quoteRequestSequence\.current \+= 1/u);
-  assert.ok(source.includes("{displayedQuoteError}"));
-  assert.ok(source.includes(">\n            Retry\n          </Button>"));
+  assert.match(quoteHookSource, /QUOTE_REQUEST_TIMEOUT_MS = 30_000/u);
+  assert.match(quoteHookSource, /gas quote timed out/u);
+  assert.match(quoteHookSource, /quoteRequestSequence\.current \+= 1/u);
+  assert.ok(source.includes("error={displayedQuoteError}"));
+  assert.match(source, /<FeeQuoteError/u);
 });
 
 test("failed quotes are not automatically retried", () => {
   assert.match(
-    source,
+    quoteHookSource,
     /isTokenPayment[\s\S]*!quote[\s\S]*!quoteLoading[\s\S]*!quoteError[\s\S]*!quoteRequestStarted\.current/u,
   );
-  assert.match(source, /chrome\.runtime\.lastError/u);
-  assert.doesNotMatch(source, /setTimeout\(\s*requestQuote/u);
-  assert.match(source, /gas quote expired/u);
+  assert.match(quoteHookSource, /chrome\.runtime\.lastError/u);
+  assert.match(quoteHookSource, /AUTO_REFRESH_LIMIT = 5/u);
+  assert.match(quoteHookSource, /gas quote expired/u);
 });
 
 test("a completed parent-owned quote survives selector rerenders", () => {
   assert.match(source, /quote: FeePaymentQuoteSummary \| null/u);
   assert.match(source, /const maximumTokenCost = quote\?\.maximumTokenCost/u);
-  assert.match(source, /const quoteRequestStarted = useRef\(Boolean\(quote\)\)/u);
+  assert.match(quoteHookSource, /const quoteRequestStarted = useRef\(Boolean\(quote\)\)/u);
   assert.doesNotMatch(
     source,
     /useEffect\(\(\) => \{[\s\S]{0,400}onQuoteChange\(null\)[\s\S]{0,100}\}, \[cancelQuoteRequest/u,
@@ -98,8 +101,11 @@ test("token estimation uses the shared loader and catalog logos", () => {
 });
 
 test("fee-option discovery cannot spin forever", () => {
-  assert.match(source, /OPTIONS_REQUEST_TIMEOUT_MS = 10_000/u);
-  assert.match(source, /setLoading\(false\)/u);
+  const optionsSource = readFileSync(new URL(
+    "../../src/components/FeePayment/hooks/useFeePaymentOptions.ts", import.meta.url,
+  ), "utf8");
+  assert.match(optionsSource, /OPTIONS_REQUEST_TIMEOUT_MS = 10_000/u);
+  assert.match(optionsSource, /finish\(\[\]\)/u);
 });
 
 test("single, batch, cross-dapp, Safe, Swap, and internal-send reviews share the fee-option boundary", () => {

@@ -2002,3 +2002,22 @@ Built-in explorer edits have an explicit save action and default-restoration
 helper text. The existing precise, approachable Warm Midnight system remains
 unchanged; visible labels, keyboard focus, loading, and error states follow the
 shared form contract.
+
+## ERC-20 fee readout — 2026-09-09
+
+The confirmation footer retains the existing Warm Midnight financial hierarchy:
+precise, restrained, approachable. The fee asset remains a selectable control;
+a single subtle divider separates it from a two-column Maximum fee row. The
+label uses secondary 12px body text, with the exact displayed token amount in
+primary 14px semibold tabular numerals, a quieter symbol, and the approximate
+USD value on a second right-aligned 10px line. Fiat rounds to cents, with a
+`< $0.01` treatment for positive sub-cent amounts. Token precision is unchanged.
+Existing theme fonts, spacing, foreground, and border tokens apply to both
+Midnight and Bauhaus. No extra card, accent color, icon, or animation is added.
+Audit: clear numeric hierarchy, aligned columns, wrapping amounts, semantic
+insufficient-balance error, and no new interactive or motion affordances.
+
+Fee errors use at most three wrapping lines beside a non-shrinking Copy/Retry
+control group. The compact copy explains known signature expiry; Copy retains
+the complete provider diagnostic. Both actions stay visible at 320px, with
+28px targets and accessible labels. No extra warning card is introduced.

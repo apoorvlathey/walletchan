@@ -74,6 +74,7 @@ interface MultiTxGasEstimateDisplayProps {
    * issuing duplicate CoinGecko lookups.
    */
   onNativePriceUsd?: (priceUsd: number | null) => void;
+  hideInsufficientBalanceWarning?: boolean;
   onFeeSummaryChange?: (summary: NativeFeePaymentSummary | null) => void;
   /** When true, estimate gas for L1 deposit transactions (force inclusion) */
   forceInclusion?: boolean;
@@ -211,6 +212,7 @@ function MultiTxGasEstimateDisplay({
   onGasEstimates,
   onValidityChange,
   onNativePriceUsd,
+  hideInsufficientBalanceWarning = false,
   onFeeSummaryChange,
   forceInclusion,
   onAnyFailedChange,
@@ -1009,7 +1011,7 @@ function MultiTxGasEstimateDisplay({
       )}
 
       {/* Insufficient balance warning */}
-      {anyInsufficient && insufficientBalanceMessage && !anyFailed && (
+      {!hideInsufficientBalanceWarning && anyInsufficient && insufficientBalanceMessage && !anyFailed && (
         <HStack
           bg="status.warning.bg"
           border={tokens.borders.medium}
