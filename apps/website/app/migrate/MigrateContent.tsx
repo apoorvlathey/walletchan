@@ -47,7 +47,7 @@ import {
   useSendCalls,
   useCallsStatus,
 } from "wagmi";
-import { formatUnits, parseUnits, encodeFunctionData, maxUint256 } from "viem";
+import { formatUnits, parseUnits, encodeFunctionData } from "viem";
 import { Navigation } from "../components/Navigation";
 import { TokenBanner } from "../components/TokenBanner";
 import { Footer } from "../components/Footer";
@@ -352,15 +352,14 @@ export default function MigrateContent() {
       [];
 
     if (needsApproval) {
-      // Use max approval in the bundle so a future top-up doesn't require a
-      // second batch — same UX as a normal "approve once" pattern.
+      // Approve only the amount being migrated, matching the standalone flow.
       calls.push({
         to: TOKEN_ADDR,
         value: 0n,
         data: encodeFunctionData({
           abi: erc20Abi,
           functionName: "approve",
-          args: [WCHAN_ADDR, maxUint256],
+          args: [WCHAN_ADDR, parsedAmount],
         }),
       });
     }
