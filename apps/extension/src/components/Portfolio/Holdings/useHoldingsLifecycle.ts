@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { getPortfolioHoldingsSnapshot } from "@/chrome/portfolio/holdingsCache";
 import { getReceiptTokenRefresh } from "@/components/tokenHoldingsUtils";
 import {
@@ -49,6 +49,23 @@ export function useHoldingsLifecycle({
     setTokens,
     setTotalValueUsd,
   } = state;
+
+  const autoRefreshRef = useRef({ loadPortfolio, state });
+  autoRefreshRef.current = { loadPortfolio, state };
+
+  useEffect(() => {
+    if (!address) return;
+    let refreshing = false;
+    const timer = window.setInterval(() => {
+      const current = autoRefreshRef.current;
+      if (refreshing || current.state.loading || current.state.portfolioBalanceRefreshing) return;
+      refreshing = true;
+      void current.loadPortfolio(true, { suppressSkeleton: true })
+        .catch(() => undefined)
+        .finally(() => { refreshing = false; });
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [address, chainReloadKey]);
 
   // Preserve the original address/network-only reload trigger. The loader
   // closure changes as data paints and must not restart hydration.

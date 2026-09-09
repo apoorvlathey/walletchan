@@ -3975,6 +3975,13 @@ rows at a time and advance with normal pagination. Swap and bridge remote token
 catalogs are independently validated and capped at 2,000 entries with 2 MiB
 transport ceilings.
 
+While public Holdings is mounted (including its Activity tab), a renderer-owned
+60-second timer refreshes the portfolio without a skeleton. It uses the latest
+account loader, skips ticks during loading or onchain balance refresh, and is
+cleared on unmount or account/network changes. There is no background-worker
+polling after the portfolio closes. Timed refreshes use the same cache bypass
+as manual refreshes.
+
 Explicit Holdings refreshes propagate `forceRefresh` through the token catalog
 and request `/api/portfolio?address=…&refresh=1` with browser `cache: no-store`.
 The route returns `Cache-Control: no-store` and bypasses the Next.js balance
