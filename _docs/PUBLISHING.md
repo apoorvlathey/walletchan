@@ -97,6 +97,15 @@ Once approved, **CWS users** receive the update.
 
 ### Manual release (optional)
 
+The one-off `Recover v4.1.0 release` workflow builds the original Chrome release
+commit `2dda76fd6485d56bc23a8089c13e72e6a6c6bd88` without moving `v4.1.0`.
+Its test-only patch corrects three stale Swap labels and records the frozen
+snapshot's line counts (executionRoutes 132, pendingRequests 241, settingsRegistry
+456). These historical baselines do not relax current development budgets.
+The full security suite runs, then the workflow restores the original tests and
+requires a clean checkout before building both browser ZIPs. Source, manifests,
+dependencies, and build scripts remain those of the original release commit.
+
 If you need to create a release without the automated workflow:
 
 ```bash
