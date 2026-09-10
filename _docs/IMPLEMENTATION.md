@@ -4418,7 +4418,7 @@ resolution is remote-first, local-second:
 
 - `chrome/clearSigningHandlers.ts` is the stable facade over the focused
   `chrome/clearSigning/` audit domain. `descriptorCache.ts` owns the exact v3
-  key/schema and 7-day hit / 1-day miss TTL; `descriptorClient.ts` owns the
+  key/schema and 1-day hit / 1-day miss TTL; `descriptorClient.ts` owns the
   10-second, 512 KiB bounded public request; `descriptorResolver.ts` owns the
   configured-RPC proxy fallback and immutable deployment extension; and
   `handlers.ts` coordinates opt-out, validation, cache, and resolution.

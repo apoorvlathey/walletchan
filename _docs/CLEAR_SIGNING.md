@@ -4,6 +4,16 @@ The extension renders a human-readable view of transactions and EIP-712 signatur
 
 ## Source of descriptors
 
+The API applies a temporary Ethereum DAI permit expiry override after upstream
+resolution, without mutating its cached source descriptor. Exact chain, address,
+domain, and Permit format guards restrict the override. Existing `ifNotIn` and
+enum support show zero as **Never expires**; nonzero values show both the date
+and a raw **Permit expiry** timestamp. The response identifies the override as
+`walletchan:dai-zero-expiry-v1`. Remove this workaround when upstream issue
+[#2894](https://github.com/ethereum/clear-signing-erc7730-registry/issues/2894)
+has a supported replacement. Existing clients may retain the old descriptor for
+one day; toggling Clear signing off and on clears the local cache for QA.
+
 Descriptors come from the public registry at [`ethereum/clear-signing-erc7730-registry`](https://github.com/ethereum/clear-signing-erc7730-registry). **Nothing is bundled** in the extension. The website acts as a thin proxy + cache:
 
 - `walletchan.eth.sh/api/clearsigning/descriptor?chainId=…&address=0x…&kind=calldata|eip712&selector=0x…|formatKey=…` → descriptor JSON, or 404.
@@ -20,7 +30,7 @@ Confirmation surface
                  └─ clearSigningHandlers.ts facade (background)
                       └─ clearSigning/handlers.ts
                            ├─ descriptorCache.ts  cs:desc:<chainId>:<address>:<kind>:<selector|format>
-                           │    (TTL 7d hits, 1d misses; schema v3)
+                           │    (TTL 1d hits, 1d misses; schema v3)
                            ├─ walletchan.eth.sh/api/clearsigning/descriptor (direct)
                            ├─ ON MISS → network/proxyResolver.ts (Safe / EIP-1967 / beacon)
                            │    └─ re-fetch descriptor for impl address
@@ -33,7 +43,7 @@ Confirmation surface
 
 ### Cache schema versioning
 
-Cache entries are stamped with `schemaVersion`. On read, entries with a version older than `CLEAR_SIGNING_CACHE_SCHEMA_VERSION` in `clearSigning/descriptorCache.ts` are treated as misses and re-resolved. Bump the constant whenever the resolution pipeline changes in a way that would make pre-existing cache entries wrong — users see new behavior immediately instead of waiting 1–7 days for a stale entry to expire.
+Cache entries are stamped with `schemaVersion`. On read, entries with a version older than `CLEAR_SIGNING_CACHE_SCHEMA_VERSION` in `clearSigning/descriptorCache.ts` are treated as misses and re-resolved. Bump the constant whenever the resolution pipeline changes in a way that would make pre-existing cache entries wrong — users see new behavior immediately instead of waiting one day for a stale entry to expire.
 
 | Version | Change |
 |---|---|

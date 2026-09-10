@@ -4,7 +4,7 @@ import type { DescriptorLookup } from "./types";
 export const CLEAR_SIGNING_ENABLED_KEY = "cs:enabled";
 export const CLEAR_SIGNING_CACHE_PREFIX = "cs:desc:";
 export const CLEAR_SIGNING_CACHE_SCHEMA_VERSION = 3;
-export const CLEAR_SIGNING_HIT_TTL_MS = 7 * 24 * 3600 * 1000;
+export const CLEAR_SIGNING_HIT_TTL_MS = 24 * 3600 * 1000;
 export const CLEAR_SIGNING_MISS_TTL_MS = 1 * 24 * 3600 * 1000;
 
 export interface DescriptorCacheEntry {

@@ -21,6 +21,22 @@ import { TestButton } from "./TestButton";
  */
 
 const PERMIT2: Address = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
+const DAI: Address = "0x6b175474e89094c44da98b954eedeac495271d0f";
+const DAI_PERMIT_TYPES = {
+  EIP712Domain: [
+    { name: "name", type: "string" },
+    { name: "version", type: "string" },
+    { name: "chainId", type: "uint256" },
+    { name: "verifyingContract", type: "address" },
+  ],
+  Permit: [
+    { name: "holder", type: "address" },
+    { name: "spender", type: "address" },
+    { name: "nonce", type: "uint256" },
+    { name: "expiry", type: "uint256" },
+    { name: "allowed", type: "bool" },
+  ],
+} as const;
 
 // Aave V3 Pool — covered in the ERC-7730 registry across most major chains.
 // Picked over Uniswap because the registry only has Uniswap V3 SwapRouter02 on
@@ -95,6 +111,35 @@ export function ClearSigningSection() {
       </Text>
     );
   }
+
+  // Display fixtures only: self-spender, fixed nonce, no onchain submission.
+  const signDaiPermit = (neverExpires: boolean) => {
+    if (chainId !== 1) throw new Error("Switch to Ethereum to test DAI permits.");
+    const expiry = neverExpires ? 0 : Math.floor(Date.now() / 1000) + 24 * 3600;
+    return request({
+      method: "eth_signTypedData_v4",
+      params: [
+        address,
+        JSON.stringify({
+          domain: {
+            name: "Dai Stablecoin",
+            version: "1",
+            chainId: 1,
+            verifyingContract: DAI,
+          },
+          types: DAI_PERMIT_TYPES,
+          primaryType: "Permit",
+          message: {
+            holder: address,
+            spender: address,
+            nonce: "0",
+            expiry: expiry.toString(),
+            allowed: true,
+          },
+        }),
+      ],
+    });
+  };
 
   // ------------------------------------------------------------------------
   // Permit2 — EIP-712 signature, chain-agnostic
@@ -266,6 +311,18 @@ export function ClearSigningSection() {
 
   return (
     <>
+      <TestButton
+        label="DAI Permit — never expires (Ethereum)"
+        description="Expiry is 0, meaning no permit deadline. Compare the Valid until row (currently shown as —). Switch to Ethereum. Uses your own address as spender; signature only, no submission."
+        onRun={() => signDaiPermit(true)}
+        isDisabled={chainId !== 1}
+      />
+      <TestButton
+        label="DAI Permit — 24-hour expiry (Ethereum)"
+        description="Expiry is 24 hours from clicking Run. Valid until should show tomorrow’s local date and time. Switch to Ethereum. Uses your own address as spender; signature only, no submission."
+        onRun={() => signDaiPermit(false)}
+        isDisabled={chainId !== 1}
+      />
       <TestButton
         label={`Permit2 PermitSingle (sig, ${chain?.name ?? "?"})`}
         description='Authorize Permit2 to spend 100 USDC for 30 days. Should render the clear-signing card with "Authorize spending of token" intent, amount in USDC, expiry date.'

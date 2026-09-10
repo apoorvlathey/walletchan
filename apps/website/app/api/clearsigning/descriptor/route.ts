@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { toFunctionSelector } from "viem";
 import snapshotRaw from "@/data/clearsigning-index.json";
+import { applyDaiExpiryOverride } from "./daiExpiryOverride";
 
 const REPO = "ethereum/clear-signing-erc7730-registry";
 const BRANCH = "master";
@@ -247,8 +248,12 @@ export async function GET(req: NextRequest) {
         { status: 404, headers: { "Cache-Control": "public, s-maxage=3600" } },
       );
     }
+    const descriptor = applyDaiExpiryOverride(resolved.desc, chainId, address, resolvedKind);
     return NextResponse.json(
-      { descriptor: resolved.desc, sourcePath: resolved.path, kind: resolvedKind },
+      {
+        descriptor, sourcePath: resolved.path, kind: resolvedKind,
+        ...(descriptor !== resolved.desc ? { overrides: ["walletchan:dai-zero-expiry-v1"] } : {}),
+      },
       { headers: { "Cache-Control": "public, s-maxage=86400" } },
     );
   } catch (err) {

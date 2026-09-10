@@ -17,6 +17,12 @@ palette, focus, loading, and disabled states. Ethereum-only gating and explicit
 PASS/INCONCLUSIVE/FAIL copy distinguish ABI rejection from manual rejection.
 No new visual system or motion is introduced (2026-09-08).
 
+DAI permit expiry examples in `/test#clear-signing` reuse TestButton’s existing
+typography, palette, keyboard action, loading, and disabled states. The two
+Ethereum-only controls compare zero expiry with a fresh 24-hour deadline;
+their labels and descriptions distinguish the cases without color changes.
+No new layout or styling is needed (2026-09-10).
+
 ## Docs site projection
 
 - Artifact type: searchable end-user documentation and product reference.

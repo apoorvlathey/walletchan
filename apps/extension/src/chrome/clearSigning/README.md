@@ -8,7 +8,7 @@ Review in dependency order:
 
 1. `types.ts` — descriptor transport, normalized lookup, and snapshot input.
 2. `descriptorCache.ts` — exact `cs:desc:*` key/schema, selector/format hint,
-   v3 invalidation, 7-day hit / 1-day miss TTL, best-effort writes, and purge.
+   v3 invalidation, 1-day hit / 1-day miss TTL, best-effort writes, and purge.
 3. `settings.ts` — default-on `cs:enabled` preference and disable-time purge.
 4. `descriptorClient.ts` — the only descriptor API egress: 10-second deadline,
    512 KiB body cap, redirect/credential-safe shared transport, and null errors.

@@ -80,7 +80,7 @@ test("descriptor cache preserves exact key hints, v3 schema, and TTLs", async ()
 
       harness.stores.local[key] = {
         schemaVersion: 3,
-        updatedAt: NOW - 7 * DAY,
+        updatedAt: NOW - DAY,
         descriptor,
       };
       assert.ok(await cache.readDescriptorCache(calldataLookup));
