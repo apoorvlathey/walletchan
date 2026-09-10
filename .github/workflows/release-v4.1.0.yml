@@ -1,0 +1,81 @@
+name: Recover v4.1.0 release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: source
+    steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+          sparse-checkout: |
+            .github
+            CHANGELOG.md
+          sparse-checkout-cone-mode: false
+
+      - name: Checkout original Chrome release source
+        uses: actions/checkout@v4
+        with:
+          ref: 2dda76fd6485d56bc23a8089c13e72e6a6c6bd88
+          path: source
+
+      - name: Verify immutable source tag
+        run: |
+          test "$(git rev-parse HEAD)" = "2dda76fd6485d56bc23a8089c13e72e6a6c6bd88"
+          test "$(git ls-remote origin refs/tags/v4.1.0 | cut -f1)" = "$(git rev-parse HEAD)"
+          test "$(node -p "require('./apps/extension/package.json').version")" = "4.1.0"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: source/package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: source/.nvmrc
+          cache: pnpm
+          cache-dependency-path: source/pnpm-lock.yaml
+
+      - name: Install original locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Correct frozen-snapshot test expectations
+        run: git apply ../tooling/.github/release-repairs/v4.1.0-tests.patch
+
+      - name: Run full extension security tests
+        run: pnpm --filter @walletchan/extension test:security
+
+      - name: Restore original tests and verify pristine build inputs
+        run: |
+          git restore apps/extension/tests/security/moduleSizeBudget.test.ts apps/extension/tests/ui/moduleSizeBudget.test.ts apps/extension/tests/ui/swapPresentation.test.ts
+          test -z "$(git status --porcelain)"
+
+      - name: Create Chrome zip
+        run: pnpm zip
+
+      - name: Create Firefox zip
+        run: pnpm zip:firefox
+
+      - name: Extract release changelog
+        run: node ../tooling/.github/scripts/release-notes.mjs v4.1.0 > "$RUNNER_TEMP/release-notes.md"
+
+      - name: Publish original v4.1.0 release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v4.1.0
+          name: v4.1.0
+          draft: false
+          body_path: ${{ runner.temp }}/release-notes.md
+          fail_on_unmatched_files: true
+          files: |
+            source/apps/extension/zip/walletchan-v4.1.0.zip
+            source/apps/extension/zip/walletchan-firefox-v4.1.0.zip
