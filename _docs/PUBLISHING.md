@@ -69,6 +69,16 @@ The [release workflow](/.github/workflows/release.yml) triggers on `v*` tags and
 1. Runs `pnpm zip` (which builds the extension and creates the zip)
 2. Publishes `walletchan-vX.Y.Z.zip` to [GitHub Releases](https://github.com/apoorvlathey/walletchan/releases)
 
+Release notes come from the matching version section in the root `CHANGELOG.md`,
+with its full-changelog link. `.github/scripts/release-notes.mjs` extracts that
+section; the workflow rejects missing/empty entries and tag/version mismatches.
+To update an existing release's notes from the changelog:
+
+```bash
+node .github/scripts/release-notes.mjs v4.1.0 > /tmp/walletchan-release-notes.md
+gh release edit v4.1.0 --repo apoorvlathey/walletchan --notes-file /tmp/walletchan-release-notes.md
+```
+
 Users can download the zip from GitHub Releases and load it as an unpacked extension in developer mode.
 
 ### 3. Upload to Chrome Web Store

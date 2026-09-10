@@ -31,6 +31,14 @@ jobs:
         id: version
         run: echo "version=$(node -p "require('./apps/extension/package.json').version")" >> $GITHUB_OUTPUT
 
+      - name: Extract release changelog
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          test "$RELEASE_TAG" = "v$RELEASE_VERSION"
+          node .github/scripts/release-notes.mjs "$RELEASE_TAG" > "$RUNNER_TEMP/release-notes.md"
+
       - name: Run extension security tests
         run: pnpm --filter @walletchan/extension test:security
 
@@ -46,4 +54,4 @@ jobs:
           files: |
             apps/extension/zip/walletchan-v${{ steps.version.outputs.version }}.zip
             apps/extension/zip/walletchan-firefox-v${{ steps.version.outputs.version }}.zip
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/release-notes.md
