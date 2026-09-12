@@ -1,0 +1,24 @@
+/** Shared portfolio types */
+
+export interface DefiAsset {
+  symbol: string;
+  name: string;
+  address: string;
+  decimals: number;
+  valueUsd: number;
+  balance: string | null;
+  logoUrl?: string;
+}
+
+export interface DefiPosition {
+  protocol: string;
+  /** Supplied/collateral assets (positive value) */
+  assets: DefiAsset[];
+  /** Borrowed/debt assets (rendered as debt, subtracted from net value) */
+  borrowAssets: DefiAsset[];
+  /** Unclaimed rewards */
+  rewardAssets: DefiAsset[];
+  /** Net position value: sum(assets) + sum(rewards) - sum(borrowAssets) */
+  valueUsd: number;
+  logoUrl?: string;
+}

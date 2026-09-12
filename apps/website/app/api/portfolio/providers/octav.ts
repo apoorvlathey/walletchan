@@ -136,20 +136,27 @@ export const octavProvider: PortfolioProvider = {
                     rewardAssets: [],
                   });
                 }
-              }
-              if (pos.protocolPositions) {
-                for (const subPos of pos.protocolPositions) {
-                  const assets = toDefiAssets(
-                    [...(subPos.assets || []), ...(subPos.supplyAssets || [])],
-                    chainId
-                  );
-                  const rewardAssets = toDefiAssets(subPos.rewardAssets, chainId);
-                  const posValueUsd =
-                    assets.reduce((s, a) => s + a.valueUsd, 0) +
-                    rewardAssets.reduce((s, a) => s + a.valueUsd, 0);
-                  if (assets.length === 0 && rewardAssets.length === 0) continue;
-                  defiPositions.push({
-                    protocol: proto.name || protoKey,
+      const entry: DefiPosition = {
+        protocol: position.protocol?.name ?? "unknown",
+        assets: [],
+        borrowAssets: [],
+        rewardAssets: [],
+        valueUsd: 0,
+      };
+
+      for (const subPos of subPositions) {
+        const assets = [...(subPos.assets ?? []), ...(subPos.supplyAssets ?? [])];
+        const borrows = subPos.borrowAssets ?? [];
+
+        for (const asset of assets) {
+          entry.assets.push(normalizeOctavAsset(asset));
+          entry.valueUsd += asset.valueUsd ?? 0;
+        }
+        for (const borrow of borrows) {
+          entry.borrowAssets.push(normalizeOctavAsset(borrow));
+          entry.valueUsd -= borrow.valueUsd ?? 0;
+        }
+      }
                     protocolLogo: proto.imgSmall || proto.imgLarge || undefined,
                     chainId,
                     type: posKey,

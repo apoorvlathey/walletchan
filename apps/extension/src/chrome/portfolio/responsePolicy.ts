@@ -38,16 +38,48 @@ function boundedText(
 ): string {
   if (typeof value !== "string") return fallback;
   const normalized = value.trim();
-  return normalized ? normalized.slice(0, maximum) : fallback;
+  return assets.slice(0, MAX_REMOTE_DEFI_ASSETS_PER_POSITION);
 }
 
-function finiteUsd(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) && value > 0
-    ? Math.min(value, MAX_USD_VALUE)
-    : 0;
+function parseDefiAssetsSigned(value: unknown): DefiAsset[] {
+  if (!Array.isArray(value)) return [];
+  const assets: DefiAsset[] = [];
+  for (const item of value) {
+    const asset = parseDefiAssetSigned(item);
+    if (asset) assets.push(asset);
+  }
+  return assets.slice(0, MAX_REMOTE_DEFI_ASSETS_PER_POSITION);
 }
 
-function positiveSafeInteger(value: unknown): number | null {
+function parseDefiAssetSigned(value: unknown): DefiAsset | null {
+  if (!isRecord(value)) return null;
+  const symbol = typeof value.symbol === "string" ? value.symbol.slice(0, 20) : null;
+  const name = typeof value.name === "string" ? value.name.slice(0, 100) : null;
+  const address = contractAddress(value.address ?? value.contractAddress);
+  const decimals = positiveSafeInteger(value.decimals);
+  // Allow negative valueUsd for debt assets
+  const valueUsd = typeof value.valueUsd === "number" && Number.isFinite(value.valueUsd)
+    ? value.valueUsd
+    : null;
+  const balance = numericText(value.balance);
+  if (!symbol || !name || !address || decimals === null || valueUsd === null) return null;
+  return { symbol, name, address, decimals, valueUsd, balance };
+}
+
+function parseDefiPosition(value: unknown): DefiPosition | null {
+  if (!isRecord(value)) return null;
+  const protocol = typeof value.protocol === "string" ? value.protocol.slice(0, 100) : null;
+  // Allow negative valueUsd for net position (collateral - debt)
+  const valueUsd = typeof value.valueUsd === "number" && Number.isFinite(value.valueUsd)
+    ? value.valueUsd
+    : null;
+  const assets = parseDefiAssets(value.assets);
+  const borrowAssets = parseDefiAssetsSigned(value.borrowAssets);
+  const rewardAssets = parseDefiAssets(value.rewardAssets);
+  const logoUrl = safeHttpsUrl(value.logoUrl);
+  if (!protocol || valueUsd === null || (assets.length === 0 && borrowAssets.length === 0)) return null;
+  return { protocol, valueUsd, assets, borrowAssets, rewardAssets, logoUrl };
+}
   return typeof value === "number" &&
     Number.isSafeInteger(value) &&
     value > 0

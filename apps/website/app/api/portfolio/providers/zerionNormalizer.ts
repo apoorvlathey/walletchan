@@ -101,19 +101,28 @@ function addDefiPosition(
       valueUsd: 0,
       siteUrl: attrs.application_metadata?.url || undefined,
       assets: [],
+    const entry: DefiPosition = {
+      protocol: position.attributes?.protocol_id ?? "unknown",
+      assets: [],
+      borrowAssets: [],
       rewardAssets: [],
+      valueUsd: 0,
     };
 
-  if (attrs.position_type === "reward" || type.toLowerCase().includes("reward")) {
-    entry.rewardAssets.push(asset);
-  } else {
-    entry.assets.push(asset);
-  }
-  entry.valueUsd += asset.valueUsd;
-  positions.set(key, entry);
-}
+    for (const asset of assets) {
+      const isBorrow = position.attributes?.position_type === "borrow" ||
+        asset.attributes?.position_type === "borrow";
+      const normalizedAsset = normalizeAsset(asset);
+      if (isBorrow) {
+        entry.borrowAssets.push(normalizedAsset);
+        entry.valueUsd -= asset.valueUsd ?? 0;
+      } else {
+        entry.assets.push(normalizedAsset);
+        entry.valueUsd += asset.valueUsd ?? 0;
+      }
+    }
 
-function finalizeDefiPosition(position: DefiPosition): DefiPosition {
+    for (const reward of rewards) {
   const assets = [...position.assets];
   const rewardAssets = [...position.rewardAssets];
   const allAssets = [...assets, ...rewardAssets];
