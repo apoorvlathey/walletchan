@@ -11,6 +11,7 @@ import {
   ZEROX_SUPPORTED_CHAIN_IDS,
   chainHasNativeToken,
 } from "../../src/constants/chainRegistry";
+import { ZEROX_SWAP_SUPPORTED_CHAIN_IDS as WEBSITE_SWAP_CHAIN_IDS } from "../../../website/app/api/swap/supportedChains";
 import { PLATFORM_IDS as WEBSITE_TOKEN_LIST_PLATFORM_IDS } from "../../../website/app/api/swap/token-list/platformIds";
 import {
   getVisibleChains,
@@ -361,16 +362,20 @@ test("HyperEVM mainnet and testnet share the contrast-safe logo style", () => {
   );
 });
 
-test("swap support matches the official 0x Swap API table", () => {
+test("swap support matches the API allowlist and 0x deprecations", () => {
   const expected = [
-    1, 10, 56, 130, 137, 143, 146, 480, 999, 2741, 4217, 4663, 5000,
-    8453, 9745, 42161, 43114, 57073, 59144, 80094, 534352,
+    1, 10, 56, 130, 137, 143, 480, 999, 2741, 4217, 4663,
+    8453, 9745, 42161, 43114, 57073, 59144,
   ];
   const registrySwapIds = MAINNET_CHAIN_REGISTRY.filter((chain) => chain.isSwapSupported)
     .map((chain) => chain.chainId)
     .sort((a, b) => a - b);
 
   assert.deepEqual(registrySwapIds, [...expected].sort((a, b) => a - b));
+  assert.deepEqual(
+    [...WEBSITE_SWAP_CHAIN_IDS].map(Number).sort((a, b) => a - b),
+    registrySwapIds,
+  );
   assert.deepEqual(
     [...ZEROX_SUPPORTED_CHAIN_IDS].sort((a, b) => a - b),
     registrySwapIds,

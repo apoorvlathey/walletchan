@@ -16,7 +16,7 @@ User → SwapCard (UI) → useSwapQuote hook → /api/swap/price (Next.js route)
 
 ### Multi-chain support
 - The **website** swap page is Base-only (`SWAP_CHAIN_ID = 8453`)
-- The **extension** swap supports all 21 EVM chains currently checked in 0x's **Swap and Gasless APIs** table, including Robinhood Chain. Blast and Mode remain usable as WalletChan networks but are not swap-eligible: neither is in that Swap API table (Mode appears only in 0x's separate Cross-Chain API table). The server-side price and quote routes share `api/swap/supportedChains.ts`; extension eligibility is derived from `isSwapSupported` flags in `chainRegistry.ts`.
+- The **extension** swap supports 17 EVM chains through 0x, including Robinhood Chain. Berachain (80094), Mantle (5000), Sonic (146), and Scroll (534352) are disabled following 0x's September 21, 2026 deprecation. These remain supported wallet networks. Blast and Mode remain usable as WalletChan networks but are not swap-eligible: neither is in that Swap API table (Mode appears only in 0x's separate Cross-Chain API table). The server-side price and quote routes share `api/swap/supportedChains.ts`; extension eligibility is derived from `isSwapSupported` flags in `chainRegistry.ts`.
 
 ## 0x Integration
 

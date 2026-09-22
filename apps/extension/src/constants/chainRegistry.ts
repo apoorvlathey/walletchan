@@ -295,7 +295,7 @@ export const MAINNET_CHAIN_REGISTRY: readonly ChainEntry[] = [
     nativeCurrency: { name: "BERA Token", symbol: "BERA", decimals: 18 },
     isOpStack: false,
     isBankrSupported: false,
-    isSwapSupported: true,
+    isSwapSupported: false, // 0x deprecation notice: 2026-09-21
     isEip7702Supported: true,
     coingeckoTokenId: "berachain-bera",
     coingeckoPlatformId: "berachain",
@@ -429,7 +429,7 @@ export const MAINNET_CHAIN_REGISTRY: readonly ChainEntry[] = [
     hiddenByDefault: true,
     isOpStack: true,
     isBankrSupported: false,
-    isSwapSupported: true,
+    isSwapSupported: false, // 0x deprecation notice: 2026-09-21
     isEip7702Supported: true,
     coingeckoTokenId: "mantle",
     coingeckoPlatformId: "mantle",
@@ -601,7 +601,7 @@ export const MAINNET_CHAIN_REGISTRY: readonly ChainEntry[] = [
     hiddenByDefault: true,
     isOpStack: false,
     isBankrSupported: false,
-    isSwapSupported: true,
+    isSwapSupported: false, // 0x deprecation notice: 2026-09-21
     isEip7702Supported: false,
     coingeckoTokenId: "ethereum",
     coingeckoPlatformId: "scroll",
@@ -622,7 +622,7 @@ export const MAINNET_CHAIN_REGISTRY: readonly ChainEntry[] = [
     hiddenByDefault: true,
     isOpStack: false,
     isBankrSupported: false,
-    isSwapSupported: true,
+    isSwapSupported: false, // 0x deprecation notice: 2026-09-21
     isEip7702Supported: true,
     coingeckoTokenId: "sonic-3",
     coingeckoPlatformId: "sonic",

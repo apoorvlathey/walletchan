@@ -2856,7 +2856,10 @@ Gasless APIs** table. `chainRegistry.ts` derives `ZEROX_SUPPORTED_CHAIN_IDS`
 from built-in `isSwapSupported` flags, while the website price and quote
 proxies share `api/swap/supportedChains.ts`. The separate 0x Cross-Chain API
 table is not evidence of single-chain Swap API support; accordingly, Blast and
-Mode are built-in networks but are not swap-eligible.
+Mode are built-in networks but are not swap-eligible. Berachain (80094),
+Mantle (5000), Sonic (146), and Scroll (534352) are also excluded from both
+swap allowlists following 0x's September 21, 2026 deprecation. General
+network support remains enabled.
 
 `src/chrome/swapApi.ts` is an implementation-free compatibility facade over
 the focused `chrome/swap/` domain. The split preserves its released exports,
