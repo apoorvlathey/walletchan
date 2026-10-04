@@ -8,7 +8,7 @@ function buildRewrites() {
   for (const { slug, path } of routing.routes) {
     for (const host of routing.subdomainBaseHosts) {
       rewrites.push({
-        source: "/:path((?!_next|api|images|og|screenshots).*)",
+        source: "/:path((?!_next|api|images|og|screenshots|robots\\.txt|sitemap\\.xml).*)",
         has: [{ type: "host", value: `${slug}.${host}` }],
         destination: `${path}/:path*`,
       });

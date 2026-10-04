@@ -14,6 +14,9 @@ export default defineConfig({
           ? "http://localhost:5173"
           : "https://docs.walletchan.com",
   checkDeadlinks: true,
+  // The outer Waku layout has no MDX context. Only the page owns SEO tags;
+  // otherwise React streams both the site defaults and the page metadata.
+  head: (_path, { frontmatter }) => (frontmatter ? {} : false),
   colorScheme: "dark",
   description:
     "Guides and answers for every WalletChan feature: accounts, dapps, transactions, swaps, privacy, security, networks, and settings.",

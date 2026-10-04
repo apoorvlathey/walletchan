@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Migrate to WCHAN | WalletChan",
-  description: "Migrate your BNKRW tokens to WCHAN. 1:1 Wrap",
+  description: "Migrate BNKRW tokens to WCHAN with the WalletChan 1:1 wrap interface. Connect your wallet, review your balance, and check the migration details before approving.",
   openGraph: {
     title: "Migrate to WCHAN | WalletChan",
-    description: "Migrate your BNKRW tokens to WCHAN. 1:1 Wrap",
+    description: "Migrate BNKRW tokens to WCHAN with the WalletChan 1:1 wrap interface. Connect your wallet, review your balance, and check the migration details before approving.",
     url: "https://migrate.walletchan.com",
     siteName: "WalletChan",
     type: "website",
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@walletchan_",
     title: "Migrate to WCHAN | WalletChan",
-    description: "Migrate your BNKRW tokens to WCHAN. 1:1 Wrap",
+    description: "Migrate BNKRW tokens to WCHAN with the WalletChan 1:1 wrap interface. Connect your wallet, review your balance, and check the migration details before approving.",
     images: ["https://migrate.walletchan.com/og/migrate-og.png"],
   },
 };

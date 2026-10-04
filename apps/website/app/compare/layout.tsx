@@ -2,9 +2,10 @@ import { Metadata } from "next";
 
 const title = "Wallet Tokens Leaderboard | WalletChan";
 const description =
-  "Compare wallet token market caps. See where WCHAN ranks against other wallet tokens like TWT, WCT, and more.";
+  "Compare wallet token market caps and trading volume. See where WCHAN ranks alongside TWT, WCT, and other wallet tokens in the public leaderboard.";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://compare.walletchan.com/" },
   title,
   description,
   openGraph: {

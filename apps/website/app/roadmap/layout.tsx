@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://walletchan.com/roadmap" },
   title: "Roadmap | WalletChan",
   description:
-    "See what we're building and what's next for WalletChan — the AI-powered browser wallet.",
+    "Explore shipped features and upcoming work for WalletChan, the Ethereum and EVM browser wallet for clear signing, dapp connections, swaps, and bridges.",
   openGraph: {
     title: "Roadmap | WalletChan",
     description:
-      "See what we're building and what's next for WalletChan — the AI-powered browser wallet.",
+      "Explore shipped features and upcoming work for WalletChan, the Ethereum and EVM browser wallet for clear signing, dapp connections, swaps, and bridges.",
     url: "https://walletchan.com/roadmap",
     siteName: "WalletChan",
     type: "website",
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
     site: "@walletchan_",
     title: "Roadmap | WalletChan",
     description:
-      "See what we're building and what's next for WalletChan — the AI-powered browser wallet.",
+      "Explore shipped features and upcoming work for WalletChan, the Ethereum and EVM browser wallet for clear signing, dapp connections, swaps, and bridges.",
     images: ["https://walletchan.com/api/og/roadmap"],
   },
 };

@@ -60,6 +60,7 @@ export default function CompareContent() {
           {/* Header */}
           <Box textAlign="center">
             <Text
+              as="h1"
               fontSize={{ base: "3xl", md: "5xl" }}
               fontWeight="900"
               textTransform="uppercase"

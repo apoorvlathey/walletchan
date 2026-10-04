@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import HomeV2Content from "./home-v2/HomeV2Content";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://walletchan.com" },
   title: "WalletChan - EVM Wallet for Web3 | Sign Smarter. Move Faster.",
   description:
     "WalletChan is a self-custodial Ethereum and EVM browser wallet. Connect to Web3 dapps, swap and bridge, and understand each signature before you approve.",

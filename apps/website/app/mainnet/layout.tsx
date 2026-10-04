@@ -3,11 +3,11 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Bridge WCHAN to Mainnet | WalletChan",
   description:
-    "Bridge your WCHAN tokens from Base to Ethereum Mainnet. Track withdrawals and claim on L1.",
+    "Bridge WCHAN from Base to Ethereum Mainnet with WalletChan. Review withdrawal details, track progress, and return to prove and claim your tokens on L1.",
   openGraph: {
     title: "Bridge WCHAN to Mainnet | WalletChan",
     description:
-      "Bridge your WCHAN tokens from Base to Ethereum Mainnet. Track withdrawals and claim on L1.",
+      "Bridge WCHAN from Base to Ethereum Mainnet with WalletChan. Review withdrawal details, track progress, and return to prove and claim your tokens on L1.",
     url: "https://mainnet.walletchan.com",
     siteName: "WalletChan",
     type: "website",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     site: "@walletchan_",
     title: "Bridge WCHAN to Mainnet | WalletChan",
     description:
-      "Bridge your WCHAN tokens from Base to Ethereum Mainnet. Track withdrawals and claim on L1.",
+      "Bridge WCHAN from Base to Ethereum Mainnet with WalletChan. Review withdrawal details, track progress, and return to prove and claim your tokens on L1.",
     images: ["https://walletchan.com/og/home-og.png"],
   },
 };

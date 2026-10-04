@@ -3,11 +3,11 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Claim on Mainnet | WalletChan",
   description:
-    "Prove and finalize your Base to Ethereum withdrawals. Claim your WCHAN tokens on Ethereum Mainnet.",
+    "Prove and finalize an eligible Base-to-Ethereum withdrawal in WalletChan. Track the withdrawal status and claim your WCHAN tokens on Ethereum Mainnet.",
   openGraph: {
     title: "Claim on Mainnet | WalletChan",
     description:
-      "Prove and finalize your Base to Ethereum withdrawals. Claim your WCHAN tokens on Ethereum Mainnet.",
+      "Prove and finalize an eligible Base-to-Ethereum withdrawal in WalletChan. Track the withdrawal status and claim your WCHAN tokens on Ethereum Mainnet.",
     url: "https://mainnet.walletchan.com/claim",
     siteName: "WalletChan",
     type: "website",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     site: "@walletchan_",
     title: "Claim on Mainnet | WalletChan",
     description:
-      "Prove and finalize your Base to Ethereum withdrawals. Claim your WCHAN tokens on Ethereum Mainnet.",
+      "Prove and finalize an eligible Base-to-Ethereum withdrawal in WalletChan. Track the withdrawal status and claim your WCHAN tokens on Ethereum Mainnet.",
     images: ["https://walletchan.com/og/home-og.png"],
   },
 };

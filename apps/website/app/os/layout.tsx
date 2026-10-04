@@ -3,11 +3,11 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "WalletChan OS — Web3 Operating System",
   description:
-    "Browse and use your favorite dapps in a desktop OS experience. Swap, stake, and explore — all from one place.",
+    "Explore WalletChan OS, a web3 desktop for browsing your favorite dapps. Open apps, swap, stake, and manage your workspace from one browser interface.",
   openGraph: {
     title: "WalletChan OS — Web3 Operating System",
     description:
-      "Browse and use your favorite dapps in a desktop OS experience. Swap, stake, and explore — all from one place.",
+      "Explore WalletChan OS, a web3 desktop for browsing your favorite dapps. Open apps, swap, stake, and manage your workspace from one browser interface.",
     url: "https://os.walletchan.com",
     siteName: "WalletChan",
     type: "website",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     site: "@walletchan_",
     title: "WalletChan OS — Web3 Operating System",
     description:
-      "Browse and use your favorite dapps in a desktop OS experience. Swap, stake, and explore — all from one place.",
+      "Explore WalletChan OS, a web3 desktop for browsing your favorite dapps. Open apps, swap, stake, and manage your workspace from one browser interface.",
     images: ["https://os.walletchan.com/api/og/os"],
   },
 };
