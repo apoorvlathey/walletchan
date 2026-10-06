@@ -7,6 +7,8 @@ feature-local hooks below. Keep it free of RPC/storage implementations.
 ## Form and presentation
 
 - `SwapFormScreen.tsx` lays out the form and sticky review action.
+  Price-impact warnings use the shared `WarningAcknowledgementPopover` directly
+  above that action; both the button and preparation handler require its checkbox.
 - `SellTokenCard.tsx` owns sell amount, USD mode, balance, and the same compact
   amber rounded-square slider used by Send.
 - `BuyTokenCard.tsx` owns the read-only quoted output presentation.
@@ -61,6 +63,11 @@ message, RPC, or storage effects except the existing explorer/copy actions in
 - `useSwapSlippage.ts` owns the `swapSlippageBps` sync-storage preference.
 - `useSwapQuotes.ts` owns debounced 0x/Bungee indicative quotes and destination
   native-token recovery metadata.
+- `useSwapPriceImpactDecision.ts` binds the footer checkbox/disclosure to the
+  exact quote, account, token pair, amounts, prices, chains, slippage, loading,
+  and picker state. Changes reset acknowledgement synchronously, including
+  changing away and back. The existing >3% warning and >10% critical thresholds
+  remain; missing price data still yields no price-impact decision.
 - `useImpersonatedSwapPolicy.ts` mirrors the exact selected-RPC developer flag
   for confirmation presentation; the background remains authoritative.
 - `usePreparedSwap.ts` stages confirmation state and coordinates preparation

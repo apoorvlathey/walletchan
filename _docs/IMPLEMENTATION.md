@@ -2851,6 +2851,19 @@ WalletConnect support is a parallel dapp transport for sites that do not list Wa
 
 ### Swap API and token metadata
 
+The Swap/Bridge form places price-impact warnings in the sticky action footer
+above Review swap/bridge, using the shared `WarningAcknowledgementPopover`.
+The existing estimated USD input/output comparison warns above 3% and uses
+critical styling above 10%. Every displayed price-impact warning requires
+the explicit checkbox before review preparation; both the disabled button and
+the UI preparation handler enforce it. `useSwapPriceImpactDecision` resets
+the checkbox/disclosure synchronously for quote, account, token pair, amount,
+price, chain, slippage, loading, or picker changes, including A → B → A.
+This is a renderer review gate, not signing authority. Missing token prices
+still omit price-impact warnings; firm-quote preparation and final transaction
+review retain their existing behavior. Ledger built-in swaps remain unsupported
+and view-only accounts cannot submit.
+
 Swap eligibility follows the exact chain IDs checked in 0x's **Swap and
 Gasless APIs** table. `chainRegistry.ts` derives `ZEROX_SUPPORTED_CHAIN_IDS`
 from built-in `isSwapSupported` flags, while the website price and quote

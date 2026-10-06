@@ -1,4 +1,6 @@
-import { Box, Button, IconButton, VStack } from "@chakra-ui/react";
+import { Box, Button, IconButton, Text, VStack } from "@chakra-ui/react";
+import { WarningTwoIcon } from "@chakra-ui/icons";
+import { WarningAcknowledgementPopover } from "@/components/shared/WarningAcknowledgementPopover";
 import type { PortfolioToken } from "@/chrome/portfolio/api";
 import type { SwapQuoteResponse, TokenInfo } from "@/chrome/swapApi";
 import { FromAccountDisplay } from "@/components/FromAccountDisplay";
@@ -13,6 +15,7 @@ import { BuyTokenCard } from "./BuyTokenCard";
 import { SellTokenCard } from "./SellTokenCard";
 import { SwapQuoteSection } from "./SwapQuoteSection";
 import { SwapArrowIcon } from "./SwapTokenControls";
+import type { useSwapPriceImpactDecision } from "./useSwapPriceImpactDecision";
 import type {
   DestinationNativeInfo,
   SwapAccountType,
@@ -39,6 +42,7 @@ interface SwapFormScreenProps {
   unifiedBuyAmount?: string;
   outputUsd: number;
   priceImpact: number | null;
+  priceImpactDecision: ReturnType<typeof useSwapPriceImpactDecision>["decision"];
   quote: SwapQuoteResponse | null;
   bridgeQuote: BungeeQuoteResponse | null;
   quoteLoading: boolean;
@@ -177,7 +181,6 @@ export function SwapFormScreen(props: SwapFormScreenProps) {
             slippageBps={props.slippageBps}
             sourceNativeSymbol={props.sourceNativeSymbol}
             sourceNativePriceUsd={props.sourceNativePriceUsd}
-            priceImpact={props.priceImpact}
             accountType={props.accountType}
             onUseDestinationNative={props.onUseDestinationNative}
             onSlippageChange={props.onSlippageChange}
@@ -185,6 +188,26 @@ export function SwapFormScreen(props: SwapFormScreenProps) {
         </VStack>
       </ScreenBody>
       <StickyActionBar
+        notice={props.priceImpactDecision.requiresAcknowledgement && props.priceImpact !== null ? (
+          <WarningAcknowledgementPopover
+            matchTriggerWidth
+            tone={props.priceImpact > 10 ? "error" : "warning"}
+            label={`${props.priceImpact > 10 ? "High price impact" : "Price impact"} (~${props.priceImpact.toFixed(1)}%)`}
+            title="Review price impact"
+            acknowledgement="I understand the price impact and want to continue."
+            isOpen={props.priceImpactDecision.isOpen}
+            isAcknowledged={props.priceImpactDecision.acknowledged}
+            isDisabled={props.isSubmitting}
+            onOpenChange={props.priceImpactDecision.setOpen}
+            onAcknowledgedChange={props.priceImpactDecision.setAcknowledged}
+          >
+            <Text>
+              {props.priceImpact > 10
+                ? `High price impact (~${props.priceImpact.toFixed(1)}%). You may receive significantly fewer tokens.`
+                : `Price impact is ~${props.priceImpact.toFixed(1)}%.`}
+            </Text>
+          </WarningAcknowledgementPopover>
+        ) : undefined}
         primaryAction={
           <Button
             w="100%"
@@ -192,7 +215,8 @@ export function SwapFormScreen(props: SwapFormScreenProps) {
             onClick={props.onPrepare}
             isLoading={props.isSubmitting}
             loadingText="Preparing…"
-            isDisabled={!props.canSwap}
+            isDisabled={!props.canSwap || props.priceImpactDecision.blocked}
+            leftIcon={props.priceImpactDecision.blocked ? <WarningTwoIcon /> : undefined}
           >
             {props.sellAmountNumber <= 0
               ? "Enter an amount"

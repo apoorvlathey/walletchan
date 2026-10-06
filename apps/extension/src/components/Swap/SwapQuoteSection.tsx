@@ -33,7 +33,6 @@ interface SwapQuoteSectionProps {
   slippageBps: number;
   sourceNativeSymbol: string;
   sourceNativePriceUsd?: number;
-  priceImpact: number | null;
   accountType: SwapAccountType;
   onUseDestinationNative: () => void;
   onSlippageChange: (value: number) => void;
@@ -54,7 +53,6 @@ export function SwapQuoteSection({
   slippageBps,
   sourceNativeSymbol,
   sourceNativePriceUsd,
-  priceImpact,
   accountType,
   onUseDestinationNative,
   onSlippageChange,
@@ -169,25 +167,6 @@ export function SwapQuoteSection({
           sourceNativeSymbol={sourceNativeSymbol}
           sourceNativePriceUsd={sourceNativePriceUsd}
         />
-      )}
-
-      {priceImpact !== null && priceImpact > 3 && (
-        <Box
-          bg={priceImpact > 10 ? "status.error.bg" : "status.warning.bg"}
-          color={priceImpact > 10 ? "status.error.fg" : "status.warning.fg"}
-          border="1px solid"
-          borderColor={
-            priceImpact > 10 ? "status.error.border" : "status.warning.border"
-          }
-          borderRadius="lg"
-          p={3}
-        >
-          <Text fontSize="sm" fontWeight="700">
-            {priceImpact > 10
-              ? `High price impact (~${priceImpact.toFixed(1)}%). You may receive significantly fewer tokens.`
-              : `Price impact is ~${priceImpact.toFixed(1)}%.`}
-          </Text>
-        </Box>
       )}
 
       {accountType === "impersonator" && (
