@@ -75,9 +75,6 @@ After making significant changes, **update the corresponding doc** if you modifi
 
 ## Monorepo Structure
 
-Independent apps now live in separate repositories. See
-[`_docs/REPOSITORIES.md`](./_docs/REPOSITORIES.md) for ownership and integrations.
-
 ```
 walletchan/
 ├── apps/
@@ -146,13 +143,9 @@ When working on features, refer to these docs.
 | [`_docs/FIREFOX.md`](./_docs/FIREFOX.md) | Firefox port: pipeline, manifest divergence, storage.session shim, AMO release |
 | [`_docs/PK_ACCOUNTS.md`](./_docs/PK_ACCOUNTS.md) | Private-key / Seed phrase account architecture & flows |
 | [`_docs/ADD_CHAIN.md`](./_docs/ADD_CHAIN.md) | Adding a new chain (single registry entry) |
-| [`_docs/INDEXER.md`](./_docs/INDEXER.md) | External indexer integrations and repository links |
+| [`_docs/INDEXER.md`](./_docs/INDEXER.md) | Website and extension indexer API integrations |
 | [`_docs/RAILWAY.md`](./_docs/RAILWAY.md) | Railway deploy: Dockerfile + railway.toml pattern for pnpm monorepo |
 | [`_docs/TOKEN_GATED_TG.md`](./_docs/TOKEN_GATED_TG.md) | Retired TG deployment and remaining website integration |
-| [walletchan/tg-bot implementation](https://github.com/walletchan/tg-bot/blob/main/IMPLEMENTATION.md) | TG bot: verification flow, commands, API, balance checker |
-| [walletchan/arb-bot implementation](https://github.com/walletchan/arb-bot/blob/main/IMPLEMENTATION.md) | Arb bot: cross-pool strategy, batched RPC, encoding |
-| [walletchan/wchan-vault-indexer implementation](https://github.com/walletchan/wchan-vault-indexer/blob/main/IMPLEMENTATION.md) | WCHAN vault indexer: sWCHAN balance tracking, APY, snapshots |
-| [BNKRW indexer implementation](https://github.com/walletchan/bnkrw-staking-indexer/blob/main/STAKING_INDEXER_IMPLEMENTATION.md) | Staking indexer (legacy) |
 | `_docs/bankr-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling |
 | [github.com/apoorvlathey/walletchan-skill](https://github.com/apoorvlathey/walletchan-skill) | Public agent skill for driving the extension via CDP (canonical source lives in that repo) |
 

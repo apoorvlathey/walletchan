@@ -97,9 +97,6 @@ that private key/seed phrase/Ledger accounts have separate handlers.
 
 ## Monorepo Structure
 
-Independent apps now live in separate repositories. See
-[`_docs/REPOSITORIES.md`](./_docs/REPOSITORIES.md) for ownership and integrations.
-
 ```
 walletchan/
 ├── apps/
@@ -665,15 +662,11 @@ When working on features, refer to these docs:
 | `_docs/ERC5792.md`                                       | ERC-5792 batch txs: message flow, ERC-7821 encoding, 7702 plan |
 | `_docs/WALLETCHAN_RPC.md`                                | Local JSON-RPC -> WalletConnect bridge implementation      |
 | `_docs/WALLETCHAN_MCP.md`                                | Local MCP adapter, managed RPC, and Base skill wrapping              |
-| [BNKRW indexer implementation](https://github.com/walletchan/bnkrw-staking-indexer/blob/main/STAKING_INDEXER_IMPLEMENTATION.md) | Staking indexer: sBNKRW vault events, balance tracking (legacy) |
-| [walletchan/wchan-vault-indexer implementation](https://github.com/walletchan/wchan-vault-indexer/blob/main/IMPLEMENTATION.md)             | WCHAN vault indexer: sWCHAN balance tracking, APY, snapshots    |
 | `.agents/skills/walletchan-chain-research/SKILL.md`      | Codex-local research checklist for adding/updating WalletChan chain params |
 | `_docs/DEVELOPMENT.md`                                   | Build process, dev environment setup                      |
 | `_docs/PUBLISHING.md`                                    | Release workflow, CWS upload, auto-update, signing        |
 | `_docs/STORAGE.md`                                       | Every chrome.storage key, shapes, version history         |
 | `_docs/ADD_CHAIN.md`                                     | How to add a new chain (single registry entry)            |
-| [walletchan/tg-bot implementation](https://github.com/walletchan/tg-bot/blob/main/IMPLEMENTATION.md)                          | TG bot: verification flow, commands, API, balance checker |
-| [walletchan/arb-bot implementation](https://github.com/walletchan/arb-bot/blob/main/IMPLEMENTATION.md)                         | Arb bot: cross-pool arb strategy, batched RPC, encoding   |
 | `_docs/TOKEN_GATED_TG.md`                                | Retired TG deployment and website integration  |
 | `_docs/bankr-skills/bankr/SKILL.md`                      | Bankr API interactions, workflows, error handling         |
 
@@ -942,8 +935,6 @@ const isOnStake = isOnPage("/stake");            // → true on /stake path OR s
 
 Only `apps/domain-reputation` remains deployed from this monorepo. Use its
 Dockerfile and `railway.toml`; see [`_docs/RAILWAY.md`](./_docs/RAILWAY.md).
-Independent bots and indexers deploy from their own repositories; their
-implementation rules belong there. See [`_docs/REPOSITORIES.md`](./_docs/REPOSITORIES.md).
 
 ## Testing Extension Changes
 

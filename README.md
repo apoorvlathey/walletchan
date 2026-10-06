@@ -135,9 +135,7 @@ See [DEVELOPMENT.md](_docs/DEVELOPMENT.md) for the development workflow and
 ## Repository layout
 
 This repo contains the extension, website, docs, domain reputation service, and
-RPC/MCP companion tools. Independent bots, indexers, contracts, redirects, and
-mascot authoring live in their own repositories. See
-[repository ownership](_docs/REPOSITORIES.md) for links and integration boundaries.
+RPC/MCP companion tools, along with the shared packages used by these apps.
 
 ## Security
 

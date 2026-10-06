@@ -1,6 +1,22 @@
 # Development
 
-This pnpm workspace contains the browser extension, website, docs site, domain reputation service, and RPC/MCP companion tools. Independent apps and contracts live in separate repositories; see [REPOSITORIES.md](./REPOSITORIES.md).
+This pnpm workspace contains the browser extension, website, docs site, domain reputation service, and RPC/MCP companion tools.
+
+## Contract address updates
+
+The public [contracts repository](https://github.com/walletchan/contracts) owns
+Solidity source and deployment records. This workspace keeps a reviewed local
+address snapshot, so builds do not need access to another repository.
+
+To update addresses from a reviewed contracts checkout:
+
+```sh
+pnpm sync:addresses /path/to/contracts/addresses.json
+```
+
+Review the generated diff before committing. This command never runs during
+extension, website, or docs builds. Simulator source and tests are linked in
+[ASSET_CHANGES_SIMULATION.md](./ASSET_CHANGES_SIMULATION.md).
 
 ## Pre-requisites
 

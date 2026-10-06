@@ -75,7 +75,7 @@ identity assets, and blue reserved for transactional/focus roles.
 - Trust-critical confirmation screens remain information-first. Do not place a
   large mascot beside transaction outcomes, asset changes, fees, or approval
   limits.
-- Follow the semantic states and animation pipeline in `MASCOT.md` rather than
+- Follow the packaged-asset and motion guidance in `MASCOT.md`; avoid
   creating one-off character behavior inside screens.
 
 ### 3.3 Color responsibilities
