@@ -102,15 +102,13 @@ walletchan/
 ├── apps/
 │   ├── extension/        # Browser extension (Vite + React + Chakra UI)
 │   ├── website/          # Landing page (Next.js + Chakra UI)
-│   ├── indexer/          # Ponder indexer for coin launches
-│   ├── staking-indexer/  # Ponder indexer for sBNKRW vault staking
-│   ├── tg-bot/           # Token-gated Telegram bot (Grammy + Hono)
-│   ├── arb-bot/          # WETH↔WCHAN/BNKRW cross-pool arbitrage bot (Base)
+│   ├── docs/             # Public documentation site
+│   ├── domain-reputation/ # Phishing-list lookup service
 │   ├── walletchan-rpc/   # Local JSON-RPC -> WalletConnect bridge
-│   ├── walletchan-mcp/   # Local stdio MCP adapter for WalletChan RPC + Base skills
-│   └── contracts/        # Solidity smart contracts (Foundry)
+│   └── walletchan-mcp/   # Local stdio MCP adapter for WalletChan RPC + Base skills
 ├── packages/
 │   ├── shared/           # Shared design tokens, assets, and contract constants
+│   ├── contract-addresses/ # Reviewed public address snapshot
 │   └── wchan-swap/       # Shared swap logic (quoting, encoding, permit2)
 ├── _docs/                # LLM-facing documentation
 │   ├── IMPLEMENTATION.md  # Extension architecture and message flows
@@ -128,13 +126,8 @@ walletchan/
 | --------------- | ----------------------- | ---------- | ---------- |
 | Extension       | React 18                | Chakra UI  | Vite       |
 | Website         | Next.js 14 (App Router) | Chakra UI  | Next.js    |
-| Indexer         | Ponder                  | Hono       | Ponder     |
-| Staking Indexer | Ponder                  | Hono       | Ponder     |
-| TG Bot          | Grammy + Hono           | —          | tsc        |
-| Arb Bot         | Node.js + viem          | —          | tsc        |
 | WalletChan RPC  | Node.js + Hono          | —          | tsc        |
 | WalletChan MCP  | Node.js stdio MCP       | —          | tsc        |
-| Contracts       | Solidity                | —          | Foundry    |
 
 **Design System**: Warm Midnight is the current extension and website
 direction. The extension retains Bauhaus as an optional alternate theme; the
@@ -150,9 +143,6 @@ pnpm install
 # Development
 pnpm dev:extension         # Build extension in dev mode
 pnpm dev:website           # Start website dev server at localhost:3000
-pnpm dev:staking-indexer   # Start staking indexer at localhost:42070
-pnpm dev:tg-bot            # Start TG bot + API at localhost:3001
-pnpm dev:arb-bot           # Start arb bot (requires .env with PRIVATE_KEY + BASE_RPC_URL)
 pnpm dev:walletchan-rpc    # Start local JSON-RPC -> WalletConnect proxy at localhost:4209
 pnpm dev:walletchan-mcp    # Start local stdio MCP adapter backed by walletchan-rpc
 
@@ -169,12 +159,10 @@ pnpm zip:cws            # Build + zip (strips `key` defensively, for CWS upload)
 pnpm lint               # Lint extension code
 pnpm test:extension-ui  # UI architecture, facade, pure-model, and size guardrails
 
-# Contracts
-pnpm build:contracts    # Compile Solidity contracts
-pnpm test:contracts     # Run Foundry tests
+# Contracts live in https://github.com/walletchan/contracts
 
 # Foundry library installation (ALWAYS use git submodules)
-cd apps/contracts && forge install <org>/<repo>   # Do NOT use --no-git
+cd /path/to/contracts && forge install <org>/<repo>   # Do NOT use --no-git
 
 # Release (auto-bumps version, syncs manifest, creates tag, pushes)
 pnpm release:patch      # 0.1.0 → 0.1.1
@@ -674,16 +662,11 @@ When working on features, refer to these docs:
 | `_docs/ERC5792.md`                                       | ERC-5792 batch txs: message flow, ERC-7821 encoding, 7702 plan |
 | `_docs/WALLETCHAN_RPC.md`                                | Local JSON-RPC -> WalletConnect bridge implementation      |
 | `_docs/WALLETCHAN_MCP.md`                                | Local MCP adapter, managed RPC, and Base skill wrapping              |
-| `apps/staking-indexer/STAKING_INDEXER_IMPLEMENTATION.md` | Staking indexer: sBNKRW vault events, balance tracking (legacy) |
-| `apps/wchan-vault-indexer/IMPLEMENTATION.md`             | WCHAN vault indexer: sWCHAN balance tracking, APY, snapshots    |
 | `.agents/skills/walletchan-chain-research/SKILL.md`      | Codex-local research checklist for adding/updating WalletChan chain params |
 | `_docs/DEVELOPMENT.md`                                   | Build process, dev environment setup                      |
 | `_docs/PUBLISHING.md`                                    | Release workflow, CWS upload, auto-update, signing        |
 | `_docs/STORAGE.md`                                       | Every chrome.storage key, shapes, version history         |
 | `_docs/ADD_CHAIN.md`                                     | How to add a new chain (single registry entry)            |
-| `apps/tg-bot/IMPLEMENTATION.md`                          | TG bot: verification flow, commands, API, balance checker |
-| `apps/arb-bot/IMPLEMENTATION.md`                         | Arb bot: cross-pool arb strategy, batched RPC, encoding   |
-| `_docs/TOKEN_GATED_TG.md`                                | Token-gated TG system: architecture, DB schema, security  |
 | `_docs/bankr-skills/bankr/SKILL.md`                      | Bankr API interactions, workflows, error handling         |
 
 ## Important Patterns
@@ -947,40 +930,10 @@ const { href, homeHref, isOnPage } = useSiteNav();
 const isOnStake = isOnPage("/stake");            // → true on /stake path OR stake.walletchan.com
 ```
 
-## Ponder Indexer Performance
+## Railway Deployment
 
-**CRITICAL**: When indexing events from **shared contracts** (contracts used by many users, like ClankerFeeLocker), always use Ponder's `filter` option in `ponder.config.ts` to filter by indexed event parameters at the RPC level — do NOT rely solely on filtering inside the event handler.
-
-Without config-level filtering, Ponder fetches **all** events from the contract via `eth_getLogs` and your handler discards 99%+ of them. With `filter.args`, the RPC node uses topic filtering to only return matching events, which is orders of magnitude faster.
-
-```ts
-// BAD: fetches ALL ClaimTokens events, filters in handler
-ClankerFeeLocker: {
-  abi, address, startBlock,
-}
-
-// GOOD: RPC node filters by indexed args before returning
-ClankerFeeLocker: {
-  abi, address, startBlock,
-  filter: {
-    event: "ClaimTokens",
-    args: { feeOwner: "0x...", token: ["0x...", "0x..."] },
-  },
-}
-```
-
-**Rule of thumb**: If an event parameter is `indexed` in the ABI and you only care about specific values, put it in `filter.args`. Keep the handler-level filter as a safety net if you want.
-
-## Railway Deployment (pnpm Monorepo)
-
-Railway's default Nixpacks builder does NOT work for this pnpm monorepo with `workspace:*` dependencies. Always use a **Dockerfile** + **`railway.toml`**.
-
-**Pattern** (see `apps/indexer/` for reference):
-
-- `Dockerfile`: `node:20-slim`, enable corepack/pnpm, copy workspace root files + the app + any `packages/*` workspace deps, `pnpm install --frozen-lockfile --filter <pkg>`
-- `railway.toml`: sets `dockerfilePath` (from repo root), deploy config
-- Do NOT set Root Directory, Build Command, or Start Command in Railway UI — `railway.toml` handles it
-- For Ponder indexers: start command uses `--schema $RAILWAY_DEPLOYMENT_ID` for zero-downtime deploys
+Only `apps/domain-reputation` remains deployed from this monorepo. Use its
+Dockerfile and `railway.toml`; see [`_docs/RAILWAY.md`](./_docs/RAILWAY.md).
 
 ## Testing Extension Changes
 

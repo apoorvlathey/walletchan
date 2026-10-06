@@ -1,6 +1,22 @@
 # Development
 
-This is a pnpm workspaces monorepo containing the browser extension (`apps/extension`), the landing page website (`apps/website`), Ponder indexers, bots, and Solidity contracts.
+This pnpm workspace contains the browser extension, website, docs site, domain reputation service, and RPC/MCP companion tools.
+
+## Contract address updates
+
+The public [contracts repository](https://github.com/walletchan/contracts) owns
+Solidity source and deployment records. This workspace keeps a reviewed local
+address snapshot, so builds do not need access to another repository.
+
+To update addresses from a reviewed contracts checkout:
+
+```sh
+pnpm sync:addresses /path/to/contracts/addresses.json
+```
+
+Review the generated diff before committing. This command never runs during
+extension, website, or docs builds. Simulator source and tests are linked in
+[ASSET_CHANGES_SIMULATION.md](./ASSET_CHANGES_SIMULATION.md).
 
 ## Pre-requisites
 
@@ -13,13 +29,8 @@ This is a pnpm workspaces monorepo containing the browser extension (`apps/exten
 | --------------- | ----------------------- | ---------- | ---------- |
 | Extension       | React 18                | Chakra UI  | Vite       |
 | Website         | Next.js 14 (App Router) | Chakra UI  | Next.js    |
-| Indexer         | Ponder                  | Hono       | Ponder     |
-| Staking Indexer | Ponder                  | Hono       | Ponder     |
-| TG Bot          | Grammy + Hono           | —          | tsc        |
-| Arb Bot         | Node.js + viem          | —          | tsc        |
 | WalletChan RPC  | Node.js + Hono          | —          | tsc        |
 | WalletChan MCP  | Node.js stdio MCP       | —          | tsc        |
-| Contracts       | Solidity                | —          | Foundry    |
 
 ## Commands
 
@@ -31,10 +42,7 @@ pnpm install
 pnpm dev:extension         # Build extension in DEVELOPMENT mode (vite build --mode development)
 pnpm dev-sepolia:extension # Local APIs with Sepolia Privacy Pools
 pnpm dev:website           # Start website dev server at localhost:3030
-pnpm dev:staking-indexer   # Start staking indexer at localhost:42070
-pnpm dev:tg-bot            # Start TG bot + API at localhost:3001
 pnpm dev:domain-reputation # Start domain reputation service at localhost:42110
-pnpm dev:arb-bot           # Start arb bot (requires .env with PRIVATE_KEY + BASE_RPC_URL)
 pnpm dev:walletchan-rpc    # Start local JSON-RPC -> WalletConnect proxy at localhost:4209
 pnpm dev:walletchan-mcp    # Start local stdio MCP adapter backed by walletchan-rpc
 
@@ -64,12 +72,10 @@ pnpm dev:extension:firefox     # Dev Firefox build (uses local website)
 pnpm zip:firefox               # Build + zip Firefox artifact for archival
 pnpm sign:firefox              # Build + submit to AMO (requires WEB_EXT_API_KEY / WEB_EXT_API_SECRET)
 
-# Contracts
-pnpm build:contracts    # Compile Solidity contracts
-pnpm test:contracts     # Run Foundry tests
+# Contracts live in https://github.com/walletchan/contracts
 
 # Foundry library installation (ALWAYS use git submodules)
-cd apps/contracts && forge install <org>/<repo>   # Do NOT use --no-git
+cd /path/to/contracts && forge install <org>/<repo>   # Do NOT use --no-git
 
 # Release (auto-bumps version, syncs manifest, creates tag, pushes)
 pnpm release:patch      # 0.1.0 → 0.1.1

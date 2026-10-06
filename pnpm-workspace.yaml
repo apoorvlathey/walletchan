@@ -1,3 +1,10 @@
 packages:
-  - "apps/*"
-  - "packages/*"
+  - "apps/extension"
+  - "apps/website"
+  - "apps/docs"
+  - "apps/domain-reputation"
+  - "apps/walletchan-rpc"
+  - "apps/walletchan-mcp"
+  - "packages/shared"
+  - "packages/wchan-swap"
+  - "packages/contract-addresses"
