@@ -1,6 +1,6 @@
 # Development
 
-This pnpm workspace contains the browser extension, website, docs site, domain reputation service, and RPC/MCP companion tools.
+This pnpm workspace contains the browser extension, website, docs site, and domain reputation service.
 
 ## Contract address updates
 
@@ -29,8 +29,6 @@ extension, website, or docs builds. Simulator source and tests are linked in
 | --------------- | ----------------------- | ---------- | ---------- |
 | Extension       | React 18                | Chakra UI  | Vite       |
 | Website         | Next.js 14 (App Router) | Chakra UI  | Next.js    |
-| WalletChan RPC  | Node.js + Hono          | —          | tsc        |
-| WalletChan MCP  | Node.js stdio MCP       | —          | tsc        |
 
 ## Commands
 
@@ -43,16 +41,12 @@ pnpm dev:extension         # Build extension in DEVELOPMENT mode (vite build --m
 pnpm dev-sepolia:extension # Local APIs with Sepolia Privacy Pools
 pnpm dev:website           # Start website dev server at localhost:3030
 pnpm dev:domain-reputation # Start domain reputation service at localhost:42110
-pnpm dev:walletchan-rpc    # Start local JSON-RPC -> WalletConnect proxy at localhost:4209
-pnpm dev:walletchan-mcp    # Start local stdio MCP adapter backed by walletchan-rpc
 
 # Build
 pnpm build              # Build both extension and website
 pnpm build:extension    # Build extension in PRODUCTION mode (output: apps/extension/build/)
 pnpm build-sepolia:extension # Production APIs with Sepolia Privacy Pools
 pnpm build:website      # Build website only
-pnpm build:walletchan-rpc # Build WalletChan RPC CLI only
-pnpm build:walletchan-mcp # Build WalletChan MCP CLI only
 pnpm build:domain-reputation # Build Railway domain reputation service
 pnpm test:domain-reputation  # Test source validation, snapshots, and lookups
 
@@ -196,10 +190,9 @@ Domain reputation requires:
 
 ## WalletChan RPC / MCP
 
-Implementation details for the local agent tooling live in:
-
-- [`WALLETCHAN_RPC.md`](./WALLETCHAN_RPC.md) - local JSON-RPC to WalletConnect bridge
-- [`WALLETCHAN_MCP.md`](./WALLETCHAN_MCP.md) - local stdio MCP adapter, managed RPC, and Base skill wrapping
+Local agent tooling is maintained in the public
+[RPC](https://github.com/walletchan/walletchan-rpc) and
+[MCP](https://github.com/walletchan/walletchan-mcp) repositories.
 
 ## Releasing & Publishing
 

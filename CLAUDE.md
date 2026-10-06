@@ -81,9 +81,7 @@ walletchan/
 │   ├── extension/             # Browser extension (Vite + React + Chakra UI)
 │   ├── website/               # Landing page (Next.js + Chakra UI)
 │   ├── docs/                  # End-user documentation (Vocs)
-│   ├── domain-reputation/     # Phishing-list lookup service
-│   ├── walletchan-rpc/        # Local JSON-RPC -> WalletConnect bridge
-│   └── walletchan-mcp/        # Local stdio MCP adapter for agents
+│   └── domain-reputation/     # Phishing-list lookup service
 ├── packages/
 │   ├── shared/                # Shared design tokens, assets, contract constants
 │   ├── contract-addresses/ # Reviewed public address snapshot

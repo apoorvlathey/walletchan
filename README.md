@@ -113,9 +113,9 @@ enabled.
 ## Build from source
 
 This repository is a pnpm monorepo containing the browser extension,
-[website](apps/website/), and supporting apps such as
-[WalletChan RPC](apps/walletchan-rpc/) and
-[WalletChan MCP](apps/walletchan-mcp/).
+[website](apps/website/), docs site, and domain reputation service.
+[WalletChan RPC](https://github.com/walletchan/walletchan-rpc) and
+[WalletChan MCP](https://github.com/walletchan/walletchan-mcp) are maintained separately.
 
 ### Prerequisites
 
