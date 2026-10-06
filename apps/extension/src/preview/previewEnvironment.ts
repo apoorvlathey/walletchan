@@ -193,7 +193,7 @@ export function createPreviewEnvironment(href: string): PreviewEnvironment {
         createPreviewHomePortfolioSnapshots(),
     };
   }
-  if (route === "home" && scenario === "private") local.walletHomeModeV1 = "private";
+  if (route === "home" && (scenario === "private" || scenario === "private-ready")) local.walletHomeModeV1 = "private";
   if (route === "onboarding") {
     delete local.encryptedApiKeyVault;
     delete local.encryptedApiKey;

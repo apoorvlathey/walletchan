@@ -36,6 +36,7 @@ export const PREVIEW_ROUTE_REGISTRY: Record<
       "portfolio-empty",
       "portfolio-error",
       "private",
+      "private-ready",
       "stress",
       "safe-account",
     ],

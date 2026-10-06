@@ -27,7 +27,7 @@ export function previewShieldPortfolioResponse(
   },
 ) {
   const pendingEligibility = scenario === "pending-eligibility" || scenario === "unshield-pending" || scenario === "private";
-  const readyToUnshield = scenario === "unshield" || scenario === "private";
+  const readyToUnshield = scenario === "unshield" || scenario === "private" || scenario === "private-ready";
   const readyBalanceWei = readyToUnshield ? 10_000_000_000_000_000n : 0n;
   const pendingBalanceWei = pendingEligibility ? previewPendingShieldedWei : 0n;
   return {
