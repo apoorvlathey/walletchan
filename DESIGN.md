@@ -3,6 +3,20 @@
 > Screen-by-screen implementation decisions and current review status live in
 > [`_docs/WARM_MIDNIGHT.md`](./_docs/WARM_MIDNIGHT.md).
 
+## Bankr chat
+
+Chat extends Warm Midnight as a calm, compact, approachable conversation
+surface. Neutral, content-sized user bubbles sit on the right; Bankr replies
+use the left reading edge. Metadata and copy/resend controls belong below
+the message, never inside its content area. Error messages have recovery
+actions instead of copy controls. API-access setup uses a neutral warning
+surface with an amber settings action; generic failures retain red semantic
+emphasis. The composer uses amber Send and focus, an explicit exception to
+the ordinary blue field-focus family, with the existing typography, 4px
+spacing rhythm, 8/12px geometry, and no added shadows or motion. Multiline
+drafts grow within a bounded composer; Enter sends, Shift+Enter inserts a line,
+and IME composition never submits prematurely.
+
 ## Wallet test playground
 
 The account-domain regression controls in `/test#signatures` extend the existing

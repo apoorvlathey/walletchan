@@ -114,3 +114,46 @@ test("chat storage preserves its key, ordering, and bounded message history", as
     harness.restore();
   }
 });
+
+test("disabled Agent API access produces actionable chat guidance", async () => {
+  for (const body of [
+    { error: "Agent API access not enabled" },
+    { error: "Agent API access not enabled", message: "Forbidden" },
+    { message: "This API key does not have Agent API access enabled." },
+  ]) {
+    globalThis.fetch = async () => new Response(JSON.stringify(body), { status: 403 });
+    await assert.rejects(chat.submitChatPrompt("secret-api-key", "hello"), (error: unknown) =>
+      error instanceof Error && /enable Agent API access/.test(error.message) &&
+      error.message.includes("https://bankr.bot/api-keys"));
+  }
+  globalThis.fetch = async () => new Response(JSON.stringify({ message: "IP not allowed" }), { status: 403 });
+  await assert.rejects(chat.submitChatPrompt("secret-api-key", "hello"), /IP not allowed/);
+});
+
+test("chat polling never completes with an empty or failed assistant reply", async () => {
+  for (const body of [
+    { status: "completed", response: "" },
+    { status: "completed", response: "   \n" },
+    { status: "completed" },
+    { status: "completed", success: false },
+    { status: "failed", result: { error: "Agent API access not enabled" } },
+    { status: "completed", response: "Agent API access not enabled" },
+  ]) {
+    globalThis.fetch = async () => new Response(JSON.stringify(body));
+    const result = await chat.pollChatJobUntilComplete("secret-api-key", "safe_job-1");
+    assert.equal(result.success, false);
+    assert.equal(result.response, "");
+    assert.match(result.error!, /Agent API access/);
+    assert.match(result.error!, /https:\/\/bankr.bot\/api-keys/);
+  }
+  for (const status of ["completed", "failed"]) {
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      status, response: "Ignored", result: { error: "Insufficient credits" },
+    }));
+    assert.equal((await chat.pollChatJobUntilComplete("secret-api-key", "safe_job-1")).error, "Insufficient credits");
+  }
+  globalThis.fetch = async () => new Response(JSON.stringify({ status: "completed", response: "Hello!" }));
+  assert.deepEqual(await chat.pollChatJobUntilComplete("secret-api-key", "safe_job-1"), {
+    success: true, response: "Hello!",
+  });
+});

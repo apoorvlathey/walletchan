@@ -183,6 +183,10 @@ export function ChatView({ onBack, startWithNewChat = false, returnToConversatio
         title={currentConversation?.title || "New Chat"}
         onBack={handleBackFromChat}
         onNewChat={handleNewChat}
+        onHistory={() => {
+          void refreshConversations();
+          setMode("list");
+        }}
         onDelete={handleDeleteChat}
         showDelete={!!currentConversation && messages.length > 0}
       />
@@ -208,7 +212,7 @@ export function ChatView({ onBack, startWithNewChat = false, returnToConversatio
         pt={3}
         pb="calc(12px + env(safe-area-inset-bottom, 0px))"
       >
-        <ChatInput onSend={sendMessage} isLoading={isLoading} />
+        <ChatInput key={currentConversation?.id || "new"} onSend={sendMessage} isLoading={isLoading} />
       </Box>
     </AppScreen>
   );

@@ -3,7 +3,7 @@ import {
   IconButton,
   useDisclosure,
 } from "@chakra-ui/react";
-import { AddIcon, DeleteIcon, HamburgerIcon } from "@chakra-ui/icons";
+import { AddIcon, DeleteIcon, HamburgerIcon, TimeIcon } from "@chakra-ui/icons";
 import { useRef } from "react";
 import { ActionSheet, AppHeader } from "@/components/ui";
 
@@ -11,6 +11,7 @@ interface ChatHeaderProps {
   title: string;
   onBack: () => void;
   onNewChat: () => void;
+  onHistory: () => void;
   onDelete?: () => void;
   showDelete?: boolean;
 }
@@ -19,6 +20,7 @@ export function ChatHeader({
   title,
   onBack,
   onNewChat,
+  onHistory,
   onDelete,
   showDelete = true,
 }: ChatHeaderProps) {
@@ -33,6 +35,15 @@ export function ChatHeader({
         backLabel="Back from conversation"
         trailing={
           <HStack spacing={0}>
+            <IconButton
+              aria-label="Open chat history"
+              icon={<TimeIcon boxSize={4} />}
+              variant="ghost"
+              minW="44px"
+              w="44px"
+              h="44px"
+              onClick={onHistory}
+            />
             <IconButton
               aria-label="Start a new chat"
               icon={<AddIcon boxSize={4} />}

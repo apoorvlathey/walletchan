@@ -15,7 +15,7 @@ import TokenTransfer from "@/components/TokenTransfer";
 import { QRCodeModal } from "@/components/QRCodeModal";
 import MoreActionsView from "@/components/MoreActionsView";
 import WalletConnectView from "@/components/WalletConnectView";
-import ChatView from "@/components/Chat/ChatView";
+import ChatPreview from "./ChatPreview";
 import AccountSettings, {
   type AccountSettingsSubView,
 } from "@/components/AccountSettings";
@@ -732,11 +732,7 @@ export function PreviewScreen({
     case "chat":
       return (
         <PreviewShell>
-          <ChatView
-            onBack={noop}
-            startWithNewChat={scenario === "new"}
-            isWalletUnlocked
-          />
+          <ChatPreview scenario={scenario} />
         </PreviewShell>
       );
     case "account-management":

@@ -62,7 +62,7 @@ export function MessageList({
   }
 
   return (
-    <ScreenBody px={4} py={0}>
+    <ScreenBody px={4} py={2}>
       <VStack as="section" aria-label="Conversation" spacing={0} align="stretch">
         {messages.map((message) => (
           <MessageBubble
@@ -71,8 +71,9 @@ export function MessageList({
             statusText={message.status === "pending" ? statusUpdateText : undefined}
             isWalletUnlocked={isWalletUnlocked}
             onUnlock={onUnlock}
-            onRetry={onRetry}
+            onRetry={message.id === messages[messages.length - 1]?.id ? onRetry : undefined}
             onResend={onResend}
+            isBusy={isLoading}
           />
         ))}
         <div ref={bottomRef} />
