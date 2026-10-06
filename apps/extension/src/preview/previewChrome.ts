@@ -652,11 +652,21 @@ export function responseForPreviewMessage(
         success: true,
         balanceWei: "2812260000000000000",
       };
-    case "fetchSwapPrice":
+    case "fetchSwapPrice": {
+      // Fixture outputs for a 0.5 ETH ($874.845) swap to USDC.
+      // Exercise the production warning without changing swap policy.
+      const scenario = environment.parsed.state.scenario;
+      const buyAmount = scenario === "price-impact-warning"
+        ? "831102750" // 5%
+        : scenario === "high-price-impact"
+          ? "743618250" // 15%
+          : scenario === "extreme-price-impact"
+            ? "6123915" // 99.3%, matching the linked post's example
+            : "873420000";
       return {
         success: true,
         data: {
-          buyAmount: "873420000",
+          buyAmount,
           sellAmount: String(message?.sellAmount ?? "500000000000000000"),
           buyToken: String(message?.buyToken ?? ""),
           sellToken: String(message?.sellToken ?? ""),
@@ -664,7 +674,7 @@ export function responseForPreviewMessage(
           gasPrice: "120000000",
           totalNetworkFee: "21600000000000",
           liquidityAvailable: true,
-          minBuyAmount: "829749000",
+          minBuyAmount: String(BigInt(buyAmount) * 9500n / 10000n),
           allowanceTarget: "0x111111125421cA6dc452d289314280a0f8842A65",
           issues: {},
           fees: {},
@@ -680,6 +690,7 @@ export function responseForPreviewMessage(
           },
         },
       };
+    }
     case "fetchBridgeQuote": {
       const outputToken = {
         address: String(message?.outputToken ?? ""),

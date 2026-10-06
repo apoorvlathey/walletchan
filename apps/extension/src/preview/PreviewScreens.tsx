@@ -16,6 +16,7 @@ import { QRCodeModal } from "@/components/QRCodeModal";
 import MoreActionsView from "@/components/MoreActionsView";
 import WalletConnectView from "@/components/WalletConnectView";
 import ChatPreview from "./ChatPreview";
+import { AutoConfigureSwap } from "./AutoConfigureSwap";
 import AccountSettings, {
   type AccountSettingsSubView,
 } from "@/components/AccountSettings";
@@ -162,74 +163,6 @@ function AutoActivateButton({ label }: { label: string }) {
 
   return null;
 }
-function setReactInputValue(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    "value",
-  )?.set;
-  setter?.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
-function AutoConfigureSwap({ bridge }: { bridge: boolean }) {
-  useEffect(() => {
-    let cancelled = false;
-    const waitFor = async <T extends Element,>(
-      find: () => T | undefined,
-    ): Promise<T | undefined> => {
-      for (let attempt = 0; attempt < 50 && !cancelled; attempt += 1) {
-        const match = find();
-        if (match) return match;
-        await new Promise((resolve) => window.setTimeout(resolve, 100));
-      }
-      return undefined;
-    };
-
-    void (async () => {
-      const select = await waitFor(() =>
-        Array.from(document.querySelectorAll("button")).find(
-          (button) =>
-            button.textContent?.trim().toUpperCase().startsWith("SELECT"),
-        ),
-      );
-      if (!select || cancelled) return;
-      select.click();
-
-      if (bridge) {
-        const arbitrum = await waitFor(() =>
-          Array.from(document.querySelectorAll("button")).find((button) =>
-            button.textContent?.toLowerCase().includes("arbitrum"),
-          ),
-        );
-        if (!arbitrum || cancelled) return;
-        arbitrum.click();
-        await new Promise((resolve) => window.setTimeout(resolve, 250));
-      }
-
-      const usdc = await waitFor(() =>
-        Array.from(document.querySelectorAll("button")).find((button) =>
-          button.textContent?.toUpperCase().includes("USDC"),
-        ),
-      );
-      if (!usdc || cancelled) return;
-      usdc.click();
-
-      const amountInput = await waitFor(() =>
-        Array.from(document.querySelectorAll("input")).find(
-          (input) => !input.readOnly && input.placeholder === "0.0",
-        ),
-      );
-      if (!amountInput || cancelled) return;
-      setReactInputValue(amountInput, "0.5");
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [bridge]);
-
-  return null;
-}
 
 function SwapPreview({
   wallet,
@@ -242,7 +175,7 @@ function SwapPreview({
   const account = getPreviewWallet(effectiveWallet);
   return (
     <PreviewShell>
-      {(scenario === "quoted" || scenario === "bridge-quoted") && (
+      {(["quoted", "bridge-quoted", "price-impact-warning", "high-price-impact", "extreme-price-impact"].includes(scenario)) && (
         <AutoConfigureSwap bridge={scenario === "bridge-quoted"} />
       )}
       <SwapView
