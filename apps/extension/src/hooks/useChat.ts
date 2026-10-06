@@ -61,7 +61,7 @@ export function useChat(): UseChatReturn {
     ) => {
       if (message.type === "chatJobComplete" && message.conversationId) {
         // Clear status update text on completion
-        setStatusUpdateText(null);
+        if (currentConversation?.id === message.conversationId) setStatusUpdateText(null);
         // Update the message with the response
         if (currentConversation?.id === message.conversationId && message.messageId) {
           const errorContent = message.error || "";
@@ -81,7 +81,7 @@ export function useChat(): UseChatReturn {
         refreshConversations();
       }
 
-      if (message.type === "chatJobUpdate" && message.conversationId) {
+      if (message.type === "chatJobUpdate" && message.conversationId && message.conversationId === currentConversation?.id) {
         // Extract the latest status update message
         if (message.statusUpdates && message.statusUpdates.length > 0) {
           const latest = message.statusUpdates[message.statusUpdates.length - 1];
@@ -105,6 +105,7 @@ export function useChat(): UseChatReturn {
   const loadConversation = useCallback(async (id: string) => {
     const conv = await getConversation(id);
     setCurrentConversation(conv);
+    setIsLoading(conv?.messages.some((message) => message.status === "pending") ?? false);
     setError(null);
   }, []);
 
@@ -119,6 +120,7 @@ export function useChat(): UseChatReturn {
       updatedAt: now,
     };
     setCurrentConversation(tempConv);
+    setIsLoading(false);
     setIsUnsavedChat(true);
     setError(null);
     return tempConv;

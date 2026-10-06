@@ -6036,6 +6036,12 @@ The `/wallet/submit` API returns a structured response:
   backend redirect to another origin. Chat prompt submission uses the same
   deadline/byte/error-text bounds and validates the returned job ID before
   polling.
+  Disabled Agent API access is mapped to an actionable assistant error with
+  `https://bankr.bot/api-keys` and instructions to enable Agent API access for
+  the key used in WalletChan. Chat jobs with empty/whitespace replies, an
+  explicit failure flag, or a result error never become successful messages.
+  Empty replies suggest checking this permission without asserting it is
+  disabled; unrelated API errors retain their own guidance.
 
 ## Build Configuration
 
@@ -6670,7 +6676,11 @@ The main view (after unlock) shows:
    - Empty state: "No recent transactions"
 7. **Footer**: "Chat with Bankr" button (Bankr accounts only)
 
-**Note**: The Chat History button in the header and "Chat with Bankr" button in the footer are only visible when the currently selected account is a Bankr API account. Private Key accounts do not have access to the Bankr chat feature.
+**Note**: The home chat button opens a fresh unsaved conversation. The chat
+header has History and New Chat actions; History opens saved conversations,
+whose header retains its New Chat action. Returning after unlock restores the
+existing conversation. Chat entry points are only visible for Bankr API
+accounts. Private Key accounts do not have access to the Bankr chat feature.
 
 ### Lock Wallet Button
 

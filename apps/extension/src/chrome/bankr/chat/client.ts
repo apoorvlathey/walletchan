@@ -13,6 +13,8 @@ const API_BASE_URL = BANKR_API_BASE;
 const MAX_PROMPT_LENGTH = 10000;
 const CHAT_SUBMIT_TIMEOUT_MS = 30_000;
 const CHAT_RESPONSE_MAX_BYTES = 64 * 1024;
+const AGENT_ACCESS_WARNING =
+  "Bankr chat requires Agent API access. Open https://bankr.bot/api-keys, enable Agent API access for the API key you use in WalletChan, then send your message again.";
 
 export interface SubmitChatPromptResponse {
   jobId: string;
@@ -65,6 +67,7 @@ function extractPromptErrorMessage(value: unknown): string | undefined {
 }
 
 function formatPromptSubmitError(text: string, status: number): string {
+  if (isAgentAccessDisabled(text)) return AGENT_ACCESS_WARNING;
   const message = extractPromptErrorMessage(text);
   if (message) return sanitizeRemoteError(message);
 
@@ -72,6 +75,11 @@ function formatPromptSubmitError(text: string, status: number): string {
   if (trimmed) return sanitizeRemoteError(trimmed);
 
   return `Failed to submit chat prompt (${status})`;
+}
+
+function isAgentAccessDisabled(value: string): boolean {
+  return /agent\s+api\s+access\s+(?:is\s+)?(?:not\s+enabled|disabled)/i.test(value) ||
+    /does\s+not\s+have\s+agent\s+api\s+access\s+enabled/i.test(value);
 }
 
 function sanitizeRemoteError(value: string): string {
@@ -226,16 +234,23 @@ export async function pollChatJobUntilComplete(
       signal: options.signal,
     });
 
-    if (status.status === "completed") {
+    const response = status.response?.trim();
+    const remoteError = status.result?.error?.trim();
+    if (isAgentAccessDisabled(remoteError || "") || isAgentAccessDisabled(response || "")) {
+      return { success: false, response: "", error: AGENT_ACCESS_WARNING };
+    }
+
+    if (status.status === "completed" && status.success !== false && !remoteError && response) {
       return {
         success: true,
-        response: status.response || "No response received",
+        response: status.response!,
       };
-    } else if (status.status === "failed") {
+    } else if (status.status === "failed" || status.status === "completed") {
       return {
         success: false,
         response: "",
-        error: status.result?.error || status.response || "Request failed",
+        error: remoteError || response ||
+          "Bankr returned no chat response. Check that Agent API access is enabled for your key at https://bankr.bot/api-keys, then try again.",
       };
     } else {
       return {
@@ -256,7 +271,7 @@ export async function pollChatJobUntilComplete(
       return {
         success: false,
         response: "",
-        error: error.message,
+        error: isAgentAccessDisabled(error.message) ? AGENT_ACCESS_WARNING : error.message,
       };
     }
     return {

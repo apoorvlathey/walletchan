@@ -3355,7 +3355,7 @@ function App() {
           sidePanelMode={sidePanelMode}
           isFullscreenTab={isFullscreenTab}
           onChat={() => {
-            setStartChatWithNew(false);
+            setStartChatWithNew(true);
             setView("chat");
           }}
           onLock={requestManualLock}

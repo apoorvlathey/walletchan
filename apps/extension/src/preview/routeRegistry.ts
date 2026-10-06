@@ -321,7 +321,7 @@ export const PREVIEW_ROUTE_REGISTRY: Record<
   chat: {
     label: "Chat",
     defaultScenario: "history",
-    scenarios: ["history", "new"],
+    scenarios: ["history", "new", "conversation", "access-error", "error", "locked", "pending"],
     wallets: ["bankr"],
     fidelity: "production",
   },

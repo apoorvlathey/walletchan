@@ -62,6 +62,7 @@ export const revokeCashAddressUrl = (address: string) =>
 // ---------------------------------------------------------------------------
 export const BANKR_API_BASE = "https://api.bankr.bot";
 export const BANKR_BOT_API_PAGE = "https://bankr.bot/api";
+export const BANKR_BOT_API_KEYS_PAGE = "https://bankr.bot/api-keys";
 export const BANKR_BOT_TERMINAL_PAGE = "https://bankr.bot/terminal";
 
 // ---------------------------------------------------------------------------

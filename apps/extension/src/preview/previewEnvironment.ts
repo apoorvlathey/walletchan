@@ -32,6 +32,7 @@ import { parsePreviewState, type ParsedPreviewState } from "./previewState";
 import { resolveSafeHomePreviewAccount } from "./safeHomePreview";
 import type { PreviewWalletType } from "./types";
 import { getPreviewActivityTransactions } from "./completedTransactionFixture";
+import { createPreviewChatHistory } from "./chatFixtures";
 export type PreviewStorageAreaName = "local" | "sync" | "session";
 export type PreviewStorageRecord = Record<string, unknown>;
 export interface PreviewEnvironment {
@@ -89,6 +90,7 @@ export function createPreviewEnvironment(href: string): PreviewEnvironment {
       ? createPreviewCrossDappBatchScenario(scenarioWallet, scenario)
       : null;
   const local: PreviewStorageRecord = {
+    ...(route === "chat" ? { chatHistory: createPreviewChatHistory(scenario) } : {}),
     [SELECTED_THEME_STORAGE_KEY]: parsed.state.theme,
     networkRpcUrls: previewNetworkRpcUrls,
     // App.tsx only checks presence during startup. This intentionally is not a
