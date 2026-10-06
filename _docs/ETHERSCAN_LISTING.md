@@ -17,7 +17,7 @@ application form for the WCHAN token.
 | Logo URL                       | `https://walletchan.com/images/wchan-token-logo.svg` |
 | Project Sector                 | `Wallets`                                            |
 | X / Twitter                    | `https://x.com/walletchan_`                          |
-| GitHub                         | `https://github.com/apoorvlathey/walletchan`         |
+| GitHub                         | `https://github.com/walletchan/walletchan`           |
 
 ---
 
@@ -95,5 +95,5 @@ WalletChan is a feature-packed EVM wallet, building on the cutting edge of Ether
 - Use the official-domain email (`hello@walletchan.com`) for requester and
   project email verification.
 - If the form asks for social links, use `https://x.com/walletchan_` for the
-  project account and `https://github.com/apoorvlathey/walletchan` for the
+  project account and `https://github.com/walletchan/walletchan` for the
   source repository.

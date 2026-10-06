@@ -131,7 +131,7 @@ const roadmapItems: RoadmapItemProps[] = [
     shape: "square",
     color: "red",
     filled: true,
-    githubUrl: "https://github.com/apoorvlathey/walletchan/tag/v0.1.0",
+    githubUrl: "https://github.com/walletchan/walletchan/releases/tag/v0.1.0",
   },
   {
     version: "v0.2.0",

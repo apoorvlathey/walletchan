@@ -227,7 +227,7 @@ WalletChan needs `unlimitedStorage` because it is a crypto wallet that must reli
 
 ## Privacy Policy URL
 
-https://github.com/apoorvlathey/walletchan/blob/master/PRIVACY_POLICY.md
+https://github.com/walletchan/walletchan/blob/master/PRIVACY_POLICY.md
 
 ---
 

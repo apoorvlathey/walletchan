@@ -27,7 +27,7 @@ const releaseVersion = /^(\d+)\.(\d+)\.(\d+)$/.exec(packageJson.version);
 const isV4Release =
   releaseVersion !== null && Number(releaseVersion[1]) >= 4;
 const sourceUrl = isV4Release
-  ? `https://github.com/apoorvlathey/walletchan/tree/${sourceTag}`
+  ? `https://github.com/walletchan/walletchan/tree/${sourceTag}`
   : "the local source checkout that produced this development build";
 const releaseStatus = isV4Release
   ? ""
@@ -53,7 +53,7 @@ THIRD_PARTY_NOTICES.txt.
 
 If a release tag or source archive is unavailable, do not distribute this
 binary. Contact the publisher through:
-https://github.com/apoorvlathey/walletchan
+https://github.com/walletchan/walletchan
 `;
 await writeFile(resolve(buildDirectory, "SOURCE_CODE.txt"), sourceNotice);
 

@@ -18,7 +18,7 @@ public links are verified. -->
   ·
   <a href="https://addons.mozilla.org/en-US/firefox/addon/walletchan/">Firefox</a>
   ·
-  <a href="https://github.com/apoorvlathey/walletchan/releases/latest">Releases</a>
+  <a href="https://github.com/walletchan/walletchan/releases/latest">Releases</a>
 </p>
 
 ![WalletChan Warm Midnight home showing a multichain portfolio and primary wallet actions](.github/screenshots/readme/01-home.png)
@@ -106,7 +106,7 @@ Install the released extension from the
 or [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/walletchan/).
 
 Developers and prerelease testers can also download the
-[latest GitHub release](https://github.com/apoorvlathey/walletchan/releases/latest)
+[latest GitHub release](https://github.com/walletchan/walletchan/releases/latest)
 and load the extracted extension from `chrome://extensions` with Developer mode
 enabled.
 

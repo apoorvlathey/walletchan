@@ -4,7 +4,7 @@ Local Ethereum JSON-RPC server for WalletChan approvals.
 
 WalletChan RPC gives scripts, CLIs, and AI agents a standard local RPC endpoint while keeping transaction and signature approval inside the user's connected wallet. Tools send normal Ethereum JSON-RPC to `localhost`; the paired wallet receives the request over WalletConnect or MetaMask Connect and asks the user to approve it.
 
-> Agent skill: [SKILL.md](https://raw.githubusercontent.com/apoorvlathey/walletchan/master/apps/walletchan-rpc/SKILL.md)
+> Agent skill: [SKILL.md](https://raw.githubusercontent.com/walletchan/walletchan/master/apps/walletchan-rpc/SKILL.md)
 
 Use it for:
 

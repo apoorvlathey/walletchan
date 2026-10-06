@@ -16,9 +16,9 @@ export const CHROME_STORE_URL =
   "https://chromewebstore.google.com/detail/walletchan/kofbkhbkfhiollbhjkbebajngppmpbgc";
 export const FIREFOX_STORE_URL =
   "https://addons.mozilla.org/en-US/firefox/addon/walletchan/";
-export const GITHUB_URL = "https://github.com/apoorvlathey/walletchan";
+export const GITHUB_URL = "https://github.com/walletchan/walletchan";
 export const GITHUB_RELEASES_URL =
-  "https://github.com/apoorvlathey/walletchan/releases/latest";
+  "https://github.com/walletchan/walletchan/releases/latest";
 export const TWITTER_URL = "https://x.com/walletchan_";
 export const TELEGRAM_URL = "https://t.me/wchanpublic";
 export const BANKR_API_URL = "https://bankr.bot/api";

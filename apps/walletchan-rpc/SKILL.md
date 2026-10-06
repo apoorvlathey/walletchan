@@ -7,7 +7,7 @@ description: Use when sending Ethereum JSON-RPC, Foundry, or ERC-5792 wallet_sen
 
 WalletChan RPC is a local JSON-RPC proxy for wallet-approved Ethereum transactions and signatures. A user starts the CLI, approves or reuses a wallet session, and then agents or tools send standard JSON-RPC to the local server. The default transport is WalletConnect; MetaMask Connect is available with `--wallet-transport metamask-connect` or the live transport switch endpoints.
 
-Package README: https://github.com/apoorvlathey/walletchan/blob/master/apps/walletchan-rpc/README.md
+Package README: https://github.com/walletchan/walletchan/blob/master/apps/walletchan-rpc/README.md
 
 ## Package Setup
 

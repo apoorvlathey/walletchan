@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const EXTENSION_ID = process.env.EXTENSION_ID!;
-const GITHUB_REPO = "apoorvlathey/walletchan";
+const GITHUB_REPO = "walletchan/walletchan";
 
 interface GitHubAsset {
   name: string;
