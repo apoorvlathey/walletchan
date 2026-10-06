@@ -10,7 +10,7 @@ WalletChan is distributed through two channels.
 | **Update mechanism** | Manual (download new zip, refresh)                                     | CWS built-in auto-update                                                                                  |
 | **Audience**         | Beta testers, developers                                               | General public                                                                                            |
 | **Speed**            | Instant (GitHub Release publishes immediately)                         | CWS review (hours to days)                                                                                |
-| **Listing**          | [GitHub Releases](https://github.com/apoorvlathey/walletchan/releases) | [Chrome Web Store](https://chromewebstore.google.com/detail/bankrwallet/kofbkhbkfhiollbhjkbebajngppmpbgc) |
+| **Listing**          | [GitHub Releases](https://github.com/walletchan/walletchan/releases) | [Chrome Web Store](https://chromewebstore.google.com/detail/bankrwallet/kofbkhbkfhiollbhjkbebajngppmpbgc) |
 
 ### Two Zip Variants
 
@@ -67,7 +67,7 @@ This automatically (via `scripts/release.sh`):
 The [release workflow](/.github/workflows/release.yml) triggers on `v*` tags and:
 
 1. Runs `pnpm zip` (which builds the extension and creates the zip)
-2. Publishes `walletchan-vX.Y.Z.zip` to [GitHub Releases](https://github.com/apoorvlathey/walletchan/releases)
+2. Publishes `walletchan-vX.Y.Z.zip` to [GitHub Releases](https://github.com/walletchan/walletchan/releases)
 
 Release notes come from the matching version section in the root `CHANGELOG.md`,
 with its full-changelog link. `.github/scripts/release-notes.mjs` extracts that
@@ -76,7 +76,7 @@ To update an existing release's notes from the changelog:
 
 ```bash
 node .github/scripts/release-notes.mjs v4.1.0 > /tmp/walletchan-release-notes.md
-gh release edit v4.1.0 --repo apoorvlathey/walletchan --notes-file /tmp/walletchan-release-notes.md
+gh release edit v4.1.0 --repo walletchan/walletchan --notes-file /tmp/walletchan-release-notes.md
 ```
 
 Users can download the zip from GitHub Releases and load it as an unpacked extension in developer mode.
@@ -171,7 +171,7 @@ GitHub Releases provide a ZIP file for users who want to sideload the extension 
 
 ### How to install from GitHub Release
 
-1. Download `walletchan-vX.Y.Z.zip` from [GitHub Releases](https://github.com/apoorvlathey/walletchan/releases)
+1. Download `walletchan-vX.Y.Z.zip` from [GitHub Releases](https://github.com/walletchan/walletchan/releases)
 2. Extract the zip
 3. Go to `chrome://extensions` → enable Developer mode
 4. Click "Load unpacked" → select the extracted folder

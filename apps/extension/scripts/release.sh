@@ -87,7 +87,7 @@ const path = '$CHANGELOG';
 const current = '$CURRENT_VERSION';
 const next = '$NEW_VERSION';
 const today = '$TODAY';
-const repo = 'https://github.com/apoorvlathey/walletchan';
+const repo = 'https://github.com/walletchan/walletchan';
 let md = fs.readFileSync(path, 'utf8');
 
 // Promote Unreleased section

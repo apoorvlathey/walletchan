@@ -21,7 +21,7 @@ export default defineConfig({
   description:
     "Guides and answers for every WalletChan feature: accounts, dapps, transactions, swaps, privacy, security, networks, and settings.",
   editLink: {
-    link: "https://github.com/apoorvlathey/walletchan/edit/main/apps/docs/src/pages/:path",
+    link: "https://github.com/walletchan/walletchan/edit/master/apps/docs/src/pages/:path",
   },
   iconUrl: "/favicon.ico",
   jsonLd: true,
@@ -161,7 +161,7 @@ export default defineConfig({
     },
   ],
   socials: [
-    { icon: "github", link: "https://github.com/apoorvlathey/walletchan" },
+    { icon: "github", link: "https://github.com/walletchan/walletchan" },
     { icon: "x", link: "https://x.com/walletchan_" },
   ],
   title: "WalletChan Docs - Web3 Wallet",
