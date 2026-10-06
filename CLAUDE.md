@@ -145,7 +145,6 @@ When working on features, refer to these docs.
 | [`_docs/ADD_CHAIN.md`](./_docs/ADD_CHAIN.md) | Adding a new chain (single registry entry) |
 | [`_docs/INDEXER.md`](./_docs/INDEXER.md) | Website and extension indexer API integrations |
 | [`_docs/RAILWAY.md`](./_docs/RAILWAY.md) | Railway deploy: Dockerfile + railway.toml pattern for pnpm monorepo |
-| [`_docs/TOKEN_GATED_TG.md`](./_docs/TOKEN_GATED_TG.md) | Retired TG deployment and remaining website integration |
 | `_docs/bankr-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling |
 | [github.com/apoorvlathey/walletchan-skill](https://github.com/apoorvlathey/walletchan-skill) | Public agent skill for driving the extension via CDP (canonical source lives in that repo) |
 
@@ -211,7 +210,3 @@ When working on features, refer to these docs.
   `messageAccessPolicy.ts`, and compose it through the ordered message pipeline.
   Do not add a residual switch to `background.ts`. Update
   [`_docs/IMPLEMENTATION.md`](./_docs/IMPLEMENTATION.md) and the domain audit map.
-
-## Foundry libraries (separate contracts repository)
-
-Always install via git submodules: `cd /path/to/contracts && forge install <org>/<repo>` — do NOT use `--no-git`.

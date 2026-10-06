@@ -667,7 +667,6 @@ When working on features, refer to these docs:
 | `_docs/PUBLISHING.md`                                    | Release workflow, CWS upload, auto-update, signing        |
 | `_docs/STORAGE.md`                                       | Every chrome.storage key, shapes, version history         |
 | `_docs/ADD_CHAIN.md`                                     | How to add a new chain (single registry entry)            |
-| `_docs/TOKEN_GATED_TG.md`                                | Retired TG deployment and website integration  |
 | `_docs/bankr-skills/bankr/SKILL.md`                      | Bankr API interactions, workflows, error handling         |
 
 ## Important Patterns
