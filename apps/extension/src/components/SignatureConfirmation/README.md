@@ -14,7 +14,8 @@ used by App and the preview harness.
 | `signaturePresentation.ts` | Pure decoding, readability classification, signer/method/origin projection, typed-data guards, and plain-language intent. | None. |
 
 `TypedDataDisplay.tsx` owns recursive visible EIP-712 message fields and the
-separate technical domain/types/raw projection. `SiweMessageDisplay.tsx` owns
+separate technical Domain / Types / Raw typed data tabs with per-panel copy
+controls in Advanced details. `SiweMessageDisplay.tsx` owns
 non-duplicated SIWE statement/time/resource fields and validation issues.
 Typed-data addresses reuse `shared/LabeledAddressPopover.tsx`.
 

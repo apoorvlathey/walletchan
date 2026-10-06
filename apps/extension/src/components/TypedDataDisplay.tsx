@@ -1,4 +1,6 @@
-import { Box, Code, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Box, Code, HStack, Tab, TabList, TabPanel, TabPanels, Tabs, Text, VStack,
+} from "@chakra-ui/react";
 import { memo, useEffect, useState } from "react";
 
 import { CopyButton } from "@/components/CopyButton";
@@ -257,11 +259,32 @@ function TypedDataDisplay({
 
   if (mode === "technical") {
     return (
-      <VStack align="stretch" spacing={4}>
-        <TechnicalBlock label="Domain" value={domain} />
-        <TechnicalBlock label="Types" value={types} />
-        <TechnicalBlock label="Raw typed data" value={rawData} />
-      </VStack>
+      <Tabs variant="line" isFitted isLazy minW={0}>
+        <TabList
+          aria-label="EIP-712 advanced details"
+          sx={{
+            '& [role="tab"][aria-selected="true"]': {
+              color: "accent.highlight",
+              borderColor: "accent.highlight",
+            },
+          }}
+        >
+          <Tab px={2} fontSize="xs">Domain</Tab>
+          <Tab px={2} fontSize="xs">Types</Tab>
+          <Tab px={2} fontSize="xs">Raw typed data</Tab>
+        </TabList>
+        <TabPanels>
+          <TabPanel px={0} pb={0}>
+            <TechnicalBlock label="Domain" value={domain} />
+          </TabPanel>
+          <TabPanel px={0} pb={0}>
+            <TechnicalBlock label="Types" value={types} />
+          </TabPanel>
+          <TabPanel px={0} pb={0}>
+            <TechnicalBlock label="Raw typed data" value={rawData} />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     );
   }
 
