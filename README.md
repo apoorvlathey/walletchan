@@ -132,6 +132,13 @@ The Chromium build is written to `apps/extension/build/`.
 See [DEVELOPMENT.md](_docs/DEVELOPMENT.md) for the development workflow and
 [IMPLEMENTATION.md](_docs/IMPLEMENTATION.md) for the extension architecture.
 
+## Repository layout
+
+This repo contains the extension, website, docs, domain reputation service, and
+RPC/MCP companion tools. Independent bots, indexers, contracts, redirects, and
+mascot authoring live in their own repositories. See
+[repository ownership](_docs/REPOSITORIES.md) for links and integration boundaries.
+
 ## Security
 
 The repository documents its trust boundaries,

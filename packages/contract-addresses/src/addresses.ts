@@ -1,5 +1,5 @@
 // AUTO-GENERATED — do not edit manually.
-// Run `pnpm sync:addresses` to regenerate from apps/contracts/addresses.json
+// Run `pnpm sync:addresses /path/to/contracts/addresses.json` to regenerate from walletchan/contracts
 
 import type { Address } from "viem";
 

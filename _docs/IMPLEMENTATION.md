@@ -18,6 +18,12 @@ account models:
 
 This document describes the core architecture and transaction handling implementation.
 
+Independent bots, indexers, Solidity contracts, redirect pages, and mascot
+authoring now live in separate repositories. The extension, website, docs,
+domain reputation, RPC/MCP companions, and their local shared packages remain
+here. See [REPOSITORIES.md](./REPOSITORIES.md) for ownership and integration
+boundaries; the wallet transaction and signing paths are unchanged.
+
 ### Account-type extension checklist
 
 `chrome/accounts/accountTypePolicy.ts` owns general direct-signer classification.

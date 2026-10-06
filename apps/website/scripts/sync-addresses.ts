@@ -1,8 +1,8 @@
 /**
- * Syncs contract addresses from apps/contracts/addresses.json into
- * packages/contract-addresses/src/addresses.ts (single source of truth).
+ * Syncs contract addresses from a walletchan/contracts checkout into
+ * packages/contract-addresses/src/addresses.ts (reviewed local snapshot).
  *
- * Usage: pnpm sync:addresses
+ * Usage: pnpm sync:addresses /path/to/contracts/addresses.json
  */
 
 import { readFileSync, writeFileSync } from "fs";
@@ -10,10 +10,11 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CONTRACTS_ADDRESSES = resolve(
-  __dirname,
-  "../../contracts/addresses.json",
-);
+const inputPath = process.argv[2];
+if (!inputPath) {
+  throw new Error("Usage: pnpm sync:addresses /path/to/contracts/addresses.json");
+}
+const CONTRACTS_ADDRESSES = resolve(inputPath);
 const OUTPUT = resolve(
   __dirname,
   "../../../packages/contract-addresses/src/addresses.ts",
@@ -92,7 +93,7 @@ function main() {
   const liveCheck = LIVE_CHAINS.map((c) => `chainId === ${c}`).join(" || ");
 
   const output = `// AUTO-GENERATED — do not edit manually.
-// Run \`pnpm sync:addresses\` to regenerate from apps/contracts/addresses.json
+// Run \`pnpm sync:addresses /path/to/contracts/addresses.json\` to regenerate from walletchan/contracts
 
 import type { Address } from "viem";
 

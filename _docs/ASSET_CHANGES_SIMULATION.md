@@ -85,7 +85,7 @@ metadata/balance probes, not the user's transaction. Balance/owner probes use a
 small cap so a hostile fallback cannot burn the entire `eth_call` and hide the
 native ETH delta. Onchain NFT metadata gets a larger bounded budget plus a
 return-gas reserve so SVG renderers can work without risking the entire
-simulation. The regression test is `apps/contracts/test/TxSimulator.t.sol`.
+simulation. The regression test is [TxSimulator tests](https://github.com/walletchan/contracts/blob/main/test/TxSimulator.t.sol).
 
 **Why override balance to 100,000 ETH?** So the call doesn't revert due to insufficient funds. The ETH delta calculation is still correct: `after - before = -(value sent) + (value received back)`. Gas is NOT included (eth_call doesn't consume gas — that's shown separately in the gas estimate).
 
@@ -154,7 +154,7 @@ more retries at 2.5s intervals. The UI updates reactively as metadata arrives.
 
 | File | Purpose |
 |------|---------|
-| `apps/contracts/src/utils/TxSimulator.sol` | Solidity simulator (never deployed, bytecode-only) |
+| [TxSimulator source](https://github.com/walletchan/contracts/blob/main/src/utils/TxSimulator.sol) | Solidity simulator (never deployed, bytecode-only) |
 | `apps/extension/src/chrome/txSimulation.ts` | Stable simulation coordinator: RPC calls, metadata enrichment, and public API |
 | `apps/extension/src/chrome/simulation/types.ts` | Normalized asset-change and raw simulator result shapes |
 | `apps/extension/src/chrome/simulation/constants.ts` | Shared single/batch gas caps and canonical Permit2 address |
@@ -258,7 +258,7 @@ See `_docs/ERC5792.md` → "Simulation & Tenderly" for the full flow.
 
 If you modify `TxSimulator.sol`:
 
-1. `cd apps/contracts && forge build`
+1. `cd /path/to/contracts && forge build`
 2. Extract **exact** `deployedBytecode.object` from `out/TxSimulator.sol/TxSimulator.json`
 3. Update `SIMULATOR_BYTECODE` in `txSimulation.ts`
 4. Update `SIMULATOR_ABI` / `BATCH_SIMULATOR_ABI` if the function signature changed

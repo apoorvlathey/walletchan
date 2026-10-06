@@ -75,22 +75,21 @@ After making significant changes, **update the corresponding doc** if you modifi
 
 ## Monorepo Structure
 
+Independent apps now live in separate repositories. See
+[`_docs/REPOSITORIES.md`](./_docs/REPOSITORIES.md) for ownership and integrations.
+
 ```
 walletchan/
 ├── apps/
 │   ├── extension/             # Browser extension (Vite + React + Chakra UI)
 │   ├── website/               # Landing page (Next.js + Chakra UI)
 │   ├── docs/                  # End-user documentation (Vocs)
-│   ├── indexer/               # Ponder indexer for coin launches
-│   ├── staking-indexer/       # Ponder indexer for sBNKRW vault staking (legacy)
-│   ├── wchan-vault-indexer/   # Ponder indexer for sWCHAN
-│   ├── tg-bot/                # Token-gated Telegram bot (Grammy + Hono)
-│   ├── arb-bot/               # WETH↔WCHAN/BNKRW cross-pool arbitrage bot (Base)
+│   ├── domain-reputation/     # Phishing-list lookup service
 │   ├── walletchan-rpc/        # Local JSON-RPC -> WalletConnect bridge
-│   ├── walletchan-mcp/        # Local stdio MCP adapter for agents
-│   └── contracts/             # Solidity smart contracts (Foundry)
+│   └── walletchan-mcp/        # Local stdio MCP adapter for agents
 ├── packages/
 │   ├── shared/                # Shared design tokens, assets, contract constants
+│   ├── contract-addresses/ # Reviewed public address snapshot
 │   └── wchan-swap/            # Shared swap logic (quoting, encoding, permit2)
 └── _docs/                     # LLM-facing documentation (start here)
 ```
@@ -147,13 +146,13 @@ When working on features, refer to these docs.
 | [`_docs/FIREFOX.md`](./_docs/FIREFOX.md) | Firefox port: pipeline, manifest divergence, storage.session shim, AMO release |
 | [`_docs/PK_ACCOUNTS.md`](./_docs/PK_ACCOUNTS.md) | Private-key / Seed phrase account architecture & flows |
 | [`_docs/ADD_CHAIN.md`](./_docs/ADD_CHAIN.md) | Adding a new chain (single registry entry) |
-| [`_docs/INDEXER.md`](./_docs/INDEXER.md) | Ponder indexer conventions (filter.args perf rule) |
+| [`_docs/INDEXER.md`](./_docs/INDEXER.md) | External indexer integrations and repository links |
 | [`_docs/RAILWAY.md`](./_docs/RAILWAY.md) | Railway deploy: Dockerfile + railway.toml pattern for pnpm monorepo |
-| [`_docs/TOKEN_GATED_TG.md`](./_docs/TOKEN_GATED_TG.md) | Token-gated TG system: architecture, DB schema, security |
-| [`apps/tg-bot/IMPLEMENTATION.md`](./apps/tg-bot/IMPLEMENTATION.md) | TG bot: verification flow, commands, API, balance checker |
-| [`apps/arb-bot/IMPLEMENTATION.md`](./apps/arb-bot/IMPLEMENTATION.md) | Arb bot: cross-pool strategy, batched RPC, encoding |
-| [`apps/wchan-vault-indexer/IMPLEMENTATION.md`](./apps/wchan-vault-indexer/IMPLEMENTATION.md) | WCHAN vault indexer: sWCHAN balance tracking, APY, snapshots |
-| [`apps/staking-indexer/STAKING_INDEXER_IMPLEMENTATION.md`](./apps/staking-indexer/STAKING_INDEXER_IMPLEMENTATION.md) | Staking indexer (legacy) |
+| [`_docs/TOKEN_GATED_TG.md`](./_docs/TOKEN_GATED_TG.md) | Retired TG deployment and remaining website integration |
+| [walletchan/tg-bot implementation](https://github.com/walletchan/tg-bot/blob/main/IMPLEMENTATION.md) | TG bot: verification flow, commands, API, balance checker |
+| [walletchan/arb-bot implementation](https://github.com/walletchan/arb-bot/blob/main/IMPLEMENTATION.md) | Arb bot: cross-pool strategy, batched RPC, encoding |
+| [walletchan/wchan-vault-indexer implementation](https://github.com/walletchan/wchan-vault-indexer/blob/main/IMPLEMENTATION.md) | WCHAN vault indexer: sWCHAN balance tracking, APY, snapshots |
+| [BNKRW indexer implementation](https://github.com/walletchan/bnkrw-staking-indexer/blob/main/STAKING_INDEXER_IMPLEMENTATION.md) | Staking indexer (legacy) |
 | `_docs/bankr-skills/bankr/SKILL.md` | Bankr API interactions, workflows, error handling |
 | [github.com/apoorvlathey/walletchan-skill](https://github.com/apoorvlathey/walletchan-skill) | Public agent skill for driving the extension via CDP (canonical source lives in that repo) |
 
@@ -220,6 +219,6 @@ When working on features, refer to these docs.
   Do not add a residual switch to `background.ts`. Update
   [`_docs/IMPLEMENTATION.md`](./_docs/IMPLEMENTATION.md) and the domain audit map.
 
-## Foundry libraries
+## Foundry libraries (separate contracts repository)
 
-Always install via git submodules: `cd apps/contracts && forge install <org>/<repo>` — do NOT use `--no-git`.
+Always install via git submodules: `cd /path/to/contracts && forge install <org>/<repo>` — do NOT use `--no-git`.
