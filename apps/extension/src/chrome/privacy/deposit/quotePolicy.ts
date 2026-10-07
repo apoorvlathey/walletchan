@@ -19,6 +19,8 @@ export type PrivacyShieldQuoteErrorCode =
   | "view-only-account"
   | "invalid-amount"
   | "amount-below-minimum"
+  | "balance-below-minimum"
+  | "insufficient-funds"
   | "quote-unavailable";
 
 export class PrivacyShieldQuoteError extends Error {

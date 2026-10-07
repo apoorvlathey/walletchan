@@ -1,11 +1,16 @@
 # Privacy deposit quote and review boundary
 
 The public quote validates an exact account snapshot, rejects impersonators,
-enforces the onchain 0.001 ETH minimum and valid `uint256` input, simulates the
+enforces the active onchain minimum (0.01 ETH mainnet / 0.001 ETH Sepolia)
+and valid `uint256` input, simulates the
 exact Entrypoint native `deposit(uint256)` call, and returns only serialized
 public amounts. It applies no arbitrary application maximum: affordability is
-bounded by the public source balance after the gas reserve. The shared active-chain
-RPC policy caps JSON-RPC batches at three requests for free-tier compatibility.
+bounded by the public source balance after the gas reserve.
+A source balance below the profile minimum fails with `balance-below-minimum`
+and two-line minimum guidance. A balance below the gross deposit fails before
+gas estimation with
+`insufficient-funds`; Viem insufficient-gas errors retain that same code.
+The shared active-chain RPC policy caps JSON-RPC batches at three requests for free-tier compatibility.
 
 The review path requires a current password or fresh biometric master session.
 Under the wallet-secret lock it re-pins the stored account, decrypts the phrase

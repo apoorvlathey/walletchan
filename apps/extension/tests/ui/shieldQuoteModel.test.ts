@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { privacyShieldInsufficientBalanceMessage } from "../../src/lib/privacyShieldAmounts";
 
 import {
   convertShieldAmountInputMode,
@@ -116,4 +117,15 @@ test("Shield USD entry fails closed when a current ETH price is unavailable", ()
   assert.equal(shieldAmountInputInEth("36.00", true, null), "");
   assert.equal(formatShieldAmountConversion("0.01", false, null), null);
   assert.equal(convertShieldAmountInputMode("0.01", false, null), "0.01");
+});
+
+test("Shield balance messages use exact mainnet copy and preserve the minimum newline", () => {
+  assert.equal(
+    privacyShieldInsufficientBalanceMessage(true, "0.01"),
+    "Insufficient ETH balance.\nMinimum to shield is 0.01 ETH.",
+  );
+  assert.equal(
+    privacyShieldInsufficientBalanceMessage(false, "0.01"),
+    "Insufficient ETH balance for amount + gas.",
+  );
 });

@@ -1,8 +1,11 @@
 import {
   createPublicClient,
+  BaseError,
+  InsufficientFundsError,
   encodeFunctionData,
   parseAbi,
   type Address,
+  type PublicClient,
 } from "viem";
 
 import { estimateFees } from "../../gas/feeEstimator";
@@ -11,6 +14,7 @@ import { secureHttpTransport } from "../../network/rpcClient";
 import { PRIVACY_POOLS_VIEM_CHAIN } from "../deployment/chain";
 import { PRIVACY_POOLS_DEPLOYMENT } from "../deployment/manifest";
 import { PRIVACY_POOLS_RPC_BATCH_SIZE } from "../rpcPolicy";
+import { PrivacyShieldQuoteError } from "./quotePolicy";
 
 const ENTRYPOINT_DEPOSIT_ABI = parseAbi([
   "function deposit(uint256 precommitment) payable returns (uint256)",
@@ -36,8 +40,12 @@ export async function readPrivacyShieldRpcQuote(
   rpcUrl: string,
   sourceAddress: Address,
   amountWei: bigint,
+  overrides: Partial<{
+    createClient: (rpcUrl: string) => PublicClient;
+    estimateFees: typeof estimateFees;
+  }> = {},
 ): Promise<PrivacyShieldRpcQuote> {
-  const client = createPublicClient({
+  const client = overrides.createClient?.(rpcUrl) ?? createPublicClient({
     chain: PRIVACY_POOLS_VIEM_CHAIN,
     transport: secureHttpTransport(rpcUrl, {
       batch: { batchSize: PRIVACY_POOLS_RPC_BATCH_SIZE, wait: 0 },
@@ -51,15 +59,30 @@ export async function readPrivacyShieldRpcQuote(
     args: [createPublicQuotePrecommitment()],
   });
 
-  const [balanceWei, estimatedGas, fees] = await Promise.all([
-    client.getBalance({ address: sourceAddress }),
+  // Check the real source balance before estimation: RPC nodes can reject an
+  // unfunded deposit before returning gas, hiding the useful balance failure.
+  const balanceWei = await client.getBalance({ address: sourceAddress });
+  if (balanceWei < PRIVACY_POOLS_DEPLOYMENT.assetConfig.minimumDepositAmount) {
+    throw new PrivacyShieldQuoteError("balance-below-minimum");
+  }
+  if (balanceWei < amountWei) {
+    throw new PrivacyShieldQuoteError("insufficient-funds");
+  }
+  const [estimatedGas, fees] = await Promise.all([
     client.estimateGas({
       account: sourceAddress,
       to: PRIVACY_POOLS_DEPLOYMENT.contracts.entrypointProxy.address,
       data,
       value: amountWei,
+    }).catch((error: unknown) => {
+      if (error instanceof BaseError && error.walk(
+        (cause) => cause instanceof InsufficientFundsError,
+      ) instanceof InsufficientFundsError) {
+        throw new PrivacyShieldQuoteError("insufficient-funds");
+      }
+      throw error;
     }),
-    estimateFees(client, PRIVACY_POOLS_DEPLOYMENT.chainId),
+    (overrides.estimateFees ?? estimateFees)(client, PRIVACY_POOLS_DEPLOYMENT.chainId),
   ]);
   if (!fees || fees.maxFeePerGas <= 0n || estimatedGas <= 0n) {
     throw new Error("Privacy Shield fee estimate unavailable");
