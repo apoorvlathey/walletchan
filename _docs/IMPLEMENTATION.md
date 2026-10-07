@@ -75,6 +75,17 @@ must fail, and its declared capability determines the derived signer type.
 - [PRIVACY_POOLS_MAINNET_TEST.md](./PRIVACY_POOLS_MAINNET_TEST.md) - Production deployment pins, live read-only evidence, build-profile checks, and value-bearing smoke gates
 - [PRIVACY_POOLS_HANDOFF.md](./PRIVACY_POOLS_HANDOFF.md) - Current dual-profile progress, recent proof-signal correction, automated baseline, and ordered next steps
 
+## Bankr typed-data chain IDs
+
+`chrome/bankr/typedData.ts` normalizes decimal/hex string `domain.chainId` before
+the existing bounded Bankr signing transport. Values must be positive safe JSON
+integers; null, malformed, fractional, and unsafe IDs fail locally. An omitted
+chain ID stays omitted. Normalization clones only the changed domain and preserves
+the EIP-712 digest and existing signer recovery. Local and Ledger paths are unchanged.
+`/test#typed-data-chain-id` provides V3/V4 JSON/object decimal, hex, and numeric
+controls with original-payload signature verification, plus Bankr-specific
+fractional/unsafe rejection cases.
+
 ## Known ERC-20 calldata encoding protection
 
 `lib/calldataValidation.ts` checks exact static argument length and zero upper

@@ -11,6 +11,7 @@ import {
   type SignMessageResponse,
 } from "./response";
 import { bankrFetchText } from "./transport";
+import { normalizeBankrTypedDataChainId } from "./typedData";
 
 /** Sign a personal message or typed-data payload through Bankr's remote signer. */
 export async function signMessageViaApi(
@@ -49,6 +50,7 @@ export async function signMessageViaApi(
     if (typeof typedData === "string") {
       typedData = JSON.parse(typedData);
     }
+    typedData = normalizeBankrTypedDataChainId(typedData);
     body = { signatureType: "eth_signTypedData_v4", typedData };
     expectedSigner = params[0];
   } else {
