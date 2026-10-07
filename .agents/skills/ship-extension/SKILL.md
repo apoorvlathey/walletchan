@@ -1,3 +1,12 @@
+---
+name: ship-extension
+description: Commit approved WalletChan extension changes and open a pull request targeting master. Use when asked to ship extension changes; merge only with explicit user authorization.
+---
+
+# Ship extension changes
+
+Read the repository `AGENTS.md` before acting.
+
 Ship extension changes by creating a branch, committing, creating a PR on origin, and merging to master only when the user explicitly authorizes the merge.
 
 ## Instructions

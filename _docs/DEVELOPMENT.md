@@ -29,6 +29,14 @@ with `/context` in a fresh session. The option is user-scoped; setting it in
 this repo's `.claude/settings.json` does not take effect. See the
 [official Claude Code instructions guide](https://code.claude.com/docs/en/memory#read-agentsmd-files).
 
+### Shared skills
+
+Keep shared skill content under `.agents/skills/<name>/SKILL.md`. Claude's
+`.claude/skills/<name>` entries are relative symlinks to the canonical folders,
+so edits and supporting references have one owner. Edit the files in `.agents`,
+not a second copy. The shipping workflow is now a skill rather than a legacy
+`.claude/commands` file; Claude keeps the `/ship-extension` name.
+
 ## Contract address updates
 
 The public [contracts repository](https://github.com/walletchan/contracts) owns
