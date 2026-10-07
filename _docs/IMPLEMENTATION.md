@@ -19,7 +19,7 @@ account models:
 This document describes the core architecture and transaction handling implementation.
 
 This workspace contains the extension, website, docs, domain reputation service,
-RPC/MCP companions, and their local shared packages.
+and their local shared packages.
 
 ### Account-type extension checklist
 

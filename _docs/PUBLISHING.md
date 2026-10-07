@@ -115,56 +115,6 @@ pnpm zip:cws    # builds + zips without `key` (for CWS upload)
 
 Then upload `apps/extension/zip/walletchan-vX.Y.Z.zip` to a new GitHub release.
 
-## NPM Packages: WalletChan RPC and MCP
-
-`apps/walletchan-rpc` and `apps/walletchan-mcp` are published separately to npm as `@walletchan/rpc` and `@walletchan/mcp`. This flow is independent of the browser extension `pnpm release:*` commands.
-
-Use patch/minor/major according to semver, then update package metadata in the same commit as the code change:
-
-- `apps/walletchan-rpc/package.json` `version`
-- `apps/walletchan-mcp/package.json` `version`
-- `apps/walletchan-mcp/src/mcpServer.ts` `serverInfo.version`
-- `apps/walletchan-mcp/package.json` `dependencies["@walletchan/rpc"]` when MCP needs the new RPC package
-- `apps/walletchan-rpc/CHANGELOG.md` and/or `apps/walletchan-mcp/CHANGELOG.md`
-- publish-facing docs: `apps/walletchan-rpc/README.md`, `apps/walletchan-mcp/README.md`, `_docs/WALLETCHAN_RPC.md`, and `_docs/WALLETCHAN_MCP.md`
-- `pnpm-lock.yaml` via `pnpm install --lockfile-only`
-
-Before bumping or publishing, populate the package changelog from the actual code changes:
-
-1. Find the previous published package version with `npm view @walletchan/rpc version` or `npm view @walletchan/mcp version`.
-2. Review git history for the package since that release. Useful commands:
-   ```bash
-   git log --oneline -- apps/walletchan-rpc _docs/WALLETCHAN_RPC.md
-   git diff <previous-release-ref>...HEAD -- apps/walletchan-rpc _docs/WALLETCHAN_RPC.md
-   git log --oneline -- apps/walletchan-mcp _docs/WALLETCHAN_MCP.md
-   git diff <previous-release-ref>...HEAD -- apps/walletchan-mcp _docs/WALLETCHAN_MCP.md
-   ```
-3. Summarize user-visible changes under `Added`, `Changed`, `Fixed`, and `Security` where relevant. Keep internal-only refactors out unless they affect behavior, packaging, or operations.
-4. Move relevant `[Unreleased]` notes into the new version section with the release date, then reset `[Unreleased]` to `_Nothing yet._`.
-5. If publishing both packages, update both changelogs and make sure MCP's entry mentions any required RPC version bump.
-
-For an RPC + MCP release:
-
-```bash
-pnpm install --lockfile-only
-pnpm build:walletchan-mcp
-pnpm pack:walletchan-rpc
-pnpm pack:walletchan-mcp
-
-pnpm publish:walletchan-rpc:dry-run
-pnpm publish:walletchan-mcp:dry-run
-
-pnpm publish:walletchan-rpc
-pnpm publish:walletchan-mcp
-```
-
-Publish `@walletchan/rpc` before `@walletchan/mcp` when MCP depends on the new RPC version. After publishing, verify npm:
-
-```bash
-npm view @walletchan/rpc version
-npm view @walletchan/mcp version
-```
-
 ## GitHub Releases (Sideloading)
 
 GitHub Releases provide a ZIP file for users who want to sideload the extension in developer mode. This is useful for beta testing or trying out the extension before it's approved on CWS.

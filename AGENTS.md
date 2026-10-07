@@ -103,9 +103,7 @@ walletchan/
 │   ├── extension/        # Browser extension (Vite + React + Chakra UI)
 │   ├── website/          # Landing page (Next.js + Chakra UI)
 │   ├── docs/             # Public documentation site
-│   ├── domain-reputation/ # Phishing-list lookup service
-│   ├── walletchan-rpc/   # Local JSON-RPC -> WalletConnect bridge
-│   └── walletchan-mcp/   # Local stdio MCP adapter for WalletChan RPC + Base skills
+│   └── domain-reputation/ # Phishing-list lookup service
 ├── packages/
 │   ├── shared/           # Shared design tokens, assets, and contract constants
 │   ├── contract-addresses/ # Reviewed public address snapshot
@@ -126,8 +124,6 @@ walletchan/
 | --------------- | ----------------------- | ---------- | ---------- |
 | Extension       | React 18                | Chakra UI  | Vite       |
 | Website         | Next.js 14 (App Router) | Chakra UI  | Next.js    |
-| WalletChan RPC  | Node.js + Hono          | —          | tsc        |
-| WalletChan MCP  | Node.js stdio MCP       | —          | tsc        |
 
 **Design System**: Warm Midnight is the current extension and website
 direction. The extension retains Bauhaus as an optional alternate theme; the
@@ -143,15 +139,11 @@ pnpm install
 # Development
 pnpm dev:extension         # Build extension in dev mode
 pnpm dev:website           # Start website dev server at localhost:3000
-pnpm dev:walletchan-rpc    # Start local JSON-RPC -> WalletConnect proxy at localhost:4209
-pnpm dev:walletchan-mcp    # Start local stdio MCP adapter backed by walletchan-rpc
 
 # Build
 pnpm build              # Build both extension and website
 pnpm build:extension    # Full Chrome extension build (all manifest scripts; output: apps/extension/build/)
 pnpm build:website      # Build website only; do NOT use this to verify extension reloads
-pnpm build:walletchan-rpc # Build WalletChan RPC CLI only
-pnpm build:walletchan-mcp # Build WalletChan MCP CLI only
 
 # Extension-specific
 pnpm zip                # Build + zip (for GitHub Releases)
@@ -660,8 +652,6 @@ When working on features, refer to these docs:
 | `_docs/CALLDATA.md`                                      | Calldata decoder UI, param components, type routing       |
 | `_docs/ASSET_CHANGES_SIMULATION.md`                      | Tx simulation: state override injection, metadata retry   |
 | `_docs/ERC5792.md`                                       | ERC-5792 batch txs: message flow, ERC-7821 encoding, 7702 plan |
-| `_docs/WALLETCHAN_RPC.md`                                | Local JSON-RPC -> WalletConnect bridge implementation      |
-| `_docs/WALLETCHAN_MCP.md`                                | Local MCP adapter, managed RPC, and Base skill wrapping              |
 | `.agents/skills/walletchan-chain-research/SKILL.md`      | Codex-local research checklist for adding/updating WalletChan chain params |
 | `_docs/DEVELOPMENT.md`                                   | Build process, dev environment setup                      |
 | `_docs/PUBLISHING.md`                                    | Release workflow, CWS upload, auto-update, signing        |

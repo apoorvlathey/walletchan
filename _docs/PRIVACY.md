@@ -919,7 +919,7 @@ Protocol tests must include:
 
 ### Phase 2: Base Veil beta candidate
 
-- Reuse knowledge from `apps/walletchan-mcp` but do not reuse its separate data
+- Reuse knowledge from [WalletChan MCP](https://github.com/walletchan/walletchan-mcp) but do not reuse its separate data
   directory or random key model inside the browser extension.
 - Derive/import a WalletChan-controlled Veil key.
 - Implement registration, queue, eligibility, ETH/USDC deposit, transfer,
