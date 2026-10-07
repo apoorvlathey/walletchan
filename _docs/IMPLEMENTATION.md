@@ -343,7 +343,14 @@ private-key, seed-phrase, and Ledger public addresses. `quoteClient.ts` uses the
 bounded active-chain transport to read the public balance, estimate the standard fee
 tier, and simulate the pinned Entrypoint `deposit(uint256)` call with the
 canonical gross value that produces the entered shielded amount after fees,
-plus a fresh throwaway public precommitment. The pure policy applies the active
+plus a fresh throwaway public precommitment. Before estimating, it rejects a public
+balance below the profile minimum with `balance-below-minimum`, or below the
+gross deposit with `insufficient-funds`; Viem insufficient-gas
+errors use the same bounded code. Shield displays an insufficient ETH message
+on two lines with the active profile minimum only when the balance is below
+that minimum. Otherwise it displays `Insufficient ETH balance for amount + gas.`,
+including quotes whose amount plus gas exceeds the balance. Other RPC failures retain
+`quote-unavailable`. The pure policy applies the active
 manifest's onchain vetting fee on top of the entered amount (1% Sepolia, 0.5%
 mainnet),
 the existing 20% gas-limit buffer,

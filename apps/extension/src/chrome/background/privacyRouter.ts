@@ -1,6 +1,7 @@
 /** Wallet-UI transport for bounded Privacy Pools setup and operation state. */
 
 import { formatEther } from "viem";
+import { privacyShieldInsufficientBalanceMessage } from "../../lib/privacyShieldAmounts";
 
 import { ensurePrivacyIdentityInitialized } from "../privacy/identity";
 import { quotePrivacyShield } from "../privacy/deposit/quote";
@@ -448,8 +449,10 @@ function privacyOperationFailure(error: unknown): {
     "quote-unavailable": "Quote unavailable. Try again.",
     "auth-required": "Unlock with your main password or biometrics and try again.",
     "recovery-unavailable": "Shield recovery needs attention before you continue.",
-    "insufficient-funds":
-      `Not enough ${PRIVACY_POOLS_DEPLOYMENT.chainName} ETH for this amount and gas.`,
+    "balance-below-minimum": privacyShieldInsufficientBalanceMessage(
+      true, formatEther(PRIVACY_POOLS_DEPLOYMENT.assetConfig.minimumDepositAmount),
+    ),
+    "insufficient-funds": privacyShieldInsufficientBalanceMessage(false, ""),
     "operation-unavailable": "Couldn’t save this Shield operation. Try again.",
     "bankr-testnet-unsupported":
       `Bankr doesn’t support ${PRIVACY_POOLS_DEPLOYMENT.chainName} transactions in this build.`,
@@ -536,8 +539,10 @@ function privacyReviewFailure(error: unknown): {
     "quote-unavailable": "Quote unavailable. Try again.",
     "auth-required": "Unlock with your main password or biometrics and try again.",
     "recovery-unavailable": "Shield recovery needs attention before you continue.",
-    "insufficient-funds":
-      `Not enough ${PRIVACY_POOLS_DEPLOYMENT.chainName} ETH for this amount and gas.`,
+    "balance-below-minimum": privacyShieldInsufficientBalanceMessage(
+      true, formatEther(PRIVACY_POOLS_DEPLOYMENT.assetConfig.minimumDepositAmount),
+    ),
+    "insufficient-funds": privacyShieldInsufficientBalanceMessage(false, ""),
     "review-unavailable": "Review unavailable. Try again.",
   };
   return { success: false, code, error: messages[code] };
@@ -560,6 +565,10 @@ function privacyQuoteFailure(error: unknown): {
     "amount-below-minimum":
       `Minimum amount to shield is ${formatEther(PRIVACY_POOLS_DEPLOYMENT.assetConfig.minimumDepositAmount)} ETH. The protocol fee is added on top.`,
     "quote-unavailable": "Quote unavailable. Try again.",
+    "balance-below-minimum": privacyShieldInsufficientBalanceMessage(
+      true, formatEther(PRIVACY_POOLS_DEPLOYMENT.assetConfig.minimumDepositAmount),
+    ),
+    "insufficient-funds": privacyShieldInsufficientBalanceMessage(false, ""),
   };
   return { success: false, code, error: messages[code] };
 }

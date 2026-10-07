@@ -1151,3 +1151,45 @@ test("privacy router fails closed on extra fields and readiness errors", async (
   });
   assert.equal(calls, 1);
 });
+
+test("Shield quote reports insufficient ETH for amount plus gas for every signer", async () => {
+  for (const accountType of ["privateKey", "seedPhrase", "ledger", "bankr"] as const) {
+    const capture = responseCapture();
+    const route = createBackgroundPrivacyMessageRouter({
+      warnPrivacyQuoteFailure: () => {},
+      quotePrivacyShield: async () => { throw new PrivacyShieldQuoteError("insufficient-funds"); },
+    });
+    route({
+      type: "privacyQuoteShield",
+      accountId: `${accountType}-1`,
+      accountAddress: "0x1111111111111111111111111111111111111111",
+      accountType,
+      amount: "0.01",
+    }, capture.sendResponse);
+    assert.deepEqual(await capture.response, {
+      success: false,
+      code: "insufficient-funds",
+      error: "Insufficient ETH balance for amount + gas.",
+    });
+  }
+});
+
+test("Shield quote preserves the newline in the below-minimum balance message", async () => {
+  const capture = responseCapture();
+  const route = createBackgroundPrivacyMessageRouter({
+    warnPrivacyQuoteFailure: () => {},
+    quotePrivacyShield: async () => { throw new PrivacyShieldQuoteError("balance-below-minimum"); },
+  });
+  route({
+    type: "privacyQuoteShield",
+    accountId: "pk-1",
+    accountAddress: "0x1111111111111111111111111111111111111111",
+    accountType: "privateKey",
+    amount: "0.01",
+  }, capture.sendResponse);
+  assert.deepEqual(await capture.response, {
+    success: false,
+    code: "balance-below-minimum",
+    error: "Insufficient ETH balance.\nMinimum to shield is 0.001 ETH.",
+  });
+});

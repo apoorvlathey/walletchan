@@ -69,3 +69,13 @@ export function privacyShieldGrossAmountForAvailableWei(
   }
   return privacyShieldGrossAmountWei(shieldedAmountWei, feeBPS);
 }
+
+/** Shared public copy for Shield quote and rendered affordability failures. */
+export function privacyShieldInsufficientBalanceMessage(
+  belowMinimum: boolean,
+  minimumEth: string,
+): string {
+  return belowMinimum
+    ? `Insufficient ETH balance.\nMinimum to shield is ${minimumEth} ETH.`
+    : "Insufficient ETH balance for amount + gas.";
+}

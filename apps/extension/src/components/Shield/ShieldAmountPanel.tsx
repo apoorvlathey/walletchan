@@ -1,5 +1,6 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
+import { privacyShieldInsufficientBalanceMessage } from "../../lib/privacyShieldAmounts";
 import type { ShieldQuoteController } from "./hooks/useShieldQuote";
 import type { ShieldReviewController } from "./hooks/useShieldReview";
 import type { ShieldOperationController } from "./hooks/useShieldOperation";
@@ -11,6 +12,7 @@ import {
 import { PrivacyPoolsLogo } from "./ShieldComplianceInfoPopover";
 import {
   formatShieldWei,
+  SHIELD_MINIMUM_WEI,
   SHIELD_VETTING_FEE_BPS,
   type ShieldSourceAccount,
 } from "./model/shieldQuote";
@@ -40,7 +42,10 @@ export default function ShieldAmountPanel({
       : quote.state.status === "failed"
         ? quote.state.error
         : readyQuote && !readyQuote.canAfford
-          ? `Not enough ${SHIELDED_ETH_NETWORK_NAME} ETH for this amount and network fee.`
+          ? privacyShieldInsufficientBalanceMessage(
+              readyQuote.balanceWei < SHIELD_MINIMUM_WEI,
+              formatShieldWei(SHIELD_MINIMUM_WEI),
+            )
           : quote.validation.message;
 
   useEffect(() => {
@@ -88,6 +93,7 @@ export default function ShieldAmountPanel({
           ref={errorRef}
           id={errorId}
           role="alert"
+          whiteSpace="pre-line"
           px={1}
           pt={3}
           color="status.error.fg"
