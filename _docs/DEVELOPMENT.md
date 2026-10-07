@@ -14,6 +14,21 @@ bypass its protection. Merge only when explicitly requested. After a merge,
 return to `master` and fast-forward it while preserving uncommitted local work.
 Leave files requested to stay local out of the PR.
 
+## Agent instructions
+
+`AGENTS.md` is the shared repository instruction file; do not maintain a
+separate duplicate `CLAUDE.md`. Claude Code v2.1.277 and later supports it
+natively through the built-in AGENTS.md plugin. Use a current Claude Code
+version and keep that plugin enabled.
+
+The default Project instructions mode loads `AGENTS.md` only when no
+`CLAUDE.md` or `CLAUDE.local.md` exists in the working directory or its
+ancestors. If your environment has such a file, choose
+`claude-md-and-agents-md` in `/config` → Project instructions. Confirm loading
+with `/context` in a fresh session. The option is user-scoped; setting it in
+this repo's `.claude/settings.json` does not take effect. See the
+[official Claude Code instructions guide](https://code.claude.com/docs/en/memory#read-agentsmd-files).
+
 ## Contract address updates
 
 The public [contracts repository](https://github.com/walletchan/contracts) owns

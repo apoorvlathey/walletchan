@@ -317,7 +317,7 @@ option.
 
 - `_docs/STORAGE.md` — add `selectedThemeId` row under `### Settings`.
 - `_docs/PUBLISHING.md` — add to pre-release storage checklist as a no-migration key.
-- `CLAUDE.md` — add `theme/` under Key Extension Files.
+- `AGENTS.md` — add `theme/` under Key Extension Files.
 
 ---
 
@@ -345,7 +345,7 @@ Numbering: **P1–P13**. Phases P1–P3 are foundation (no user-visible change y
 
 - `apps/extension/src/index.tsx` — replace `<ChakraProvider theme={theme}>` with `<ThemeProvider>`. Add the pre-mount `document.documentElement.dataset.theme` bootstrap.
 - Delete `apps/extension/src/theme.ts` after confirming nothing imports it.
-- `_docs/STORAGE.md`, `_docs/PUBLISHING.md`, `CLAUDE.md` — storage doc updates.
+- `_docs/STORAGE.md`, `_docs/PUBLISHING.md`, `AGENTS.md` — storage doc updates.
 
 **Variant renames** (this is the "breaking" surface area of P1):
 
@@ -566,7 +566,7 @@ This requires a grep + replace sweep. ~30-50 usage sites.
 **Test gate:**
 
 - Trigger `personal_sign` from a dapp — verify in both themes.
-- Trigger `eth_signTypedData_v4` — verify nested struct rendering in both themes (`AddressValue` copy button + explorer link must work per CLAUDE.md standard).
+- Trigger `eth_signTypedData_v4` — verify nested struct rendering in both themes (`AddressValue` copy button + explorer link must work per AGENTS.md standard).
 - Trigger `wallet_watchAsset` — verify in both themes.
 - Test all four signing wallet types.
 
@@ -776,7 +776,7 @@ This requires a grep + replace sweep. ~30-50 usage sites.
 **Test gate:**
 
 - Go through the full onboarding wizard with each account type (Bankr, PK, Seed) in both themes. This is a fresh-install flow — do it in a dedicated Chrome profile.
-- Reveal private key / seed phrase in both themes (agent password should remain blocked per CLAUDE.md).
+- Reveal private key / seed phrase in both themes (agent password should remain blocked per AGENTS.md).
 - Open Add Account from Settings in both themes — verify all 4 account-type radio cards render correctly with their selected-state borders.
 - Open Account Settings modal in both themes — exercise the 3 sub-views (settings, confirmDelete, changeApiKey).
 - Verify the Onboarding success-step "pin & click" pointer is visible and animates in both themes (the SVG stroke uses CSS var resolution).
@@ -917,7 +917,7 @@ After migration:
 | Bauhaus visually regresses during token rename | High (users see a broken wallet) | Phase 1 ports Bauhaus as-is with a bit-for-bit mapping. Screenshot diff every touched screen. Do a visual QA pass before merging P1. |
 | Flash of wrong theme on popup open | Medium (looks janky) | Pre-mount `dataset.theme` bootstrap in `index.tsx` (Phase 1). |
 | Midnight design gets messy as we go | Medium (inconsistent feel across screens) | Keep the Section 4 design brief as the law. Any deviation must update the PRD first. |
-| Adding a new screen mid-phases that ignores the token rules | Low-Medium | Document the new pattern in `CLAUDE.md` so future sessions (Claude or the user) know about `<ThemedCard>` / `<ThemedField>` / no-hardcoded-colors. Add the ESLint rule from Section 8. |
+| Adding a new screen mid-phases that ignores the token rules | Low-Medium | Document the new pattern in `AGENTS.md` so future sessions (Claude or the user) know about `<ThemedCard>` / `<ThemedField>` / no-hardcoded-colors. Add the ESLint rule from Section 8. |
 | Merging Phase N before Phase N-1 is tested in both themes | High | Explicit rule: every PR must include screenshots (or a GIF) of the affected screen in **both themes** before merging. |
 | Chart colors (PortfolioChart) look bad in dark mode | Low | Phase 6 has explicit chart token swap; tune during that phase's visual QA. |
 | Third-party components (Chakra Menu/Modal scrim) don't pick up the theme cleanly | Medium | Chakra Menu and Modal respect component-level theme config. Factory must emit full `Menu` / `Modal` component blocks per theme. Validated in Phases 4 and 7. |
@@ -958,7 +958,7 @@ The theming engine is "done" when all of the following are true:
 3. Switching themes is instant with no flash and persists across reloads.
 4. `rg '#[0-9A-Fa-f]{6}' apps/extension/src --glob '!theme/**'` returns zero matches (ignoring code that explicitly parses hex for user-pasted values, e.g., color input fields).
 5. All three wallet types (Bankr / PK / Seed) work identically to before in both themes.
-6. `_docs/STYLING.md`, `_docs/STORAGE.md`, `_docs/IMPLEMENTATION.md`, and `CLAUDE.md` are updated to reflect the new architecture.
+6. `_docs/STYLING.md`, `_docs/STORAGE.md`, `_docs/IMPLEMENTATION.md`, and `AGENTS.md` are updated to reflect the new architecture.
 7. Adding `themes/paper.ts` (a hypothetical third theme) would require editing zero component files.
 
 When #7 is provably true, we've built a theme **engine**, not just a second theme.
