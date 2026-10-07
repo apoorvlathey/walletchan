@@ -57,7 +57,7 @@ export function useTokenManagement({
         return next;
       });
       state.setTotalValueUsd((previous) =>
-        Math.max(0, previous - Math.max(0, tokenToHide.valueUsd || 0)),
+        previous - Math.max(0, tokenToHide.valueUsd || 0),
       );
       setTokenToHide(null);
       await loadPortfolio(true, { forceSnapshot: true });

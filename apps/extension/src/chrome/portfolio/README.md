@@ -28,3 +28,5 @@ The storage keys `portfolioSnapshotsV2`, `portfolioHoldingsCache`,
 best-effort cache writes, CoinGecko/GeckoTerminal fallback order, and snapshot
 refresh ordering must not change during file-only refactors. The legacy
 `portfolioSnapshots` key is purge-only and remains in the wallet-reset manifest.
+
+Debt accounting retains positive `borrowAssets` magnitudes and signed net position/portfolio values. Holdings cache V4 rejects older gross-valued caches through the existing idempotent pruner. Existing snapshots are preserved; new snapshots may be negative.

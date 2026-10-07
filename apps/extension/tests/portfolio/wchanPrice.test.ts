@@ -64,6 +64,11 @@ test("WCHAN fallback uses staking price and exact chain/address without replacin
   assert.equal(priced.defiPositions[0].valueUsd, 50 + Number(token.balance) * 0.000001765 + 100 * 0.000001765);
   assert.equal(priced.defiPositions[0].assets[1], position.assets[1]);
   assert.equal(position.valueUsd, 50);
+  const debtPosition = { ...position, assets: [], rewardAssets: [], borrowAssets: [{ ...token, balance: "100" }], valueUsd: 50 };
+  const pricedDebt = await applyPortfolioFallback([], [debtPosition]);
+  assert.equal(pricedDebt.defiPositions[0].borrowAssets?.[0].valueUsd, 100 * 0.000001765);
+  assert.equal(pricedDebt.defiPositions[0].valueUsd, 50 - 100 * 0.000001765);
+  assert.equal(debtPosition.borrowAssets[0].valueUsd, 0);
   const afterPositionCalls = calls;
   assert.deepEqual(await applyPortfolioFallback([], priced.defiPositions), priced);
   assert.equal(calls, afterPositionCalls, "already priced positions must not be counted twice");

@@ -27,6 +27,7 @@ interface PositionAssetLineProps {
   hideValue: boolean;
   formatUsd: (value: number) => string;
   resolveLogo: (url: string | undefined) => string | undefined;
+  debt?: boolean;
 }
 
 const COMPACT_BALANCE_THRESHOLD = 1_000_000;
@@ -59,6 +60,7 @@ function PositionAssetLine({
   hideValue,
   formatUsd,
   resolveLogo,
+  debt = false,
 }: PositionAssetLineProps) {
   const logoSrc = resolveLogo(asset.logoUrl);
   const exactBalance = `${asset.balanceFormatted} ${asset.symbol}`;
@@ -122,11 +124,11 @@ function PositionAssetLine({
       </HStack>
       <Text
         flexShrink={0}
-        color="fg.secondary"
+        color={debt ? "status.error.emphasis" : "fg.secondary"}
         fontSize="xs"
         sx={{ fontVariantNumeric: "tabular-nums" }}
       >
-        {formatUsd(asset.valueUsd)}
+        {formatUsd(debt ? -asset.valueUsd : asset.valueUsd)}
       </Text>
     </HStack>
   );
@@ -256,7 +258,7 @@ export function DefiPositionRow({
           </ListItemContent>
           <ListItemMeta
             flex="0 0 auto"
-            color="fg.primary"
+            color={position.valueUsd < 0 ? "status.error.emphasis" : "fg.primary"}
             fontWeight={600}
             noOfLines={1}
           >
@@ -264,7 +266,7 @@ export function DefiPositionRow({
           </ListItemMeta>
         </HStack>
 
-        {(position.assets.length > 0 || position.rewardAssets.length > 0) && (
+        {(position.assets.length > 0 || position.rewardAssets.length > 0 || (position.borrowAssets?.length ?? 0) > 0) && (
           <VStack align="stretch" spacing={0.5} pl={4}>
             <VStack align="stretch" spacing={0.5}>
               {position.assets.map((asset, index) => (
@@ -277,6 +279,21 @@ export function DefiPositionRow({
                 />
               ))}
             </VStack>
+            {(position.borrowAssets?.length ?? 0) > 0 && (
+              <VStack align="stretch" spacing={0.5} mt={1} pt={2} borderTopWidth="1px" borderTopColor="border.subtle">
+                <Text color="fg.muted" fontSize="2xs" fontWeight={600}>Borrowed / Debt</Text>
+                {position.borrowAssets?.map((asset, index) => (
+                  <PositionAssetLine
+                    key={`debt-${asset.chainId}-${asset.contractAddress}-${index}`}
+                    asset={asset}
+                    debt
+                    hideValue={hideValue}
+                    formatUsd={formatUsd}
+                    resolveLogo={resolveLogo}
+                  />
+                ))}
+              </VStack>
+            )}
             {position.rewardAssets.length > 0 && (
               <VStack
                 align="stretch"

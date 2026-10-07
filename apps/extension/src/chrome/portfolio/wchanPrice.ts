@@ -22,7 +22,7 @@ export async function applyWchanPriceFallback(
     Number(asset.balance) > 0;
   const needsPositionPrice = (position: DefiPosition) =>
     position.chainId === WCHAN_CHAIN_ID &&
-    [...position.assets, ...position.rewardAssets].some(needsAssetPrice);
+    [...position.assets, ...position.rewardAssets, ...(position.borrowAssets ?? [])].some(needsAssetPrice);
   if (!tokens.some(needsPrice) && !defiPositions.some(needsPositionPrice)) {
     return unchanged;
   }
@@ -48,19 +48,20 @@ export async function applyWchanPriceFallback(
     const pricedPositions = defiPositions.map((position) => {
       if (!needsPositionPrice(position)) return position;
       let addedValueUsd = 0;
-      const priceAsset = (asset: DefiAsset): DefiAsset => {
+      const priceAsset = (asset: DefiAsset, side = 1): DefiAsset => {
         if (!needsAssetPrice(asset)) return asset;
         const valueUsd = Number(asset.balance) * priceUsd;
         if (!Number.isFinite(valueUsd)) return asset;
-        addedValueUsd += valueUsd;
+        addedValueUsd += side * valueUsd;
         return { ...asset, valueUsd };
       };
-      const assets = position.assets.map(priceAsset);
-      const rewardAssets = position.rewardAssets.map(priceAsset);
+      const assets = position.assets.map((asset) => priceAsset(asset));
+      const rewardAssets = position.rewardAssets.map((asset) => priceAsset(asset));
+      const borrowAssets = position.borrowAssets?.map((asset) => priceAsset(asset, -1));
       // Preserve provider-valued legs and only add the missing WCHAN value.
       const valueUsd = position.valueUsd + addedValueUsd;
       return Number.isFinite(valueUsd)
-        ? { ...position, assets, rewardAssets, valueUsd }
+        ? { ...position, assets, rewardAssets, borrowAssets, valueUsd }
         : position;
     });
     return { tokens: pricedTokens, defiPositions: pricedPositions };

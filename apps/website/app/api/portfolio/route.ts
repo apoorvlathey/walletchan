@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
       if (override) token.logoUrl = override;
     }
     for (const pos of defiPositions) {
-      for (const a of pos.assets) {
+      for (const a of [...pos.assets, ...(pos.borrowAssets ?? [])]) {
         const key = `${a.chainId}:${a.contractAddress.toLowerCase()}`;
         if (LOGO_OVERRIDES[key]) a.logoUrl = LOGO_OVERRIDES[key];
       }

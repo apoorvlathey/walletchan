@@ -7,9 +7,11 @@ import {
   MAX_REMOTE_PORTFOLIO_TOKENS,
   boundPortfolioTokens,
   sanitizeDefiPositions,
+  finiteSignedUsd,
 } from "./responsePolicy";
 
-export const PORTFOLIO_HOLDINGS_CACHE_VERSION = 3;
+// Old caches cannot distinguish borrowed assets from deposits. Refetch them.
+export const PORTFOLIO_HOLDINGS_CACHE_VERSION = 4;
 export const MAX_PORTFOLIO_HOLDINGS_CACHE_ENTRIES = 4;
 export const MAX_PORTFOLIO_HOLDINGS_CACHE_BYTES = 4 * 1024 * 1024;
 
@@ -89,7 +91,7 @@ function sanitizeSnapshot(
   const snapshot: PortfolioHoldingsCacheSnapshot = {
     tokens: bounded.tokens,
     defiPositions,
-    totalValueUsd: finiteNonNegative(value.totalValueUsd),
+    totalValueUsd: finiteSignedUsd(value.totalValueUsd),
     omittedTokenCount: storedOmittedCount + bounded.omittedTokenCount,
     omittedTokenValueUsd:
       storedOmittedValue + bounded.omittedTokenValueUsd,

@@ -108,17 +108,18 @@ test("metadata enrichment retains authoritative balance while updating price", (
   assert.equal(merged?.valueUsd, 6);
 });
 
-test("chain totals include positive token and DeFi values without negatives", () => {
+test("chain totals subtract net DeFi debt while token magnitudes remain non-negative", () => {
   const totals = getChainTotals(
     [token("ETH", 1, { valueUsd: 10 }), token("BAD", 1, { valueUsd: -5 })],
     [
       { chainId: 1, valueUsd: 7 },
       { chainId: 8453, valueUsd: 3 },
+      { chainId: 1, valueUsd: -30 },
     ] as DefiPosition[],
     { "1": 2, "8453": 1.5 },
   );
 
-  assert.equal(totals.get(1), 19);
+  assert.equal(totals.get(1), -11);
   assert.equal(totals.get(8453), 4.5);
 });
 

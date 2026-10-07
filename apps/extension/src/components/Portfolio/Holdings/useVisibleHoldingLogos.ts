@@ -16,6 +16,7 @@ export function useVisibleHoldingLogos(
     for (const position of positions) {
       urls.push(position.protocolLogo);
       for (const asset of position.assets ?? []) urls.push(asset.logoUrl);
+      for (const asset of position.borrowAssets ?? []) urls.push(asset.logoUrl);
       for (const asset of position.rewardAssets ?? []) urls.push(asset.logoUrl);
     }
     return urls;

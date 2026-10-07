@@ -55,6 +55,13 @@ function positiveSafeInteger(value: unknown): number | null {
     : null;
 }
 
+/** Net DeFi/portfolio values may be negative; individual asset legs stay positive. */
+export function finiteSignedUsd(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(-MAX_USD_VALUE, Math.min(value, MAX_USD_VALUE))
+    : 0;
+}
+
 function boundedCount(value: unknown): number | null {
   return typeof value === "number" &&
     Number.isSafeInteger(value) &&
@@ -167,9 +174,10 @@ function parseDefiPosition(value: unknown): DefiPosition | null {
     chainId,
     type: boundedText(value.type, MAX_TEXT_LENGTH, "position"),
     name: boundedText(value.name, MAX_TEXT_LENGTH, "Position"),
-    valueUsd: finiteUsd(value.valueUsd),
+    valueUsd: finiteSignedUsd(value.valueUsd),
     siteUrl: boundedText(value.siteUrl, MAX_URL_LENGTH) || undefined,
     assets: parseDefiAssets(value.assets),
+    borrowAssets: parseDefiAssets(value.borrowAssets),
     rewardAssets: parseDefiAssets(value.rewardAssets),
   };
 }
@@ -288,7 +296,7 @@ export function decodePortfolioResponse(payload: unknown): DecodedPortfolioRespo
   return {
     tokens: bounded.tokens,
     defiPositions,
-    totalValueUsd: finiteUsd(payload.totalValueUsd),
+    totalValueUsd: finiteSignedUsd(payload.totalValueUsd),
     tokenCount,
     omittedTokenCount,
     omittedTokenValueUsd:

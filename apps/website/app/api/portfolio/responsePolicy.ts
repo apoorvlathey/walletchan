@@ -50,11 +50,13 @@ export function boundPortfolioResponse(
     .map((position) => ({
       ...position,
       assets: position.assets.slice(0, MAX_PORTFOLIO_POSITION_ASSETS),
+      borrowAssets: (position.borrowAssets ?? []).slice(0, MAX_PORTFOLIO_POSITION_ASSETS),
       rewardAssets: position.rewardAssets.slice(0, MAX_PORTFOLIO_POSITION_ASSETS),
     }));
   const truncatedPositions = visiblePositions.some(
     (position, index) =>
       position.assets.length !== defiPositions[index]?.assets.length ||
+      position.borrowAssets.length !== (defiPositions[index]?.borrowAssets?.length ?? 0) ||
       position.rewardAssets.length !== defiPositions[index]?.rewardAssets.length,
   );
 

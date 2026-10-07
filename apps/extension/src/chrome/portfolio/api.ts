@@ -1,7 +1,7 @@
 import { WALLETCHAN_PORTFOLIO_API } from "@/constants/externalUrls";
 import { fetchTextBounded } from "../network/boundedHttp";
 import { sanitizeExternalNavigationUrl } from "@/lib/externalNavigation";
-import { decodePortfolioResponse } from "./responsePolicy";
+import { decodePortfolioResponse, finiteSignedUsd } from "./responsePolicy";
 import type {
   DecodedPortfolioResponse,
   PortfolioSummaryResponse,
@@ -93,8 +93,8 @@ export async function fetchPortfolioSummary(
   const totalValueUsd = Number(
     (payload as { totalValueUsd?: unknown }).totalValueUsd,
   );
-  if (!Number.isFinite(totalValueUsd) || totalValueUsd < 0) {
+  if (!Number.isFinite(totalValueUsd)) {
     throw new Error("Portfolio API returned an invalid summary");
   }
-  return { totalValueUsd };
+  return { totalValueUsd: finiteSignedUsd(totalValueUsd) };
 }

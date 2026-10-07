@@ -2871,3 +2871,7 @@ or password type. It does not recursively validate arbitrary wrapper calldata
 or make unknown selectors safe. Contract creation is exempt from ABI-call
 interpretation. No new secrets, permissions, storage keys, or signing transports.
 See [local evidence and manual QA](./LEGACY_APPROVAL_PADDING.md).
+
+### Public DeFi debt accounting
+
+Only net position and portfolio USD totals accept signed finite values, bounded to the existing USD magnitude ceiling. Individual wallet-token, supply, reward and debt legs remain non-negative; explicit provider loan/borrow direction owns classification, not symbol or arbitrary lending text. Each debt collection retains the existing 50-leg bound, chain/address validation and safe image/navigation policies. Cache V4 invalidates disposable old gross-valued snapshots through the existing reset-aware pruner. No secrets, signing routes, message audiences, permissions or credential storage change.
