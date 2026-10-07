@@ -18,6 +18,22 @@ their own eligibility. The single source of truth is
 
 These rules apply to almost every change. The detailed docs are listed in [Documentation References](#documentation-references) — read the one that matches the area you're touching.
 
+### Changes must go through a PR
+
+`master` requires a pull request with no bypass actors. There are currently
+zero required approvals and no required CI checks, but run the checks required
+by this repository before handing work back.
+
+Work on a `codex/` topic branch from current `origin/master`, push that branch,
+and open a PR targeting `master`, including for docs-only changes. Never push
+directly to `master` or disable/bypass its rules. Commit/push requests do not
+authorize merging; merge only on explicit user instruction. After a merge,
+return to `master` and fast-forward it, preserving uncommitted local work.
+Files explicitly requested to stay local must remain outside commits and PRs.
+
+Do not run legacy `pnpm release:*` commands: they push directly to `master`.
+Use the PR-based release steps in [`_docs/PUBLISHING.md`](./_docs/PUBLISHING.md).
+
 ### Test ALL four wallet types
 
 Signing account types: `privateKey` (local), `seedPhrase` (local HD), `ledger`

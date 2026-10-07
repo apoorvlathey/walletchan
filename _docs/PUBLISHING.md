@@ -38,29 +38,36 @@ license does not revoke earlier grants.
 
 ## Release Process
 
-### 1. Bump version and push tag
+### 1. Prepare a release PR, then tag the merged commit
 
-```bash
-pnpm release:patch  # 0.2.0 → 0.2.1 (bug fixes)
-pnpm release:minor  # 0.2.0 → 0.3.0 (new features)
-pnpm release:major  # 0.2.0 → 1.0.0 (breaking changes)
-```
+`master` requires a PR, with no bypass actors, required approvals, or required
+CI checks. Release version changes must follow this rule too.
 
-**Important:** The working tree must be clean before running a release command,
-including no untracked files. `scripts/release.sh` checks
-`git status --porcelain` so an untracked source or asset cannot affect a local
-build while being omitted from the release commit.
+**Do not run `pnpm release:patch`, `pnpm release:minor`, or `pnpm release:major`.**
+The legacy `apps/extension/scripts/release.sh` ends with
+`git push origin master --tags`, which is incompatible with PR-only protection.
+Do not disable the ruleset or publish tags from an unmerged release branch.
 
-**Store artifact rule:** Every extension version bump must be followed by a fresh `pnpm zip:cws` run before uploading to stores. Do not reuse an older zip after changing `apps/extension/package.json` or either manifest version. This regenerates `apps/extension/cws-zip/walletchan-vX.Y.Z.zip` for Chrome Web Store and `apps/extension/zip/walletchan-firefox-vX.Y.Z.zip` for Firefox.
+1. Create a release topic branch from current `origin/master`.
+2. Choose the next semantic version. Update `apps/extension/package.json`,
+   `apps/extension/public/manifest.json`, and
+   `apps/extension/manifest.firefox.json` together. Promote the populated
+   `[Unreleased]` changelog into a dated version section. Refresh the lockfile
+   if the package version change affects it.
+3. Run the release checks documented below and generate fresh store artifacts
+   with `pnpm zip:cws`. Do not reuse ZIPs from an earlier version.
+4. Commit only the intended release files, push the topic branch, and open a PR
+   targeting `master`. Keep local-only files out of the release.
+5. After explicit merge authorization and the PR merge, return to `master` and
+   fast-forward it. Verify the approved merged release commit contains the
+   matching version, manifests, and changelog.
+6. With explicit release authorization, create the `vX.Y.Z` tag on that verified
+   merged commit and push only that tag. This triggers the release workflow
+   below; it does not push changes directly to `master`.
 
-This automatically (via `scripts/release.sh`):
-
-1. Bumps the version in `apps/extension/package.json`
-2. Syncs the version to `apps/extension/public/manifest.json` and `apps/extension/manifest.firefox.json`
-3. Promotes the populated `[Unreleased]` changelog into the new version
-4. Commits the release files from the repo root (so monorepo paths resolve correctly)
-5. Creates a git tag (e.g. `v0.2.1`)
-6. Pushes to origin with tags
+**Store artifact rule:** Every extension version bump requires fresh Chrome and
+Firefox ZIPs from `pnpm zip:cws`. Verify final upload artifacts match the merged
+release source; rebuild if the merged source differs from the validated branch.
 
 ### 2. GitHub Actions builds the release
 
@@ -136,14 +143,13 @@ This is why we only distribute ZIP files (for unpacked loading) and not CRX file
 ### Version Flow
 
 ```
-pnpm release:patch
-  → bumps version in package.json + manifest.json
-  → creates git tag v0.2.1
-  → pushes to GitHub
-
-GitHub Actions (.github/workflows/release.yml)
-  → runs pnpm zip (builds + creates ZIP)
-  → attaches to GitHub Release
+Release topic branch
+  → update version, manifests, and changelog
+  → validate and open a PR targeting master
+  → merge with explicit authorization
+  → tag the verified merged release commit
+  → push only the release tag
+  → GitHub Actions builds and publishes release ZIPs
 ```
 
 ### Update XML Endpoint

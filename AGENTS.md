@@ -63,6 +63,23 @@ that private key/seed phrase/Ledger accounts have separate handlers.
   Hardware additions also need real-device QA. See the account-type extension
   checklist in `_docs/IMPLEMENTATION.md`.
 
+## Git workflow: PR-only master
+
+`master` is protected by an active GitHub ruleset requiring a pull request.
+There are no bypass actors, required approvals, or required CI checks.
+
+- Start changes on a `codex/` topic branch from current `origin/master`.
+- Commit and push the topic branch, then open a PR targeting `master`.
+  This applies to documentation and small fixes too.
+- Never push directly to `master`, force-push it, or disable/bypass protection.
+- A request to commit and push means publish the topic branch and PR; it does
+  not authorize merging. Merge only when the user explicitly requests it.
+- After the user merges a PR, return to `master` and update it with a
+  fast-forward pull. Preserve any uncommitted local work.
+- Keep files explicitly requested to stay local out of commits and PRs.
+- The legacy `pnpm release:*` script pushes directly to `master`; do not run
+  it under this rule. Follow the PR-based release steps in `_docs/PUBLISHING.md`.
+
 ## AI Session Workflow
 
 **At the start of each session**, before writing any code:
@@ -156,10 +173,8 @@ pnpm test:extension-ui  # UI architecture, facade, pure-model, and size guardrai
 # Foundry library installation (ALWAYS use git submodules)
 cd /path/to/contracts && forge install <org>/<repo>   # Do NOT use --no-git
 
-# Release (auto-bumps version, syncs manifest, creates tag, pushes)
-pnpm release:patch      # 0.1.0 → 0.1.1
-pnpm release:minor      # 0.1.0 → 0.2.0
-pnpm release:major      # 0.1.0 → 1.0.0
+# Release: use the PR-based workflow in _docs/PUBLISHING.md.
+# Do not run legacy pnpm release:* commands; they push directly to master.
 
 # Store artifacts (required after every extension version bump)
 pnpm zip:cws            # Fresh Chrome Web Store zip + Firefox zip for store uploads
