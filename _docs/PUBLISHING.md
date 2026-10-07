@@ -115,13 +115,6 @@ pnpm zip:cws    # builds + zips without `key` (for CWS upload)
 
 Then upload `apps/extension/zip/walletchan-vX.Y.Z.zip` to a new GitHub release.
 
-## NPM Packages: WalletChan RPC and MCP
-
-RPC and MCP releases are maintained in their public repositories:
-[WalletChan RPC](https://github.com/walletchan/walletchan-rpc/blob/main/_docs/PUBLISHING.md)
-and [WalletChan MCP](https://github.com/walletchan/walletchan-mcp/blob/main/_docs/PUBLISHING.md).
-Their npm releases are independent of browser extension releases.
-
 ## GitHub Releases (Sideloading)
 
 GitHub Releases provide a ZIP file for users who want to sideload the extension in developer mode. This is useful for beta testing or trying out the extension before it's approved on CWS.

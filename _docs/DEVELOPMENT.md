@@ -188,12 +188,6 @@ Domain reputation requires:
 - Extension: the existing `VITE_DEFILLAMA_SEARCH_KEY`; no Railway secret is
   compiled into the extension.
 
-## WalletChan RPC / MCP
-
-Local agent tooling is maintained in the public
-[RPC](https://github.com/walletchan/walletchan-rpc) and
-[MCP](https://github.com/walletchan/walletchan-mcp) repositories.
-
 ## Releasing & Publishing
 
 See [`PUBLISHING.md`](./PUBLISHING.md) for the full release workflow, Chrome Web Store upload process, and self-hosted auto-update system. Storage migration rules and the pre-release checklist live there too.
