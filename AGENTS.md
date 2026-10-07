@@ -63,22 +63,52 @@ that private key/seed phrase/Ledger accounts have separate handlers.
   Hardware additions also need real-device QA. See the account-type extension
   checklist in `_docs/IMPLEMENTATION.md`.
 
+## Git workflow: PR-only master
+
+`master` is protected by an active GitHub ruleset requiring a pull request.
+There are no bypass actors, required approvals, or required CI checks.
+
+- Start changes on a `codex/` topic branch from current `origin/master`.
+- Commit and push the topic branch, then open a PR targeting `master`.
+  This applies to documentation and small fixes too.
+- Never push directly to `master`, force-push it, or disable/bypass protection.
+- A request to commit and push means publish the topic branch and PR; it does
+  not authorize merging. Merge only when the user explicitly requests it.
+- After the user merges a PR, return to `master` and update it with a
+  fast-forward pull. Preserve any uncommitted local work.
+- Keep files explicitly requested to stay local out of commits and PRs.
+- The legacy `pnpm release:*` script pushes directly to `master`; do not run
+  it under this rule. Follow the PR-based release steps in `_docs/PUBLISHING.md`.
+
+## Cross-surface and storage guardrails
+
+- Transaction confirmation behavior must stay consistent across single,
+  batch, cross-dapp batch, and swap/bridge surfaces. When adding gas or fee UX,
+  audit all four, including `isNonAtomic`, `onGasEstimates`,
+  `onValidityChange`, and overrides applied at signing time. See
+  `_docs/TX_CONFIRMATION.md`.
+- Before changing any `chrome.storage` key or persisted shape, read
+  `_docs/STORAGE.md` and the migration/release checks in `_docs/PUBLISHING.md`.
+  Chrome auto-updates silently; audit every reader and writer and use an
+  idempotent migration in the owning lifecycle module when required.
+
 ## AI Session Workflow
 
 **At the start of each session**, before writing any code:
 
 1. **Read `_docs/IMPLEMENTATION.md`** when working on extension logic, message passing, background handlers, or crypto
-2. **Read `_docs/STYLING.md`** when working on any UI components or styling
+2. **Read `_docs/STYLING.md`** when working on any UI components or styling, and `_docs/THEME.md` when touching theme tokens
 3. **Read `_docs/EXTENSION_UI_ARCHITECTURE.md`** when moving, splitting, or adding extension UI components, hooks, models, or feature folders
 4. **Read `_docs/WEBSITE.md`** when working on the landing page
+5. **Read `_docs/DEVELOPMENT.md`** when working on build/dev commands, Firefox, or Railway
 
 **Before every commit** that touches extension code:
 
-5. **Read `_docs/SECURITY.md`** and verify changes against the pre-commit security checklist. This is critical for any changes to message handlers, storage, crypto, content scripts, or session management.
+6. **Read `_docs/SECURITY.md`** and verify changes against the pre-commit security checklist. This is critical for any changes to message handlers, storage, crypto, content scripts, or session management.
 
 **After making any changes, before handing work back to the user:**
 
-6. **Run `pnpm build:extension`** and confirm it succeeds. This is required even when targeted tests or typechecks already passed, so `apps/extension/build/` is always refreshed and ready for the user to reload and test in the browser.
+7. **Run `pnpm build:extension`** and confirm it succeeds. This is required even when targeted tests or typechecks already passed, so `apps/extension/build/` is always refreshed and ready for the user to reload and test in the browser.
 
 **After making significant changes:**
 
@@ -156,10 +186,8 @@ pnpm test:extension-ui  # UI architecture, facade, pure-model, and size guardrai
 # Foundry library installation (ALWAYS use git submodules)
 cd /path/to/contracts && forge install <org>/<repo>   # Do NOT use --no-git
 
-# Release (auto-bumps version, syncs manifest, creates tag, pushes)
-pnpm release:patch      # 0.1.0 → 0.1.1
-pnpm release:minor      # 0.1.0 → 0.2.0
-pnpm release:major      # 0.1.0 → 1.0.0
+# Release: use the PR-based workflow in _docs/PUBLISHING.md.
+# Do not run legacy pnpm release:* commands; they push directly to master.
 
 # Store artifacts (required after every extension version bump)
 pnpm zip:cws            # Fresh Chrome Web Store zip + Firefox zip for store uploads
@@ -658,6 +686,20 @@ When working on features, refer to these docs:
 | `_docs/STORAGE.md`                                       | Every chrome.storage key, shapes, version history         |
 | `_docs/ADD_CHAIN.md`                                     | How to add a new chain (single registry entry)            |
 | `_docs/bankr-skills/bankr/SKILL.md`                      | Bankr API interactions, workflows, error handling         |
+| [`_docs/SECURITY_ARCHITECTURE.md`](./_docs/SECURITY_ARCHITECTURE.md) | Service-worker domain boundaries, dependency direction, audit maps, safe refactors |
+| [`_docs/TX_CONFIRMATION.md`](./_docs/TX_CONFIRMATION.md) | Tx confirmation surfaces + gas-fee UX wiring (must audit all surfaces) |
+| [`_docs/THEME.md`](./_docs/THEME.md) | Theme engine handbook (architecture, authoring rules, adding a new theme) |
+| [`_docs/THEMING_PRD.md`](./_docs/THEMING_PRD.md) | Theme engine PRD: ADR, design briefs, phased rollout history |
+| [`_docs/BRIDGE.md`](./_docs/BRIDGE.md) | Bridge: Bungee API, cross-chain quote/build/submit/status |
+| [`_docs/CLEAR_SIGNING.md`](./_docs/CLEAR_SIGNING.md) | ERC-7730 clear-signing pipeline |
+| [`_docs/ERC5792-DAPP-SUPPORT.md`](./_docs/ERC5792-DAPP-SUPPORT.md) | Dapp-side wagmi upgrade guide for batched txs |
+| [`_docs/7702.md`](./_docs/7702.md) | EIP-7702 atomic batching for PK/SP: default delegate, resolution, custom override, revoke |
+| [`_docs/L2_FORCE_INCLUSION.md`](./_docs/L2_FORCE_INCLUSION.md) | OP Stack force inclusion: L1 deposit flow |
+| [`_docs/FIREFOX.md`](./_docs/FIREFOX.md) | Firefox port: pipeline, manifest divergence, storage.session shim, AMO release |
+| [`_docs/PK_ACCOUNTS.md`](./_docs/PK_ACCOUNTS.md) | Private-key / Seed phrase account architecture & flows |
+| [`_docs/INDEXER.md`](./_docs/INDEXER.md) | Website and extension indexer API integrations |
+| [`_docs/RAILWAY.md`](./_docs/RAILWAY.md) | Railway deploy: Dockerfile + railway.toml pattern for pnpm monorepo |
+| [github.com/apoorvlathey/walletchan-skill](https://github.com/apoorvlathey/walletchan-skill) | Public agent skill for driving the extension via CDP (canonical source lives in that repo) |
 
 ## Important Patterns
 
@@ -668,7 +710,30 @@ When working on features, refer to these docs:
 - **EIP-6963**: Modern wallet discovery alongside legacy window.ethereum
 - **Shared contract constants**: `packages/shared/src/contracts.ts` is the single source of truth for `BASE_CHAIN_ID`, `BNKRW_TOKEN_ADDRESS`, `SBNKRW_VAULT_ADDRESS`, `BNKRW_POOL_ADDRESS`. Import via `@walletchan/shared/contracts`.
 - **Address display standard**: Whenever a `0x` address is shown in the UI, always include a **copy button** (CopyIcon/CheckIcon toggle) and a **view on explorer** link (ExternalLinkIcon, opens `${chainConfig.explorer}/address/${addr}`). See `TypedDataDisplay.tsx` `AddressValue` component for the reference pattern.
-- **Copy button feedback**: NEVER use toast notifications for copy actions — toasts block nearby buttons (e.g., Reject/Confirm on tx confirmation, Chat button on homepage). Instead, toggle the icon from `CopyIcon` → `CheckIcon` (with `bauhaus.yellow` color) for 2 seconds. Use the shared `CopyButton` component from `components/CopyButton.tsx` when possible. For inline copy buttons, follow the same pattern: `setCopied(true)` + `setTimeout(() => setCopied(false), 2000)`.
+- **Copy button feedback**: NEVER use toast notifications for copy actions — toasts block nearby buttons (e.g., Reject/Confirm on tx confirmation, Chat button on homepage). Instead, toggle the icon from `CopyIcon` → `CheckIcon` (with `accent.highlight` color) for 2 seconds. Use the shared `CopyButton` component from `components/CopyButton.tsx` when possible. For inline copy buttons, follow the same pattern: `setCopied(true)` + `setTimeout(() => setCopied(false), 2000)`.
+
+- **Token-driven theming**: Warm Midnight is the extension default; Bauhaus is
+  an optional extension-only theme. Website and docs use Warm Midnight.
+  Consume intent tokens (`accent.*`, `surface.*`, `fg.*`, `border.*`,
+  `status.*`, `chart.*`), never hex literals or `bauhaus.red`. See `DESIGN.md`,
+  `_docs/WARM_MIDNIGHT.md`, and `_docs/THEME.md`.
+- **Reject All button color**: use `chart.negative`; `status.error.fg` is white
+  in Bauhaus and can make the control invisible.
+- **Dark CTA strips**: use `useStripTokens()` from `@/theme` for inverted cards
+  and bars. Do not inline theme-specific ternaries for these surfaces.
+- **External lookups**: reuse one cached helper for each lookup (such as
+  `getEthShLabels`, `fetchTokenInfo`, or `getCachedTokenLogo`) rather than making
+  each surface issue its own request.
+- **Arbitrary chain metadata**: use `getResolvedChainById(chainId, networksInfo)`
+  for potentially custom chains. `getChainConfig(chainId)` only knows built-in
+  chains and can return unknown names or empty icons.
+- **Native asset metadata**: use `getNativeAssetMeta(chainId, networksInfo)` for
+  symbols, names, decimals, and logos. Do not hardcode ETH/chain-icon fallbacks.
+
+## Writing Conventions
+
+Use "onchain", not "on-chain", including derived forms such as "onchain balance"
+and "confirmed onchain", in user-facing copy, docs, comments, and identifiers.
 
 ## Code Quality Guidelines
 
@@ -690,7 +755,8 @@ When working on features, refer to these docs:
 ### Extension Domain Folder Contract
 
 - **The `src/chrome/` root is not a general source directory.** Read
-  `src/chrome/README.md` before adding or moving service-worker logic. New root
+  `src/chrome/README.md` and `_docs/SECURITY_ARCHITECTURE.md` before adding or
+  moving service-worker logic. New root
   files are allowed only for manifest/Vite entrypoints, documented compatibility
   facades, or genuinely cross-domain primitives.
 - **Group related logic in a named domain folder.** If a feature has two or
@@ -755,7 +821,12 @@ When working on features, refer to these docs:
 ### Reuse Over Duplication
 
 - **Extract shared utilities** when the same logic appears in 2+ files. See `cryptoUtils.ts` for the pattern (shared constants + functions used by both `crypto.ts` and `vault/entryCrypto.ts`).
-- **Reuse existing React components** before creating new ones. Check `components/` for existing UI patterns.
+- **Search before building** any component, hook, utility, storage helper, or
+  handler. Extend an existing implementation when it already covers most of
+  the behavior. Shared primitives include `CopyButton`, `useCachedAvatarSrc`,
+  `useCachedAvatarMap`, `ERC20ApproveDisplay`, `TokenAmount`, `AddressValue`,
+  `useThemedToast`, `useStripTokens`, `getEthShLabels`, `fetchTokenInfo`, and
+  `getCachedTokenLogo`.
 - **Use dependency injection** to avoid circular imports (e.g., `tryRestoreSession(unlockFn)` in `sessionCache.ts` takes a callback instead of importing `authHandlers.ts` directly).
 
 ### Naming & Organization

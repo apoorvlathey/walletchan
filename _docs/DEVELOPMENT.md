@@ -2,6 +2,33 @@
 
 This pnpm workspace contains the browser extension, website, docs site, and domain reputation service.
 
+## Contributing changes
+
+`master` requires a PR for every change, including documentation. No approval
+or CI check is currently required by GitHub; repository validation requirements
+still apply. There are no bypass actors.
+
+Start a `codex/` branch from current `origin/master`, commit and push the topic
+branch, and open a PR targeting `master`. Never push directly to `master` or
+bypass its protection. Merge only when explicitly requested. After a merge,
+return to `master` and fast-forward it while preserving uncommitted local work.
+Leave files requested to stay local out of the PR.
+
+## Agent instructions
+
+`AGENTS.md` is the shared repository instruction file; do not maintain a
+separate duplicate `CLAUDE.md`. Claude Code v2.1.277 and later supports it
+natively through the built-in AGENTS.md plugin. Use a current Claude Code
+version and keep that plugin enabled.
+
+The default Project instructions mode loads `AGENTS.md` only when no
+`CLAUDE.md` or `CLAUDE.local.md` exists in the working directory or its
+ancestors. If your environment has such a file, choose
+`claude-md-and-agents-md` in `/config` → Project instructions. Confirm loading
+with `/context` in a fresh session. The option is user-scoped; setting it in
+this repo's `.claude/settings.json` does not take effect. See the
+[official Claude Code instructions guide](https://code.claude.com/docs/en/memory#read-agentsmd-files).
+
 ## Contract address updates
 
 The public [contracts repository](https://github.com/walletchan/contracts) owns
@@ -71,10 +98,8 @@ pnpm sign:firefox              # Build + submit to AMO (requires WEB_EXT_API_KEY
 # Foundry library installation (ALWAYS use git submodules)
 cd /path/to/contracts && forge install <org>/<repo>   # Do NOT use --no-git
 
-# Release (auto-bumps version, syncs manifest, creates tag, pushes)
-pnpm release:patch      # 0.1.0 → 0.1.1
-pnpm release:minor      # 0.1.0 → 0.2.0
-pnpm release:major      # 0.1.0 → 1.0.0
+# Release: prepare a PR, then tag the merged commit (see PUBLISHING.md).
+# Legacy pnpm release:* commands push directly to master; do not run them.
 ```
 
 See [`PUBLISHING.md`](./PUBLISHING.md) for the full release workflow.
@@ -192,13 +217,9 @@ Domain reputation requires:
 
 See [`PUBLISHING.md`](./PUBLISHING.md) for the full release workflow, Chrome Web Store upload process, and self-hosted auto-update system. Storage migration rules and the pre-release checklist live there too.
 
-Quick reference:
-
-```bash
-pnpm release:patch  # 0.2.0 → 0.2.1 (bug fixes)
-pnpm release:minor  # 0.2.0 → 0.3.0 (new features)
-pnpm release:major  # 0.2.0 → 1.0.0 (breaking changes)
-```
+The legacy `pnpm release:*` commands push directly to `master` and must not be
+used with PR-only protection. Prepare version changes in a release PR, then tag
+the merged commit as described in `PUBLISHING.md`.
 
 ## Deploying long-running services (Railway)
 
