@@ -7,7 +7,9 @@ dependency order:
 2. `transport.ts` — redirect-denying, deadline/byte-bounded Bankr HTTP text
    transport and transport-error normalization.
 3. `signing.ts` — personal/typed-data request mapping plus recovered-signer
-   verification. Raw `eth_sign` remains rejected.
+   verification. `typedData.ts` normalizes decimal/hex chain IDs to positive safe
+   JSON integers without mutating reviewed data. Missing IDs stay missing;
+   null/malformed/unsafe IDs fail before HTTP. Raw `eth_sign` remains rejected.
 4. `submission.ts` — reviewed signer challenge, gas-field omission, secret-lock
    start boundary, and ambiguous irreversible-submit outcomes.
 5. `jobs.ts` — bounded job IDs, polling, cancellation, and normalized status.

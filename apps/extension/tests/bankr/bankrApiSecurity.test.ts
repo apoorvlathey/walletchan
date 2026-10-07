@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import { privateKeyToAccount } from "viem/accounts";
+import { recoverTypedDataAddress } from "viem";
 
 const originalFetch = globalThis.fetch;
 const signerAccount = privateKeyToAccount(`0x${"11".repeat(32)}`);
@@ -40,6 +41,40 @@ afterEach(() => {
 
 const bankr = await import("../../src/chrome/bankr/client");
 const bounded = await import("../../src/chrome/network/boundedHttp");
+
+test("Bankr sends numeric chain IDs and verifies signatures against the original typed data", async () => {
+  let calls = 0;
+  globalThis.fetch = async (_input, init) => {
+    calls += 1;
+    const body = JSON.parse(String(init?.body));
+    assert.equal(body.typedData.domain.chainId, 8453);
+    assert.equal(init?.redirect, "error");
+    return signatureResponse(init);
+  };
+  for (const method of ["eth_signTypedData_v3", "eth_signTypedData_v4"]) {
+    for (const chainId of [8453, "8453", "0x2105"]) {
+      const typedData = {
+        domain: { name: "WalletChan test", chainId },
+        types: {
+          EIP712Domain: [{ name: "name", type: "string" }, { name: "chainId", type: "uint256" }],
+          Message: [{ name: "contents", type: "string" }],
+        },
+        primaryType: "Message",
+        message: { contents: "Review this exact payload" },
+      };
+      for (const data of [typedData, JSON.stringify(typedData)]) {
+        const result = await bankr.signMessageViaApi("test-api-key", method, [signer, data]);
+        assert.equal(await recoverTypedDataAddress({ ...typedData, signature: result.signature } as never), signer);
+        assert.equal(typedData.domain.chainId, chainId);
+      }
+    }
+  }
+  assert.equal(calls, 12);
+  for (const chainId of [null, "1.5", "9007199254740992"]) {
+    await assert.rejects(bankr.signMessageViaApi("test-api-key", "eth_signTypedData_v4", [signer, JSON.stringify({ domain: { chainId } })]), /chainId/);
+  }
+  assert.equal(calls, 12, "invalid chain IDs must fail before network access");
+});
 
 test("Bankr signatures require a bounded valid response from the requested signer", async () => {
   globalThis.fetch = async (_input, init) => signatureResponse(init);

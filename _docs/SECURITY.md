@@ -1153,6 +1153,12 @@ the final pinned account/transport/tag gate. The `chat/` subdomain keeps the
 unchanged `chatHistory` repository separate from prompt egress and session
 orchestration.
 
+`typedData.ts` converts decimal/hex domain chain IDs to exact positive safe JSON
+integers before HTTP without mutating reviewed data. Missing IDs remain absent;
+null, malformed, fractional, and unsafe IDs fail locally. For an explicit
+EIP-712 domain schema, conversion preserves the exact digest. The existing
+recovered-signer and auth/release checks remain mandatory.
+
 Remote navigation metadata is separate from image/network fetch policy.
 `externalNavigation.ts` accepts public HTTPS only; Settings-owned custom
 explorers may retain explicit loopback HTTP(S) for local development while

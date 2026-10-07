@@ -25,6 +25,9 @@ test("Bankr transport, response, signing, submission, and authorization are isol
   );
   assert.match(signing, /from ["'].\/transport["']/);
   assert.match(signing, /from ["'].\/response["']/);
+  assert.match(signing, /from ["'].\/typedData["']/);
+  const typedData = await readChromeModule("bankr/typedData.ts");
+  assert.doesNotMatch(typedData, /fetch\(|chrome\.|sessionCache|accountStorage|storageLock/);
   assert.doesNotMatch(signing, /chrome\.|sessionCache|accountStorage|storageLock/);
   assert.match(submission, /from ["'].\/signing["']/);
   assert.match(submission, /from ["'].\/transport["']/);
