@@ -650,7 +650,9 @@ export function responseForPreviewMessage(
     case "getTokenBalanceWei":
       return {
         success: true,
-        balanceWei: "2812260000000000000",
+        balanceWei: environment.parsed.state.scenario.startsWith("portfolio-debt")
+          ? "0"
+          : "2812260000000000000",
       };
     case "fetchSwapPrice": {
       // Fixture outputs for a 0.5 ETH ($874.845) swap to USDC.

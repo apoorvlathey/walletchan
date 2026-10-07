@@ -46,4 +46,7 @@ test("portfolio snapshot V2 ignores and removes sentinel-era history", async (t)
   assert.equal(snapshots.length, 1);
   assert.equal(snapshots[0].totalValueUsd, 42);
   assert.equal(typeof snapshots[0].timestamp, "number");
+  assert.equal(await recordSnapshot(address, -302.04, { force: true }), true);
+  assert.equal((await getSnapshots(address)).at(-1)?.totalValueUsd, -302.04);
+  assert.equal(await recordSnapshot(address, NaN, { force: true }), false);
 });

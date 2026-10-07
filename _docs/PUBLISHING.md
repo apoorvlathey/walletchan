@@ -318,3 +318,7 @@ Before every release that touches `chrome.storage`:
 - **Never commit the .pem file** to the repository (it's in `.gitignore`)
 - The website API caches GitHub responses for 5 minutes to avoid rate limits
 - CWS publishing info and permission justifications are in `CHROME_WEBSTORE.md`
+
+### Debt-aware portfolio rollout
+
+Deploy the website provider/response changes together with the extension debt display/decoder. Production extension builds use the deployed backend; `pnpm dev:extension` uses the local website on port 3030. Holdings cache V4 rejects V1-V3 disposable display state on read and removes it idempotently via the existing startup/periodic portfolio cache pruner. No unlock or wallet-record migration is needed. Existing aggregate chart history remains intact and may contain pre-fix gross totals; new snapshots retain signed net values. Verify Morpho collateral $669.17 minus debt $302.04 gives $367.13, debt-only values remain negative, supply-only positions remain unchanged, and privacy masking covers debt.

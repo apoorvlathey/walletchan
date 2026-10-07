@@ -33,6 +33,8 @@ export interface DefiPosition {
   valueUsd: number;
   siteUrl?: string;
   assets: DefiAsset[];
+  /** Positive debt magnitudes, subtracted from net value. Absent in older responses. */
+  borrowAssets?: DefiAsset[];
   rewardAssets: DefiAsset[];
 }
 

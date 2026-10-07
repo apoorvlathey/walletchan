@@ -35,7 +35,7 @@ export async function recordSnapshot(
   totalValueUsd: number,
   options: { force?: boolean } = {},
 ): Promise<boolean> {
-  if (!Number.isFinite(totalValueUsd) || totalValueUsd < 0) return false;
+  if (!Number.isFinite(totalValueUsd)) return false;
   // V1 totals may contain Tempo's eth_getBalance sentinel. They cannot be
   // repaired because snapshots do not retain a per-chain/token breakdown.
   await purgeLegacySnapshots();

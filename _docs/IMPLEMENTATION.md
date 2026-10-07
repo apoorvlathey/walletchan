@@ -4071,6 +4071,28 @@ API portfolio data is shown immediately, while onchain balances are verified in 
   fails and a final `eth_blockNumber` health probe also fails.
 - `fetchOnchainBalances(..., { preserveZeroBalanceTokens: true })` keeps zero-balance entries within a selector's bounded working projection instead of dropping them after verification
 
+### DeFi debt accounting
+
+Website Zerion normalization routes explicit `loan` and legacy `borrow` position
+sides into optional `borrowAssets`. Octav maps its explicit `borrowAssets` too.
+Debt legs carry positive quantity/USD magnitudes; each is subtracted once from
+supply plus rewards. The actual provider and extension API types share this
+additive shape; missing debt collections remain readable as empty. Server and
+extension bounds cap each collection to 50 legs, retaining the provider net
+position value even when display legs are truncated. Negative net values survive
+aggregate/summary responses, chain totals, hiding tokens, cache round-trips, and
+new snapshots. Missing WCHAN debt prices reduce net value when enriched.
+
+`PortfolioDefiPositionRow` displays debt in a separate Borrowed / Debt section
+with negative USD values and the existing privacy mask. V4 holdings caches reject
+old gross-valued caches and reuse the idempotent owning-domain startup/periodic
+pruner; wallet secrets, account records, and existing historical snapshots are
+unchanged. Historical chart values cannot be retroactively repaired without the
+original per-position data. Preview home scenarios `portfolio-debt` and
+`portfolio-debt-only` expose collateral/debt and negative-only states. Local live
+testing needs `pnpm dev:website` plus `pnpm dev:extension` so the extension calls
+the locally fixed provider rather than the production backend.
+
 ### Shared Portfolio Token Catalog
 
 `portfolio/tokenCatalog.ts` is the single source of truth for wallet token lists shown across the extension. It builds a shared catalog consumed by `TokenHoldings`, `TokenTransfer`, and `SwapView` by merging:
@@ -4106,7 +4128,7 @@ API portfolio data is shown immediately, while onchain balances are verified in 
   totals and snapshots.
 - Fresh popup/sidepanel mounts hydrate asynchronously from the reset-aware
   `chrome.storage.local.portfolioHoldingsCache` before the live fetch starts.
-  Cache V3 is keyed by address plus the visible-chain reload key, capped to four
+  Cache V4 is keyed by address plus the visible-chain reload key, capped to four
   entries, limited to 4 MiB total and 1,000 tokens per entry, TTL-pruned after
   24 hours, and treated as optional display data. V3 invalidates older unbounded
   snapshots. The renderer mirror uses the same four-entry LRU boundary. Older

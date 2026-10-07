@@ -35,6 +35,8 @@ export const PREVIEW_ROUTE_REGISTRY: Record<
       "portfolio-loading",
       "portfolio-empty",
       "portfolio-error",
+      "portfolio-debt",
+      "portfolio-debt-only",
       "private",
       "private-ready",
       "stress",

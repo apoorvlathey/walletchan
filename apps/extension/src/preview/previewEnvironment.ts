@@ -181,13 +181,13 @@ export function createPreviewEnvironment(href: string): PreviewEnvironment {
         },
       ],
     },
-    customTokens: [{ ...previewCustomToken }],
+    customTokens: scenario.startsWith("portfolio-debt") ? [] : [{ ...previewCustomToken }],
     hiddenPortfolioTokens:
       route === "token-management" && parsed.state.scenario === "hidden"
         ? previewHiddenTokens.map((token) => ({ ...token }))
         : [],
   };
-  if (route === "home") {
+  if (route === "home" && !scenario.startsWith("portfolio-debt")) {
     local.portfolioSnapshotsV2 = {
       [activeAccount.address.toLowerCase()]:
         createPreviewHomePortfolioSnapshots(),
@@ -289,6 +289,24 @@ const previewHomePortfolioResponse = createPreviewHomePortfolioResponse(
 );
 
 export function getPreviewPortfolioResponse(scenario: string): PortfolioResponse {
+  if (scenario === "portfolio-debt" || scenario === "portfolio-debt-only") {
+    const debtOnly = scenario === "portfolio-debt-only";
+    const asset = (symbol: string, balance: string, valueUsd: number, address: string) => ({
+      symbol, name: symbol, chainId: 8453, contractAddress: address,
+      balance, balanceFormatted: balance, valueUsd,
+    });
+    return {
+      tokens: [],
+      totalValueUsd: debtOnly ? -302.04 : 367.13,
+      defiPositions: [{
+        protocol: "Morpho", chainId: 8453, type: "lending", name: "wstETH / USDC",
+        valueUsd: debtOnly ? -302.04 : 367.13,
+        assets: debtOnly ? [] : [asset("wstETH", "0.2041", 669.17, "0x0000000000000000000000000000000000000001")],
+        borrowAssets: [asset("USDC", "302.08", 302.04, "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")],
+        rewardAssets: [],
+      }],
+    };
+  }
   if (scenario === "portfolio-empty" || scenario === "empty") {
     return { tokens: [], defiPositions: [], totalValueUsd: 0 };
   }
@@ -379,7 +397,7 @@ export function createPreviewFetch(
         );
       }
       return jsonResponse(
-        environment?.parsed.state.route === "home"
+        environment?.parsed.state.route === "home" && !scenario.startsWith("portfolio-debt")
           ? previewHomePortfolioResponse
           : getPreviewPortfolioResponse(scenario),
       );
@@ -392,6 +410,9 @@ export function createPreviewFetch(
           | PreviewJsonRpcRequest
           | PreviewJsonRpcRequest[];
         const scenario = environment?.parsed.state.scenario;
+        if (scenario?.startsWith("portfolio-debt") && !Array.isArray(request) && request.method === "eth_getBalance") {
+          return jsonResponse({ jsonrpc: "2.0", id: request.id ?? null, result: "0x0" });
+        }
         if (scenario === "portfolio-error" || scenario === "error") {
           const failure = (entry: PreviewJsonRpcRequest) => ({
             jsonrpc: "2.0",

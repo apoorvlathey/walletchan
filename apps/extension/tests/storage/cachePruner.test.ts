@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test, { after, beforeEach } from "node:test";
+import { PORTFOLIO_HOLDINGS_CACHE_VERSION } from "../../src/chrome/portfolio/holdingsCachePolicy";
 
 const NOW = 1_800_000_000_000;
 const HOUR = 60 * 60 * 1000;
@@ -171,7 +172,7 @@ test("portfolio cache pruning stays delegated and reset-aware", async () => {
     timestamp,
   });
   values.portfolioHoldingsCache = {
-    version: 3,
+    version: PORTFOLIO_HOLDINGS_CACHE_VERSION,
     entries: {
       fresh: snapshot(1, NOW),
       stale: snapshot(2, NOW - DAY - 1),

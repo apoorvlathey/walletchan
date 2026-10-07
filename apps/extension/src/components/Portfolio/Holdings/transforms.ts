@@ -202,7 +202,7 @@ export function getChainTotals(
     totals.set(
       position.chainId,
       (totals.get(position.chainId) ?? 0) +
-        Math.max(0, position.valueUsd || 0),
+        (Number.isFinite(position.valueUsd) ? position.valueUsd : 0),
     );
   }
   for (const [chainKey, valueUsd] of Object.entries(

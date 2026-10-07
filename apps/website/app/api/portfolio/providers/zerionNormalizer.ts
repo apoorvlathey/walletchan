@@ -101,22 +101,38 @@ function addDefiPosition(
       valueUsd: 0,
       siteUrl: attrs.application_metadata?.url || undefined,
       assets: [],
+      borrowAssets: [],
       rewardAssets: [],
     };
 
-  if (attrs.position_type === "reward" || type.toLowerCase().includes("reward")) {
+  // Zerion documents `loan`; retain `borrow` compatibility with older payloads.
+  // A lending module alone cannot distinguish deposits from liabilities.
+  const side = attrs.position_type?.toLowerCase();
+  if (side === "loan" || side === "borrow") {
+    const balance = Math.abs(Number(asset.balance));
+    const debt = {
+      ...asset,
+      valueUsd: Math.abs(asset.valueUsd),
+      balance: Number.isFinite(balance) ? asset.balance.replace(/^-/, "") : "0",
+      balanceFormatted: formatBalance(balance),
+    };
+    (entry.borrowAssets ??= []).push(debt);
+    entry.valueUsd -= debt.valueUsd;
+  } else if (side === "reward" || type.toLowerCase().includes("reward")) {
     entry.rewardAssets.push(asset);
+    entry.valueUsd += asset.valueUsd;
   } else {
     entry.assets.push(asset);
+    entry.valueUsd += asset.valueUsd;
   }
-  entry.valueUsd += asset.valueUsd;
   positions.set(key, entry);
 }
 
 function finalizeDefiPosition(position: DefiPosition): DefiPosition {
   const assets = [...position.assets];
   const rewardAssets = [...position.rewardAssets];
-  const allAssets = [...assets, ...rewardAssets];
+  const borrowAssets = [...(position.borrowAssets ?? [])];
+  const allAssets = [...assets, ...borrowAssets, ...rewardAssets];
   const symbols = Array.from(
     new Set(allAssets.map((asset) => asset.symbol).filter(Boolean)),
   );
@@ -128,6 +144,7 @@ function finalizeDefiPosition(position: DefiPosition): DefiPosition {
         ? symbols.join(" / ")
         : position.name,
     assets,
+    borrowAssets,
     rewardAssets,
   };
 }

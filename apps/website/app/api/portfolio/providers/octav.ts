@@ -144,10 +144,15 @@ export const octavProvider: PortfolioProvider = {
                     chainId
                   );
                   const rewardAssets = toDefiAssets(subPos.rewardAssets, chainId);
+                  const borrowAssets = toDefiAssets(subPos.borrowAssets, chainId).map((asset) => {
+                    const balance = Math.abs(Number(asset.balance));
+                    return { ...asset, valueUsd: Math.abs(asset.valueUsd), balance: asset.balance.replace(/^-/, ""), balanceFormatted: formatBalance(balance) };
+                  });
                   const posValueUsd =
                     assets.reduce((s, a) => s + a.valueUsd, 0) +
-                    rewardAssets.reduce((s, a) => s + a.valueUsd, 0);
-                  if (assets.length === 0 && rewardAssets.length === 0) continue;
+                    rewardAssets.reduce((s, a) => s + a.valueUsd, 0) -
+                    borrowAssets.reduce((s, a) => s + a.valueUsd, 0);
+                  if (assets.length === 0 && rewardAssets.length === 0 && borrowAssets.length === 0) continue;
                   defiPositions.push({
                     protocol: proto.name || protoKey,
                     protocolLogo: proto.imgSmall || proto.imgLarge || undefined,
@@ -157,6 +162,7 @@ export const octavProvider: PortfolioProvider = {
                     valueUsd: posValueUsd,
                     siteUrl: subPos.siteUrl || undefined,
                     assets,
+                    borrowAssets,
                     rewardAssets,
                   });
                 }
@@ -222,6 +228,7 @@ function toDefiAssets(
     const balance = parseFloat(asset.balance || "0");
     const valueUsd = parseFloat(asset.value || "0");
     if (balance === 0 && valueUsd === 0) continue;
+    if (!Number.isFinite(balance) || !Number.isFinite(valueUsd)) continue;
     let logoUrl = asset.imgSmall || asset.imgLarge || undefined;
     if (logoUrl?.includes("NoImageAvailable")) logoUrl = undefined;
     result.push({
