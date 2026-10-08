@@ -2057,3 +2057,47 @@ The approval-change section uses `surface.raisedHover` in Midnight, extending
 to the parent surface edges with the existing content gutters. This lighter
 background separates approvals from the asset deltas below; Bauhaus retains
 its existing background.
+
+## Bunker Mode website tool, 2026-10-08
+
+A personal address checker at `/bunker-mode`, following Warm Midnight graphite,
+off-white and amber with Anton headings, Outfit body text and mono metadata.
+One address/name input leads to a concurrent mainnet scan. Keep progress visible
+until chain checks, name/avatar resolution and the final PNG finish; reveal only
+the finished card. Valid pasted addresses/names trigger the check and scroll the
+input to the top. The header links to the Chrome Web Store with the homepage's
+colored Chrome logo. Justin Drake's shared tweet component follows results.
+
+The 1200×630 share card uses a split collectible composition: identity and a large
+verdict at left, Bunker Mode above a status stamp and approved mascot at right.
+Active results use the generated spiral-eye neutral mascot and a gold/silver/bronze
+leaderboard of the address's own top three positive signer nonces. Contract
+nonces are excluded. Clean and contract results use a happy mascot; unavailable
+coverage is neutral. Red/green/neutral panel tints feather into black over 128px.
+Named cards show a shortened address beneath the name; unnamed cards show only
+one shortened address. Reuse verified avatar fallbacks and the extension's blo
+blockie. Status words accompany color; no verdict is a security guarantee.
+
+Use react-parallax-tilt with a stationary pointer hit area and 12px edge buffer.
+A damped angle source blends ten-second idle drift (2.2°/3.5°) into cursor tilt
+(maximum 8°/10°), perspective 1000px and warm glare capped at 9%. Touch scrolling
+stays native. Reduced motion disables rotation and glare. Exported PNG is static.
+
+Center amber Post on 𝕏 and secondary Download card beneath the card, followed
+by always-visible Details Checked with chain logos. No identity toggle, native
+share action, duplicate helper text or export dimensions. The full limitations
+appear with a small amber bulb below the network grid. Keep the footer at the
+page bottom.
+
+Post on 𝕏 copies the ready PNG, then opens a compact native dialog: Card copied,
+a 16px paste instruction and a three-second amber fill behind one stable dark
+Post label. Hover/focus fills the button and pauses; leaving resumes. Clicking
+opens immediately. Escape/close/backdrop cancel. Popup blocking leaves a direct
+click recovery. Reduced motion uses static amber with a readable countdown.
+Clipboard failure retains download and Open X. The user pastes the image and
+publishes manually. The prefilled post uses the founder's question/result line,
+a blank line and the check out page link, with no attribution.
+
+Browser acceptance covered named active and clean cards, responsive layout,
+three trophy ranks, contract/incomplete and fewer-rank fixtures, stable hover,
+PNG clipboard copy, countdown/focus/Escape and the colored Chrome header icon.

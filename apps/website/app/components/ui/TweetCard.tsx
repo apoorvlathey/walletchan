@@ -40,7 +40,7 @@ export function VerifiedBadge({ size = 18 }: { size?: number }) {
 interface TweetCardProps {
   tweetId: string;
   decoratorColor?: "red" | "blue" | "yellow";
-  decoratorShape?: "circle" | "square" | "triangle";
+  decoratorShape?: "circle" | "square" | "triangle" | null;
   delay?: number;
   hideQuotedTweet?: boolean;
 }
@@ -70,12 +70,12 @@ function TweetCardSkeleton({
   decoratorShape = "circle",
 }: {
   decoratorColor?: "red" | "blue" | "yellow";
-  decoratorShape?: "circle" | "square" | "triangle";
+  decoratorShape?: "circle" | "square" | "triangle" | null;
 }) {
   return (
     <Card
       decoratorColor={decoratorColor}
-      decoratorShape={decoratorShape}
+      decoratorShape={decoratorShape ?? undefined}
       p={{ base: 4, md: 6 }}
     >
       <VStack align="stretch" spacing={4}>
@@ -564,7 +564,7 @@ export function TweetCard({
       >
         <Card
           decoratorColor={decoratorColor}
-          decoratorShape={decoratorShape}
+          decoratorShape={decoratorShape ?? undefined}
           p={{ base: 4, md: 6 }}
         >
           <Text color="gray.500" textAlign="center">
@@ -589,7 +589,7 @@ export function TweetCard({
     >
       <Card
         decoratorColor={decoratorColor}
-        decoratorShape={decoratorShape}
+        decoratorShape={decoratorShape ?? undefined}
         role="group"
         p={{ base: 4, md: 6 }}
       >
