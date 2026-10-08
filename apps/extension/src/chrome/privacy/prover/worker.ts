@@ -1,3 +1,5 @@
+import { computePrivacyAspTreeRoots } from "../asp/treeRoots";
+import { parsePrivacyAspTreeRequest, type PrivacyAspTreeResult } from "../asp/treeMessages";
 /// <reference lib="webworker" />
 
 import * as snarkjs from "snarkjs";
@@ -257,9 +259,18 @@ async function runRequestedProof(
 
 workerScope.addEventListener("message", (event: MessageEvent<unknown>) => {
   const request = parsePrivacyProverSelfTestRequest(event.data) ??
-    parsePrivacyProverProofRequest(event.data);
+    parsePrivacyProverProofRequest(event.data) ??
+    parsePrivacyAspTreeRequest(event.data);
   if (!request || running) return;
   running = true;
+  if (request.action === "compute-tree-roots") {
+    try {
+      workerScope.postMessage({ version: 1, id: request.id, kind: "result", action: request.action, ok: true, ...computePrivacyAspTreeRoots(request.leaves) } satisfies PrivacyAspTreeResult);
+    } catch {
+      workerScope.postMessage({ version: 1, id: request.id, kind: "result", action: request.action, ok: false, code: "worker-runtime-failed" } satisfies PrivacyAspTreeResult);
+    } finally { running = false; }
+    return;
+  }
   const operation = request.action === "fixed-self-test"
     ? runFixedSelfTest(request.id)
     : runRequestedProof(request);

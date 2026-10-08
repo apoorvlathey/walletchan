@@ -1,3 +1,4 @@
+import { hasVerifiedPrivacyAspMembership } from "./treeEvidence";
 import { generateMerkleProof } from "@0xbow/privacy-pools-core-sdk";
 
 import type {
@@ -64,6 +65,9 @@ function verifyPublicTreeMembership(input: {
   ) {
     throw new Error("ASP roots do not match the active Privacy Pools deployment");
   }
+  const cached = hasVerifiedPrivacyAspMembership(input);
+  if (cached === false) throw new Error("Leaf not found in the leaves array.");
+  if (cached === true) return;
   const aspProof = generateMerkleProof(
     bigintLeaves(input.leaves.aspLeaves),
     BigInt(input.label),

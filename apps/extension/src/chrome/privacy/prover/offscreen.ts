@@ -1,4 +1,9 @@
 import {
+  parsePrivacyAspTreeResult,
+  type PrivacyAspTreeRequest,
+  type PrivacyAspTreeResult,
+} from "../asp/treeMessages";
+import {
   isPrivacyProverBackgroundSender,
   parsePrivacyProverOffscreenRequest,
   parsePrivacyProverProofResult,
@@ -17,9 +22,15 @@ let activeWorker: Worker | null = null;
 let activeRequestId: string | null = null;
 
 function failure(
-  request: PrivacyProverSelfTestRequest | PrivacyProverProofRequest,
+  request: PrivacyProverSelfTestRequest | PrivacyProverProofRequest | PrivacyAspTreeRequest,
   code: PrivacyProverSelfTestFailure["code"] = "worker-launch-failed",
-): PrivacyProverSelfTestFailure | PrivacyProverProofResult {
+): PrivacyProverSelfTestFailure | PrivacyProverProofResult | PrivacyAspTreeResult {
+  if (request.action === "compute-tree-roots") {
+    const treeCode = code === "worker-launch-failed" || code === "worker-timeout" ||
+        code === "worker-message-failed"
+      ? code : "worker-runtime-failed";
+    return { version: 1, id: request.id, kind: "result", action: request.action, ok: false, code: treeCode };
+  }
   return request.action === "fixed-self-test"
     ? { version: 1, id: request.id, kind: "result", ok: false, code }
     : {
@@ -41,8 +52,8 @@ function isBackgroundSender(sender: chrome.runtime.MessageSender): boolean {
 }
 
 function runWorker(
-  request: PrivacyProverSelfTestRequest | PrivacyProverProofRequest,
-): Promise<PrivacyProverSelfTestResult | PrivacyProverProofResult> {
+  request: PrivacyProverSelfTestRequest | PrivacyProverProofRequest | PrivacyAspTreeRequest,
+): Promise<PrivacyProverSelfTestResult | PrivacyProverProofResult | PrivacyAspTreeResult> {
   if (activeWorker) return Promise.resolve(failure(request));
 
   return new Promise((resolve) => {
@@ -60,7 +71,7 @@ function runWorker(
     activeRequestId = request.id;
 
     const finish = (
-      result: PrivacyProverSelfTestResult | PrivacyProverProofResult,
+      result: PrivacyProverSelfTestResult | PrivacyProverProofResult | PrivacyAspTreeResult,
     ): void => {
       if (activeRequestId !== request.id) return;
       clearTimeout(timeout);
@@ -76,7 +87,9 @@ function runWorker(
     worker.addEventListener("message", (event: MessageEvent<unknown>) => {
       const result = request.action === "fixed-self-test"
         ? parsePrivacyProverSelfTestResult(event.data)
-        : parsePrivacyProverProofResult(event.data);
+        : request.action === "compute-tree-roots"
+          ? parsePrivacyAspTreeResult(event.data)
+          : parsePrivacyProverProofResult(event.data);
       if (result?.id === request.id) finish(result);
     });
     worker.addEventListener("error", () =>

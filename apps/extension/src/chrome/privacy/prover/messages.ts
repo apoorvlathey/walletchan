@@ -1,3 +1,4 @@
+import { parsePrivacyAspTreeRequest, type PrivacyAspTreeRequest } from "../asp/treeMessages";
 export const PRIVACY_PROVER_OFFSCREEN_PATH = "privacy-prover-offscreen.html";
 export const PRIVACY_PROVER_OFFSCREEN_TARGET =
   "walletchan-privacy-prover-offscreen-v1";
@@ -130,7 +131,7 @@ export type PrivacyProverSelfTestResult =
 export interface PrivacyProverOffscreenRequest {
   readonly target: typeof PRIVACY_PROVER_OFFSCREEN_TARGET;
   readonly nonce: string;
-  readonly request: PrivacyProverSelfTestRequest | PrivacyProverProofRequest;
+  readonly request: PrivacyProverSelfTestRequest | PrivacyProverProofRequest | PrivacyAspTreeRequest;
 }
 
 export function isPrivacyProverBackgroundSender(
@@ -326,7 +327,8 @@ export function parsePrivacyProverOffscreenRequest(
     return null;
   }
   const request = parsePrivacyProverSelfTestRequest(candidate.request) ??
-    parsePrivacyProverProofRequest(candidate.request);
+    parsePrivacyProverProofRequest(candidate.request) ??
+    parsePrivacyAspTreeRequest(candidate.request);
   if (!request) return null;
   return {
     target: PRIVACY_PROVER_OFFSCREEN_TARGET,

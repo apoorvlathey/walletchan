@@ -11,7 +11,7 @@ import {
   assertPrivacyMasterAuthorization,
   capturePrivacyMasterAuthorization,
 } from "../authorization";
-import { fetchPrivacyAspLeaves, fetchPrivacyAspRoots } from "../asp/client";
+import { getPrivacyAspSnapshot } from "../asp/snapshot";
 import { readPrivacyAspMasterMaterial } from "../asp/eligibility";
 import { readPrivacyAspOnchainRoots } from "../asp/onchain";
 import {
@@ -150,13 +150,7 @@ export async function executePrivacyUnshield(
 
   let effectStarted = false;
   try {
-    const [roots, leaves] = await Promise.all([
-      fetchPrivacyAspRoots(),
-      fetchPrivacyAspLeaves(),
-    ]);
-    const onchain = await readPrivacyAspOnchainRoots({
-      expectedStateRoot: BigInt(roots.onchainMtRoot),
-    });
+    const { roots, leaves, onchain } = await getPrivacyAspSnapshot();
     if (
       BigInt(roots.mtRoot) !== onchain.associationRoot ||
       BigInt(roots.onchainMtRoot) !== onchain.verifiedStateRoot

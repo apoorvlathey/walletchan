@@ -1,3 +1,4 @@
+export { MAX_PRIVACY_ASP_LEAVES_PER_TREE, parsePrivacyAspLeaves } from "@walletchan/shared/privacy/aspPolicy";
 import type { Address, Hex } from "viem";
 
 export const PRIVACY_ASP_REVIEW_STATUSES = [
@@ -34,7 +35,6 @@ export interface PrivacyAspDeposit {
   reviewStatus: PrivacyAspReviewStatus;
 }
 
-export const MAX_PRIVACY_ASP_LEAVES_PER_TREE = 10_000;
 export const MAX_PRIVACY_ASP_LABELS_PER_REQUEST = 20;
 export const PRIVACY_SNARK_SCALAR_FIELD =
   21_888_242_871_839_275_222_246_405_745_257_275_088_548_364_400_416_034_343_698_204_186_575_808_495_617n;
@@ -92,46 +92,6 @@ export function parsePrivacyAspRoots(value: unknown): PrivacyAspRoots {
     mtRoot: roots.mtRoot!,
     createdAt: roots.createdAt!,
     onchainMtRoot: roots.onchainMtRoot!,
-  };
-}
-
-function parseLeaves(
-  value: unknown,
-  name: string,
-): string[] {
-  if (
-    !Array.isArray(value) ||
-    value.length === 0 ||
-    value.length > MAX_PRIVACY_ASP_LEAVES_PER_TREE
-  ) {
-    throw new Error(`Invalid ASP ${name}`);
-  }
-  const leaves: string[] = [];
-  const seen = new Set<string>();
-  for (const leaf of value) {
-    const parsed = parsePrivacyFieldElement(leaf);
-    if (parsed === null) throw new Error(`Invalid ASP ${name}`);
-    const normalized = parsed.toString();
-    if (seen.has(normalized)) throw new Error(`Invalid ASP ${name}`);
-    seen.add(normalized);
-    leaves.push(normalized);
-  }
-  return leaves;
-}
-
-export function parsePrivacyAspLeaves(value: unknown): PrivacyAspLeaves {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    Array.isArray(value) ||
-    !exactKeys(value, ["aspLeaves", "stateTreeLeaves"])
-  ) {
-    throw new Error("Invalid ASP leaves");
-  }
-  const leaves = value as Partial<PrivacyAspLeaves>;
-  return {
-    aspLeaves: parseLeaves(leaves.aspLeaves, "label leaves"),
-    stateTreeLeaves: parseLeaves(leaves.stateTreeLeaves, "state leaves"),
   };
 }
 

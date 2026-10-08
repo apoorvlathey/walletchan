@@ -16,12 +16,11 @@ import {
   readPrivacyAspMasterMaterial,
   verifyPrivacyCommitmentAspMembership,
 } from "./eligibility";
-import { fetchPrivacyAspLeaves, fetchPrivacyAspRoots } from "./client";
+import { getPrivacyAspSnapshot } from "./snapshot";
 import {
   logPrivacyAspStatusResponse,
   warnPrivacyAspRefreshDeferred,
 } from "./diagnostics";
-import { readPrivacyAspOnchainRoots } from "./onchain";
 import { partitionPrivacyAspStatusResponse } from "./statusResponse";
 import type { PrivacyAspDeposit, PrivacyAspReviewStatus } from "./types";
 
@@ -168,13 +167,7 @@ export async function refreshPrivacyCommitmentEligibility(): Promise<PrivacyComm
       }
     }
     if (approved.length > 0) {
-      const [roots, leaves] = await Promise.all([
-        fetchPrivacyAspRoots(),
-        fetchPrivacyAspLeaves(),
-      ]);
-      const onchain = await readPrivacyAspOnchainRoots({
-        expectedStateRoot: BigInt(roots.onchainMtRoot),
-      });
+      const { roots, leaves, onchain } = await getPrivacyAspSnapshot();
       for (const candidate of approved) {
         verifyPrivacyCommitmentAspMembership({
           details: candidate.details,

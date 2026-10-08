@@ -1,4 +1,11 @@
 import {
+  parsePrivacyAspTreeRequest,
+  parsePrivacyAspTreeResult,
+  type PrivacyAspTreeRequest,
+  type PrivacyAspTreeResult,
+} from "../asp/treeMessages";
+import type { PrivacyAspLeaves } from "../asp/types";
+import {
   parsePrivacyProverSelfTestResult,
   parsePrivacyProverProofRequest,
   parsePrivacyProverProofResult,
@@ -73,6 +80,7 @@ export function getPrivacyProverDiagnosticCode(
 }
 
 export interface PrivacyProverCoordinator {
+  computeTreeRoots(leaves: PrivacyAspLeaves): Promise<Extract<PrivacyAspTreeResult, { ok: true }>>;
   runFixedSelfTest(): Promise<PrivacyProverSelfTestSuccess>;
   proveCommitment(
     input: PrivacyCommitmentProofInput,
@@ -133,8 +141,8 @@ export function createPrivacyProverCoordinator(
   const execute = async (
     requestForId: (
       id: string,
-    ) => PrivacyProverSelfTestRequest | PrivacyProverProofRequest,
-  ): Promise<PrivacyProverSelfTestSuccess | Extract<PrivacyProverProofResult, { ok: true }>> => {
+    ) => PrivacyProverSelfTestRequest | PrivacyProverProofRequest | PrivacyAspTreeRequest,
+  ): Promise<PrivacyProverSelfTestSuccess | Extract<PrivacyProverProofResult, { ok: true }> | Extract<PrivacyAspTreeResult, { ok: true }>> => {
     if (!dependencies.available()) throw new Error("unavailable");
     const existingUrls = await dependencies.listOffscreenDocumentUrls().catch(() => {
       throw new Error("context-query-failed");
@@ -172,7 +180,9 @@ export function createPrivacyProverCoordinator(
       );
       const result = request.action === "fixed-self-test"
         ? parsePrivacyProverSelfTestResult(rawResult)
-        : parsePrivacyProverProofResult(rawResult);
+        : request.action === "compute-tree-roots"
+          ? parsePrivacyAspTreeResult(rawResult)
+          : parsePrivacyProverProofResult(rawResult);
       if (!result || result.id !== id) throw new Error("invalid-result");
       if (
         request.action !== "fixed-self-test" &&
@@ -229,6 +239,17 @@ export function createPrivacyProverCoordinator(
   };
 
   return {
+    computeTreeRoots(leaves) {
+      return enqueue(async () => {
+        const result = await execute((id) => {
+          const parsed = parsePrivacyAspTreeRequest({ version: 1, id, kind: "request", action: "compute-tree-roots", leaves });
+          if (!parsed) throw new Error("invalid-request");
+          return parsed;
+        });
+        if (!("action" in result) || result.action !== "compute-tree-roots") throw new Error("invalid-result");
+        return result;
+      });
+    },
     runFixedSelfTest(): Promise<PrivacyProverSelfTestSuccess> {
       if (!activeSelfTest) {
         activeSelfTest = enqueue(() => execute((id) => ({
@@ -413,4 +434,9 @@ export function provePrivacyWithdrawal(
   input: PrivacyWithdrawalProofInput,
 ): Promise<Extract<PrivacyProverProofResult, { ok: true }>> {
   return productionProofCoordinator().proveWithdrawal(input);
+}
+
+/** Public leaves only; same serialized, sender/nonce-bound offscreen transport as proofs. */
+export function computePrivacyAspTreeRootsOffscreen(leaves: PrivacyAspLeaves) {
+  return productionProofCoordinator().computeTreeRoots(leaves);
 }

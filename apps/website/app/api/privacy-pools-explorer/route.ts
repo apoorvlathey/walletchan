@@ -1,3 +1,4 @@
+import { getPrivacyExplorerSnapshot } from "./snapshot";
 import { NextResponse } from "next/server";
 import {
   createPublicClient,
@@ -17,8 +18,6 @@ import {
   fetchBoundedJson,
   findRootPublication,
   parseAspDeposits,
-  parseAspLeaves,
-  parseAspRoots,
   parseNetwork,
   parseTransactionHash,
 } from "./verification";
@@ -106,23 +105,15 @@ export async function POST(request: Request) {
       Accept: "application/json",
       "X-Pool-Scope": deployment.scope,
     };
-    const [rawDeposits, rawRoots, rawLeaves] = await Promise.all([
+    const [rawDeposits, snapshot] = await Promise.all([
       fetchBoundedJson(
         `${deployment.aspBaseUrl}/${deployment.chainId}/public/deposits-by-label`,
         { ...aspHeaders, "X-Labels": label },
       ),
-      fetchBoundedJson(
-        `${deployment.aspBaseUrl}/${deployment.chainId}/public/mt-roots`,
-        aspHeaders,
-      ),
-      fetchBoundedJson(
-        `${deployment.aspBaseUrl}/${deployment.chainId}/public/mt-leaves`,
-        aspHeaders,
-      ),
+      getPrivacyExplorerSnapshot(network),
     ]);
     const deposits = parseAspDeposits(rawDeposits);
-    const roots = parseAspRoots(rawRoots);
-    const leaves = parseAspLeaves(rawLeaves);
+    const roots = snapshot.roots;
     const aspDeposit = deposits.find(
       (deposit) =>
         deposit.txHash.toLowerCase() === txHash &&
@@ -135,9 +126,7 @@ export async function POST(request: Request) {
       BigInt(aspDeposit.precommitmentHash) === args._precommitmentHash,
     );
     const reviewStatus = aspDeposit?.reviewStatus ?? "not_seen";
-    const labelIncluded = leaves.aspLeaves.some(
-      (leaf) => BigInt(leaf) === args._label,
-    );
+    const labelIncluded = snapshot.data.has(label);
     const latestRoot = await client.readContract({
       address: deployment.entrypoint,
       abi: ENTRYPOINT_ABI,
@@ -205,6 +194,9 @@ export async function POST(request: Request) {
     const message = caught instanceof Error ? caught.message : "Verification failed";
     if (/could not be found|not found/i.test(message)) {
       return error(`Transaction not found on ${deployment.chainName}`, 404);
+    }
+    if (/verification capacity|response is too large/i.test(message)) {
+      return error("Privacy Pools data exceeds verification capacity", 503);
     }
     console.error("Privacy Pools explorer verification failed", caught);
     return error("Privacy Pools verification is temporarily unavailable", 502);
