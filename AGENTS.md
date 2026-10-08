@@ -106,9 +106,11 @@ There are no bypass actors, required approvals, or required CI checks.
 
 6. **Read `_docs/SECURITY.md`** and verify changes against the pre-commit security checklist. This is critical for any changes to message handlers, storage, crypto, content scripts, or session management.
 
-**After making any changes, before handing work back to the user:**
+**Before handing work back to the user, validate the affected application:**
 
-7. **Run `pnpm build:extension`** and confirm it succeeds. This is required even when targeted tests or typechecks already passed, so `apps/extension/build/` is always refreshed and ready for the user to reload and test in the browser.
+7. **Extension changes:** run `pnpm build:extension` and confirm it succeeds when changes affect extension source, assets, manifest, build configuration, or shared dependencies consumed by the extension. Targeted tests or typechecks do not replace this build, which refreshes every manifest target for reload testing.
+8. **Website-only changes:** do not build the extension or run the combined `pnpm build`. Use the website dev server and proportionate website checks. Verify small copy/style edits in the browser; run relevant website tests/typechecks for behavior changes and `pnpm build:website` for a completed feature or release check. Do not run a full build after every small visual adjustment. Stop the website dev server before a production build because both use the same `.next` directory, then restore the preview.
+9. **Docs-only changes:** check the edited documentation and diff; no application build is required. For cross-application changes, validate each affected consumer.
 
 **After making significant changes:**
 

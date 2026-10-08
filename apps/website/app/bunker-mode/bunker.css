@@ -1,0 +1,530 @@
+@font-face {
+  font-family: BunkerAnton;
+  src: url("/fonts/bunker/anton.woff") format("woff");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: BunkerOutfit;
+  src: url("/fonts/bunker/outfit.woff") format("woff");
+  font-weight: 500;
+  font-display: swap;
+}
+.bunker-page {
+  --bunker-display: BunkerAnton, Anton, Impact, sans-serif;
+  --bunker-body: BunkerOutfit, Outfit, sans-serif;
+  --bunker-mono: "JetBrains Mono", monospace;
+  --bunker-line: oklch(1 0 0 / 12%);
+  --bunker-faint: oklch(0.67 0.012 285);
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bunker-bg);
+  color: var(--bunker-text);
+  font-family: var(--bunker-body);
+}
+.bunker-page a {
+  color: inherit;
+  text-decoration: none;
+}
+.bunker-header {
+  width: 100%;
+  max-width: 1160px;
+  margin: auto;
+  padding: 22px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.bunker-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 22px var(--bunker-display);
+}
+.bunker-header > a:last-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--bunker-muted);
+  font-size: 13px;
+}
+.bunker-main {
+  flex: 1;
+  width: 100%;
+  max-width: 828px;
+  padding: 64px 32px 40px;
+  margin: auto;
+}
+.bunker-lead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  min-height: 160px;
+  margin-bottom: 28px;
+}
+.bunker-main h1 {
+  font: clamp(44px, 6vw, 64px) / 1.1 var(--bunker-display);
+  letter-spacing: -0.01em;
+  margin-bottom: 12px;
+}
+.bunker-intro {
+  font-size: 21px;
+  line-height: 1.4;
+}
+.bunker-intro span {
+  color: var(--bunker-brand);
+}
+.bunker-mascot {
+  position: relative;
+  width: 156px;
+  height: 156px;
+  flex: none;
+}
+.bunker-mascot img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.bunker-form {
+  scroll-margin-top: 20px;
+}
+.bunker-form > label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.bunker-input-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.bunker-input-row input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  padding: 15px 16px;
+  color: var(--bunker-text);
+  background: var(--bunker-surface);
+  border: 1px solid var(--bunker-line);
+  border-radius: 8px;
+  font: 13px var(--bunker-mono);
+}
+.bunker-input-row input::placeholder {
+  color: var(--bunker-faint);
+  font-size: 12px;
+}
+.bunker-page button,
+.bunker-share-actions a {
+  min-height: 48px;
+  border-radius: 8px;
+  font: 500 15px var(--bunker-body);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border: 1px solid var(--bunker-line);
+  background: var(--bunker-surface);
+  color: var(--bunker-text);
+  transition: background 0.15s ease-out;
+}
+.bunker-input-row button,
+.bunker-share-actions > a,
+.bunker-share-actions > .bunker-post-button {
+  background: var(--bunker-brand);
+  color: var(--bunker-bg);
+  border-color: var(--bunker-brand);
+}
+.bunker-page button:hover:not(:disabled),
+.bunker-share-actions a:hover {
+  filter: brightness(1.12);
+}
+.bunker-page button:active:not(:disabled) {
+  filter: brightness(0.95);
+}
+.bunker-page button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.bunker-page :focus-visible {
+  outline: 2px solid var(--bunker-brand);
+  outline-offset: 3px;
+}
+.bunker-error {
+  margin-top: 14px;
+  color: #f87171;
+  font-size: 13px;
+}
+.bunker-tweet {
+  --chakra-colors-bauhaus-black: var(--bunker-text);
+  --chakra-colors-bauhaus-blue: var(--bunker-brand);
+  margin-top: 32px;
+}
+.bunker-tweet > div > div {
+  background: var(--bunker-surface);
+  border: 1px solid var(--bunker-line);
+  border-radius: 8px;
+  box-shadow: none;
+}
+.bunker-tweet > div > div:hover {
+  transform: none;
+  box-shadow: none;
+}
+.bunker-stage {
+  margin-top: 32px;
+}
+.bunker-scan-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.bunker-scan-head p {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.bunker-scan-head p > span {
+  color: var(--bunker-muted);
+  font: 12px var(--bunker-mono);
+}
+.bunker-scan-head button {
+  padding: 6px 10px;
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  color: var(--bunker-muted);
+}
+.bunker-progress {
+  height: 3px;
+  background: var(--bunker-line);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.bunker-progress > div {
+  width: 100%;
+  height: 100%;
+  background: var(--bunker-brand);
+  transform-origin: left center;
+  transition: transform 0.2s ease-out;
+}
+/* The stationary wrapper owns all pointer events, including a small edge buffer.
+   The moving visual cannot change the hit-test boundary. */
+.bunker-card-scene {
+  position: relative;
+  padding: 12px 0;
+  isolation: isolate;
+}
+.bunker-card-scene::before {
+  content: "";
+  position: absolute;
+  inset: 0 -12px;
+}
+.bunker-card-surface {
+  position: relative;
+  pointer-events: none;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 14px 28px -12px rgba(0, 0, 0, .45);
+  backface-visibility: hidden;
+}
+.bunker-card {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--bunker-line);
+}
+.bunker-card-loading {
+  aspect-ratio: 1200/630;
+  display: grid;
+  place-items: center;
+  color: var(--bunker-muted);
+  font-size: 13px;
+}
+.bunker-networks {
+  margin-top: 12px;
+}
+.bunker-network-heading {
+  padding: 8px 0;
+  min-height: 32px;
+  font-size: 11px;
+  color: var(--bunker-muted);
+}
+.bunker-network-heading > span {
+  float: right;
+  font: 11px var(--bunker-mono);
+}
+.bunker-network-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 4px 0 16px;
+  gap: 4px 20px;
+}
+.bunker-network {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--bunker-line);
+  padding: 8px 0;
+  font-size: 11px;
+  color: var(--bunker-muted);
+}
+.bunker-network-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.bunker-network-name img {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  object-fit: contain;
+  border-radius: 50%;
+}
+.bunker-network-name img[data-chain="4326"] {
+  background: var(--bunker-text);
+}
+.bunker-network > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.bunker-network.clean > span:last-child {
+  color: #4ade80;
+}
+.bunker-network.active > span:last-child {
+  color: var(--bunker-brand);
+}
+.bunker-network.error > span:last-child {
+  color: #f87171;
+}
+.bunker-share-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.bunker-share-note {
+  text-align: center;
+  min-height: 18px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--bunker-faint);
+  margin-top: 10px;
+}
+.bunker-share-note a {
+  color: var(--bunker-brand);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.bunker-retry {
+  margin-top: 14px;
+}
+.bunker-caveat {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 10px;
+  line-height: 1.7;
+  color: var(--bunker-faint);
+  margin: 8px 0 12px;
+  max-width: 680px;
+}
+.bunker-caveat > svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--bunker-brand);
+}
+.bunker-footer {
+  width: calc(100% - 64px);
+  max-width: 764px;
+  border-top: 1px solid var(--bunker-line);
+  margin: 0 auto 32px;
+  padding-top: 16px;
+  color: var(--bunker-faint);
+  font-size: 10px;
+  line-height: 1.8;
+}
+.bunker-footer p + p {
+  margin-top: 4px;
+}
+.bunker-footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.bunker-spin {
+  animation: bunker-spin 1.5s linear infinite;
+}
+@keyframes bunker-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 600px) {
+  .bunker-header {
+    padding: 20px;
+  }
+  .bunker-main {
+    padding: 36px 20px 28px;
+  }
+  .bunker-logo {
+    font-size: 20px;
+  }
+  .bunker-header > a:last-child {
+    font-size: 12px;
+  }
+  .bunker-lead {
+    gap: 12px;
+    min-height: 124px;
+    margin-bottom: 26px;
+  }
+  .bunker-main h1 {
+    font-size: 40px;
+  }
+  .bunker-intro {
+    font-size: 17px;
+  }
+  .bunker-footer {
+    width: calc(100% - 40px);
+    margin-bottom: 20px;
+  }
+  .bunker-mascot {
+    width: 90px;
+    height: 90px;
+  }
+  .bunker-input-row {
+    gap: 6px;
+  }
+  .bunker-input-row input {
+    padding: 14px 12px;
+    font-size: 12px;
+  }
+  .bunker-input-row input::placeholder {
+    font-size: 10px;
+  }
+  .bunker-input-row button {
+    padding: 12px 16px;
+  }
+  .bunker-network-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 14px;
+  }
+  .bunker-share-actions > button,
+  .bunker-share-actions > a {
+    padding: 12px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bunker-spin {
+    animation: none;
+  }
+  .bunker-progress > div,
+  .bunker-page button {
+    transition: none;
+  }
+}
+
+/* Clipboard handoff: one confirmation, shortcut keys, one stable action label. */
+.bunker-share-modal {
+  width: min(380px, calc(100vw - 32px));
+  margin: auto;
+  padding: 28px 24px 20px;
+  color: var(--bunker-text);
+  background: var(--bunker-surface);
+  border: 1px solid var(--bunker-line);
+  border-radius: 8px;
+  font-family: var(--bunker-body);
+}
+.bunker-share-modal::backdrop { background: rgba(0, 0, 0, .72); }
+.bunker-page .bunker-modal-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-height: 32px;
+  width: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--bunker-muted);
+}
+.bunker-share-modal h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -.4px;
+}
+.bunker-share-modal > p {
+  margin-top: 12px;
+  color: var(--bunker-muted);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.bunker-page .bunker-modal-post {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  width: 100%;
+  margin-top: 24px;
+  min-height: 48px;
+  padding: 0;
+  background: color-mix(in srgb, var(--bunker-brand) 40%, var(--bunker-text));
+  color: var(--bunker-bg);
+  border: 0;
+}
+.bunker-modal-progress {
+  position: absolute;
+  inset: 0;
+  background: var(--bunker-brand);
+  transform-origin: left;
+}
+.bunker-modal-post-label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+}
+.bunker-modal-seconds {
+  position: absolute;
+  right: 16px;
+  font: 12px var(--bunker-mono);
+  font-variant-numeric: tabular-nums;
+}
+.bunker-share-modal > .bunker-modal-timing {
+  min-height: 18px;
+  margin-top: 10px;
+  text-align: center;
+  font-size: 11px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bunker-modal-progress { transform: scaleX(1) !important; }
+}

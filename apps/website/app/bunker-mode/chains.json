@@ -1,0 +1,227 @@
+[
+  {
+    "id": 1,
+    "name": "Ethereum",
+    "icon": "/chainIcons/ethereum.svg",
+    "rpcUrls": [
+      "https://eth.drpc.org"
+    ],
+    "explorer": "https://etherscan.io"
+  },
+  {
+    "id": 2741,
+    "name": "Abstract",
+    "icon": "/chainIcons/abstract.webp",
+    "rpcUrls": [
+      "https://api.mainnet.abs.xyz"
+    ],
+    "explorer": "https://abscan.org"
+  },
+  {
+    "id": 42161,
+    "name": "Arbitrum",
+    "icon": "/chainIcons/arbitrum.svg",
+    "rpcUrls": [
+      "https://arb1.arbitrum.io/rpc"
+    ],
+    "explorer": "https://arbiscan.io"
+  },
+  {
+    "id": 43114,
+    "name": "Avalanche",
+    "icon": "/chainIcons/avalanche.svg",
+    "rpcUrls": [
+      "https://api.avax.network/ext/bc/C/rpc"
+    ],
+    "explorer": "https://snowtrace.io"
+  },
+  {
+    "id": 8453,
+    "name": "Base",
+    "icon": "/chainIcons/base.svg",
+    "rpcUrls": [
+      "https://base.drpc.org"
+    ],
+    "explorer": "https://basescan.org"
+  },
+  {
+    "id": 80094,
+    "name": "Berachain",
+    "icon": "/chainIcons/berachain.svg",
+    "rpcUrls": [
+      "https://rpc.berachain.com"
+    ],
+    "explorer": "https://berascan.com"
+  },
+  {
+    "id": 81457,
+    "name": "Blast",
+    "icon": "/chainIcons/blast.svg",
+    "rpcUrls": [
+      "https://rpc.blast.io"
+    ],
+    "explorer": "https://blastscan.io"
+  },
+  {
+    "id": 56,
+    "name": "BNB Chain",
+    "icon": "/chainIcons/bnb.svg",
+    "rpcUrls": [
+      "https://bsc-dataseed.binance.org"
+    ],
+    "explorer": "https://bscscan.com"
+  },
+  {
+    "id": 999,
+    "name": "HyperEVM",
+    "icon": "/chainIcons/hyperevm.svg",
+    "rpcUrls": [
+      "https://rpc.hyperliquid.xyz/evm"
+    ],
+    "explorer": "https://hyperevmscan.io"
+  },
+  {
+    "id": 57073,
+    "name": "Ink",
+    "icon": "/chainIcons/ink.svg",
+    "rpcUrls": [
+      "https://rpc-gel.inkonchain.com"
+    ],
+    "explorer": "https://explorer.inkonchain.com"
+  },
+  {
+    "id": 59144,
+    "name": "Linea",
+    "icon": "/chainIcons/linea.svg",
+    "rpcUrls": [
+      "https://rpc.linea.build"
+    ],
+    "explorer": "https://lineascan.build"
+  },
+  {
+    "id": 5000,
+    "name": "Mantle",
+    "icon": "/chainIcons/mantle.svg",
+    "rpcUrls": [
+      "https://rpc.mantle.xyz"
+    ],
+    "explorer": "https://mantlescan.xyz"
+  },
+  {
+    "id": 10,
+    "name": "Optimism",
+    "icon": "/chainIcons/optimism.svg",
+    "rpcUrls": [
+      "https://mainnet.optimism.io"
+    ],
+    "explorer": "https://optimistic.etherscan.io"
+  },
+  {
+    "id": 4326,
+    "name": "MegaETH",
+    "icon": "/chainIcons/megaeth.svg",
+    "rpcUrls": [
+      "https://mainnet.megaeth.com/rpc"
+    ],
+    "explorer": "https://mega.etherscan.io"
+  },
+  {
+    "id": 34443,
+    "name": "Mode",
+    "icon": "/chainIcons/mode.svg",
+    "rpcUrls": [
+      "https://mainnet.mode.network"
+    ],
+    "explorer": "https://explorer.mode.network"
+  },
+  {
+    "id": 143,
+    "name": "Monad",
+    "icon": "/chainIcons/monad.svg",
+    "rpcUrls": [
+      "https://rpc.monad.xyz"
+    ],
+    "explorer": "https://monadscan.com"
+  },
+  {
+    "id": 9745,
+    "name": "Plasma",
+    "icon": "/chainIcons/plasma.svg",
+    "rpcUrls": [
+      "https://rpc.plasma.to"
+    ],
+    "explorer": "https://plasmascan.to"
+  },
+  {
+    "id": 137,
+    "name": "Polygon",
+    "icon": "/chainIcons/polygon.svg",
+    "rpcUrls": [
+      "https://polygon.drpc.org"
+    ],
+    "explorer": "https://polygonscan.com"
+  },
+  {
+    "id": 4663,
+    "name": "Robinhood Chain",
+    "icon": "/chainIcons/robinhood.webp",
+    "rpcUrls": [
+      "https://rpc.mainnet.chain.robinhood.com"
+    ],
+    "explorer": "https://robinhoodchain.blockscout.com"
+  },
+  {
+    "id": 534352,
+    "name": "Scroll",
+    "icon": "/chainIcons/scroll.svg",
+    "rpcUrls": [
+      "https://rpc.scroll.io"
+    ],
+    "explorer": "https://scrollscan.com"
+  },
+  {
+    "id": 146,
+    "name": "Sonic",
+    "icon": "/chainIcons/sonic.webp",
+    "rpcUrls": [
+      "https://rpc.soniclabs.com"
+    ],
+    "explorer": "https://sonicscan.org"
+  },
+  {
+    "id": 4217,
+    "name": "Tempo",
+    "icon": "/chainIcons/tempo.webp",
+    "rpcUrls": [
+      "https://rpc.presto.tempo.xyz"
+    ],
+    "explorer": "https://explore.mainnet.tempo.xyz"
+  },
+  {
+    "id": 130,
+    "name": "Unichain",
+    "icon": "/chainIcons/unichain.svg",
+    "rpcUrls": [
+      "https://mainnet.unichain.org"
+    ],
+    "explorer": "https://uniscan.xyz"
+  },
+  {
+    "id": 480,
+    "name": "World Chain",
+    "icon": "/chainIcons/worldchain.svg",
+    "rpcUrls": [
+      "https://worldchain-mainnet.g.alchemy.com/public"
+    ],
+    "explorer": "https://worldscan.org"
+  },
+  {
+    "id": 324,
+    "name": "ZKsync Era",
+    "icon": "/chainIcons/zksync.svg",
+    "rpcUrls": [
+      "https://mainnet.era.zksync.io"
+    ],
+    "explorer": "https://explorer.zksync.io"
+  }
+]

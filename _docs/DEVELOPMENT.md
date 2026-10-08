@@ -65,6 +65,21 @@ extension, website, or docs builds. Simulator source and tests are linked in
 | Extension       | React 18                | Chakra UI  | Vite       |
 | Website         | Next.js 14 (App Router) | Chakra UI  | Next.js    |
 
+## Validation scope
+
+Build and check the application affected by the change. Website-only work under
+`apps/website` does not require `pnpm build:extension` or the combined `pnpm build`.
+Use `pnpm dev:website` and browser checks for small copy/style edits, targeted
+website tests/typechecks for behavior changes, and `pnpm build:website` when a
+feature is ready for final validation or release. Avoid a full build after every
+small visual adjustment. Next dev and build share `.next`; stop the dev server
+before a website production build and restore it afterward.
+
+Run the full extension build when changing extension code, assets, manifest,
+build configuration, or shared dependencies consumed by it. Cross-application
+changes require checks for each affected consumer. Docs-only changes require
+documentation/diff checks, not an application build.
+
 ## Commands
 
 ```bash
