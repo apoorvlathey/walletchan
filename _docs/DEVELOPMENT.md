@@ -94,6 +94,7 @@ pnpm typecheck:extension    # Full strict extension source gate
 pnpm typecheck:extension:qa # Strict check for Playwright/axe QA scripts
 pnpm --filter @walletchan/extension qa:preview # 235-state visual/a11y matrix
 pnpm qa:extension           # Build + packaged Chrome runtime matrix
+pnpm --filter @walletchan/extension qa:extension:privacy-asp # Public-tree hashing and UI/background responsiveness (fresh profile, no signing)
 
 # Firefox build (separate output dir: apps/extension/build-firefox/)
 pnpm build:extension:firefox   # Production Firefox build

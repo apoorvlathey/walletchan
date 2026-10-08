@@ -21,7 +21,7 @@ import {
   assertPrivacyMasterAuthorization,
   capturePrivacyMasterAuthorization,
 } from "../authorization";
-import { fetchPrivacyAspLeaves, fetchPrivacyAspRoots } from "../asp/client";
+import { getPrivacyAspSnapshot } from "../asp/snapshot";
 import { readPrivacyAspMasterMaterial } from "../asp/eligibility";
 import { readPrivacyAspOnchainRoots } from "../asp/onchain";
 import {
@@ -243,14 +243,8 @@ export async function preparePrivacyDirectUnshield(input: {
     amountWei,
   });
 
-  const [roots, leaves] = await Promise.all([
-    fetchPrivacyAspRoots(),
-    fetchPrivacyAspLeaves(),
-  ]).catch(() => {
+  const { roots, leaves, onchain } = await getPrivacyAspSnapshot().catch(() => {
     throw new PrivacyDirectUnshieldError("operation-unavailable");
-  });
-  const onchain = await readPrivacyAspOnchainRoots({
-    expectedStateRoot: BigInt(roots.onchainMtRoot),
   });
   if (
     BigInt(roots.mtRoot) !== onchain.associationRoot ||

@@ -129,7 +129,7 @@ test("ASP codecs accept the live shape and reject drift, duplicates, and oversiz
     stateTreeLeaves: ["2"],
   }));
   assert.throws(() => parsePrivacyAspLeaves({
-    aspLeaves: Array(MAX_PRIVACY_ASP_LEAVES_PER_TREE + 1).fill("1"),
+    aspLeaves: Array.from({ length: MAX_PRIVACY_ASP_LEAVES_PER_TREE + 1 }, (_, index) => String(index + 1)),
     stateTreeLeaves: ["2"],
   }));
   assert.throws(() => parsePrivacyAspDeposits([{

@@ -932,7 +932,15 @@ default to Ethereum mainnet and wait for explicit submission. A fixed-endpoint s
 the successful Entrypoint receipt and exact ETH-pool `Deposited` event, exact
 ASP deposit metadata, association-tree label membership, and equality between
 the ASP root and Entrypoint `latestRoot()`. When available it also resolves the
-matching `RootUpdated` publication and reports its onchain time. The ASP does
+matching `RootUpdated` publication and reports its onchain time.
+
+The server retains one public label snapshot per network and reads the ASP
+root pair before reuse; changing pairs trigger a bounded leaf download with a
+second root read to reject incoherent snapshots. Deposit metadata and
+Entrypoint authority are checked for every request. Leaf decoding shares the
+extension's 100,000-per-tree and 16,500,000-byte resource policy; actual streamed
+bytes are bounded even without Content-Length. Capacity failures return an
+explicit HTTP 503 rather than a generic temporary-outage error. The ASP does
 not expose its internal approval timestamp, so older deposits explicitly show
 the current approving-root publication rather than claiming it was the first.
 

@@ -2034,7 +2034,20 @@ These must always hold true. Violations indicate a security bug.
     equal the pool's current root or one of the remaining 63 entries in its
     64-slot root history, matching the contract's exact latest-ASP/known-state
     acceptance rules. Both conditions are re-read immediately before relayer
-    submission. Public recovery is offered as soon as an exact confirmed
+    submission.
+    Public ASP snapshots are frozen and cached by both roots for the worker's
+    lifetime; each use still re-reads onchain authority. Tree hashing uses the
+    serialized prover coordinator's exact-background/nonce-bound offscreen
+    transport with an exact `compute-tree-roots` codec. Its payload contains
+    public leaves only, and its result contains two bounded field roots only.
+    A worker-computed root pair must match the ASP pair; the pair is read again
+    after loading to reject a moving snapshot. Membership sets are held in a
+    WeakMap keyed by the exact frozen leaf object, never reconstructed from a
+    caller's claimed roots. Website/extension use one policy for nonzero field
+    range, canonical strings, uniqueness, 100,000 leaves per tree, and bounded
+    streaming leaf downloads of at most 16,500,000 bytes. No new persisted keys,
+    signing permissions, or account-type exceptions are introduced.
+    Public recovery is offered as soon as an exact confirmed
     deposit is indexed, including while ASP review is pending, when Proof of
     Association is required, after decline/removal, and when its ASP
     endpoint/root cannot currently be verified. Pending review or ASP outage

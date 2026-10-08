@@ -1,3 +1,4 @@
+import { getPrivacyAspSnapshot } from "./snapshot";
 import { getCachedPrivacyKey } from "../../sessionCache";
 import { decryptPrivacyRecovery } from "../crypto";
 import {
@@ -30,8 +31,6 @@ import type {
 } from "../commitments/types";
 import {
   fetchPrivacyAspDepositsByLabel,
-  fetchPrivacyAspLeaves,
-  fetchPrivacyAspRoots,
 } from "./client";
 import {
   logPrivacyAspStatusResponse,
@@ -399,17 +398,11 @@ export async function refreshPrivacyAspEligibility(): Promise<PrivacyAspEligibil
   }
 
   if (approved.length > 0) {
-    let roots: Awaited<ReturnType<typeof fetchPrivacyAspRoots>>;
-    let leaves: Awaited<ReturnType<typeof fetchPrivacyAspLeaves>>;
+    let roots: Awaited<ReturnType<typeof getPrivacyAspSnapshot>>["roots"];
+    let leaves: Awaited<ReturnType<typeof getPrivacyAspSnapshot>>["leaves"];
     let onchain: Awaited<ReturnType<typeof readPrivacyAspOnchainRoots>>;
     try {
-      [roots, leaves] = await Promise.all([
-        fetchPrivacyAspRoots(),
-        fetchPrivacyAspLeaves(),
-      ]);
-      onchain = await readPrivacyAspOnchainRoots({
-        expectedStateRoot: BigInt(roots.onchainMtRoot),
-      });
+      ({ roots, leaves, onchain } = await getPrivacyAspSnapshot());
       for (const item of approved) {
         verifyPrivacyAspPublicMembership({
           operation: item.operation,

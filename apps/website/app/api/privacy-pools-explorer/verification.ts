@@ -1,3 +1,4 @@
+import { parsePrivacyAspLeaves } from "@walletchan/shared/privacy/aspPolicy";
 import {
   decodeFunctionData,
   parseAbi,
@@ -183,24 +184,10 @@ export function parseAspRoots(value: unknown): AspRoots {
 }
 
 export function parseAspLeaves(value: unknown): AspLeaves {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error("Privacy Pools ASP returned invalid leaves");
-  }
-  const leaves = value as Partial<AspLeaves>;
-  if (
-    !Array.isArray(leaves.aspLeaves) ||
-    !Array.isArray(leaves.stateTreeLeaves) ||
-    leaves.aspLeaves.length > 10_000 ||
-    leaves.stateTreeLeaves.length > 10_000 ||
-    !leaves.aspLeaves.every(isFieldElement) ||
-    !leaves.stateTreeLeaves.every(isFieldElement)
-  ) {
-    throw new Error("Privacy Pools ASP returned invalid leaves");
-  }
-  return leaves as AspLeaves;
+  return parsePrivacyAspLeaves(value);
 }
 
-export async function fetchBoundedJson(url: string, headers: HeadersInit) {
+export async function fetchBoundedJson(url: string, headers: HeadersInit, maxBytes = MAX_RESPONSE_BYTES) {
   const response = await fetch(url, {
     headers,
     cache: "no-store",
@@ -210,14 +197,28 @@ export async function fetchBoundedJson(url: string, headers: HeadersInit) {
     throw new Error(`Privacy Pools ASP returned HTTP ${response.status}`);
   }
   const contentLength = Number(response.headers.get("content-length") ?? 0);
-  if (contentLength > MAX_RESPONSE_BYTES) {
+  if (contentLength > maxBytes) {
+    await response.body?.cancel();
     throw new Error("Privacy Pools ASP response is too large");
   }
-  const body = await response.text();
-  if (body.length > MAX_RESPONSE_BYTES) {
-    throw new Error("Privacy Pools ASP response is too large");
+  if (!response.body) throw new Error("Privacy Pools ASP returned an empty response");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let bytes = 0;
+  let body = "";
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      bytes += chunk.value.byteLength;
+      if (bytes > maxBytes) throw new Error("Privacy Pools ASP response is too large");
+      body += decoder.decode(chunk.value, { stream: true });
+    }
+    body += decoder.decode();
+    return JSON.parse(body) as unknown;
+  } finally {
+    await reader.cancel().catch(() => undefined);
   }
-  return JSON.parse(body) as unknown;
 }
 
 async function findBlockAtOrAfter(

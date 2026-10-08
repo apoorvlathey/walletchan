@@ -10,6 +10,8 @@
     "./theme": "./theme/tokens.ts",
     "./contracts": "./src/contracts.ts",
     "./bungee": "./src/bungee.ts",
-    "./assets/*": "./assets/*"
+    "./assets/*": "./assets/*",
+    "./privacy/aspPolicy": "./src/privacy/aspPolicy.ts",
+    "./privacy/rootSnapshotCache": "./src/privacy/rootSnapshotCache.ts"
   }
 }

@@ -1,3 +1,4 @@
+import { PRIVACY_ASP_LEAVES_RESPONSE_BYTES } from "@walletchan/shared/privacy/aspPolicy";
 import { fetchJsonBounded } from "../../network/boundedHttp";
 import { PRIVACY_POOLS_DEPLOYMENT } from "../deployment/manifest";
 import {
@@ -13,7 +14,6 @@ import {
 
 const ASP_TIMEOUT_MS = 12_000;
 const ROOTS_RESPONSE_BYTES = 8_192;
-const LEAVES_RESPONSE_BYTES = 2_000_000;
 const DEPOSITS_RESPONSE_BYTES = 512_000;
 
 function endpoint(path: "mt-roots" | "mt-leaves" | "deposits-by-label"): string {
@@ -54,7 +54,7 @@ export async function fetchPrivacyAspRoots(): Promise<PrivacyAspRoots> {
 
 export async function fetchPrivacyAspLeaves(): Promise<PrivacyAspLeaves> {
   return parsePrivacyAspLeaves(
-    await getJson("mt-leaves", requestHeaders(), LEAVES_RESPONSE_BYTES),
+    await getJson("mt-leaves", requestHeaders(), PRIVACY_ASP_LEAVES_RESPONSE_BYTES),
   );
 }
 

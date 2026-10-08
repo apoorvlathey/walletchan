@@ -458,6 +458,31 @@ strict ASP responses by matching the association root to
 the pool's current root or one of the other 63 roots retained in the deployed
 64-slot circular history. This mirrors the withdrawal contract: association
 roots are latest-only, while state proofs may use any still-known pool root.
+
+ASP tree refresh follows a root-driven snapshot policy: one public snapshot per
+compiled deployment is retained for the service-worker lifetime. Every refresh
+reads the ASP root pair first; unchanged roots reuse immutable leaves and
+verified membership sets. Concurrent loads share one job. A changed root pair
+fetches and strictly validates new leaves, computes both LeanIMT roots once in
+the existing nonce-bound offscreen worker, and checks a second ASP root read
+before publishing the snapshot. Hashing receives public leaves only, never
+privacy keys or lineage secrets. Every use independently re-reads current
+onchain authority; cached data cannot retain an obsolete latest-only ASP root
+or a state root that aged out of the 64-slot history. Cached identity-bound
+membership sets avoid rebuilding both trees for every approved Shield and its
+subsequent local-lineage check. Direct and relayed Unshield share this loader
+and retain their own proof and final-submission root checks.
+
+The extension and website share strict leaf validation and resource budgets in
+`packages/shared/src/privacy/aspPolicy.ts`: 100,000 unique, canonical nonzero
+field elements per tree, with a 16,500,000-byte streaming download ceiling
+covering two maximum-size trees. These are operational limits, not protocol
+capacities; root mismatch, oversized input, transport/worker failure, or an
+incoherent snapshot fails closed. The cache contains public pool data only,
+uses no persisted key, and is rebuilt after MV3 restart. Incremental
+`LeafInserted` state-tree indexing remains a separate storage/reorg change;
+this update retains the ASP bulk snapshot transport.
+
 The same two checks run again immediately before relayer submission. The sync
 then maintains that commitment's eligibility state. The renderer sees
 only aggregate ready and pending balances plus the active original depositor's
