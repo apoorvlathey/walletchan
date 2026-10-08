@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { midnightTokens } from "../../src/theme/themes/midnight";
+import { bauhausTokens } from "../../src/theme/themes/bauhaus";
 
 type Rgb = [number, number, number];
 
@@ -70,5 +71,13 @@ test("Midnight status foregrounds meet WCAG AA on composited washes", () => {
       contrast(status.fg, washHex) >= 4.5,
       `${status.fg} does not pass on ${status.bg}`,
     );
+  }
+});
+
+test("progress emphasis is readable on both themes' neutral surfaces", () => {
+  for (const { colors } of [midnightTokens, bauhausTokens]) {
+    for (const surface of [colors.surface.base, colors.surface.raised]) {
+      assert.ok(contrast(colors.status.progress.emphasis, surface) >= 4.5);
+    }
   }
 });

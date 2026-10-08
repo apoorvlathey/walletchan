@@ -1,3 +1,4 @@
+import type { SafeProposalRecord } from "@/chrome/safe/types";
 import type { ProviderRequestSurfaceHint } from "@/chrome/windowing/providerRequestSurface";
 
 type Loader<T> = () => Promise<T[]>;
@@ -13,6 +14,7 @@ type ApprovalRequestLoaders<
   Loader<Permission>,
   Loader<Batch>,
   Loader<DappConnection>,
+  Loader<SafeProposalRecord>?,
 ];
 type ApprovalRequestLists<Tx, Sig, Permission, Batch, DappConnection> = [
   Tx[],
@@ -20,6 +22,7 @@ type ApprovalRequestLists<Tx, Sig, Permission, Batch, DappConnection> = [
   Permission[],
   Batch[],
   DappConnection[],
+  SafeProposalRecord[]?,
 ];
 
 const REQUEST_INDEX = {
@@ -79,16 +82,25 @@ export async function loadInitialApprovalRequestsWith<
   dependencies: InitialApprovalDependencies = productionDependencies,
 ): Promise<ApprovalRequestLists<Tx, Sig, Permission, Batch, DappConnection>> {
   const lists = (await Promise.all(
-    loaders.map((load) => load()),
+    loaders.map((load) => load?.() ?? Promise.resolve([])),
   )) as ApprovalRequestLists<Tx, Sig, Permission, Batch, DappConnection>;
   if (!hint) return lists;
 
   const requestIndex = REQUEST_INDEX[hint.requestType];
-  if (lists[requestIndex].length > 0) return lists;
+  const hasMatchingRequest = () => lists[requestIndex].length > 0 ||
+    ((requestIndex === 0 || requestIndex === 3) && (lists[5]?.some((proposal) =>
+      proposal.createdAt >= hint.createdAt &&
+      (requestIndex === 3 ? proposal.route.kind === "erc5792" :
+        proposal.route.kind === "injected" || proposal.route.kind === "walletConnect")) ?? false));
+  if (hasMatchingRequest()) return lists;
 
   const deadline = dependencies.now() + REQUEST_WAIT_MS;
   while (dependencies.now() < deadline) {
     await dependencies.delay(REQUEST_POLL_MS);
+    if ((requestIndex === 0 || requestIndex === 3) && loaders[5]) {
+      lists[5] = await loaders[5]();
+      if (hasMatchingRequest()) return lists;
+    }
     switch (requestIndex) {
       case 0:
         lists[0] = await loaders[0]();

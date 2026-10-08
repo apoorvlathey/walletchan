@@ -6983,9 +6983,17 @@ ambiguous until reconciled with the Transaction Service, and execution claims
 retain any deterministic hash/signed bytes for exact-envelope reconciliation.
 Idempotent local-cancellation route results are replayed so a worker shutdown
 between terminal storage and provider delivery cannot strand the caller.
-New wallet, injected, WalletConnect, ERC-5792, and Safe-swap proposals first
-refresh the Safe directly onchain, then reserve the lowest unused nonce at or
-above that value while holding the `safeProposals` storage lock. Pending local
+New wallet, injected, WalletConnect, ERC-5792, and Safe-swap drafts read only
+the live Safe nonce, then reserve the lowest unused nonce at or above that
+value while holding the `safeProposals` storage lock. Drafts retain the imported
+version/configuration epoch and its verification block; nonce preparation does
+not grant signing authority. The request screen paints before its full live
+authority refresh, and approval/execution independently re-verify the exact
+configuration before signing or submission. A changed configuration blocks
+the draft until it is reviewed again. Cold popup/sidepanel bootstrap and unlock
+load durable pending Safe proposals alongside EOA queues, and hinted single or
+ERC-5792 requests also poll the Safe queue. Review navigation resolves the
+proposal-pinned Safe instead of assuming the active tab account. Pending local
 and service-verified records reserve their nonce; confirmed executed/replaced
 evidence advances a stale local floor without reserving the old nonce. This makes concurrent
 dapp intake deterministic and prevents an ordinary request from silently
@@ -7017,6 +7025,27 @@ so a transient service miss cannot misreport a deployed Safe as unavailable;
 RPC or authority-verification failure still blocks signing until a fresh review
 succeeds. The Safe security screen may omit the chain ID to refresh every
 previously imported chain.
+
+When the selected unsigned owner is the final confirmation at the live nonce,
+private-key, seed-phrase, and Ledger owners default to a split **Sign & Execute**
+action. Its dropdown retains **Sign offchain**. Bankr remains offchain-only under
+the shared Safe execution policy; future nonces remain approval-only. Combined
+execution uses native gas paid by that same owner, with the standard gas tier,
+balance validity, and explicit overrides shown before confirmation. Existing
+quorum-ready execution retains its full executor and fee-token selection.
+`prepareSafeSignAndExecute` is a trusted-UI read-only route: it fully verifies
+live authority and estimates an owner-sender v=1 preview with gas headroom. That
+preview is never stored as a confirmation or broadcast. The effect route
+`signAndExecuteSafeProposal` independently checks final-owner eligibility,
+collects the normal recovered ECDSA approval through `ownerAuthorization`,
+authorizes any ERC-5792 route, and estimates the actual signed envelope. It
+refuses automatic execution above the reviewed gas limit, then delegates to
+normal execution with the exact reviewed overrides. No Transaction Service
+publication is required before this direct execution. Failure after approval
+keeps the genuine signature saved for normal Execute/retry; worker interruption
+does not auto-resume an unsubmitted combined intent. Ledger retains separate
+EIP-712 approval and outer-transaction device confirmations. No new storage
+shape, signer classification, secret release, or session-restoration path is added.
 
 Owner authorization selects one concrete WalletChan record. Bankr signs via
 the pinned credential/session-restoring typed-data path; private-key and seed
@@ -7220,13 +7249,42 @@ collected signature it terminalizes the unsigned request locally. Once any EOA
 or visible unsupported confirmation exists, `startSafeProposalRejection`
 creates or reuses Safe Protocol Kit's canonical rejection envelope: an empty,
 zero-value call from the Safe to itself at the original nonce. The replacement
-is a distinct durable proposal, collects a fresh threshold through the normal
-Bankr/private-key/seed approval path, and uses the normal local executor and
-exact-envelope gas flow. Back is navigation only; pending signed proposals
+starts as a private review draft, excluded from Requests, Activity, and pending
+counts until an owner signs. Back discards that unsigned canonical wallet draft
+under the proposal-storage lock; active signing claims and saved signatures
+prevent removal. It is never published without a signature. Once signed, it
+collects a fresh threshold through the normal Bankr/private-key/seed/Ledger
+approval path and uses the normal local executor and exact-envelope gas flow.
+Back then becomes navigation only; pending signed proposals
 cannot be hidden. The original record and its injected/WalletConnect/ERC-5792
 result route become cancelled/failed only after the rejection transaction has
 a successful onchain receipt. If the original wins the nonce race, the
 rejection proposal is instead marked replaced.
+
+`getPendingSafeRequests` projects the actionable inbox, Home count, cold routing,
+and badge from local records. An executing or ambiguous outer transaction/user
+operation hash suppresses every competing request at the same chain/Safe/nonce
+immediately; those unresolved records remain in Activity and receipt recovery.
+Confirmed executions keep their nonce slot suppressed while competing records
+and provider routes finish settlement. A submitted execution marked replaced
+after verified nonce advancement also keeps the consumed slot suppressed.
+Stale service approval states cannot resurrect an original already cancelled
+by a confirmed rejection receipt.
+Safe Activity orders and groups by execution time: receipt block `executionAt`,
+local executor submission/preparation time while pending, or service execution
+date for imported executions. Legacy terminal records fall back to the saved
+executor time or stable creation time; sync updates never change Activity time.
+Proposal creation time remains unchanged
+for identity and unresolved approval reviews. Block-time enrichment is bounded
+and best effort and never prevents applying a verified receipt.
+A failed execution restores the original request to the inbox. Cancellation and
+provider/ERC-5792 failure still require a confirmed rejection receipt. Renderer
+loads ignore stale responses so service sync cannot overwrite newer submission
+projections.
+Automatic startup/unlock Safe routing further selects attached local
+injected/WalletConnect/ERC-5792 requests only. Imported service proposals and
+wallet-created proposals remain in the Home Safe Requests banner. Explicit
+proposal selection made before unlock still resumes that chosen review.
 
 Execution refreshes authority, packs sorted confirmations, and estimates and
 simulates the exact `execTransaction` envelope for the selected local executor.

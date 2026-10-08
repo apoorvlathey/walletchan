@@ -14,7 +14,7 @@ const EXEC_ABI = [{
 }] as const;
 
 /** Exact outer Safe call shared by confirmation-time gas review and broadcast. */
-export function buildSafeExecutionData(proposal: SafeProposalRecord) {
+function encodeSafeExecutionData(proposal: SafeProposalRecord, signatures: Hex) {
   const tx = proposal.transaction;
   return encodeFunctionData({
     abi: EXEC_ABI,
@@ -29,9 +29,32 @@ export function buildSafeExecutionData(proposal: SafeProposalRecord) {
       BigInt(tx.gasPrice),
       tx.gasToken,
       tx.refundReceiver,
-      packSafeSignatures(proposal.confirmations),
+      signatures,
     ],
   });
+}
+
+export function buildSafeExecutionData(proposal: SafeProposalRecord) {
+  return encodeSafeExecutionData(proposal, packSafeSignatures(proposal.confirmations));
+}
+
+/** Read-only fee/simulation preview. Never persisted or used for broadcast.
+ * Safe v=1 accepts the executing owner as msg.sender (Safe.sol checkNSignatures).
+ * The real combined flow still collects a recovered ECDSA approval first.
+ */
+export function buildSafeFinalOwnerPreviewData(proposal: SafeProposalRecord, ownerAddress: string) {
+  const owner = ownerAddress.toLowerCase();
+  if (!/^0x[0-9a-f]{40}$/.test(owner) || proposal.confirmations.some((item) => item.ownerAddress === owner)) {
+    throw new Error("Invalid final Safe owner preview");
+  }
+  // Validate duplicates and ordinary signatures before adding the preview-only entry.
+  packSafeSignatures(proposal.confirmations);
+  const entries: { owner: string; signature: string }[] = proposal.confirmations.map((confirmation) => ({
+    owner: confirmation.ownerAddress,
+    signature: packSafeSignatures([confirmation]).slice(2),
+  }));
+  entries.push({ owner, signature: `${owner.slice(2).padStart(64, "0")}${"0".repeat(64)}01` });
+  return encodeSafeExecutionData(proposal, `0x${entries.sort((a, b) => a.owner.localeCompare(b.owner)).map((entry) => entry.signature).join("")}`);
 }
 
 /** Read-only decoding of the exact execution envelope; does not verify a Safe or signatures. */

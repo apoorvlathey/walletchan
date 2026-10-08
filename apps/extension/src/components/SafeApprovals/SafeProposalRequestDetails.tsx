@@ -1,12 +1,12 @@
 import { CheckIcon } from "@chakra-ui/icons";
-import { Badge, Box, Divider, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Text, VStack } from "@chakra-ui/react";
 import type {
   SafeChainSnapshot,
   SafeProposalRecord,
 } from "@/chrome/safe/types";
 import type { Account } from "@/chrome/types";
 import { BatchCallsList } from "@/components/BatchCallsList";
-import { FromAccountDisplay } from "@/components/FromAccountDisplay";
+import { SafeProposalSigners } from "./SafeProposalSigners";
 import { makeSafeDisplayCalls } from "./safeProposalActionModel";
 import { isSafeExecutionRpcWarning } from "@/chrome/safe/executionStatus";
 import {
@@ -30,10 +30,6 @@ const STATE_LABELS: Record<SafeProposalRecord["state"], string> = {
   blocked: "Blocked",
   failed: "Failed",
 };
-
-function short(value: string) {
-  return `${value.slice(0, 6)}…${value.slice(-4)}`;
-}
 
 function SuccessStatusPill({ label }: { label: string }) {
   return (
@@ -97,15 +93,6 @@ export function SafeProposalRequestDetails({
   simulationReverted: boolean;
   showRequestLifecycle: boolean;
 }) {
-  const accountByAddress = new Map(
-    accounts.map((account) => [account.address.toLowerCase(), account]),
-  );
-  const confirmed = new Set(
-    proposal.confirmations.map((confirmation) => confirmation.ownerAddress),
-  );
-  const unsupported = new Set(
-    proposal.unsupportedConfirmations?.map((confirmation) => confirmation.ownerAddress),
-  );
   const proposalError = !isFutureSafeNonceError(proposal.error) && (
     proposal.state === "failed" || (
     showRequestLifecycle &&
@@ -121,19 +108,6 @@ export function SafeProposalRequestDetails({
 
   return (
     <VStack spacing={3} align="stretch">
-      {showRequestLifecycle &&
-        (proposal.route.kind === "injected" || proposal.route.kind === "walletConnect") &&
-        !proposal.route.detachedAt && (
-          <Box bg="status.info.bg" border="1px solid" borderColor="status.info.border" borderRadius="lg" p={3}>
-            <Text color="status.info.fg" fontSize="sm" fontWeight="700">
-              {proposal.route.kind === "walletConnect" ? "WalletConnect app" : "Connected site"} waiting for execution
-            </Text>
-            <Text color="status.info.fg" fontSize="xs" mt={1}>
-              The app receives the real onchain transaction hash only after the Safe executes.
-            </Text>
-          </Box>
-        )}
-
       {showRequestLifecycle && simulationReverted && (
         <Box bg="status.error.bg" border="1px solid" borderColor="status.error.border" borderRadius="lg" p={3}>
           <Text color="status.error.fg" fontSize="sm" fontWeight="700">
@@ -175,10 +149,9 @@ export function SafeProposalRequestDetails({
           border="1px solid"
           borderColor="border.default"
           borderRadius="lg"
-          px={3}
-          py={3}
+          p={3}
         >
-          <Text color="fg.secondary" fontSize="sm">
+          <Text color="fg.primary" fontSize="md" fontWeight="600" lineHeight="short">
             Reject pending transaction #{proposal.transaction.nonce}
           </Text>
         </Box>
@@ -186,62 +159,9 @@ export function SafeProposalRequestDetails({
         <BatchCallsList calls={makeSafeDisplayCalls(proposal)} chainId={proposal.chainId} />
       )}
 
-      <Divider borderColor="border.subtle" opacity={1} />
-
-      <HStack justify="space-between" spacing={3}>
-        <Text color="fg.primary" fontSize="sm" fontWeight="700">
-          Signers
-        </Text>
-        <Text
-          color="fg.secondary"
-          fontSize="xs"
-          fontWeight="600"
-          whiteSpace="nowrap"
-          sx={{ fontVariantNumeric: "tabular-nums" }}
-        >
-          {proposal.confirmations.length}/{snapshot.threshold} signed
-        </Text>
-      </HStack>
-
-      <Box bg="surface.raised" border="1px solid" borderColor="border.default" borderRadius="lg" overflow="hidden">
-        <VStack spacing={0} align="stretch">
-          {snapshot.owners.map((owner, index) => {
-            const account = accountByAddress.get(owner);
-            const status = confirmed.has(owner)
-              ? "Approved"
-              : unsupported.has(owner) || snapshot.contractOwners.includes(owner)
-                ? "Unsupported"
-                : account
-                  ? "Available"
-                  : "External";
-            return (
-              <HStack
-                key={owner}
-                minH="48px"
-                px={3}
-                py={2}
-                spacing={3}
-                justify="space-between"
-                borderTop={index > 0 ? "1px solid" : undefined}
-                borderColor="border.subtle"
-              >
-                {account ? (
-                  <FromAccountDisplay chainId={proposal.chainId} address={account.address} />
-                ) : (
-                  <Text fontFamily="mono" fontSize="xs">{short(owner)}</Text>
-                )}
-                {status === "Approved" ? (
-                  <SuccessStatusPill label="Signed" />
-                ) : (
-                  <Badge variant={status === "Available" ? "warning" : undefined}>
-                    {status}
-                  </Badge>
-                )}
-              </HStack>
-            );
-          })}
-        </VStack>
-      </Box>
+      {!showRequestLifecycle && (
+        <SafeProposalSigners proposal={proposal} snapshot={snapshot} accounts={accounts} />
+      )}
     </VStack>
   );
 }

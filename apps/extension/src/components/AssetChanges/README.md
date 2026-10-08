@@ -12,6 +12,9 @@ the named simulation-warning banner exports.
   deferral, parent status callbacks, the released three-attempt metadata retry
   schedule, and non-blocking late residual-approval detection keyed to the
   exact durable request identity.
+  Optional preparation gating defers the initial RPC, and a scoped loading
+  callback reports completion including transport failures. Safe combined
+  signing waits for its outer execution preview before beginning simulation.
 - `AssetChangesPanel.tsx` owns loading, empty, collapsed-summary, and grouped
   approval/Send/Receive presentation. Approval increases are rendered
   before asset deltas and remain visible when asset simulation is unavailable;

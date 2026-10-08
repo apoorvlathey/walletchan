@@ -10,6 +10,7 @@
 | Batch tx confirmation (ERC-5792, dapp-initiated) | `apps/extension/src/components/BatchTransactionConfirmation.tsx` | `MultiTxGasEstimateDisplay.tsx` |
 | Cross-dapp batch confirmation (user-assembled) | `apps/extension/src/components/CrossDappBatchConfirmation.tsx` | `MultiTxGasEstimateDisplay.tsx` (wraps BatchTransactionConfirmation) |
 | **Swap / Bridge confirmation (internal)** | `apps/extension/src/components/Swap/SwapConfirmation.tsx` | `MultiTxGasEstimateDisplay.tsx` |
+| **Safe approval / execution** | `apps/extension/src/components/SafeApprovals/SafeProposalConfirmation.tsx` | `GasEstimateDisplay.tsx` (execution and final-owner Sign & Execute) |
 
 **When you change anything about gas params, the tier picker, validity, or override plumbing in ANY of these screens, audit the others.** The swap path in particular is easy to miss — it's its own confirmation UI separate from the dapp-initiated batch flow but uses the same underlying `MultiTxGasEstimateDisplay`.
 
@@ -38,3 +39,17 @@ The component additionally fires `estimateBatchGasSequential` over the inner cal
 ## Adding a NEW tx-confirmation surface
 
 List it in the table above and make sure every gas feature here works on it before merging.
+
+## Final-owner Safe combined action
+
+The final unsigned native executor may choose Sign & Execute or keep Sign offchain.
+The complete asset simulation waits for authority and execution-envelope
+preparation, avoiding an initial approximation followed by a second pass.
+The combined button keeps its dots until simulation and fee loading finish;
+transport/preparation errors stop loading and retain the offchain choice.
+The same GasEstimateDisplay tier, balance validity, and gas overrides are reviewed
+before combined confirmation. Preparation estimates a read-only owner-sender
+preview with headroom; after obtaining the real owner signature, the background
+estimates the exact envelope again and refuses execution above the reviewed limit.
+It passes those exact native overrides through normal Safe execution. This does
+not change gas behavior on single, batch, cross-dapp, or swap/bridge surfaces.

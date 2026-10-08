@@ -153,6 +153,23 @@ export interface VerifySafeOnchainStateInput {
   ) => boolean;
 }
 
+/** Draft nonce allocation only; this read grants no Safe signing authority. */
+export async function readSafeDraftNonce(
+  input: Pick<VerifySafeOnchainStateInput, "chainId" | "safeAddress" | "client">,
+): Promise<bigint> {
+  const rpcUrl = input.client ? null : await getStoredRpcUrl(input.chainId);
+  if (!input.client && !rpcUrl) throw new Error("No RPC configured for chain");
+  const client = input.client ?? createPublicClient({
+    transport: secureHttpTransport(rpcUrl!, { timeout: 12_000, retryCount: 1 }),
+  });
+  return client.readContract({
+    address: getAddress(input.safeAddress),
+    abi: SAFE_READ_ABI,
+    functionName: "nonce",
+    blockTag: "latest",
+  });
+}
+
 export async function verifySafeOnchainState(
   input: VerifySafeOnchainStateInput,
 ): Promise<SafeChainSnapshot> {

@@ -89,6 +89,7 @@ export const bauhausTokens: ThemeTokens = {
       highlight: BLACK,
     },
     status: {
+      progress: { bg: "#FFF1E6", fg: "#9A4200", border: BLACK, emphasis: "#9A4200" },
       success: { bg: YELLOW, fg: BLACK, border: BLACK, emphasis: GREEN },
       // Cornsilk/cream tint — used as a soft warning wash on the cross-dapp
       // batch page and the gas-estimate fallback row, where the saturated

@@ -152,6 +152,7 @@ export const midnightTokens: ThemeTokens = {
       highlight: FG_INVERSE,
     },
     status: {
+      progress: { bg: "rgba(251, 146, 60, 0.12)", fg: "#FB923C", border: "rgba(251, 146, 60, 0.3)", emphasis: "#FB923C" },
       success: { bg: SUCCESS_BG, fg: SUCCESS_FG, border: SUCCESS_BORDER, emphasis: SUCCESS_FG },
       // `tint` is the same recessed surface used for cross-dapp / fallback rows;
       // Bauhaus uses a literal cornsilk for parity, Midnight reuses surface.sunken

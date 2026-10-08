@@ -8,10 +8,10 @@ const dotBounce = keyframes`
 
 /** Three bouncing dots used wherever we render an inline "pending /
  *  awaiting" placeholder (quote loaders, bridge destination tx hash, etc.). */
-export default function LoadingDots() {
+export default function LoadingDots({ color = "text.tertiary" }: { color?: string }) {
   const prefersReducedMotion = usePrefersReducedMotion();
   return (
-    <HStack spacing="3px" aria-label="Loading">
+    <HStack spacing="3px" color={color} aria-label="Loading">
       {[0, 1, 2].map((i) => (
         <Box
           key={i}
@@ -20,7 +20,7 @@ export default function LoadingDots() {
           w="4px"
           h="4px"
           borderRadius="full"
-          bg="text.tertiary"
+          bg="currentColor"
           animation={prefersReducedMotion ? undefined : `${dotBounce} 1.1s ease-in-out infinite`}
           opacity={prefersReducedMotion ? 0.7 : undefined}
           style={prefersReducedMotion ? undefined : { animationDelay: `${i * 0.16}s` }}

@@ -12,7 +12,9 @@ import {
 import {
   createSafeProposal,
   getSafeProposal,
+  getSafeProposals,
 } from "../../src/chrome/safe/proposalRepository";
+import { getPendingSafeRequests } from "../../src/chrome/safe/proposalStatus";
 import type { SafeProposalRecord } from "../../src/chrome/safe/types";
 import { installNativeSessionStorage } from "../session/testStorage";
 
@@ -152,6 +154,8 @@ test("the original becomes cancelled only when the rejection wins its Safe nonce
   });
 
   assert.equal((await getSafeProposal(original.id))?.state, "readyToExecute");
+  assert.deepEqual(getPendingSafeRequests(await getSafeProposals()), [],
+    "the original cannot flash back into Requests between receipt and settlement");
   await settleCompetingSafeProposals(rejection);
 
   const cancelled = await getSafeProposal(original.id);

@@ -136,6 +136,8 @@ export interface StatusColor {
 }
 
 export interface StatusColors {
+  /** Ongoing work that requires attention, distinct from a warning. */
+  progress: StatusColor;
   success: StatusColor;
   warning: StatusColor;
   error: StatusColor;

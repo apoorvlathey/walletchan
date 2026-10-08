@@ -11,6 +11,9 @@
   the same confirmation composition used by transaction and batch requests.
   It owns the live authority refresh and exact outer fee state, while keeping
   the selected action visible through intermediate proposal-storage updates.
+  Execution also retains the original rejection button as a disabled footer
+  slot and hides the signing dropdown until submission finishes, preventing
+  approval/execution claims from resizing the primary button between stages.
   A simulated revert uses the shared likely-to-fail confirmation and sends an
   explicit acknowledgement to the final background execution gate; it never
   silently enables execution.
@@ -35,20 +38,37 @@
   concise multi-call action summaries without mounting detail cards. Resolution
   is keyed by proposal ID plus calldata, so equivalent background refreshes do
   not clear an already-readable row while decoding the same calls again.
+- `SafeProposalPrimaryAction.tsx`: split primary action for eligible final
+  signers, retaining Sign offchain through its dropdown and the shared
+  simulation-failure acknowledgement.
+- `hooks/useSafeSignAndExecute.ts`: immutable proposal/actor-scoped read-only
+  fee preparation, local action choice, and frozen actor/preview during submission.
+  It uses the shared background eligibility policy and owns no signing authority.
+  Combined review defers asset simulation until authority and the execution
+  envelope are ready, then runs one complete preview. The primary dots remain
+  visible until that preview and fee estimation finish; errors stop preparation
+  and retain the offchain choice.
 - `SafeProposalDecisionSummary.tsx`: sticky `Signing with` / `Execute with`
   identity row, account dropdown, and shared transaction gas estimator.
   Long signer/executor lists stay inside a 320px scrollable menu so the
   selector remains usable in popup, sidepanel, and short-window viewports.
+  Combined final-owner execution locks payment to native gas from the selected
+  owner; regular quorum execution keeps the full fee-token selector.
   Execution choices that are also Safe owners carry an explicit `Owner` label;
   non-owner gas payers remain selectable without appearing to hold Safe signing
   authority. At quorum it also reuses the standard fee-token selector. Its
   option and quote messages bind the current Safe proposal, proposal chain, and
   selected executor; changing executor restores native payment and discards the
   prior quote.
-- `SafeProposalRequestDetails.tsx`: read-only shared call cards, a quiet
-  section divider, and validated signer progress with an `n/m signed` summary
-  plus explicit per-owner signed states. Canonical rejection proposals replace
-  the generic self-call card with plain same-nonce cancellation copy. Pending
+- `SafeProposalSigners.tsx`: validated signer progress with an `n/m signed`
+  summary and explicit owner status. Requests show two signer rows in the sticky
+  footer; its header expands a bounded scrollable list of every owner. Historical
+  details retain the full signer list in the body. Expansion never changes the
+  selected signing account or signing authority.
+- `SafeProposalRequestDetails.tsx`: read-only shared call cards and historical
+  signer progress. Canonical rejection proposals replace
+  the generic self-call card with a neutral, semibold summary identifying
+  the pending transaction nonce. Pending
   execution shows a yellow retrying notice only when every trusted receipt RPC
   is unavailable.
 - `SafeProposalFinancialImpact.tsx`: request-only estimated-change surface
@@ -86,23 +106,27 @@
   It imports eligibility guards and derived account types from the exhaustive
   background `safe/accountTypePolicy.ts` instead of maintaining a
   renderer-specific wallet-type list.
-- `SafeProposalRow.tsx`: Nonce-labeled, Activity-style chain-led request row with
+- `SafeProposalNonceGroup.tsx`: one neutral card and nonce heading for related
+  requests, with a request count when competing proposals share that nonce.
+- `SafeProposalRow.tsx`: Activity-style chain-led request row within a nonce group with
   plain-language action, resolved wallet/contact counterparty, and compact
   lifecycle status. Future-nonce rows remain approval-oriented before quorum,
   then identify the earlier nonce that must execute first. Chain identity stays
   in the leading logo instead of being repeated in copy.
 - `safeProposalPresentation.ts`: pure request-row intent and status projection.
-- `safeProposalOrdering.ts`: pure descending-nonce inbox ordering with stable
-  same-nonce tie-breaking.
+- `safeProposalOrdering.ts`: pure descending-nonce inbox ordering and grouping
+  by chain, Safe address, and nonce, with stable same-nonce tie-breaking.
 - `safeProposalSequence.ts`: maps a verified future Safe nonce to the live or
   visible earlier nonce that gates only its final execution.
-- `SafeProposalActivity.tsx`: descending-nonce proposal selection, shared date
+- `SafeProposalActivity.tsx`: execution-time proposal ordering, shared date
   grouping, live origin resolution, and Activity-ledger composition.
 - `SafeProposalActivityRow.tsx`: compact Warm Midnight Activity row with dapp
   identity, chain badge, decoded plain-language intent/context, inline status, and
   muted-label/primary-value nonce metadata. Executable rows use an amber
   hourglass and full inset focus boundary, while Midnight Safe fallback marks
   use a dark success-tinted chip instead of the generic light favicon canvas.
+- `safeProposalActivityModel.ts`: origin formatting and execution/submission
+  timestamp selection shared by Activity date groups and row time labels.
 
 The UI never counts signatures as authority or authorizes effects itself; it
 renders validated proposal records returned by the Safe background domain.
@@ -121,6 +145,22 @@ Safe execution locks the reviewed executor, fee asset, gas controls, and
 simulation while broadcast is in flight. Once the background accepts the
 submission, the review routes immediately to Public Activity so its pending
 executor-history row is visible without waiting for Safe finality.
+
+Successfully rejecting an unsigned dapp/WC/ERC-5792 request returns Home.
+Header Back retains inbox/Activity navigation, and a failed post-rejection
+inbox reload cannot prevent leaving an already-cancelled request.
+
+Unsigned rejection reviews remain private drafts outside Requests, Activity,
+and pending counts. Back asks the background to discard the canonical wallet
+draft before navigating; a signing claim or saved signature prevents removal.
+Once signed, Back retains the rejection proposal and only navigates.
+
+The inbox, Home count, cold routing, and badge share `getPendingSafeRequests`.
+Submitted nonce slots leave Requests immediately while their unresolved execution
+stays in Activity. Failed execution restores competing requests; only a confirmed
+receipt terminalizes them. Request/count loaders discard stale local responses.
+Confirmed execution continues suppressing its consumed nonce during asynchronous
+competitor settlement, preventing the original request from briefly reappearing.
 
 Reject is deliberately asymmetric: a proposal with no collected signatures
 can be cancelled locally, while a proposal with any supported or unsupported

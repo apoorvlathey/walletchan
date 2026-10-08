@@ -27,6 +27,8 @@ type SimulationProps = Pick<
   | "isNonAtomic"
   | "safeAddress"
   | "safeExecutionRequest"
+  | "simulationEnabled"
+  | "onSimulationLoadingChange"
   | "residualApprovalRequest"
   | "onRevertedChange"
   | "onSimulationUnavailableChange"
@@ -38,6 +40,8 @@ export function useAssetChangesSimulation({
   isNonAtomic,
   safeAddress,
   safeExecutionRequest,
+  simulationEnabled = true,
+  onSimulationLoadingChange,
   residualApprovalRequest,
   onRevertedChange,
   onSimulationUnavailableChange,
@@ -72,7 +76,7 @@ export function useAssetChangesSimulation({
   const screenEntered = useScreenEntered();
 
   useEffect(() => {
-    if (!screenEntered) return;
+    if (!screenEntered || !simulationEnabled) return;
     let cancelled = false;
     setLoading(true);
     setResult(null);
@@ -93,6 +97,7 @@ export function useAssetChangesSimulation({
     );
     chrome.runtime.sendMessage(message, (response: SimulationResult) => {
       if (cancelled) return;
+      setCompletedSimulationKey(simulationKey);
       if (chrome.runtime.lastError) {
         console.error(
           "[AssetChangesUI] chrome.runtime.lastError:",
@@ -132,7 +137,12 @@ export function useAssetChangesSimulation({
     };
     // Simulate from the stable request id plus batch-call signature, not array identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txRequest.id, batchCallsKey, safeAddress, safeExecutionRequest?.id, screenEntered]);
+  }, [txRequest.id, batchCallsKey, safeAddress, safeExecutionRequest?.id, screenEntered, simulationEnabled]);
+
+  const simulationLoading = !simulationEnabled || loading || completedSimulationKey !== simulationKey;
+  useEffect(() => {
+    onSimulationLoadingChange?.(simulationLoading);
+  }, [simulationLoading, onSimulationLoadingChange]);
 
   useEffect(() => {
     if (
@@ -282,5 +292,5 @@ export function useAssetChangesSimulation({
     txRequest.id,
   ]);
 
-  return { loading, result };
+  return { loading: simulationLoading, result };
 }

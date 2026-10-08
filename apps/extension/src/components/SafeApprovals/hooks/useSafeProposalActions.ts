@@ -9,7 +9,7 @@ import type {
 } from "../safeProposalActionModel";
 import { getSafeProposalDisplayActionKind } from "../safeProposalActionModel";
 
-type SafeProposalOperation = "approve" | "execute" | "reject" | "secondary";
+type SafeProposalOperation = "approve" | "execute" | "signAndExecute" | "reject" | "secondary";
 
 function send<T>(message: Record<string, unknown>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -29,6 +29,7 @@ export function useSafeProposalActions({
   gasOverrides,
   feePaymentToken,
   feePaymentQuote,
+  onRejected,
   onBack,
   onOpenProposal,
   onReload,
@@ -40,6 +41,7 @@ export function useSafeProposalActions({
   gasOverrides: GasOverrides | null;
   feePaymentToken: "native" | `0x${string}`;
   feePaymentQuote: FeePaymentQuoteSummary | null;
+  onRejected: () => void;
   onBack: () => void;
   onOpenProposal: (proposalId: string) => void;
   onReload: () => Promise<void>;
@@ -91,7 +93,14 @@ export function useSafeProposalActions({
 
   const handleConfirm = useCallback(async (options?: {
     allowSimulationFailure?: boolean;
+    signAndExecute?: boolean;
   }) => {
+    if (options?.signAndExecute) {
+      if (actionKind !== "approve" || !selectedOwner || !gasOverrides) return false;
+      return runAction({ type: "signAndExecuteSafeProposal", proposalId: proposal.id,
+        ownerAccountId: selectedOwner.id, gasOverrides, allowSimulationFailure: options.allowSimulationFailure === true,
+      }, undefined, "signAndExecute");
+    }
     if (actionKind === "approve" && selectedOwner) {
       if (!beginOperation("approve")) return;
       try {
@@ -170,11 +179,11 @@ export function useSafeProposalActions({
       if (!response.success || !response.result) {
         throw new Error(response.error || "Could not reject Safe transaction");
       }
-      await onReload();
+      await onReload().catch(() => undefined);
       if (response.result.kind === "onchain") {
         onOpenProposal(response.result.proposal.id);
       } else {
-        onBack();
+        onRejected();
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Safe rejection failed");
@@ -184,7 +193,7 @@ export function useSafeProposalActions({
   }, [
     beginOperation,
     endOperation,
-    onBack,
+    onRejected,
     onOpenProposal,
     onReload,
     proposal.id,
@@ -217,11 +226,31 @@ export function useSafeProposalActions({
     }
   }, [beginOperation, endOperation, onOpenProposal, onReload, proposal.id]);
 
+  const handleBack = useCallback(async () => {
+    if (!beginOperation("secondary")) return;
+    try {
+      if (proposal.purpose === "rejection") {
+        const response = await send<{ success: boolean; error?: string }>({
+          type: "discardUnsignedSafeRejection",
+          proposalId: proposal.id,
+        });
+        if (!response.success) throw new Error(response.error || "Could not discard rejection draft");
+        await onReload().catch(() => undefined);
+      }
+      onBack();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not leave rejection review");
+    } finally {
+      endOperation();
+    }
+  }, [beginOperation, endOperation, onBack, onReload, proposal.id, proposal.purpose]);
+
   return {
     busy: operation !== null,
     error,
     handleConfirm,
     handleReject,
+    handleBack,
     handleNonceChange,
     notice,
     operation,

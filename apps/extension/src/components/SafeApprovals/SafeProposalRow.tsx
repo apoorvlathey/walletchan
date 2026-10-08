@@ -54,35 +54,20 @@ export function SafeProposalRow({
     rejectionPending,
     addressLabels,
   });
-  const statusColor = TONE_COLOR[presentation.statusTone];
+  const statusColor = rejectionPending ? "status.progress.emphasis" : TONE_COLOR[presentation.statusTone];
 
   return (
     <ListItem
       interactive
       as="button"
       density="compact"
-      minH="104px"
+      minH="80px"
       py={3}
       align="stretch"
       aria-label={`Open Safe nonce ${proposal.transaction.nonce}: ${presentation.intent}. ${presentation.status}`}
       onClick={onOpen}
     >
       <Flex as="span" direction="column" w="full" gap={2}>
-        <Text
-          as="span"
-          color="fg.muted"
-          fontSize="xs"
-          fontWeight="600"
-          lineHeight="1.3"
-          sx={{ fontVariantNumeric: "tabular-nums" }}
-          aria-hidden="true"
-        >
-          Nonce{" "}
-          <Text as="span" color="fg.primary">
-            #{proposal.transaction.nonce}
-          </Text>
-        </Text>
-
         <Flex as="span" align="center" gap={3} minW={0}>
           <ListItemMedia
             boxSize="40px"

@@ -3,6 +3,7 @@ import { getAccountById } from "../accountStorage";
 import { getLocalPrivateKeyForAccount } from "../accounts/localKeyResolver";
 import { getAuthCeremonyEpoch, isCurrentAuthCeremonyEpoch } from "../authTransition";
 import { broadcastSerializedTransaction, signAndBroadcastTransaction } from "../localSigner";
+import { resolveSafeExecutionTime } from "./executionTime";
 import { getNextNonce, resetNonce } from "../forceInclusion/nonceManager";
 import { ensureLedgerSigningSession } from "../ledger/session";
 import { signAndBroadcastLedgerTransaction } from "../ledger/signing";
@@ -328,7 +329,8 @@ export async function reconcileSafeExecution(id: string): Promise<SafeProposalRe
   }
   if (receipt) {
     const state = receipt.status === "success" ? "executed" : "failed";
-    const updated = await updateSafeProposal(id, (record) => ({ ...record, state, serializedExecution: undefined, executionPreparedAt: undefined, error: state === "failed" ? "Safe execution reverted" : undefined, updatedAt: Date.now() }));
+    const executionAt = proposal.executionAt ?? await resolveSafeExecutionTime({ chainId: proposal.chainId, blockNumber: receipt.blockNumber, client });
+    const updated = await updateSafeProposal(id, (record) => ({ ...record, state, executionAt, serializedExecution: undefined, executionPreparedAt: undefined, error: state === "failed" ? "Safe execution reverted" : undefined, updatedAt: Date.now() }));
     if ((proposal.route.kind === "injected" || proposal.route.kind === "walletConnect") && !proposal.route.detachedAt && proposal.route.requestId) {
       await writeResultToStorage(`txResult:${proposal.route.requestId}`, state === "executed" ? { success: true, txHash: proposal.transactionHash } : { success: false, error: "Safe execution reverted" });
     }

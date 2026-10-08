@@ -7,6 +7,7 @@ import {
 import {
   claimSafeProposalEffect,
   createSafeProposal,
+  discardUnsignedSafeRejection,
   decodeSafeProposalsEnvelope,
   getSafeProposal,
   hasUnresolvedSafeEffects,
@@ -24,6 +25,56 @@ import {
 
 const installed: Array<ReturnType<typeof installNativeSessionStorage>> = [];
 afterEach(() => installed.pop()?.restore());
+
+test("Back discards only an unsigned canonical wallet rejection and allows recreating it", async () => {
+  installed.push(installNativeSessionStorage());
+  const original = await createSafeProposal(proposal());
+  const built = buildSafeRejectionTransaction({
+    chainId: original.chainId, safeAddress: original.safeAddress,
+    safeVersion: original.safeVersion, nonce: BigInt(original.transaction.nonce),
+  });
+  const rejection: SafeProposalRecord = {
+    ...original, id: `${original.chainId}:${original.safeAddress}:${built.safeTxHash}`,
+    ...built, purpose: "rejection", route: { kind: "wallet", origin: "WalletChan" },
+  };
+  await createSafeProposal(rejection);
+  assert.equal(await discardUnsignedSafeRejection(original.id), false);
+  assert.equal(await discardUnsignedSafeRejection(rejection.id), true);
+  assert.equal(await getSafeProposal(rejection.id), null);
+  assert.deepEqual(await getSafeProposal(original.id), original);
+  assert.equal(await discardUnsignedSafeRejection(rejection.id), false);
+  await createSafeProposal(rejection);
+  const claimed = await claimSafeProposalEffect(rejection.id, { kind: "approve" });
+  await assert.rejects(discardUnsignedSafeRejection(rejection.id), /signing is in progress/);
+  await releaseSafeProposalEffect(rejection.id, claimed.effectClaim!.claimId, {
+    state: "approvedLocally",
+    confirmations: [{
+      ownerAddress: "0xcccccccccccccccccccccccccccccccccccccccc",
+      signature: `0x${"11".repeat(65)}`, createdAt: Date.now(),
+    }],
+  });
+  assert.equal(await discardUnsignedSafeRejection(rejection.id), false);
+  assert.equal((await getSafeProposal(rejection.id))?.confirmations.length, 1);
+  for (const accountType of ["privateKey", "seedPhrase", "ledger", "bankr"] as const) {
+    await updateSafeProposal(rejection.id, (record) => ({
+      ...record, state: "draft", confirmations: [{
+        ...record.confirmations[0], accountId: "owner", accountType,
+      }],
+    }));
+    assert.equal(await discardUnsignedSafeRejection(rejection.id), false, accountType);
+  }
+  await updateSafeProposal(rejection.id, (record) => ({
+    ...record, confirmations: [], unsupportedConfirmations: [{
+      ownerAddress: "0xcccccccccccccccccccccccccccccccccccccccc",
+      signatureType: "contract", createdAt: Date.now(),
+    }],
+  }));
+  assert.equal(await discardUnsignedSafeRejection(rejection.id), false);
+  await updateSafeProposal(rejection.id, (record) => ({
+    ...record, unsupportedConfirmations: [], transactionHash: `0x${"22".repeat(32)}`,
+  }));
+  assert.equal(await discardUnsignedSafeRejection(rejection.id), false);
+});
 
 function proposal(): SafeProposalRecord {
   const safeAddress = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const;
@@ -64,6 +115,8 @@ test("proposal creation is idempotent and effect claims are first-action-wins", 
   assert.equal(claimed.effectClaim?.kind, "execute");
   await assert.rejects(() => claimSafeProposalEffect(initial.id, { kind: "execute" }), /already in progress/);
   const released = await releaseSafeProposalEffect(initial.id, claimed.effectClaim!.claimId, { state: "executed", transactionHash: `0x${"34".repeat(32)}` });
+  await updateSafeProposal(initial.id, (record) => ({ ...record, executionAt: 123_000 }));
+  assert.equal((await getSafeProposal(initial.id))?.executionAt, 123_000);
   assert.equal(released.state, "executed");
   assert.equal((await getSafeProposal(initial.id))?.transactionHash, `0x${"34".repeat(32)}`);
 });

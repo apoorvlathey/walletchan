@@ -5,6 +5,8 @@ service coordination, execution, and MV3 reconciliation. No module stores a
 Safe private key or treats a Safe as an EOA.
 
 - `types.ts`, `featurePolicy.ts`: validated vocabulary and staged fail-closed policy.
+- `executionTime.ts`: bounded best-effort inclusion-block timestamps for
+  Activity; lookup failure cannot prevent applying a verified receipt.
 - `accountTypePolicy.ts`: exhaustive account-type capability matrix and type
   guards for owner approval, outer execution, signing-path dispatch, and
   fee-token execution. Storage, discovery, authorization, execution, and
@@ -21,6 +23,9 @@ Safe private key or treats a Safe as an EOA.
 - `accountRefresh.ts`: chain-scoped direct-RPC re-verification for already
   imported Safes. Transaction Service discovery never decides whether a known
   Safe remains available onchain.
+- `proposalLifecycle.ts` prepares unsigned drafts using a live nonce read and
+  the imported authority binding. `onchainState.ts:readSafeDraftNonce` grants
+  no signing authority; review and irreversible effects retain full verification.
 - `proposalStatus.ts`: shared pending/terminal request classification used by
   both renderer summaries and the extension action badge.
 - `proposalNonce.ts`, `proposalNonceReconciliation.ts`: lowest-free automatic
@@ -36,7 +41,13 @@ Safe private key or treats a Safe as an EOA.
 - `proposalRejectionPolicy.ts`, `proposalRejection.ts`: canonical same-nonce
   rejection classification and creation. Unsigned requests may cancel locally;
   any supported or unsupported collected signature requires a fresh Safe
-  rejection proposal and normal threshold execution.
+  rejection proposal and normal threshold execution. Unsigned rejection reviews
+  stay out of request/activity counts; Back removes only the canonical local
+  draft under the repository lock, preserving active claims and saved signatures.
+- `signAndExecutePolicy.ts`, `signAndExecute.ts`: final-owner/current-nonce
+  eligibility, read-only fee preview, and orchestration through existing guarded
+  owner approval and native execution. Actual gas must fit the reviewed limit.
+  Preview v=1 data is neither a persisted confirmation nor broadcast calldata.
 - `signatureValidation.ts`, `ownerAuthorization.ts`: one-owner authorization,
   centralized live-session restoration for
   private-key/seed-phrase/Ledger/Bankr owners, auth-epoch revalidation, and
