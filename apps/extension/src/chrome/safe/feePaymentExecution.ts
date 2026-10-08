@@ -1,4 +1,5 @@
 import { WALLETCHAN_PIMLICO_PROXY_BASE } from "@/constants/externalUrls";
+import { resolveSafeExecutionTime } from "./executionTime";
 import { getAccountById } from "../accountStorage";
 import { getLocalPrivateKeyForAccount } from "../accounts/localKeyResolver";
 import { getAuthCeremonyEpoch, isCurrentAuthCeremonyEpoch } from "../authTransition";
@@ -68,7 +69,10 @@ export async function finalizeSafeFeePaymentReceipt(input: {
   )) {
     throw new Error("Safe execution no longer matches this UserOperation");
   }
-  const updated = alreadyFinalized
+  const executionAt = proposal.executionAt ?? await resolveSafeExecutionTime({
+    chainId: proposal.chainId, blockNumber: input.verified.receipt.blockNumber,
+  });
+  const updated = alreadyFinalized && proposal.executionAt
     ? proposal
     : await updateSafeProposal(proposal.id, (record) => {
         if (
@@ -78,12 +82,13 @@ export async function finalizeSafeFeePaymentReceipt(input: {
           if (
             record.transactionHash?.toLowerCase() === input.verified.txHash.toLowerCase() &&
             record.state === state
-          ) return record;
+          ) return { ...record, executionAt };
           throw new Error("Safe execution changed during receipt finalization");
         }
         return {
           ...record,
           state,
+          executionAt,
           transactionHash: input.verified.txHash,
           userOperationHash: undefined,
           serializedExecution: undefined,

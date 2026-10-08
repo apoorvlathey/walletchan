@@ -5,6 +5,7 @@ import ChainIcon from "@/components/ChainIcon";
 import SafeImage from "@/components/SafeImage";
 import { ActivityStatusLabel } from "@/components/Activity/ActivityStatus";
 import { formatTimeAgo } from "@/components/Activity/activityModel";
+import { getSafeActivityTimestamp } from "./safeProposalActivityModel";
 import { SafeIcon } from "@/components/shared/AccountTypeIcons";
 import { ListItem } from "@/components/ui";
 import { useIconChipBg, useTheme } from "@/theme";
@@ -185,7 +186,7 @@ export function SafeProposalActivityRow({
             </Text>
             <Text as="span" aria-hidden="true" fontSize="2xs">·</Text>
             <Text as="span" fontSize="2xs" fontWeight="500" lineHeight="1.3">
-              {formatTimeAgo(proposal.createdAt, Date.now())}
+              {formatTimeAgo(getSafeActivityTimestamp(proposal), Date.now())}
             </Text>
           </HStack>
         </HStack>

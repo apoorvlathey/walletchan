@@ -114,10 +114,11 @@ export const WALLET_UI_MESSAGE_TYPES = [
   "syncSafeRequests", "createSafeProposal",
   "changeSafeProposalNonce", "appendApprovalRevokeToSafeProposal", "approveSafeProposal",
   "publishSafeProposal", "retrySafePublication",
-  "cancelSafeProposal", "startSafeProposalRejection",
+  "cancelSafeProposal", "startSafeProposalRejection", "discardUnsignedSafeRejection",
   "hideSafeProposal", "detachSafeProposalRoute",
   "reconcileSafeProposal", "estimateSafeExecution",
   "executeSafeProposal", "reconcileSafeExecution",
+  "prepareSafeSignAndExecute", "signAndExecuteSafeProposal",
 
   // Credential, passkey, and session management
   "unlockWallet",

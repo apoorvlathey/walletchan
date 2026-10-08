@@ -22,6 +22,10 @@ authoring rules, common patterns, and how to add a new theme.
 
 ## 1. Architecture at a glance
 
+`status.progress` is the orange ongoing-work status pair. Use its `emphasis`
+for progress text and spinners on neutral surfaces; warning statuses retain
+their existing amber treatment. Safe rejection progress uses this intent.
+
 ```
 ThemeTokens (contract in tokens.ts)
         │

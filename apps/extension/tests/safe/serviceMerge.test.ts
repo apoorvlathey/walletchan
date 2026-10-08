@@ -49,6 +49,7 @@ function proposal(overrides: Partial<SafeProposalRecord> = {}): SafeProposalReco
 test("stale Safe service state cannot downgrade an in-flight local execution", () => {
   const current = proposal({
     state: "executing",
+    executionAt: 123_000,
     transactionHash: TX_HASH,
     serializedExecution: SERIALIZED,
     executionPreparedAt: 100,
@@ -79,6 +80,7 @@ test("stale Safe service state cannot downgrade an in-flight local execution", (
   const merged = mergeSafeServiceProposal(current, remote, 200);
 
   assert.equal(merged.state, "executing");
+  assert.equal(merged.executionAt, 123_000);
   assert.equal(merged.transactionHash, TX_HASH);
   assert.equal(merged.serializedExecution, SERIALIZED);
   assert.equal(merged.executionPreparedAt, 100);
@@ -97,6 +99,17 @@ test("a stale ready state carrying an execution hash is repaired to ambiguous", 
 
   assert.equal(merged.state, "ambiguous");
   assert.equal(merged.transactionHash, TX_HASH);
+});
+
+test("stale service approvals cannot resurrect a confirmed onchain rejection", () => {
+  for (const state of ["draft", "awaitingApprovals", "readyToExecute", "replaced"] as const) {
+    const merged = mergeSafeServiceProposal(
+      proposal({ purpose: undefined, state: "cancelled", rejectedBySafeTxHash: TX_HASH }),
+      proposal({ purpose: undefined, state }),
+    );
+    assert.equal(merged.state, "cancelled", state);
+    assert.equal(merged.rejectedBySafeTxHash, TX_HASH);
+  }
 });
 
 test("a service execution hash stays pending until receipt reconciliation applies terminal effects", () => {

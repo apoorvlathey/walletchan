@@ -5,8 +5,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Account, SafeAccount } from "@/chrome/types";
 import type { SafeAccountRecord, SafeProposalRecord } from "@/chrome/safe/types";
-import { isPendingSafeProposal } from "@/chrome/safe/proposalStatus";
-import { AppHeader, AppScreen, ListSurface, ScreenBody } from "@/components/ui";
+import { getPendingSafeRequests } from "@/chrome/safe/proposalStatus";
+import { AppHeader, AppScreen, ScreenBody } from "@/components/ui";
 import AccountSettingsIdentity from "@/components/AccountSettingsIdentity";
 import { buildActivityAddressLabels } from "@/components/Activity/activityIdentityModel";
 import { SafeIcon } from "@/components/shared/AccountTypeIcons";
@@ -15,8 +15,9 @@ import { useAddressContacts } from "@/hooks/useAddressContacts";
 import { getResolvedChainById } from "@/lib/chains";
 import { SafeProposalConfirmation } from "./SafeProposalConfirmation";
 import { SafeProposalRow } from "./SafeProposalRow";
+import { SafeProposalNonceGroup } from "./SafeProposalNonceGroup";
 import { didSafeProposalExecutionConfirm } from "./safeProposalActionModel";
-import { sortSafeProposalsByNonceDescending } from "./safeProposalOrdering";
+import { groupSafeProposalsByNonce, sortSafeProposalsByNonceDescending } from "./safeProposalOrdering";
 import { getSafeProposalBlockingNonce } from "./safeProposalSequence";
 
 function send<T>(message: Record<string, unknown>): Promise<T> {
@@ -50,11 +51,12 @@ export default function SafeApprovalsScreen({ safeAccount, chainId, accounts, in
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const previousProposalRef = useRef<Pick<SafeProposalRecord, "id" | "state"> | null>(null);
+  const loadRevisionRef = useRef(0);
   const { networksInfo } = useNetworks();
   const { contacts } = useAddressContacts();
   const proposal = proposals.find((item) => item.id === selected) ?? null;
   const pendingProposals = useMemo(
-    () => proposals.filter(isPendingSafeProposal),
+    () => getPendingSafeRequests(proposals),
     [proposals],
   );
   const effectiveChainId = proposal?.chainId ?? chainId;
@@ -68,10 +70,12 @@ export default function SafeApprovalsScreen({ safeAccount, chainId, accounts, in
     networksInfo,
   );
   const load = useCallback(async () => {
+    const revision = ++loadRevisionRef.current;
     const [safeRecords, proposalResponse] = await Promise.all([
       send<SafeAccountRecord[]>({ type: "getSafeAccounts" }),
       send<{ success: boolean; result?: SafeProposalRecord[]; error?: string }>({ type: "getSafeProposals" }),
     ]);
+    if (revision !== loadRevisionRef.current) return;
     setRecord(safeRecords.find((item) => item.accountId === safeAccount.id) ?? null);
     if (!proposalResponse.success) throw new Error(proposalResponse.error || "Could not load Safe proposals");
     setProposals(sortSafeProposalsByNonceDescending(
@@ -155,6 +159,7 @@ export default function SafeApprovalsScreen({ safeAccount, chainId, accounts, in
         explorer={chain?.explorer}
         backLabel={onProposalBack ? "Back to Activity" : undefined}
         onBack={onProposalBack ?? (() => setSelected(null))}
+        onRejected={proposal.route.kind === "wallet" ? undefined : onBack}
         onOpenProposal={setSelected}
         onReload={load}
         onExecutionSubmitted={onExecutionSubmitted}
@@ -172,8 +177,10 @@ export default function SafeApprovalsScreen({ safeAccount, chainId, accounts, in
     </Box>
     {error && <Text color="chart.negative" fontSize="sm">{error}</Text>}
     {pendingProposals.length === 0 ? <Text color="fg.secondary">No pending Safe requests.</Text> : (
-      <ListSurface aria-label="Safe requests">
-        {pendingProposals.map((item) => {
+      <VStack align="stretch" spacing={3} aria-label="Safe requests">
+        {groupSafeProposalsByNonce(pendingProposals).map((group) => (
+          <SafeProposalNonceGroup key={group.key} nonce={group.nonce} count={group.proposals.length}>
+        {group.proposals.map((item) => {
           const itemSnapshot = record.chains[String(item.chainId)];
           const itemChain = getResolvedChainById(item.chainId, networksInfo);
           const sameNoncePending = pendingProposals.filter((candidate) =>
@@ -206,7 +213,9 @@ export default function SafeApprovalsScreen({ safeAccount, chainId, accounts, in
             />
           );
         })}
-      </ListSurface>
+          </SafeProposalNonceGroup>
+        ))}
+      </VStack>
     )}
   </VStack></ScreenBody></AppScreen>;
 }

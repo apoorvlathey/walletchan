@@ -5,9 +5,10 @@ import type { SafeProposalRecord } from "../../src/chrome/safe/types";
 import {
   formatSafeProposalOrigin,
   getSafeProposalRequestOrigin,
+  getSafeActivityTimestamp,
 } from "../../src/components/SafeApprovals/safeProposalActivityModel";
 import { getSafeProposalPresentation } from "../../src/components/SafeApprovals/safeProposalPresentation";
-import { sortSafeProposalsByNonceDescending } from "../../src/components/SafeApprovals/safeProposalOrdering";
+import { groupSafeProposalsByNonce, sortSafeProposalsByNonceDescending } from "../../src/components/SafeApprovals/safeProposalOrdering";
 import { getSafeProposalBlockingNonce } from "../../src/components/SafeApprovals/safeProposalSequence";
 import { formatPendingUnlockRequestLabel } from "../../src/components/pendingUnlockRequestLabel";
 import {
@@ -216,8 +217,8 @@ test("the Safe approval banner is the single approvals entry point", async () =>
   assert.match(source, /aria-label="View pending Safe requests"/);
   assert.match(source, /usePendingSafeProposalCount\(safeAccountId\)/);
   assert.match(countHook, /type: "syncSafeRequests", accountId: safeAccountId/);
-  assert.match(countHook, /isPendingSafeProposal\(proposal\)/);
-  assert.match(pendingTxStorage, /safeProposals\.filter\(isPendingSafeProposal\)/);
+  assert.match(countHook, /getPendingSafeRequests\(records\)/);
+  assert.match(pendingTxStorage, /getPendingSafeRequests\(safeProposals\)/);
   assert.doesNotMatch(source, /<Button/);
   assert.match(source, />\s*View\s*</);
   assert.doesNotMatch(source, />\s*Approvals\s*</);
@@ -273,21 +274,21 @@ test("Safe requests use the account identity and shared list grammar", async () 
   assert.match(source, /Safe Requests/);
   assert.match(source, /<SafeIcon/);
   assert.match(source, /<AccountSettingsIdentity/);
-  assert.match(source, /<ListSurface aria-label="Safe requests">/);
+  assert.match(source, /aria-label="Safe requests"/);
+  assert.match(source, /<SafeProposalNonceGroup/);
   assert.match(source, /<SafeProposalRow/);
   assert.match(source, /Reload Safe requests/);
   assert.match(source, /type: "syncSafeRequests"/);
   assert.match(source, /buildActivityAddressLabels/);
   assert.match(source, /sortSafeProposalsByNonceDescending/);
-  assert.match(source, /proposals\.filter\(isPendingSafeProposal\)/);
+  assert.match(source, /getPendingSafeRequests\(proposals\)/);
   assert.match(source, /pendingProposals\.length === 0/);
-  assert.match(source, /pendingProposals\.map\(\(item\) =>/);
+  assert.match(source, /group\.proposals\.map\(\(item\) =>/);
   assert.match(source, /No pending Safe requests\./);
   assert.match(source, /const proposal = proposals\.find/);
   assert.doesNotMatch(source, /\{proposals\.map\(\(item\) =>/);
   assert.doesNotMatch(source, /No Safe requests yet\./);
-  assert.match(row, /Nonce\{" "\}/);
-  assert.match(row, /<Text as="span" color="fg\.primary">\s*#\{proposal\.transaction\.nonce\}/);
+  assert.match(row, /rejectionPending \? "status\.progress\.emphasis"/);
   assert.doesNotMatch(row, /Nonce #\{proposal\.transaction\.nonce\}/);
   assert.doesNotMatch(row, /#\{position\}/);
   assert.doesNotMatch(row, /position="absolute"/);
@@ -339,11 +340,36 @@ test("Safe requests sort by descending nonce with stable same-nonce grouping", (
     sortSafeProposalsByNonceDescending(proposals).map((proposal) => proposal.id),
     ["nonce-5", "nonce-4", "nonce-3-new", "nonce-3-old", "nonce-2"],
   );
+  assert.deepEqual(groupSafeProposalsByNonce(proposals).map((group) =>
+    group.proposals.map((proposal) => proposal.id)),
+  [["nonce-5"], ["nonce-4"], ["nonce-3-new", "nonce-3-old"], ["nonce-2"]]);
+  const sameNonce = proposals.find((proposal) => proposal.id === "nonce-3-old")!;
+  assert.equal(groupSafeProposalsByNonce([
+    sameNonce, { ...sameNonce, id: "other-chain", chainId: 1 },
+    { ...sameNonce, id: "other-safe", safeAddress: "0xcccccccccccccccccccccccccccccccccccccccc" },
+  ]).length, 3, "separate Safe/chain scopes never share a nonce group");
   assert.deepEqual(
     proposals.map((proposal) => proposal.id),
     ["nonce-3-old", "nonce-5", "nonce-2", "nonce-4", "nonce-3-new"],
     "sorting must not mutate background response order",
   );
+});
+
+test("Safe Activity timestamps follow execution across local signer types", () => {
+  const base = { ...safeProposal(), createdAt: 100, updatedAt: 900 };
+  assert.equal(getSafeActivityTimestamp({ ...base, state: "awaitingApprovals" }), 100);
+  for (const accountType of ["privateKey", "seedPhrase", "ledger"] as const) {
+    const submitted = { ...base, state: "executing" as const,
+      executor: { accountId: "owner", accountType, address: base.safeAddress, preparedAt: 500 } };
+    assert.equal(getSafeActivityTimestamp(submitted), 500);
+    assert.equal(getSafeActivityTimestamp({ ...submitted, state: "executed", executionAt: 700 }), 700);
+  }
+  assert.equal(getSafeActivityTimestamp({ ...base, state: "executed", executionAt: 700 }), 700);
+  for (const state of ["executed", "failed", "cancelled", "replaced"] as const) {
+    assert.equal(getSafeActivityTimestamp({ ...base, state }), 100);
+    assert.equal(getSafeActivityTimestamp({ ...base, state, updatedAt: Date.now() }), 100,
+      "service sync must never make an old activity look newly executed");
+  }
 });
 
 test("Safe Activity reuses the Warm Midnight transaction ledger grammar", async () => {
@@ -403,7 +429,7 @@ test("Safe request review uses the standard confirmation grammar without passwor
   assert.match(financialImpact, /safeExecutionRequest=\{executionRequest \?\? undefined\}/);
   assert.match(actions, /type: "startSafeProposalRejection"/);
   assert.match(screen, /chainId: proposal\.chainId/);
-  assert.match(screen, /variant=\{requiresOnchainRejection \? "danger" : "secondary"\}/);
+  assert.match(screen, /variant=\{footerRequiresOnchainRejection \? "danger" : "secondary"\}/);
   assert.match(screen, /"Reject onchain" : "Reject"/);
   assert.match(actions, /onOpenProposal\(response\.result\.proposal\.id\)/);
   assert.match(screen, /Confirming onchain…/);
@@ -424,26 +450,28 @@ test("Safe request review uses the standard confirmation grammar without passwor
   assert.match(decision, /Choose execution account/);
   assert.match(decision, /safeOwnerAccountIds\.has\(account\.id\)/);
   assert.match(decision, />\s*Owner\s*</);
-  assert.match(details, /<Divider borderColor="border\.subtle" opacity=\{1\} \/>/);
+  const signers = await readFile(new URL("../../src/components/SafeApprovals/SafeProposalSigners.tsx", import.meta.url), "utf8");
+  assert.match(screen, /actionSummary=[\s\S]*<SafeProposalSigners[\s\S]*compact/);
+  assert.match(details, /!showRequestLifecycle[\s\S]*<SafeProposalSigners/);
   assert.match(screen, /contextHeaderAction=\{<SafeProposalStatusPill proposal=\{proposal\} liveNonce=\{snapshot\.nonce\} \/>\}/);
   assert.match(details, /export function SafeProposalStatusPill/);
-  assert.match(details, /<SuccessStatusPill label="Signed" \/>/);
+  assert.match(signers, /<CheckIcon[\s\S]*Signed/);
   assert.match(details, /"Ready to reject"[\s\S]*: "Ready to execute"/);
   assert.match(details, /Reject pending transaction #\{proposal\.transaction\.nonce\}/);
   assert.match(details, /proposal\.state === "draft" \? "warning" : undefined/);
   assert.match(details, /isSafeExecutionRpcWarning/);
   assert.match(details, /status\.warning\.bg/);
   assert.match(details, /aria-live="polite"/);
-  assert.match(details, /status === "Available" \? "warning" : undefined/);
-  assert.match(details, /<Text color="fg\.secondary" fontSize="sm">\s*Reject pending transaction/);
+  assert.match(signers, /status === "Available" \? "warning" : undefined/);
+  assert.match(details, /<Text color="fg\.primary" fontSize="md" fontWeight="600" lineHeight="short">\s*Reject pending transaction/);
   assert.match(financialImpact, /<Text color="fg\.secondary" fontSize="sm">\s*No transfer in the rejection call/);
   assert.doesNotMatch(details, /This onchain Safe transaction consumes nonce/);
   assert.doesNotMatch(financialImpact, /The selected executor pays only the network fee/);
   assert.match(details, /variant="success"/);
   assert.match(details, /<CheckIcon/);
-  assert.match(details, />\s*Signers\s*</);
-  assert.match(details, /\{proposal\.confirmations\.length\}\/\{snapshot\.threshold\} signed/);
-  assert.match(details, /fontVariantNumeric: "tabular-nums"/);
+  assert.match(signers, />\s*Signers\s*</);
+  assert.match(signers, /\{proposal\.confirmations\.length\}\/\{snapshot\.threshold\} signed/);
+  assert.match(signers, /fontVariantNumeric: "tabular-nums"/);
   assert.doesNotMatch(details, /approvals\s*<\/Text>/);
   assert.doesNotMatch(screen, /type="password"|Executor password|Password for this approval/);
   assert.doesNotMatch(decision, /type="password"|Executor password|Password for this approval/);
@@ -472,10 +500,10 @@ test("terminal Safe Activity details cannot inherit live request behavior", asyn
   assert.match(screen, /financialImpactTitle=\{displayRequestView \?/);
   assert.match(screen, /contextTitle=\{displayRequestView \? "Request details" : "Safe transaction"\}/);
   assert.match(screen, /actionSummary=\{displayRequestView \?/);
-  assert.match(screen, /rejectAction=\{displayRequestView && canReject \?/);
+  assert.match(screen, /rejectAction=\{displayRequestView && footerCanReject \?/);
   assert.match(screen, /readOnly=\{!displayRequestView\}/);
 
-  assert.match(details, /showRequestLifecycle &&\s*\(proposal\.route\.kind/);
+  assert.doesNotMatch(details, /waiting for execution/);
   assert.match(details, /showRequestLifecycle && simulationReverted/);
   assert.match(details, /showRequestLifecycle && notice/);
   assert.match(details, /proposal\.state === "readyToExecute" \|\| proposal\.state === "executed"/);
@@ -553,6 +581,10 @@ test("Safe execution freezes review state and opens public Activity after submis
   assert.match(confirmation, /displayRequestView = isRequestView \|\| submissionLocked/);
   assert.match(confirmation, /if \(executing && submitted\) onExecutionSubmitted\(\)/);
   assert.match(confirmation, /disabled=\{submissionLocked \|\| isLedgerWaiting\}/);
+  assert.match(confirmation, /setSubmissionFooter\(\{ canReject, requiresOnchainRejection \}\)/);
+  assert.match(confirmation, /footerCanReject = submissionLocked \? submissionFooter\.canReject : canReject/);
+  assert.match(confirmation, /hideDropdown=\{submissionLocked\}/);
+  assert.match(confirmation, /isLoading=\{submissionLocked \|\| operation === "approve"/);
   assert.match(requestsScreen, /onExecutionSubmitted=\{onExecutionSubmitted\}/);
   assert.match(appSurfaces, /onExecutionSubmitted=\{onExecutionSubmitted\}/);
   assert.match(app, /onExecutionSubmitted=.*setWalletHomeMode\("public"\).*setActivityTabTrigger/);

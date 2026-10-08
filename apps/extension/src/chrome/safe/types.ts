@@ -148,6 +148,8 @@ export interface SafeProposalRecord {
   purpose?: "rejection";
   createdAt: number;
   updatedAt: number;
+  /** Execution block timestamp in milliseconds, or receipt observation fallback. */
+  executionAt?: number;
   hiddenAt?: number;
   /** Safe transaction hash of the confirmed rejection that consumed this nonce. */
   rejectedBySafeTxHash?: `0x${string}`;

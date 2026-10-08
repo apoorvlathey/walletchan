@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { isPendingSafeProposal } from "@/chrome/safe/proposalStatus";
+import { getPendingSafeRequests } from "@/chrome/safe/proposalStatus";
 import type { SafeProposalRecord } from "@/chrome/safe/types";
 
 export function usePendingSafeProposalCount(safeAccountId?: string): number {
@@ -7,23 +7,26 @@ export function usePendingSafeProposalCount(safeAccountId?: string): number {
 
   useEffect(() => {
     let active = true;
-    const applyRecords = (records: SafeProposalRecord[]) => {
-      if (!active) return;
-      setPendingCount(records.filter((proposal) =>
-        (!safeAccountId || proposal.safeAccountId === safeAccountId) &&
-        isPendingSafeProposal(proposal)
+    let loadRevision = 0;
+    const applyRecords = (records: SafeProposalRecord[], revision: number) => {
+      if (!active || revision !== loadRevision) return;
+      setPendingCount(getPendingSafeRequests(records).filter((proposal) =>
+        !safeAccountId || proposal.safeAccountId === safeAccountId
       ).length);
     };
-    const load = () => chrome.runtime.sendMessage(
-      { type: "getSafeProposals" },
-      (response) => {
-        if (!active || chrome.runtime.lastError) return;
-        const records = response?.success && Array.isArray(response.result)
-          ? response.result as SafeProposalRecord[]
-          : [];
-        applyRecords(records);
-      },
-    );
+    const load = () => {
+      const revision = ++loadRevision;
+      chrome.runtime.sendMessage(
+        { type: "getSafeProposals" },
+        (response) => {
+          if (!active || chrome.runtime.lastError) return;
+          const records = response?.success && Array.isArray(response.result)
+            ? response.result as SafeProposalRecord[]
+            : [];
+          applyRecords(records, revision);
+        },
+      );
+    };
 
     load();
     if (safeAccountId) {
@@ -36,7 +39,8 @@ export function usePendingSafeProposalCount(safeAccountId?: string): number {
             !response?.success ||
             !Array.isArray(response.result)
           ) return;
-          applyRecords(response.result as SafeProposalRecord[]);
+          // A service sync response may predate a concurrent local submission.
+          load();
         },
       );
     }

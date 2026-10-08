@@ -45,6 +45,7 @@ interface GasEstimateDisplayProps {
    * `false` means there's a validation error the user must fix.
    */
   onValidityChange?: (valid: boolean) => void;
+  onLoadingChange?: (loading: boolean) => void;
   forceInclusion?: boolean;
   /** Lock fee selection once a hardware-signing request is in flight. */
   isReadOnly?: boolean;
@@ -157,6 +158,7 @@ function GasEstimateDisplay({
   accountType,
   onGasOverrides,
   onValidityChange,
+  onLoadingChange,
   forceInclusion,
   isReadOnly = false,
   hideInsufficientBalanceWarning = false,
@@ -527,13 +529,13 @@ function GasEstimateDisplay({
     !isLocalAccount || // Bankr / impersonator paths don't broadcast through us
     (allFieldsValid && maxFeeCoversBase);
 
-  // Bubble validity to parent so it can disable Confirm.
+  // Report fee readiness to the parent's confirmation action.
   useEffect(() => {
     if (onValidityChange) onValidityChange(validForBroadcast);
-  }, [validForBroadcast, onValidityChange]);
+    onLoadingChange?.(loading);
+  }, [validForBroadcast, onValidityChange, loading, onLoadingChange]);
 
-  // Propagate gas overrides to parent. We always send overrides for local
-  // accounts now — even on a fresh confirmation with no edits — because the
+  // Send overrides for local accounts even on a fresh confirmation because the
   // picker's selected tier IS the source of truth, and viem's auto-estimate
   // (the alternative when overrides=null) is exactly what we're trying to
   // replace.

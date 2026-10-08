@@ -1,7 +1,8 @@
+import { prepareSafeSignAndExecute, signAndExecuteSafeProposal } from "../safe/signAndExecute";
 import { approveSafeProposalWithOwner } from "../safe/ownerAuthorization";
 import { estimateSafeExecution, executeSafeProposal, reconcileSafeExecution } from "../safe/execution";
 import { publishSafeProposalConfirmations, reconcileSafeProposal, retryAmbiguousSafePublication } from "../safe/publication";
-import { getSafeProposal, getSafeProposals } from "../safe/proposalRepository";
+import { discardUnsignedSafeRejection, getSafeProposal, getSafeProposals } from "../safe/proposalRepository";
 import { appendApprovalRevokesToSafeProposal, authorizeSafeProposalRoute, cancelSafeProposal, changeSafeProposalNonce, createReviewedSafeProposal, detachSafeProposalRoute, hideSafeProposal } from "../safe/proposalLifecycle";
 import { startSafeProposalRejection } from "../safe/proposalRejection";
 import { requireSafeFeature } from "../safe/featurePolicy";
@@ -12,11 +13,13 @@ export const BACKGROUND_SAFE_PROPOSAL_MESSAGE_TYPES = [
   "getSafeProposals", "getSafeProposal", "syncSafeRequests", "createSafeProposal",
   "approveSafeProposal", "publishSafeProposal", "cancelSafeProposal",
   "startSafeProposalRejection",
+  "discardUnsignedSafeRejection",
   "hideSafeProposal", "detachSafeProposalRoute", "reconcileSafeProposal",
   "changeSafeProposalNonce",
   "appendApprovalRevokeToSafeProposal",
   "retrySafePublication",
   "estimateSafeExecution", "executeSafeProposal", "reconcileSafeExecution",
+  "prepareSafeSignAndExecute", "signAndExecuteSafeProposal",
 ] as const;
 
 export type SafeProposalRouteResult = { handled: false } | { handled: true; keepChannelOpen: boolean };
@@ -80,11 +83,14 @@ export function routeBackgroundSafeProposalMessage(
     case "publishSafeProposal": work = gated("sendProposal", () => publishSafeProposalConfirmations(message.proposalId)); break;
     case "cancelSafeProposal": work = gated("sendProposal", () => cancelSafeProposal(message.proposalId)); break;
     case "startSafeProposalRejection": work = gated("sendProposal", () => startSafeProposalRejection(message.proposalId)); break;
+    case "discardUnsignedSafeRejection": work = gated("sendProposal", () => discardUnsignedSafeRejection(message.proposalId)); break;
     case "hideSafeProposal": work = gated("proposalInbox", () => hideSafeProposal(message.proposalId)); break;
     case "detachSafeProposalRoute": work = gated("proposalInbox", () => detachSafeProposalRoute(message.proposalId)); break;
     case "reconcileSafeProposal": work = gated("proposalInbox", () => reconcileSafeProposal(message.proposalId)); break;
     case "retrySafePublication": work = gated("sendProposal", () => retryAmbiguousSafePublication(message.proposalId)); break;
     case "estimateSafeExecution": work = gated("executeProposal", () => estimateSafeExecution({ proposalId: message.proposalId, executorAccountId: message.executorAccountId })); break;
+    case "prepareSafeSignAndExecute": work = gated("executeProposal", () => prepareSafeSignAndExecute({ proposalId: message.proposalId, ownerAccountId: message.ownerAccountId })); break;
+    case "signAndExecuteSafeProposal": work = gated("executeProposal", () => signAndExecuteSafeProposal({ proposalId: message.proposalId, ownerAccountId: message.ownerAccountId, gasOverrides: message.gasOverrides, allowSimulationFailure: message.allowSimulationFailure })); break;
     case "executeSafeProposal": work = gated("executeProposal", () => executeSafeProposal({
       proposalId: message.proposalId,
       executorAccountId: message.executorAccountId,

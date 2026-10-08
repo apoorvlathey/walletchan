@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { SafeProposalRecord } from "@/chrome/safe/types";
+import { isUncommittedSafeRejection } from "@/chrome/safe/proposalRejectionPolicy";
 import type { Account } from "@/chrome/types";
 import { ActivityDateHeader } from "@/components/Activity/ActivityDateHeader";
 import { buildActivityAddressLabels } from "@/components/Activity/activityIdentityModel";
@@ -11,7 +12,7 @@ import { useAddressContacts } from "@/hooks/useAddressContacts";
 import { useDappOriginFormatter } from "@/hooks/useDappOriginDisplay";
 import { getResolvedChainById } from "@/lib/chains";
 import { SafeProposalActivityRow } from "./SafeProposalActivityRow";
-import { getSafeProposalRequestOrigin } from "./safeProposalActivityModel";
+import { getSafeActivityTimestamp, getSafeProposalRequestOrigin } from "./safeProposalActivityModel";
 import { sortSafeProposalsByNonceDescending } from "./safeProposalOrdering";
 
 export function SafeProposalActivity({
@@ -61,13 +62,16 @@ export function SafeProposalActivity({
       records.filter((item) =>
         item.safeAccountId === safeAccountId &&
         !item.hiddenAt &&
+        !isUncommittedSafeRejection(item) &&
         (!filterChainId || item.chainId === filterChainId)),
-    ),
+    ).sort((a, b) => getSafeActivityTimestamp(b) - getSafeActivityTimestamp(a)),
     [filterChainId, records, safeAccountId],
   );
   const displayRecords = useMemo(() => visible.slice(0, 20), [visible]);
   const dateGroups = useMemo(
-    () => groupActivityByDate(displayRecords, new Date()),
+    () => groupActivityByDate(displayRecords.map((proposal) => ({
+      ...proposal, createdAt: getSafeActivityTimestamp(proposal),
+    })), new Date()),
     [displayRecords],
   );
   const addressLabels = useMemo(

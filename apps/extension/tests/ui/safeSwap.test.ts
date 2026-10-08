@@ -78,8 +78,8 @@ test("Safe swaps create a proposal and open the shared request screen", async ()
 
   assert.doesNotMatch(app, /Safe swaps are not available yet/);
   assert.match(app, /onSafeProposalCreated=\{\(proposalId\) => \{/);
-  assert.match(app, /setSelectedSafeProposalId\(proposalId\)/);
-  assert.match(app, /setView\("safeApprovals"\)/);
+  assert.match(app, /openSafeApprovals\(proposalId\)/);
+  assert.match(app, /useSafeRequestNavigation\(/);
   assert.match(preparedSwap, /createSafeSwapProposal\(\{/);
   assert.match(preparedSwap, /options\.onSafeProposalCreated\(proposalId\)/);
   assert.match(preparedSwap, /executePreparedSwap\(\{/);

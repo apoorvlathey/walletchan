@@ -2504,6 +2504,19 @@ Quick reference for which files to examine based on what area of security you're
    Supported Safe transaction hashes are rebuilt from the exact chain-bound
    SafeTx EIP-712 schema rather than a broad runtime SDK barrel.
 
+   **Combined final-owner execution:** `prepareSafeSignAndExecute` and
+   `signAndExecuteSafeProposal` are wallet-UI-only, execution-phase-gated
+   routes. Both re-resolve the stored proposal/owner and fully verify current
+   Safe configuration, nonce, exact final-owner quorum, and native executor
+   eligibility. The read-only v=1 owner-sender preview supplies no signing
+   authority and is never persisted or submitted. The effect obtains an ordinary
+   recovered owner signature through the existing guarded approval handler,
+   checks actual-envelope gas against the user's reviewed limit, and invokes
+   unchanged execution claims, session/epoch, exact-envelope simulation, and
+   broadcast gates. Bankr, imported Safes, and view-only records cannot enter
+   this native execution path. Failure preserves only the genuine local approval;
+   retry requires another explicit execution decision.
+
 2. **No account-type fallthrough.** A Safe row cannot enter an EOA, Bankr,
    delegated-permission, sponsored, swap, bridge, force-inclusion, or message-
    signature path through a default branch. Unsupported Safe features are
@@ -2513,7 +2526,12 @@ Quick reference for which files to examine based on what area of security you're
    that visibility, matching ordinary account switching. The imported-record
    and injected-feature checks remain in the background; exact-chain onchain
    verification, live owner eligibility, quorum, and session authorization remain
-   mandatory at proposal/signing/execution boundaries. Connecting never promotes
+   mandatory at review/signing/execution boundaries. Unsigned draft creation
+   uses only the configured RPC live nonce and imported version/configuration
+   binding so the request screen can paint promptly. It cannot approve, publish
+   an acknowledgement, or execute; full live verification must match the stored
+   proposal epoch before any signing/submission. A nonce read is allocation
+   input, never authority evidence. Connecting never promotes
    an observe-only or blocked Safe to a signer. WalletConnect's negotiated
    chain/method eligibility remains separate and unchanged.
 
@@ -2669,6 +2687,16 @@ Quick reference for which files to examine based on what area of security you're
    gates. The original proposal is not marked cancelled and provider/ERC-5792
    outcomes are not failed until the rejection execution receipt confirms.
    Pending signed proposals cannot be hidden as a substitute for rejection.
+   Trusted-UI-only `discardUnsignedSafeRejection` removes only uncommitted
+   canonical WalletChan rejection drafts under the signing storage lock. It
+   preserves supported/unsupported signatures and all execution evidence, and
+   refuses an active effect claim. Unsigned rejection drafts stay out of inbox,
+   Activity, and badge counts; publication still requires a saved signature.
+
+   Safe Activity's optional `executionAt` is non-authoritative display metadata:
+   timestamps cannot authorize signing, alter nonce/hash identity, or settle a
+   proposal. Receipt authority is unchanged; a failed block-time lookup uses
+   observation time and cannot prevent verified settlement.
 
 9. **Nonce allocation is fresh and atomic; replacement is explicit.** Ordinary
    wallet, provider, WalletConnect, ERC-5792, and Safe-swap intake first reads

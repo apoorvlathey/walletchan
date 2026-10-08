@@ -18,12 +18,14 @@ test("imported refund-bearing rejection proposals retain their hash, signing fie
     const input = { chainId: 1, safeAddress: safe, safeVersion: "1.4.1" as const, transaction };
     const hash = computeSafeTransactionHash(input);
     const proposal = await validateServiceTransaction({
-      value: { ...transaction, safe, safeTxHash: hash, confirmations: [] },
+      value: { ...transaction, safe, safeTxHash: hash, confirmations: [],
+        transactionHash: `0x${"44".repeat(32)}`, executionDate: "2026-10-08T10:00:00Z" },
       safeAddress: safe, safeAccountId: "safe",
       snapshot: { chainId: 1, version: "1.4.1", owners: [], threshold: 1, nonce: "0",
         configEpoch: "fixture", verifiedAtBlock: "1" } as unknown as SafeChainSnapshot,
     });
     assert.equal(proposal.purpose, "rejection");
+    assert.equal(proposal.executionAt, Date.parse("2026-10-08T10:00:00Z"));
     assert.equal(proposal.safeTxHash, hash);
     assert.deepEqual(proposal.transaction, transaction);
     assert.deepEqual(analyzeSafeTransactionRisk(proposal.transaction, 1).refund,

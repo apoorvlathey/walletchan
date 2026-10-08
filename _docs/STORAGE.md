@@ -39,6 +39,14 @@ Rule: check `cachedVaultKey` to determine which system is active before saving A
 
 ## chrome.storage.local
 
+Safe proposal records additionally accept optional `executionAt` milliseconds
+for Activity timing. Receipt reconciliation enriches it from the inclusion
+block (receipt observation time if that lookup fails); imported executions use
+the service execution date. Missing remains valid for released records, which
+use local executor preparation time or stable creation time. Sync `updatedAt`
+is never used as an execution timestamp. This is
+additive display metadata; no migration or proposal-hash change is required.
+
 Persists across extension restarts. Wallet-scoped keys and transient prefixes
 are cleared by manual reset through the stable
 `apps/extension/src/chrome/walletResetStorage.ts` facade over

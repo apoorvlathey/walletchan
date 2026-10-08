@@ -107,11 +107,11 @@ test("automatic Safe requests reserve sequential nonces under one storage lock",
   const created = await Promise.all([
     createReviewedSafeProposal(
       { safeAccountId: "safe-account", chainId: 8453, calls },
-      { verifySafeOnchainState: async () => safeRecord.chains["8453"] },
+      { readSafeDraftNonce: async () => BigInt(safeRecord.chains["8453"].nonce), verifySafeOnchainState: async () => safeRecord.chains["8453"] },
     ),
     createReviewedSafeProposal(
       { safeAccountId: "safe-account", chainId: 8453, calls },
-      { verifySafeOnchainState: async () => safeRecord.chains["8453"] },
+      { readSafeDraftNonce: async () => BigInt(safeRecord.chains["8453"].nonce), verifySafeOnchainState: async () => safeRecord.chains["8453"] },
     ),
   ]);
 
@@ -286,7 +286,7 @@ test("an identical request revives a locally cancelled unsigned Safe identity", 
     local: { safeAccounts: { version: 1, records: [safeRecord] } },
   });
   installed.push(storage);
-  const verify = { verifySafeOnchainState: async () => safeRecord.chains["8453"] };
+  const verify = { readSafeDraftNonce: async () => BigInt(safeRecord.chains["8453"].nonce), verifySafeOnchainState: async () => safeRecord.chains["8453"] };
   const calls = [{ to: target, value: "0" as const, data: "0x" as const, operation: 0 as const }];
   const initial = await createReviewedSafeProposal({
     safeAccountId: "safe-account",
@@ -319,7 +319,7 @@ test("concurrent identical retries after local cancellation reserve unique nonce
   installed.push(installNativeSessionStorage({
     local: { safeAccounts: { version: 1, records: [safeRecord] } },
   }));
-  const verify = { verifySafeOnchainState: async () => safeRecord.chains["8453"] };
+  const verify = { readSafeDraftNonce: async () => BigInt(safeRecord.chains["8453"].nonce), verifySafeOnchainState: async () => safeRecord.chains["8453"] };
   const calls = [{ to: target, value: "0" as const, data: "0x" as const, operation: 0 as const }];
   const initial = await createReviewedSafeProposal({
     safeAccountId: "safe-account",
@@ -387,7 +387,7 @@ test("custom nonce route validates against freshly verified onchain state", asyn
   installed.push(installNativeSessionStorage({
     local: { safeAccounts: { version: 1, records: [safeRecord] } },
   }));
-  const verify = { verifySafeOnchainState: async () => safeRecord.chains["8453"] };
+  const verify = { readSafeDraftNonce: async () => BigInt(safeRecord.chains["8453"].nonce), verifySafeOnchainState: async () => safeRecord.chains["8453"] };
   const initial = await createReviewedSafeProposal({
     safeAccountId: "safe-account",
     chainId: 8453,
@@ -429,7 +429,7 @@ test("an unsigned Safe draft appends a revoke without changing route or nonce", 
       tokenAddress: token,
       spender,
     },
-    { verifySafeOnchainState: async () => safeRecord.chains["8453"] },
+    { readSafeDraftNonce: async () => BigInt(safeRecord.chains["8453"].nonce), verifySafeOnchainState: async () => safeRecord.chains["8453"] },
   );
 
   assert.equal(updated.transaction.nonce, initial.transaction.nonce);
@@ -482,7 +482,7 @@ test("an unsigned Safe draft appends all revokes with one replacement", async ()
         { tokenAddress: tokenTwo, spender: spenderTwo },
       ],
     },
-    { verifySafeOnchainState: async () => safeRecord.chains["8453"] },
+    { readSafeDraftNonce: async () => BigInt(safeRecord.chains["8453"].nonce), verifySafeOnchainState: async () => safeRecord.chains["8453"] },
   );
 
   assert.equal(updated.transaction.nonce, initial.transaction.nonce);
@@ -498,4 +498,37 @@ test("an unsigned Safe draft appends all revokes with one replacement", async ()
   );
   assert.equal(await getSafeProposal(initial.id), null);
   assert.equal((await getSafeProposal(updated.id))?.id, updated.id);
+});
+
+test("draft creation reads only the current nonce and retains the imported authority binding", async () => {
+  installed.push(installNativeSessionStorage({
+    local: { safeAccounts: { version: 1, records: [safeRecord] } },
+  }));
+  const proposal = await createReviewedSafeProposal({
+    safeAccountId: "safe-account", chainId: 8453,
+    calls: [{ to: target, value: "0", data: "0x", operation: 0 }],
+  }, {
+    readSafeDraftNonce: async (input) => {
+      assert.equal(input.safeAddress, safeAddress);
+      assert.equal(input.chainId, 8453);
+      return 9n;
+    },
+    verifySafeOnchainState: async () => assert.fail("Full authority verification belongs to review/signing"),
+  });
+  assert.equal(proposal.transaction.nonce, 9);
+  assert.equal(proposal.safeConfigEpoch, safeRecord.chains["8453"].configEpoch);
+  assert.equal(proposal.verifiedAtBlock, safeRecord.chains["8453"].verifiedAtBlock);
+  assert.equal(proposal.state, "draft");
+  assert.deepEqual(proposal.confirmations, []);
+});
+
+test("a failed live nonce read does not queue a stale Safe draft", async () => {
+  installed.push(installNativeSessionStorage({
+    local: { safeAccounts: { version: 1, records: [safeRecord] } },
+  }));
+  await assert.rejects(createReviewedSafeProposal({
+    safeAccountId: "safe-account", chainId: 8453,
+    calls: [{ to: target, value: "0", data: "0x", operation: 0 }],
+  }, { readSafeDraftNonce: async () => { throw new Error("RPC unavailable"); } }), /RPC unavailable/);
+  assert.deepEqual(await getSafeProposals(), []);
 });

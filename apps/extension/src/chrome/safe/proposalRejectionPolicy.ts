@@ -15,6 +15,20 @@ export function hasSafeProposalSignatures(
     (proposal.unsupportedConfirmations?.length ?? 0) > 0;
 }
 
+/** Rejection reviews are private drafts until an owner supplies a signature. */
+export function isUncommittedSafeRejection(
+  proposal: Pick<SafeProposalRecord, "state"> & Partial<Pick<SafeProposalRecord,
+    "purpose" | "confirmations" | "unsupportedConfirmations" |
+    "transactionHash" | "userOperationHash" | "serializedExecution"
+  >>,
+): boolean {
+  return proposal.purpose === "rejection" &&
+    ["draft", "authorizing", "blocked", "stale", "failed"].includes(proposal.state) &&
+    (proposal.confirmations?.length ?? 0) === 0 &&
+    (proposal.unsupportedConfirmations?.length ?? 0) === 0 &&
+    !proposal.transactionHash && !proposal.userOperationHash && !proposal.serializedExecution;
+}
+
 export function isCanonicalSafeRejection(
   proposal: Pick<SafeProposalRecord, "safeAddress" | "calls" | "transaction">,
 ): boolean {

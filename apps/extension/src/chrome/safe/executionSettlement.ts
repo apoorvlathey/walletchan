@@ -48,6 +48,7 @@ export async function settleCompetingSafeProposals(
       ...record,
       state: isRejection ? "cancelled" : "replaced",
       rejectedBySafeTxHash: isRejection ? executed.safeTxHash : undefined,
+      executionAt: executed.executionAt,
       error: isRejection
         ? "Rejected onchain by a same-nonce Safe transaction"
         : "Another proposal at this Safe nonce executed",

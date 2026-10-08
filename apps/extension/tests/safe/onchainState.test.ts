@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { keccak256, type PublicClient } from "viem";
-import { verifySafeOnchainState } from "../../src/chrome/safe/onchainState";
+import { readSafeDraftNonce, verifySafeOnchainState } from "../../src/chrome/safe/onchainState";
 import type { SafeDeploymentIdentity } from "../../src/chrome/safe/deploymentRegistry";
 
 const safe = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const;
@@ -124,4 +124,21 @@ test("configuration epoch tracks authority rather than executable nonce", async 
   const second = await verifySafeOnchainState({ ...common, client: fakeClient({ nonce: 8n }) });
   assert.equal(first.configEpoch, second.configEpoch);
   assert.notEqual(first.nonce, second.nonce);
+});
+
+test("draft nonce preparation uses one latest-block contract read without auditing authority", async () => {
+  let reads = 0;
+  const client = {
+    readContract: async (input: any) => {
+      reads++;
+      assert.equal(input.address.toLowerCase(), safe);
+      assert.equal(input.functionName, "nonce");
+      assert.equal(input.blockTag, "latest");
+      return 42n;
+    },
+    getBlockNumber: () => assert.fail("Draft preparation must not perform a full audit"),
+    getCode: () => assert.fail("Draft preparation must not perform a full audit"),
+  } as unknown as PublicClient;
+  assert.equal(await readSafeDraftNonce({ chainId: 8453, safeAddress: safe, client }), 42n);
+  assert.equal(reads, 1);
 });

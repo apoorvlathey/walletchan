@@ -129,6 +129,7 @@ test("every hinted family opens its matching confirmation view", () => {
   const selected: string[] = [];
   const views: string[] = [];
   const setters = {
+    setSafe: (request: any) => selected.push(`safe:${request.id}`),
     setTransaction: (request: any) => selected.push(`tx:${request.id}`),
     setSignature: (request: any) => selected.push(`sig:${request.id}`),
     setPermission: (request: any) => selected.push(`permission:${request.id}`),
@@ -160,4 +161,39 @@ test("every hinted family opens its matching confirmation view", () => {
     "batchTxConfirm",
     "dappConnectionConfirm",
   ]);
+});
+
+for (const [requestType, routeKind] of [["i_sendTransaction", "injected"], ["i_walletSendCalls", "erc5792"]] as const) {
+  test(`cold ${requestType} bootstrap finds Safe drafts instead of waiting for an EOA queue`, async () => {
+    let reads = 0;
+    const proposal = { id: "safe-request", safeAccountId: "safe", createdAt: 100, route: { kind: routeKind } } as any;
+    const lists = await loadInitialApprovalRequestsWith(
+      { requestType, createdAt: 100 },
+      [async () => [], async () => [], async () => [], async () => [], async () => [],
+        async () => ++reads === 2 ? [proposal] : []],
+      immediateDependencies(),
+    );
+    assert.equal(reads, 2);
+    assert.deepEqual(resolveHintedInitialApprovalRoute({ requestType, createdAt: 100 }, lists as any), {
+      kind: "safe", request: proposal,
+    });
+  });
+}
+
+test("an earlier Safe proposal cannot steal a new EOA request hint", () => {
+  const lists = [[{ id: "new-eoa" }], [], [], [], [], [{
+    id: "old-safe", createdAt: 99, route: { kind: "injected" },
+  }]] as any;
+  assert.equal(resolveHintedInitialApprovalRoute({ requestType: "i_sendTransaction", createdAt: 100 }, lists)?.kind, "transaction");
+});
+
+test("Safe routing delegates the proposal identity without selecting an EOA view", () => {
+  let proposalId = "";
+  applyInitialApprovalRoute({ kind: "safe", request: { id: "safe-id" } as any }, {
+    setSafe: (request) => { proposalId = request.id; },
+    setTransaction: () => assert.fail(), setSignature: () => assert.fail(),
+    setPermission: () => assert.fail(), setBatch: () => assert.fail(),
+    setDappConnection: () => assert.fail(), setView: () => assert.fail(),
+  });
+  assert.equal(proposalId, "safe-id");
 });

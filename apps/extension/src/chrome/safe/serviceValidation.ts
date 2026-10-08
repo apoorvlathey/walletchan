@@ -112,6 +112,8 @@ export async function validateServiceTransaction(input: {
     tx.data === "0x"
     ? "rejection" as const
     : undefined;
+  const executionDate = executionHash && typeof raw.executionDate === "string"
+    ? Date.parse(raw.executionDate) : NaN;
   return {
     version: 1,
     id: `${input.snapshot.chainId}:${safeAddress}:${hash}`,
@@ -132,6 +134,7 @@ export async function validateServiceTransaction(input: {
     createdAt: Date.parse(raw.submissionDate || "") || now,
     updatedAt: Date.parse(raw.modified || "") || now,
     transactionHash: executionHash,
+    executionAt: Number.isSafeInteger(executionDate) && executionDate > 0 ? executionDate : undefined,
     error: proposalNonce < liveNonce && !executionHash
       ? "Safe nonce already advanced"
       : undefined,

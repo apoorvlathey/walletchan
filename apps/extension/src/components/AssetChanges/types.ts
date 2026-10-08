@@ -16,6 +16,9 @@ export interface AssetChangesDisplayProps {
   safeAddress?: string;
   /** Exact outer Safe execution request used to determine the revert verdict. */
   safeExecutionRequest?: PendingTxRequest;
+  /** Wait for required preparation before issuing the first simulation. */
+  simulationEnabled?: boolean;
+  onSimulationLoadingChange?: (loading: boolean) => void;
   /** Durable background request identity used for late residual detection. */
   residualApprovalRequest?: ResidualApprovalRequestRef;
   /** Remove the panel's duplicate disclosure header inside a titled parent section. */

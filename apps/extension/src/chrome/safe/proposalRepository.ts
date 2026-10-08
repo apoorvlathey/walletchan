@@ -1,4 +1,5 @@
 import { getAddress } from "viem";
+import { isCanonicalSafeRejection, isUncommittedSafeRejection } from "./proposalRejectionPolicy";
 import { withStorageLock } from "../storageLock";
 import { computeSafeTransactionHash } from "./transactionHash";
 import { hasUnresolvedSafeExecution } from "./executionPolicy";
@@ -222,6 +223,7 @@ export function decodeSafeProposal(value: unknown): SafeProposalRecord {
         : (() => { throw new Error("Invalid Safe proposal purpose"); })(),
     createdAt: integer(raw.createdAt, "creation time", 1),
     updatedAt: integer(raw.updatedAt, "update time", 1),
+    executionAt: raw.executionAt === undefined ? undefined : integer(raw.executionAt, "execution time", 1),
     hiddenAt: raw.hiddenAt === undefined ? undefined : integer(raw.hiddenAt, "hidden time", 1),
     rejectedBySafeTxHash: raw.rejectedBySafeTxHash === undefined
       ? undefined
@@ -300,6 +302,18 @@ export async function getSafeProposals(): Promise<SafeProposalRecord[]> {
 }
 export async function getSafeProposal(id: string) {
   return (await getSafeProposals()).find((record) => record.id === id) ?? null;
+}
+
+/** Shares the signing lock: an approval claim or saved signature prevents removal. */
+export async function discardUnsignedSafeRejection(id: string): Promise<boolean> {
+  return mutate((records) => {
+    const current = records.find((record) => record.id === id);
+    if (!current || !isUncommittedSafeRejection(current) ||
+      current.route.kind !== "wallet" || current.route.origin !== "WalletChan" ||
+      !isCanonicalSafeRejection(current)) return { records, result: false };
+    if (current.effectClaim) throw new Error("Safe rejection signing is in progress");
+    return { records: records.filter((record) => record.id !== id), result: true };
+  });
 }
 export async function createSafeProposal(record: SafeProposalRecord) {
   const decoded = decodeSafeProposal(record);

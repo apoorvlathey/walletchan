@@ -1,3 +1,5 @@
+import { useSafeRequestNavigation } from "@/app/hooks/useSafeRequestNavigation";
+import { loadInitialSafeProposals } from "@/app/initialSafeRequests";
 import {
   useState,
   useEffect,
@@ -282,13 +284,8 @@ function App() {
   const [transferToken, setTransferToken] = useState<PortfolioToken | null>(
     null,
   );
-  const [selectedSafeProposalId, setSelectedSafeProposalId] = useState<string | null>(null);
-  const [safeProposalEntryPoint, setSafeProposalEntryPoint] = useState<"requests" | "activity">("requests");
-  const openSafeApprovals = (proposalId: string | null, entryPoint: "requests" | "activity" = "requests") => {
-    setSelectedSafeProposalId(proposalId);
-    setSafeProposalEntryPoint(entryPoint);
-    setView("safeApprovals");
-  };
+  const { safeRequestAccount, selectedSafeProposalId, setSelectedSafeProposalId, safeProposalEntryPoint, setSafeProposalEntryPoint, openSafeApprovals } =
+    useSafeRequestNavigation({ setIsWalletUnlocked, setView });
   const [swapInitialBuyToken, setSwapInitialBuyToken] = useState<
     { address: string; name: string; symbol: string; decimals: number; logoURI?: string } | undefined>();
   const [swapInitialSellToken, setSwapInitialSellToken] = useState<PortfolioToken | undefined>();
@@ -755,17 +752,15 @@ function App() {
           loadPendingErc7715PermissionRequests,
           loadPendingBatchRequests,
           loadPendingDappConnectionRequests,
+          loadInitialSafeProposals,
         ], approvalRequestHint);
-      const [requests, sigRequests, permissionRequests, batchRequests, dappConnectionRequests] =
-        initialApprovalRequests;
-      const hintedApprovalRoute = resolveHintedInitialApprovalRoute(
-        approvalRequestHint,
-        initialApprovalRequests,
-      );
-      if (hintedApprovalRoute && !ledgerSetupRequestedRef.current) {
+      const [requests, sigRequests, permissionRequests, batchRequests, dappConnectionRequests, safeRequests = []] = initialApprovalRequests;
+      const hintedApprovalRoute = resolveHintedInitialApprovalRoute(approvalRequestHint, initialApprovalRequests);
+      if (hintedApprovalRoute && hintedApprovalRoute.kind !== "safe" && !ledgerSetupRequestedRef.current) {
         setIsWalletUnlocked(isUnlocked);
         if (isUnlocked) {
           applyInitialApprovalRoute(hintedApprovalRoute, {
+            setSafe: (proposal) => { void openSafeApprovals(proposal.id); },
             setTransaction: setSelectedTxRequest,
             setSignature: setSelectedSignatureRequest,
             setPermission: setSelectedErc7715PermissionRequest,
@@ -892,7 +887,7 @@ function App() {
       if (ledgerSetupRequestedRef.current) {
         setView(isUnlocked ? "addAccount" : "unlock");
       } else if (hintedApprovalRoute) {
-        // The matching request is already visible; finish hydration in place.
+        if (hintedApprovalRoute.kind === "safe") await openSafeApprovals(hintedApprovalRoute.request.id);
         if (hintedApprovalRoute.kind === "dappConnection" &&
             typeof hintedApprovalRoute.request.tabId === "number") {
           const requestAccount = await sendMessageWithRetry<Account | null>(
@@ -935,13 +930,14 @@ function App() {
       } else if (addChainRequests.length > 0) {
         setPendingAddChainRequest(addChainRequests[addChainRequests.length - 1]);
         setView("addChainConfirm");
+      } else if (safeRequests.length > 0) {
+        await openSafeApprovals(safeRequests[safeRequests.length - 1].id);
       } else {
         setView("main");
       }
 
       setIsLoading(false);
     };
-
     init();
     // Startup bootstrap intentionally runs once for the active popup.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1638,6 +1634,7 @@ function App() {
     const watchAssetRequests = await loadPendingWatchAssetRequests();
     const addChainReqs = await loadPendingAddChainRequests();
     const dappConnectionReqs = await loadPendingDappConnectionRequests();
+    const safeReqs = await loadInitialSafeProposals();
 
     if (requests.length > 0) {
       setSelectedTxRequest(requests[requests.length - 1]);
@@ -1670,6 +1667,8 @@ function App() {
     } else if (addChainReqs.length > 0) {
       setPendingAddChainRequest(addChainReqs[addChainReqs.length - 1]);
       setView("addChainConfirm");
+    } else if (selectedSafeProposalId || safeReqs.length > 0) {
+      await openSafeApprovals(selectedSafeProposalId ?? safeReqs[safeReqs.length - 1].id);
     } else {
       setView("main");
     }
@@ -2462,12 +2461,13 @@ function App() {
 
   // Safe approvals view
   if (view === "safeApprovals") {
-    if (activeAccount?.type !== "safe") {
+    const requestAccount = safeRequestAccount ?? activeAccount;
+    if (requestAccount?.type !== "safe") {
       return <SafeFeatureUnavailable title="Safe account is no longer selected" onBack={() => setView("main")} />;
     }
     const shouldReturnToActivity = safeProposalEntryPoint === "activity";
     const leaveSafeApprovals = () => { setSelectedSafeProposalId(null); setSafeProposalEntryPoint("requests"); if (shouldReturnToActivity) returnToActivity(); else setView("main"); };
-    return <SafeApprovalsSurface account={activeAccount} chainId={selectedChain?.chainId ?? 8453} accounts={accounts} proposalId={selectedSafeProposalId} fullscreen={isFullscreenTab} onBack={leaveSafeApprovals} onProposalBack={shouldReturnToActivity ? leaveSafeApprovals : undefined} onExecutionSubmitted={() => { setWalletHomeMode("public"); setSelectedSafeProposalId(null); setSafeProposalEntryPoint("requests"); setActivityTabTrigger((current) => current + 1); setView("main"); }} onExecutionConfirmed={() => { setWalletHomeMode("public"); setSelectedSafeProposalId(null); setSafeProposalEntryPoint("requests"); setActivityTabTrigger((current) => current + 1); setView("main"); }} />;
+    return <SafeApprovalsSurface account={requestAccount} chainId={selectedChain?.chainId ?? 8453} accounts={accounts} proposalId={selectedSafeProposalId} fullscreen={isFullscreenTab} onBack={leaveSafeApprovals} onProposalBack={shouldReturnToActivity ? leaveSafeApprovals : undefined} onExecutionSubmitted={() => { setWalletHomeMode("public"); setSelectedSafeProposalId(null); setSafeProposalEntryPoint("requests"); setActivityTabTrigger((current) => current + 1); setView("main"); }} onExecutionConfirmed={() => { setWalletHomeMode("public"); setSelectedSafeProposalId(null); setSafeProposalEntryPoint("requests"); setActivityTabTrigger((current) => current + 1); setView("main"); }} />;
   }
 
   // Transfer view

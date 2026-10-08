@@ -11,6 +11,9 @@ export function SafeProposalFinancialImpact({
   onRevertedChange,
   onUnavailableChange,
   approvalCleanup,
+  simulationEnabled,
+  onSimulationLoadingChange,
+  preparationError,
 }: {
   proposal: SafeProposalRecord;
   reviewRequest: PendingTxRequest;
@@ -18,6 +21,9 @@ export function SafeProposalFinancialImpact({
   onRevertedChange: (reverted: boolean) => void;
   onUnavailableChange: (unavailable: boolean) => void;
   approvalCleanup?: AssetChangesDisplayProps["approvalCleanup"];
+  simulationEnabled?: boolean;
+  onSimulationLoadingChange?: (loading: boolean) => void;
+  preparationError?: string | null;
 }) {
   if (proposal.purpose === "rejection") {
     return (
@@ -45,12 +51,16 @@ export function SafeProposalFinancialImpact({
       borderRadius="lg"
       overflow="hidden"
     >
-      <AssetChangesDisplay
+      {preparationError ? (
+        <Text py={3} color="fg.secondary" fontSize="sm">{preparationError}</Text>
+      ) : <AssetChangesDisplay
         txRequest={reviewRequest}
         batchCalls={proposal.calls}
         safeAddress={proposal.safeAddress}
         safeExecutionRequest={executionRequest ?? undefined}
         embedded
+        simulationEnabled={simulationEnabled}
+        onSimulationLoadingChange={onSimulationLoadingChange}
         approvalCleanup={approvalCleanup}
         residualApprovalRequest={{
           family: "safeProposal",
@@ -58,7 +68,7 @@ export function SafeProposalFinancialImpact({
         }}
         onRevertedChange={onRevertedChange}
         onSimulationUnavailableChange={onUnavailableChange}
-      />
+      />}
     </Box>
   );
 }

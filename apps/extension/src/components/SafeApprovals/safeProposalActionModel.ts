@@ -28,6 +28,7 @@ export type { SafeExecutorAccount, SafeOwnerAccount };
 export type SafeProposalActionKind = "approve" | "execute" | null;
 export type SafeProposalActionOperation =
   | Exclude<SafeProposalActionKind, null>
+  | "signAndExecute"
   | "reject"
   | "secondary"
   | null;
@@ -138,6 +139,7 @@ export function getSafeProposalDisplayActionKind(
   actionKind: SafeProposalActionKind,
   operation: SafeProposalActionOperation,
 ): SafeProposalActionKind {
+  if (operation === "signAndExecute") return "approve";
   return operation === "approve" || operation === "execute"
     ? operation
     : actionKind;

@@ -6,7 +6,7 @@
 import type { TransactionParams } from "../bankr/submission";
 import { bindPendingBankrCredential } from "../bankr/credentialBinding";
 import { assertCurrentMasterAuthorization } from "../masterAuthorization";
-import { isPendingSafeProposal } from "../safe/proposalStatus";
+import { getPendingSafeRequests } from "../safe/proposalStatus";
 import { withStorageLock } from "../storageLock";
 
 export interface Erc7715PermissionRevokeMeta {
@@ -220,7 +220,7 @@ export async function updateBadge(): Promise<void> {
   const crossDappBatch = await getCrossDappBatch();
   const dappConnectionRequests = await getPendingDappConnectionRequests();
   const safeProposals = await getSafeProposals().catch(() => []);
-  const safePendingCount = safeProposals.filter(isPendingSafeProposal).length;
+  const safePendingCount = getPendingSafeRequests(safeProposals).length;
   const crossDappBatchCount = crossDappBatch?.entries.length ? 1 : 0;
   const approvalCount =
     txRequests.length +

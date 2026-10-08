@@ -1,4 +1,5 @@
 import type { SafeProposalRecord, SafeProposalState } from "./types";
+import { isUncommittedSafeRejection } from "./proposalRejectionPolicy";
 
 const PENDING_BY_STATE: Record<SafeProposalState, boolean> = {
   draft: true,
@@ -18,12 +19,27 @@ const PENDING_BY_STATE: Record<SafeProposalState, boolean> = {
 };
 
 /**
- * A pending Safe request is still unresolved in the inbox, even when it is
- * temporarily blocked or stale. Hidden and terminal records do not contribute
- * to either the homepage summary or the extension action badge.
+ * Unresolved proposal state for review and receipt reconciliation, including
+ * blocked or stale proposals. Counts and inboxes use getPendingSafeRequests
+ * to additionally exclude nonce slots already crossing the execution boundary.
  */
 export function isPendingSafeProposal(
-  proposal: Pick<SafeProposalRecord, "state" | "hiddenAt">,
+  proposal: Pick<SafeProposalRecord, "state" | "hiddenAt"> &
+    Partial<SafeProposalRecord>,
 ): boolean {
-  return !proposal.hiddenAt && PENDING_BY_STATE[proposal.state];
+  return !proposal.hiddenAt && !isUncommittedSafeRejection(proposal) && PENDING_BY_STATE[proposal.state];
+}
+
+/** Submitted or consumed nonce slots never reappear while settlement finishes. */
+export function getPendingSafeRequests(proposals: readonly SafeProposalRecord[]): SafeProposalRecord[] {
+  const nonceKey = (proposal: SafeProposalRecord) =>
+    `${proposal.chainId}:${proposal.safeAddress.toLowerCase()}:${proposal.transaction.nonce}`;
+  const submittedNonces = new Set(proposals.filter((proposal) =>
+    proposal.state === "executed" ||
+    ((proposal.state === "executing" || proposal.state === "ambiguous" || proposal.state === "replaced") &&
+      (!!proposal.transactionHash || !!proposal.userOperationHash)),
+  ).map(nonceKey));
+  return proposals.filter((proposal) =>
+    isPendingSafeProposal(proposal) && !submittedNonces.has(nonceKey(proposal)),
+  );
 }

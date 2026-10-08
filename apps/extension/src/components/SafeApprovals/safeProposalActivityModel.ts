@@ -1,3 +1,10 @@
+import type { SafeProposalRecord } from "@/chrome/safe/types";
+
+/** Prefer execution/submission time; legacy records retain their stable creation time. */
+export function getSafeActivityTimestamp(proposal: SafeProposalRecord): number {
+  return proposal.executionAt ?? proposal.executor?.preparedAt ?? proposal.executionPreparedAt ?? proposal.createdAt;
+}
+
 function hostname(value: string): string | null {
   try {
     return new URL(value).hostname.replace(/^www\./, "") || null;
