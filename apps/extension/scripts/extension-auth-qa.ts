@@ -1,3 +1,4 @@
+import { completeQaOnboarding } from "./extension-onboarding-qa-support";
 import {
   chromium,
   type BrowserContext,
@@ -31,7 +32,6 @@ const BUILD_DIR = path.join(APP_DIR, "build");
 const MASTER_PASSWORD = "walletchan-auth-qa-master";
 const AGENT_PASSWORD = "walletchan-auth-qa-agent";
 const TEST_PRIVATE_KEY = `0x${"22".repeat(32)}`;
-const TEST_ADDRESS = "0x1111111111111111111111111111111111111111";
 
 async function waitForWorker(context: BrowserContext): Promise<Worker> {
   return (
@@ -41,39 +41,10 @@ async function waitForWorker(context: BrowserContext): Promise<Worker> {
 }
 
 async function completeOnboarding(page: Page, wallet: WalletType): Promise<void> {
-  await page.getByRole("button", { name: "Set up WalletChan" }).waitFor();
-  await page.getByRole("button", { name: "Set up WalletChan" }).click();
-  await page
-    .getByRole("radio", {
-      name:
-        wallet === "bankr"
-          ? /^Bankr account\b/
-          : wallet === "privateKey"
-            ? /^Private key\b/
-            : /^Seed phrase\b/,
-    })
-    .click();
-  await page.getByRole("button", { name: "Continue" }).click();
-
-  if (wallet === "bankr") {
-    await page.getByLabel("Bankr API key").fill("walletchan-auth-qa-key");
-    await page.getByLabel("Linked wallet address").fill(TEST_ADDRESS);
-    await page.getByRole("button", { name: "Continue" }).click();
-  } else if (wallet === "privateKey") {
-    await page.getByLabel("Private Key").fill(TEST_PRIVATE_KEY);
-    await page.getByRole("button", { name: "Continue" }).click();
-  } else {
-    await page.getByText("Generate new phrase", { exact: true }).click();
-    await page
-      .getByRole("button", { name: "I’ve saved my seed phrase" })
-      .click();
-  }
-  await page.getByLabel("Password", { exact: true }).fill(MASTER_PASSWORD);
-  await page.getByLabel("Confirm password").fill(MASTER_PASSWORD);
-  await page.getByRole("button", { name: "Create wallet" }).click();
-  await page
-    .getByRole("heading", { name: "Your wallet is ready" })
-    .waitFor({ timeout: 30_000 });
+  await completeQaOnboarding(page, {
+    wallet, password: MASTER_PASSWORD, privateKey: TEST_PRIVATE_KEY,
+    bankrApiKey: "walletchan-auth-qa-key",
+  });
 
   const popupMode = await page.evaluate(() =>
     chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: false }),
@@ -124,7 +95,7 @@ async function lockAndUnlock(
 ): Promise<void> {
   await page.getByRole("button", { name: "Lock wallet" }).click();
   await page.getByRole("heading", { name: "WalletChan", exact: true }).waitFor();
-  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByLabel("Enter password to unlock", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Unlock", exact: true }).click();
   await page.getByRole("button", { name: "Lock wallet" }).waitFor({
     timeout: 20_000,
@@ -153,10 +124,11 @@ async function setAgentPassword(page: Page): Promise<void> {
   await page.getByRole("button", { name: /^Agent Password\b/ }).click();
   await page.getByRole("heading", { name: "Agent password" }).waitFor();
   await page.getByRole("button", { name: "Set agent password" }).click();
+  await page.getByLabel("Current master password", { exact: true }).fill(MASTER_PASSWORD);
   await page.getByLabel("Agent password", { exact: true }).fill(AGENT_PASSWORD);
   await page.getByLabel("Confirm agent password").fill(AGENT_PASSWORD);
   await page.getByRole("button", { name: "Enable agent access" }).click();
-  await page.getByRole("heading", { name: "Settings" }).waitFor({
+  await page.getByRole("heading", { name: "Security" }).waitFor({
     timeout: 20_000,
   });
 }
@@ -177,7 +149,7 @@ async function verifyAgentRestrictions(page: Page): Promise<void> {
     throw new Error("Agent session exposed agent-password management");
   }
   await goBack(page);
-  await page.getByRole("heading", { name: "Settings" }).waitFor();
+  await page.getByRole("heading", { name: "Security" }).waitFor();
 }
 
 async function verifyProtectedAccountAction(
@@ -202,7 +174,7 @@ async function verifyProtectedAccountAction(
   const isSeed = wallet === "seedPhrase";
   const action = isSeed ? "Reveal seed phrase" : "Reveal private key";
   await page.getByText(action, { exact: true }).click();
-  await page.getByRole("heading", { name: action }).waitFor();
+  await page.getByRole("heading", { name: isSeed ? "Back up your wallet" : action, exact: true }).waitFor();
   await page
     .getByText(
       isSeed
@@ -276,7 +248,7 @@ async function runWallet(wallet: WalletType): Promise<AuthQaEvidence> {
     }
     const unlockButton = popup.getByRole("button", { name: "Unlock", exact: true });
     const unlockPositionBeforeError = await unlockButton.boundingBox();
-    await popup.getByLabel("Password", { exact: true }).fill("not-the-password");
+    await popup.getByLabel("Enter password to unlock", { exact: true }).fill("not-the-password");
     await unlockButton.click();
     await popup.getByText("Incorrect password", { exact: true }).waitFor();
     await forgotPassword.waitFor();
@@ -288,7 +260,7 @@ async function runWallet(wallet: WalletType): Promise<AuthQaEvidence> {
     ) {
       throw new Error("Unlock controls shifted when the password error appeared");
     }
-    await popup.getByLabel("Password", { exact: true }).fill(MASTER_PASSWORD);
+    await popup.getByLabel("Enter password to unlock", { exact: true }).fill(MASTER_PASSWORD);
     await unlockButton.click();
     await popup.getByRole("button", { name: "Lock wallet" }).waitFor();
 

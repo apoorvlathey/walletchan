@@ -103,7 +103,6 @@ export function AddAccountTypeGrid({
           <Button
             key={type}
             variant="secondary"
-            role="group"
             minH="132px"
             h="auto"
             p={4}

@@ -1,3 +1,5 @@
+import { connectQaDapp } from "./extension-dapp-qa-support";
+import { completeQaOnboarding } from "./extension-onboarding-qa-support";
 import AxeBuilder from "@axe-core/playwright";
 import {
   chromium,
@@ -30,7 +32,6 @@ const OUTPUT_DIR = path.resolve(
     path.join(APP_DIR, "extension-signing-qa"),
 );
 const PASSWORD = "walletchan-signing-qa-password";
-const TEST_ADDRESS = "0x1111111111111111111111111111111111111111";
 const TEST_PRIVATE_KEY = `0x${"33".repeat(32)}`;
 const METHODS: SignatureMethod[] = ["personal_sign", "eth_signTypedData_v4"];
 
@@ -76,7 +77,7 @@ const DAPP_HTML = String.raw`<!doctype html>
             Review: [{ name: "purpose", type: "string" }],
           },
           primaryType: "Review",
-          domain: { name: "WalletChan QA", version: "1", chainId: 8453 },
+          domain: { name: "WalletChan QA", version: "1", chainId: Number(await qa.provider.request({ method: "eth_chainId" })) },
           message: { purpose: "Review presentation without signing" },
         };
         const params = method === "personal_sign"
@@ -143,35 +144,11 @@ function observePage(page: Page, errors: string[]): void {
 }
 
 async function completeOnboarding(page: Page, wallet: WalletType): Promise<void> {
-  await page.getByRole("button", { name: "Set up WalletChan" }).click();
-  await page
-    .getByRole("radio", {
-      name:
-        wallet === "bankr"
-          ? /^Bankr account\b/
-          : wallet === "privateKey"
-            ? /^Private key\b/
-            : /^Seed phrase\b/,
-    })
-    .click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  if (wallet === "bankr") {
-    await page.getByLabel("Bankr API key").fill("walletchan-signing-qa-key");
-    await page.getByLabel("Linked wallet address").fill(TEST_ADDRESS);
-    await page.getByRole("button", { name: "Continue" }).click();
-  } else if (wallet === "privateKey") {
-    await page.getByLabel("Private Key").fill(TEST_PRIVATE_KEY);
-    await page.getByRole("button", { name: "Continue" }).click();
-  } else {
-    await page.getByText("Generate new phrase", { exact: true }).click();
-    await page.getByRole("button", { name: "I’ve saved my seed phrase" }).click();
-  }
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  await page.getByLabel("Confirm password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Create wallet" }).click();
-  await page
-    .getByRole("heading", { name: "Your wallet is ready" })
-    .waitFor({ timeout: 30_000 });
+  await completeQaOnboarding(page, {
+    wallet, password: PASSWORD, privateKey: TEST_PRIVATE_KEY,
+    bankrApiKey: "walletchan-signing-qa-key",
+  });
+
   const popupMode = await page.evaluate(() =>
     chrome.runtime.sendMessage({ type: "setSidePanelMode", enabled: false }),
   );
@@ -222,7 +199,7 @@ async function reopenPopup(
 }
 
 async function assertReviewSurface(page: Page): Promise<void> {
-  await page.getByRole("heading", { name: "Review signature" }).waitFor({
+  await page.getByRole("heading", { name: "Signature request" }).waitFor({
     timeout: 20_000,
   });
   const sign = page.getByRole("button", { name: "Sign", exact: true });
@@ -376,13 +353,14 @@ async function runWallet(wallet: WalletType, origin: string): Promise<SigningEvi
     const extensionId = new URL(worker.url()).host;
     const helper = context.pages()[0] || (await context.newPage());
     await helper.goto(`chrome-extension://${extensionId}/onboarding.html`);
-    await helper.getByRole("button", { name: "Set up WalletChan" }).waitFor();
+    await helper.getByRole("button", { name: "Create new wallet" }).waitFor();
     await completeOnboarding(helper, wallet);
     const dapp = await context.newPage();
     await dapp.goto(origin, { waitUntil: "domcontentloaded" });
     await dapp.waitForFunction(() => (window as any).__signQa?.provider, undefined, {
       timeout: 15_000,
     });
+    await connectQaDapp(dapp, extensionId, "__signQa");
     const evidence: SigningEvidence[] = [];
     for (const method of METHODS) {
       evidence.push(await runMethod(context, worker, extensionId, dapp, wallet, method));

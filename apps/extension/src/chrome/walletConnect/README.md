@@ -4,7 +4,8 @@ All implementations and callers use this folder directly; there is no root
 compatibility family. Review implementation in this order:
 
 1. `requestValidation.ts`, `sessionPolicy.ts` — bounded request, CAIP, method,
-   account, and metadata policy without SDK ownership.
+   account, and metadata policy without SDK ownership. `signatureMethodPolicy.ts`
+   rejects deprecated signature methods before pending-request preparation.
 2. `storage.ts`, `protocol.ts`, `outbox.ts` — durable remote-request claims,
    first terminal responses, and replay/removal ordering.
 3. `pendingRequests.ts`, `batchRequests.ts`, `rpcRequests.ts` — transaction,

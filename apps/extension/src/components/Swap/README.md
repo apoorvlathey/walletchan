@@ -71,7 +71,11 @@ message, RPC, or storage effects except the existing explorer/copy actions in
 - `useImpersonatedSwapPolicy.ts` mirrors the exact selected-RPC developer flag
   for confirmation presentation; the background remains authoritative.
 - `usePreparedSwap.ts` stages confirmation state and coordinates preparation
-  and final execution.
+  and final execution. Its independent firm-quote impact decision uses the
+  prepared sell/buy amounts and prices. A new request resets acknowledgement;
+  refresh/cancel invalidates stale callbacks. Both the confirm button and the
+  submission handler require acknowledgement before execution or Safe proposal
+  creation. `SwapPriceImpactNotice.tsx` shares the warning across both screens.
 
 ## Transaction boundaries
 

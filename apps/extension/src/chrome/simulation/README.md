@@ -10,6 +10,7 @@ simulation modules:
 - `approvalAbis.ts` owns the exact ERC-20, ERC-2612, Permit2,
   self-delegatecall `multicall(bytes[])`, Multicall3, ERC-7821, and Safe
   MultiSend decode/read contracts used by permission projection.
+- `allowanceAbis.ts` contains read-only ERC-20/Permit2 allowance contracts, re-exported by `approvalAbis.ts`.
 - `approvalIntents.ts` performs bounded local discovery of direct and
   recognized nested approval intents. Opaque calls are never guessed.
 - `approvalLogs.ts` extracts approval intents emitted by successful

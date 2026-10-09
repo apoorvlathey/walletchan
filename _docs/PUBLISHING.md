@@ -286,23 +286,33 @@ mismatched account IDs.
 
 ### Testing an update locally
 
-1. Build and load the current extension as unpacked
-2. Complete onboarding normally
-3. Open the **service worker** DevTools console and strip the new storage to simulate an old user:
-   ```js
-   // Simulate v0.2.0 storage state
-   chrome.storage.local.remove([
-     "accounts",
-     "encryptedVaultKeyMaster",
-     "encryptedApiKeyVault",
-     "agentPasswordEnabled",
-   ]);
-   chrome.storage.sync.remove(["activeAccountId", "tabAccounts"]);
-   ```
-4. Click **Reload** on `chrome://extensions` (fires `onInstalled` with `reason === "update"`)
-5. Open the popup — should show unlock screen, not onboarding
-6. Enter password — vault key migration runs on unlock
-7. Verify the service worker console shows: `[WalletChan] Legacy storage migration complete: 0x...`
+Use a disposable browser profile with synthetic accounts. Never delete credential
+or vault keys from a real wallet to simulate an older version: doing so can
+remove the only wrapper that recovers its keys.
+
+Build the released `v4.1.0` source in a separate temporary directory, and build
+the candidate normally with `pnpm build:extension`. Then run:
+
+```bash
+EXTENSION_QA_BASELINE_BUILD=/absolute/path/to/v4.1.0/apps/extension/build \
+  pnpm --filter @walletchan/extension qa:extension:upgrade
+```
+
+The runner creates encrypted records through the released background handlers,
+then updates a copy of that extension in the same Chromium profile and origin.
+Only the temporary candidate copy receives a synthetic version bump and an
+update-event observer; repository manifests and the user's browser are untouched.
+It checks the actual update lifecycle, repeats a restart and update hook,
+verifies local/sync records and IndexedDB history, and exercises master/agent unlock, local signing,
+master-only recovery, and an existing pending request returning after unlock.
+Both explicit Never and 15-minute auto-lock settings are covered. Public Ledger/Safe metadata is preserved; this is not a hardware or
+Safe execution test. Bankr ownership verification uses a local fixture signer.
+All profiles are removed in `finally`; no transaction is broadcast.
+
+Frozen older vault/passkey fixtures and migration tests additionally cover legacy
+formats without deleting real data. See `tests/vault/legacySecretUpgradeFixtures.test.ts`,
+`tests/passkey/upgradeFixtures.test.ts`, `tests/accounts/legacyMigration.test.ts`,
+and `tests/auth/legacyApiUnlockCompatibility.test.ts`.
 
 ### Pre-release checklist (storage)
 

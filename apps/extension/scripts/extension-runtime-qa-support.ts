@@ -1,10 +1,10 @@
+import { completeQaOnboarding } from "./extension-onboarding-qa-support";
 import { type BrowserContext, type Page, type Worker } from "@playwright/test";
 import { createServer, type Server } from "node:http";
 
 export type WalletType = "bankr" | "privateKey" | "seedPhrase";
 
 const PASSWORD = "walletchan-qa-password";
-const TEST_ADDRESS = "0x1111111111111111111111111111111111111111";
 const TEST_PRIVATE_KEY = `0x${"11".repeat(32)}`;
 
 const DAPP_HTML = String.raw`<!doctype html>
@@ -86,7 +86,7 @@ export async function getOnboardingPage(
   const existing = context.pages().find((page) => page.url().startsWith(onboardingUrl));
   const page = existing || context.pages()[0] || (await context.newPage());
   await page.goto(onboardingUrl, { waitUntil: "domcontentloaded" });
-  await page.getByRole("button", { name: "Set up WalletChan" }).waitFor();
+  await page.getByRole("button", { name: "Create new wallet" }).waitFor();
   return page;
 }
 
@@ -94,34 +94,9 @@ export async function completeOnboarding(
   page: Page,
   wallet: WalletType,
 ): Promise<void> {
-  await page.getByRole("button", { name: "Set up WalletChan" }).click();
-  await page.getByRole("radio", {
-    name:
-      wallet === "bankr"
-        ? /^Bankr account\b/
-        : wallet === "privateKey"
-          ? /^Private key\b/
-          : /^Seed phrase\b/,
-  }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
-
-  if (wallet === "bankr") {
-    await page.getByLabel("Bankr API key").fill("walletchan-runtime-qa-key");
-    await page.getByLabel("Linked wallet address").fill(TEST_ADDRESS);
-    await page.getByRole("button", { name: "Continue" }).click();
-  } else if (wallet === "privateKey") {
-    await page.getByLabel("Private Key").fill(TEST_PRIVATE_KEY);
-    await page.getByRole("button", { name: "Continue" }).click();
-  } else {
-    await page.getByText("Generate new phrase", { exact: true }).click();
-    await page.getByRole("button", { name: "I’ve saved my seed phrase" }).click();
-  }
-
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  await page.getByLabel("Confirm password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Create wallet" }).click();
-  await page.getByRole("heading", { name: "Your wallet is ready" }).waitFor({
-    timeout: 30_000,
+  await completeQaOnboarding(page, {
+    wallet, password: PASSWORD, privateKey: TEST_PRIVATE_KEY,
+    bankrApiKey: "walletchan-runtime-qa-key",
   });
 
   const modeResult = await page.evaluate(() =>

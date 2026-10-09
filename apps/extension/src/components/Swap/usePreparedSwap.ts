@@ -1,4 +1,6 @@
 import { useRef, useState } from "react";
+import { formatUnits } from "viem";
+import { useSwapPriceImpactDecision } from "./useSwapPriceImpactDecision";
 import type { GasEstimate } from "@/chrome/gasEstimation";
 import type { PortfolioToken } from "@/chrome/portfolio/api";
 import type { SwapQuoteResponse, TokenInfo } from "@/chrome/swapApi";
@@ -20,6 +22,7 @@ interface UsePreparedSwapOptions {
   buyTokenInfo: TokenInfo | null;
   buyTokenAddress: string;
   buyTokenLogoURI?: string;
+  buyTokenPriceUsd: number;
   sellTokenAmount: string;
   quote: SwapQuoteResponse | null;
   isBridge: boolean;
@@ -38,6 +41,7 @@ interface UsePreparedSwapOptions {
 export function usePreparedSwap(options: UsePreparedSwapOptions) {
   const toast = useThemedToast();
   const submittingRef = useRef(false);
+  const activeRequestRef = useRef<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [preparedTransactions, setPreparedTransactions] = useState<
@@ -58,6 +62,22 @@ export function usePreparedSwap(options: UsePreparedSwapOptions) {
   const [swapGasEstimates, setSwapGasEstimates] =
     useState<GasEstimate[] | null>(null);
   const [swapGasValid, setSwapGasValid] = useState(true);
+
+  const preparedSellAmount = preparedQuote && options.sellToken
+    ? formatUnits(BigInt(preparedQuote.sellAmount), options.sellToken.decimals)
+    : "0";
+  const preparedSellUsd = Number(preparedSellAmount) * (options.sellToken?.priceUsd ?? 0);
+  const impactReview = useSwapPriceImpactDecision({
+    inputUsd: preparedSellUsd,
+    outputAmount: preparedQuote?.buyAmount,
+    buyTokenDecimals: options.buyTokenInfo?.decimals,
+    buyTokenPriceUsd: options.buyTokenPriceUsd,
+    quoteLoading: false,
+    reviewContext: [preparedRequestId, preparedQuote, options.accountId,
+      options.accountType, options.fromAddress, options.sellChainId, options.buyChainId],
+  });
+  const impactBlockedRef = useRef(impactReview.decision.blocked);
+  impactBlockedRef.current = impactReview.decision.blocked;
 
   const stagePlan = async () => {
     if (submittingRef.current) return;
@@ -89,6 +109,7 @@ export function usePreparedSwap(options: UsePreparedSwapOptions) {
     if (!options.isBridge && !options.quote) return;
 
     submittingRef.current = true;
+    activeRequestRef.current = null;
     setIsSubmitting(true);
     try {
       const common = {
@@ -115,18 +136,8 @@ export function usePreparedSwap(options: UsePreparedSwapOptions) {
             indicativeQuote: options.quote!,
             chainId: options.sellChainId,
           });
-      if (!plan) return;
-
-      if (submissionKind === "safeProposal") {
-        if (!options.accountId || !options.onSafeProposalCreated) {
-          throw new Error("Safe swap request routing is unavailable");
-        }
-        const proposalId = await createSafeSwapProposal({
-          safeAccountId: options.accountId,
-          chainId: options.sellChainId,
-          transactions: plan.transactions,
-        });
-        options.onSafeProposalCreated(proposalId);
+      if (!plan) {
+        setShowConfirmation(false);
         return;
       }
 
@@ -141,9 +152,12 @@ export function usePreparedSwap(options: UsePreparedSwapOptions) {
       );
       setPrepared7702(plan.delegation);
       setPreparedQuote(plan.quote);
-      setPreparedRequestId(crypto.randomUUID());
+      const requestId = crypto.randomUUID();
+      activeRequestRef.current = requestId;
+      setPreparedRequestId(requestId);
       setShowConfirmation(true);
     } catch (error) {
+      setShowConfirmation(false);
       toast({
         title: "Error",
         description:
@@ -161,10 +175,25 @@ export function usePreparedSwap(options: UsePreparedSwapOptions) {
     feePaymentToken: "native" | `0x${string}`,
     feePaymentQuoteId: string | null,
   ) => {
-    if (submittingRef.current || !preparedTransactions?.length || !preparedRequestId) return;
+    if (submittingRef.current || !preparedTransactions?.length || !preparedRequestId ||
+      activeRequestRef.current !== preparedRequestId || impactBlockedRef.current) return;
     submittingRef.current = true;
     setIsSubmitting(true);
     try {
+      if (getSwapSubmissionKind(options.accountType, options.isBridge) === "safeProposal") {
+        if (!preparedAccountLock || !options.onSafeProposalCreated) {
+          throw new Error("Safe swap request routing is unavailable");
+        }
+        const proposalId = await createSafeSwapProposal({
+          safeAccountId: preparedAccountLock.accountId,
+          chainId: preparedTransactions[0].tx.chainId,
+          transactions: preparedTransactions,
+        });
+        activeRequestRef.current = null;
+        options.onSafeProposalCreated(proposalId);
+        return;
+      }
+
       const succeeded = await executePreparedSwap({
         transactions: preparedTransactions,
         batchTx: preparedBatchTx,
@@ -178,7 +207,13 @@ export function usePreparedSwap(options: UsePreparedSwapOptions) {
         chainName: options.chainName,
         toast,
       });
-      if (succeeded) options.onSwapInitiated();
+      if (succeeded) {
+        activeRequestRef.current = null;
+        options.onSwapInitiated();
+      }
+    } catch (error) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Swap failed",
+        status: "error", duration: 3000 });
     } finally {
       submittingRef.current = false;
       setIsSubmitting(false);
@@ -186,6 +221,7 @@ export function usePreparedSwap(options: UsePreparedSwapOptions) {
   };
 
   const cancel = () => {
+    activeRequestRef.current = null;
     setShowConfirmation(false);
     setPreparedTransactions(null);
     setPreparedBatchTx(null);
@@ -204,6 +240,9 @@ export function usePreparedSwap(options: UsePreparedSwapOptions) {
     preparedBatchTx,
     prepared7702,
     preparedQuote,
+    preparedSellAmount,
+    preparedSellUsd,
+    impactReview,
     preparedRequestId,
     swapGasValid,
     setSwapGasEstimates,

@@ -1,3 +1,4 @@
+import { completeQaOnboarding } from "./extension-onboarding-qa-support";
 import AxeBuilder from "@axe-core/playwright";
 import {
   chromium,
@@ -23,7 +24,6 @@ export interface WalletProfile {
 }
 
 const PASSWORD = "walletchan-negative-batch-qa";
-const TEST_ADDRESS = "0x1111111111111111111111111111111111111111";
 const TEST_PRIVATE_KEY = `0x${"44".repeat(32)}`;
 
 const DAPP_HTML = String.raw`<!doctype html>
@@ -68,7 +68,7 @@ qa.startBatch = async () => {
   const address = qa.address || await qa.connect();
   Object.assign(qa.batch, { status: "pending", settlements: 0, id: null });
   qa.provider.request({ method: "wallet_sendCalls", params: [{
-    version: "2.0.0", chainId: "0x2105", from: address, atomicRequired: false,
+    version: "2.0.0", chainId: await qa.provider.request({ method: "eth_chainId" }), from: address, atomicRequired: false,
     calls: [
       { to: "0x2222222222222222222222222222222222222222", value: "0x0", data: "0x" },
       { to: "0x3333333333333333333333333333333333333333", value: "0x0", data: "0x" },
@@ -122,26 +122,11 @@ function observePage(page: Page, errors: string[]): void {
 }
 
 async function completeOnboarding(page: Page, wallet: WalletType): Promise<void> {
-  await page.getByRole("button", { name: "Set up WalletChan" }).waitFor();
-  await page.getByRole("button", { name: "Set up WalletChan" }).click();
-  await page.getByRole("radio", { name: wallet === "bankr" ? /^Bankr account\b/ :
-    wallet === "privateKey" ? /^Private key\b/ : /^Seed phrase\b/ }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  if (wallet === "bankr") {
-    await page.getByLabel("Bankr API key").fill("walletchan-negative-batch-key");
-    await page.getByLabel("Linked wallet address").fill(TEST_ADDRESS);
-    await page.getByRole("button", { name: "Continue" }).click();
-  } else if (wallet === "privateKey") {
-    await page.getByLabel("Private Key").fill(TEST_PRIVATE_KEY);
-    await page.getByRole("button", { name: "Continue" }).click();
-  } else {
-    await page.getByText("Generate new phrase", { exact: true }).click();
-    await page.getByRole("button", { name: "I’ve saved my seed phrase" }).click();
-  }
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  await page.getByLabel("Confirm password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Create wallet" }).click();
-  await page.getByRole("heading", { name: "Your wallet is ready" }).waitFor({ timeout: 30_000 });
+  await completeQaOnboarding(page, {
+    wallet, password: PASSWORD, privateKey: TEST_PRIVATE_KEY,
+    bankrApiKey: "walletchan-negative-batch-key",
+  });
+
   for (const message of [
     { type: "setSidePanelMode", enabled: false },
     { type: "ensureNetworksInfo" },

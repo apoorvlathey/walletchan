@@ -95,9 +95,12 @@ function useNetworkEnsIdentities(addresses: string[], chainId = 1): UseEnsIdenti
         const lower = addr.toLowerCase();
         const cached = cache[ensIdentityKey(lower, chainId)];
 
-        if (cached && isCacheValid(cached)) {
+        // Expiry schedules a refresh; it does not erase the last display identity.
+        // Partial contact hints still require verification before display.
+        if (cached && !cached.needsAvatar) {
           newIdentities.set(lower, { name: cached.name, avatar: cached.avatar });
-        } else {
+        }
+        if (!cached || !isCacheValid(cached)) {
           // Only resolve if we haven't already started resolving in this session
           if (!resolvedRef.current.has(lower)) {
             staleAddresses.push(addr);

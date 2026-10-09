@@ -1,3 +1,4 @@
+import type { MouseEvent, KeyboardEvent } from "react";
 import { Box, Icon, Tooltip, type IconProps } from "@chakra-ui/react";
 import { AddIcon, InfoOutlineIcon, RepeatIcon, ViewOffIcon } from "@chakra-ui/icons";
 import {
@@ -73,8 +74,8 @@ function PreferenceLabel({ label, help }: { label: string; help: string }) {
           cursor="help"
           tabIndex={0}
           aria-label={`About ${label}`}
-          onClick={(event) => event.stopPropagation()}
-          onKeyDown={(event) => {
+          onClick={(event: MouseEvent<HTMLSpanElement>) => event.stopPropagation()}
+          onKeyDown={(event: KeyboardEvent<HTMLSpanElement>) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
               event.stopPropagation();

@@ -187,6 +187,7 @@ function SwapView({
     buyTokenInfo: buyToken.buyTokenInfo,
     buyTokenAddress: buyToken.buyTokenAddress,
     buyTokenLogoURI: buyToken.buyTokenLogoURI,
+    buyTokenPriceUsd: buyToken.buyTokenPriceUsd,
     sellTokenAmount: amount.sellTokenAmount,
     quote: quotes.quote,
     isBridge,
@@ -214,8 +215,8 @@ function SwapView({
         requestId={prepared.preparedRequestId} key={prepared.preparedRequestId}
         transactions={prepared.preparedTransactions}
         sellToken={sellToken}
-        sellAmount={amount.sellTokenAmount}
-        sellUsd={inputUsd}
+        sellAmount={prepared.preparedSellAmount}
+        sellUsd={prepared.preparedSellUsd}
         buyTokenInfo={buyToken.buyTokenInfo}
         buyAmount={prepared.preparedQuote.buyAmount}
         buyTokenDecimals={buyToken.buyTokenInfo.decimals}
@@ -230,7 +231,8 @@ function SwapView({
           buyToken.buyTokenAddress.toLowerCase() ===
           NATIVE_TOKEN_ADDRESS.toLowerCase()
         }
-        buyUsd={outputUsd}
+        buyUsd={prepared.impactReview.outputUsd}
+        impactReview={prepared.impactReview}
         chainId={sellChainId}
         chainName={chainName}
         fromAddress={fromAddress}

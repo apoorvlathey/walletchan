@@ -1,3 +1,4 @@
+import type { useSwapPriceImpactDecision } from "./useSwapPriceImpactDecision";
 import type { PortfolioToken } from "@/chrome/portfolio/api";
 import type { SwapQuoteResponse, TokenInfo } from "@/chrome/swapApi";
 import type { SwapTxEntry } from "@/chrome/txHandlers";
@@ -19,6 +20,7 @@ export type PreparedSwapTxEntry = Omit<SwapTxEntry, "tx"> & {
 };
 
 export interface SwapConfirmationProps {
+  impactReview: ReturnType<typeof useSwapPriceImpactDecision>;
   requestId: string;
   transactions: PreparedSwapTxEntry[];
   sellToken: PortfolioToken;

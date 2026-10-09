@@ -158,7 +158,7 @@ test("Ledger requests remain reviewable and immutable until hardware approval", 
   assert.ok(txRemoval > txSigning);
   assert.ok(signatureSigning >= 0);
   assert.ok(signatureRemoval > signatureSigning);
-  assert.match(txUi, /isReadOnly=\{isLedgerWaiting\}/);
+  assert.match(txUi, /isReadOnly=\{isLedgerWaiting \|\| !!replacement\}/);
   assert.match(txUi, /waitingForLedger=\{isLedgerWaiting\}/);
   assert.doesNotMatch(txUi, /isBackDisabled=\{isLedgerWaiting\}/);
   assert.match(

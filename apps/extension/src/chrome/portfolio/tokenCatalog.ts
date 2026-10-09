@@ -11,6 +11,7 @@ import {
 } from "./catalogEnrichment";
 import {
   applyTokenMetadata,
+  applyErc20Prices,
   finalizePortfolioTokens,
   isNativeToken,
   isTestnetChain,
@@ -329,19 +330,7 @@ export async function loadPortfolioTokenCatalog(
 
   const resolvedErc20Prices = await resolveErc20PricesBatch(erc20PriceRequests);
 
-  const tokensWithErc20Prices = tokensWithCustomNativePrices.map((token) => {
-    if (isNativeToken(token) || token.priceUsd > 0) return token;
-    const price = resolvedErc20Prices.get(
-      `${token.chainId}-${token.contractAddress.toLowerCase()}`,
-    );
-    if (!price || price <= 0) return token;
-    const balanceNum = parseFloat(token.balance || "0");
-    return {
-      ...token,
-      priceUsd: price,
-      valueUsd: balanceNum > 0 ? balanceNum * price : 0,
-    };
-  });
+  const tokensWithErc20Prices = applyErc20Prices(tokensWithCustomNativePrices, resolvedErc20Prices);
 
   const { visibleTokens, allTokenKeys } = finalizePortfolioTokens(
     tokensWithErc20Prices,

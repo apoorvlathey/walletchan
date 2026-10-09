@@ -109,7 +109,7 @@ function ApprovalRow({
             color={change.isUnlimited ? semanticColor : "fg.primary"}
             fontSize="sm"
             fontWeight="600"
-            fontVariantNumeric="tabular-nums"
+            sx={{ fontVariantNumeric: "tabular-nums" }}
             overflowWrap="anywhere"
             textAlign="right"
             title={allowance}

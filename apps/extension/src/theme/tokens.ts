@@ -1,3 +1,5 @@
+import type { LegacyAliases } from "./legacyTokenTypes";
+export type * from "./legacyTokenTypes";
 /**
  * Theme Tokens — the contract every theme must satisfy.
  *
@@ -314,59 +316,6 @@ export interface ThemeDecorators {
 // references migrate to intent tokens; they're unused in component code as
 // of Phase 13 except for `bg.muted` (button hover bg) and `border.subtle`.
 // ─────────────────────────────────────────────────────────────────────────────
-
-export interface LegacyBauhausPalette {
-  red: string;
-  blue: string;
-  yellow: string;
-  green: string;
-  black: string;
-  white: string;
-}
-
-export interface LegacyBgPalette {
-  base: string;
-  subtle: string;
-  muted: string;
-  emphasis: string;
-}
-
-export interface LegacyTextPalette {
-  primary: string;
-  secondary: string;
-  tertiary: string;
-}
-
-export interface LegacyBorderPalette {
-  subtle: string;
-  default: string;
-  strong: string;
-}
-
-export interface LegacyPrimaryPalette {
-  400: string;
-  500: string;
-  600: string;
-  700: string;
-}
-
-export interface LegacyStatusPalette {
-  bg: string;
-  border: string;
-  solid: string;
-}
-
-export interface LegacyAliases {
-  bauhaus: LegacyBauhausPalette;
-  bg: LegacyBgPalette;
-  text: LegacyTextPalette;
-  border: LegacyBorderPalette;
-  primary: LegacyPrimaryPalette;
-  success: LegacyStatusPalette;
-  warning: LegacyStatusPalette;
-  error: LegacyStatusPalette;
-  info: LegacyStatusPalette;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Top-level ThemeTokens shape
