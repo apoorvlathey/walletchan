@@ -209,8 +209,8 @@ remain manual release checks.
 
 Existing-profile upgrade coverage has its own command, `qa:extension:upgrade`,
 with `EXTENSION_QA_BASELINE_BUILD` pointing at a released Chrome build. It uses
-only disposable profiles. See [v4.1.0 upgrade acceptance](./UPGRADE_4_1_0.md)
-and [the publishing workflow](./PUBLISHING.md#testing-an-update-locally).
+only disposable profiles. See [the publishing workflow](./PUBLISHING.md#testing-an-update-locally)
+for coverage and instructions.
 
 1. `pnpm dev:extension` (for local testing against `pnpm dev:website`) or `pnpm build:extension` (production-mode build)
 2. Go to `chrome://extensions`
