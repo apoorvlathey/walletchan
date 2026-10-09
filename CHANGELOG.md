@@ -10,6 +10,10 @@ To regenerate the `[Unreleased]` section from git diffs, invoke the `/changelog`
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [4.2.0] - 2026-10-10
+
 ### Added
 
 - Force inclusion on Robinhood mainnet and testnet, plus Ledger support for eligible single transactions on supported OP Stack and Arbitrum routes.
@@ -863,7 +867,8 @@ This release is a full rebuild of the wallet — multiple account types, a real 
 - View address on Debank from the homepage.
 - Lock-wallet button and footer attribution.
 
-[Unreleased]: https://github.com/apoorvlathey/walletchan/compare/v4.1.0...HEAD
+[Unreleased]: https://github.com/walletchan/walletchan/compare/v4.2.0...HEAD
+[4.2.0]: https://github.com/walletchan/walletchan/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/apoorvlathey/walletchan/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/apoorvlathey/walletchan/compare/v3.19.0...v4.0.0
 [3.19.0]: https://github.com/apoorvlathey/walletchan/compare/v3.18.0...v3.19.0
