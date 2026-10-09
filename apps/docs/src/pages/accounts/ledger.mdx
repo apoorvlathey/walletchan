@@ -43,9 +43,14 @@ on-device, the wallet reports the request as rejected and does not submit it.
 Ledger accounts can use local fee selection, ordinary EOA nonce controls,
 pending-transaction speed-up/cancel flows, Send, supported message signing,
 Safe-owner actions, sequential staking legs, Shield paths, and transaction
-simulation. The built-in Swap/Bridge shortcut, ERC-5792 batches, fee-token gas,
-EIP-7702/ERC-7715, and force inclusion are not offered. Every Ledger signing
-feature still requires real-device approval.
+simulation. Eligible single transactions also support [force
+inclusion](/transactions/force-inclusion) through OP Stack or Arbitrum parent-chain
+routes. Arbitrum can require separate device approvals for the L2 transaction
+and its L1 submission.
+
+The built-in Swap/Bridge shortcut, ERC-5792 batches, fee-token gas, and
+EIP-7702/ERC-7715 are not offered. Every Ledger signing feature still requires
+real-device approval.
 
 ## Troubleshooting
 

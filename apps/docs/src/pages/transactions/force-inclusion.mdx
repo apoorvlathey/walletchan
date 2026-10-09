@@ -26,15 +26,19 @@ account and parent-chain access.
 
 ## Arbitrum route
 
-Arbitrum One uses a separate signed delayed-inbox path for eligible local
-accounts. A later permissionless force step is only available after the
-protocol deadline.
+Arbitrum One and Robinhood mainnet/testnet use a separate signed delayed-inbox
+path for eligible private-key, seed-phrase, and Ledger accounts. Each route uses
+its configured Ethereum or Sepolia parent deployment. A later permissionless
+force step is only available after the protocol deadline.
 
 ## Account support
 
 - Private-key and seed accounts can use eligible local L1 signing.
-- Ledger, view-only, and Safe are excluded.
-- Bankr can use a route only where its parent-L1 access supports it.
+- Ledger supports eligible single transactions, with device approval for each
+  required signature. Ledger force-inclusion batches are unavailable.
+- View-only and Safe accounts are excluded.
+- Bankr can use eligible OP Stack routes where its parent-L1 access supports
+  them; Arbitrum delayed-inbox routes are unavailable for Bankr.
 
 Force inclusion is incompatible with token-paid gas and some batch/deployment
 paths.

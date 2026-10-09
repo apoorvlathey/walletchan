@@ -33,6 +33,11 @@ It is available in production on Chromium and hidden on Firefox.
 MAX accounts for gas and the protocol fee instead of spending the full public
 ETH balance.
 
+If the source balance is below the minimum, WalletChan shows the minimum
+required ETH. If the amount and gas exceed your balance, it asks for more ETH
+or a smaller amount. Other RPC failures remain separate from insufficient
+balance errors; check your connection or RPC and retry.
+
 ## Account support
 
 Private-key, seed-phrase, Ledger, and Bankr source accounts can use supported

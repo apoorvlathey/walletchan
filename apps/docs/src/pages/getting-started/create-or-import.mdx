@@ -7,17 +7,21 @@ outline: 3
 
 # Create or import a wallet
 
-WalletChan starts by asking what kind of account you want. The choice affects
-where signing happens and which recovery material you must protect.
+Choose **Create new wallet** to generate a new seed-phrase account, or
+**Import or connect existing account** to use an account you already have.
+Your account type determines where signing happens and which recovery material
+you must protect.
 
-## Choose an account
+## Import or connect an account
 
 - **Private key**: import one EVM private key. WalletChan encrypts it locally.
-- **Seed phrase**: generate or import a recovery phrase, preview derived
+- **Seed phrase**: import a recovery phrase, preview derived
   addresses, and choose the addresses you want to add.
 - **Ledger**: connect a supported Ledger device over Chrome WebHID and choose
   addresses. The keys never leave the Ledger.
 - **View-only**: watch any EVM address without importing a signing secret.
+- **Safe**: verify and import an existing Safe on its supported networks. Add
+  an eligible owner account later to approve requests.
 - **Bankr**: optionally connect an existing Bankr API account. Bankr signs
   supported requests remotely.
 
@@ -37,9 +41,14 @@ multiple parallel flows.
 ## Back up recovery material
 
 Private keys and seed phrases are shown only in deliberate, protected flows.
-Generated seed phrases begin concealed. Reveal, record, and verify them away
-from cameras or screen sharing. Ledger users must secure the Ledger recovery
-phrase using Ledger's own instructions.
+A newly created wallet opens before you reveal its seed phrase. Select
+**Back up your wallet** on Home, authorize with your master password, reveal
+the words, and save them offline. Select **I saved these words somewhere safe**
+and **Finish backup** to clear the reminder. Complete this before adding funds.
+The reminder survives closing or restarting the browser.
+
+Reveal and record recovery material away from cameras or screen sharing. Ledger
+users must secure the Ledger recovery phrase using Ledger's own instructions.
 
 WalletChan's [Shield recovery phrase](/privacy/unshield-and-recovery) is
 separate from your wallet seed phrase and must be backed up separately if you
@@ -53,6 +62,7 @@ be required for local secrets.
 
 ## What happens next?
 
-After setup, WalletChan opens the [Home and portfolio
-view](/wallet/home-and-portfolio). You can receive funds immediately, connect
-dapps, or add other accounts.
+After setup, choose **Open wallet** to open the [Home and portfolio
+view](/wallet/home-and-portfolio) in the supported side panel or a wallet window.
+Complete any backup reminder before receiving funds. You can then connect dapps
+or add other accounts.
