@@ -1,14 +1,38 @@
-import { CheckIcon, LockIcon } from "@chakra-ui/icons";
-import { Box, Flex, HStack, Image, Text, VStack } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { CheckIcon } from "@chakra-ui/icons";
+import { Box, Flex, HStack, Icon, Image, Text, VStack, type BoxProps } from "@chakra-ui/react";
+import type { ComponentType, ReactNode } from "react";
+import { motion, useReducedMotion, type MotionProps } from "framer-motion";
 import BrandWordmark from "@/components/BrandWordmark";
-import ThemeSwitcher from "@/components/shared/ThemeSwitcher";
+
+// Framer's dependency resolves React 19 types; this renderer uses React 18.
+const MotionBox = motion(Box) as unknown as ComponentType<
+  Omit<BoxProps, keyof MotionProps> & Omit<MotionProps, "children"> & { children?: ReactNode }
+>;
 
 const SETUP_STEPS = [
-  { title: "Choose account", description: "Pick how you want to start" },
-  { title: "Add details", description: "Connect or import securely" },
-  { title: "Secure wallet", description: "Create your unlock password" },
+  { title: "Choose account" },
+  { title: "Add details" },
+  { title: "Secure wallet" },
 ];
+
+export function OnboardingHint({ children, icon, color = "status.warning.emphasis" }: {
+  children: ReactNode;
+  icon?: ReactNode;
+  color?: string;
+}) {
+  return (
+    <HStack align="start" spacing={3} py={1}>
+      <Box flexShrink={0} color={color} pt="2px" aria-hidden="true">
+        {icon ?? (
+          <Icon boxSize="18px" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 18h6M10 22h4M15.09 14a6 6 0 1 0-6.18 0C10 15 10 16 10 16h4s0-1 1.09-2" />
+          </Icon>
+        )}
+      </Box>
+      {children}
+    </HStack>
+  );
+}
 
 function ProgressRail({
   currentStep,
@@ -76,9 +100,6 @@ function ProgressRail({
               <Text fontSize="sm" fontWeight={isActive ? "700" : "600"}>
                 {step.title}
               </Text>
-              <Text fontSize="xs" color="fg.muted" lineHeight="1.4">
-                {step.description}
-              </Text>
             </VStack>
           </HStack>
         );
@@ -91,12 +112,15 @@ export function OnboardingFrame({
   children,
   currentStep,
   onStepClick,
+  morph = false,
 }: {
   children: ReactNode;
   currentStep?: number;
   onStepClick?: (step: number) => void;
+  morph?: boolean;
 }) {
   const showProgress = currentStep !== undefined;
+  const reducedMotion = useReducedMotion();
 
   return (
     <Flex
@@ -109,53 +133,59 @@ export function OnboardingFrame({
       p={{ base: 0, lg: 6 }}
     >
       <Flex
+        position="relative"
         w="full"
         maxW={showProgress ? "1120px" : "440px"}
         h={{ base: "100vh", lg: "calc(100vh - 48px)" }}
         minH={0}
-        overflow="hidden"
         bg="surface.base"
-        border={{ base: "none", sm: "1px solid" }}
-        borderColor="border.subtle"
         borderRadius={{ base: 0, lg: "xl" }}
       >
-        {showProgress && (
-          <Flex
-            as="aside"
-            display={{ base: "none", lg: "flex" }}
-            w="280px"
-            flexShrink={0}
-            direction="column"
-            justify="space-between"
-            p={7}
-            bg="surface.raised"
-            borderRight="1px solid"
-            borderColor="border.subtle"
-          >
-            <Box>
-              <HStack spacing={3}>
-                <Image src="/walletchan-icon.png" alt="" boxSize="38px" />
-                <VStack align="stretch" spacing={0}>
-                  <BrandWordmark />
-                  <Text color="fg.muted" fontSize="xs">
-                    Wallet setup
-                  </Text>
-                </VStack>
-              </HStack>
-              <ProgressRail currentStep={currentStep} onStepClick={onStepClick} />
-            </Box>
+        <MotionBox
+          aria-hidden="true"
+          position="absolute"
+          inset={0}
+          pointerEvents="none"
+          zIndex={1}
+          layoutId={morph ? "onboarding-card-border" : undefined}
+          transition={{ layout: { duration: reducedMotion ? 0 : 0.42, ease: [0.22, 1, 0.36, 1] } }}
+          border={{ base: "none", sm: "1px solid" }}
+          borderColor="border.subtle"
+          borderRadius={{ base: 0, lg: "xl" }}
+        />
+        <Flex flex="1" minW={0} minH={0} overflow="hidden" borderRadius="inherit" p={{ base: 0, sm: "1px" }}>
+          {showProgress && (
+            <Flex
+              as="aside"
+              display={{ base: "none", lg: "flex" }}
+              w="280px"
+              flexShrink={0}
+              direction="column"
+              justify="space-between"
+              p={7}
+              bg="surface.raised"
+              borderRight="1px solid"
+              borderColor="border.subtle"
+            >
+              <Box>
+                <HStack spacing={3}>
+                  <Image src="/walletchan-icon.png" alt="" boxSize="38px" />
+                  <VStack align="stretch" spacing={0}>
+                    <BrandWordmark />
+                    <Text color="fg.muted" fontSize="xs">
+                      Wallet setup
+                    </Text>
+                  </VStack>
+                </HStack>
+                <ProgressRail currentStep={currentStep} onStepClick={onStepClick} />
+              </Box>
 
-            <HStack spacing={2.5} align="center" color="fg.muted">
-              <LockIcon boxSize={3} color="accent.highlight" flexShrink={0} />
-              <Text fontSize="xs" lineHeight="1.5">
-                Credentials are encrypted before they are stored on this device.
-              </Text>
-            </HStack>
+            </Flex>
+          )}
+
+          <Flex flex="1" minW={0} minH={0} direction="column">
+            {children}
           </Flex>
-        )}
-
-        <Flex flex="1" minW={0} minH={0} direction="column">
-          {children}
         </Flex>
       </Flex>
     </Flex>
@@ -201,15 +231,17 @@ export function OnboardingCanvas({
   footer,
   currentStep,
   onStepClick,
+  morph,
 }: {
   children: ReactNode;
   header?: ReactNode;
   footer?: ReactNode;
   currentStep?: number;
   onStepClick?: (step: number) => void;
+  morph?: boolean;
 }) {
   return (
-    <OnboardingFrame currentStep={currentStep} onStepClick={onStepClick}>
+    <OnboardingFrame currentStep={currentStep} onStepClick={onStepClick} morph={morph}>
       {header}
       <Box flex="1" minH={0} overflowY="auto" px={{ base: 5, sm: 7 }} py={6}>
         <Box w="full" maxW="600px" mx="auto">
@@ -267,9 +299,6 @@ export function OnboardingHeader({
           )}
         </Box>
 
-        <Flex w="44px" h="44px" align="center" justify="center">
-          <ThemeSwitcher size="sm" ariaLabel="Choose appearance" />
-        </Flex>
       </Flex>
     </Box>
   );

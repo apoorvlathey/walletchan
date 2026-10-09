@@ -10,6 +10,8 @@ import {
   isArcBrowser,
 } from "./onboardingEnvironment";
 import { submitOnboardingAccount } from "./onboardingSubmission";
+import type { SafeOnboardingSelection } from "./safeOnboarding";
+import { ACCOUNT_SETUP_STEPS } from "./onboardingTypes";
 import type {
   AccountTypeChoice,
   OnboardingErrors,
@@ -17,7 +19,9 @@ import type {
 } from "./onboardingTypes";
 
 export function useOnboardingController() {
-  const [step, setStep] = useState<OnboardingStep>("accountType");
+  const [step, setStep] = useState<OnboardingStep>("welcome");
+  const [createNewWallet, setCreateNewWallet] = useState(false);
+  const submittingRef = useRef(false);
   const [isCheckingSetup, setIsCheckingSetup] = useState(true);
   const [accountTypeChoice, setAccountTypeChoice] =
     useState<AccountTypeChoice>("seedPhrase");
@@ -32,6 +36,7 @@ export function useOnboardingController() {
   const [viewOnlyDisplayName, setViewOnlyDisplayName] = useState("");
   const [ledgerSelection, setLedgerSelection] =
     useState<LedgerAccountSelection | null>(null);
+  const [safeSelection, setSafeSelection] = useState<SafeOnboardingSelection | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -215,13 +220,6 @@ export function useOnboardingController() {
 
   async function handleContinue() {
     switch (step) {
-      case "accountType":
-        if (accountTypeChoice === "bankr") setStep("bankrSetup");
-        else if (accountTypeChoice === "privateKey") setStep("privateKey");
-        else if (accountTypeChoice === "seedPhrase") setStep("seedPhrase");
-        else if (accountTypeChoice === "viewOnly") setStep("viewOnly");
-        else if (accountTypeChoice === "ledger") setStep("ledger");
-        break;
       case "bankrSetup":
         if (await validateBankrSetup()) setStep("password");
         break;
@@ -241,74 +239,48 @@ export function useOnboardingController() {
     }
   }
 
+  const handleCreateNew = () => {
+    setCreateNewWallet(true);
+    setAccountTypeChoice("seedPhrase");
+    setErrors({});
+    setStep("password");
+  };
+  const handleChooseExisting = (choice: AccountTypeChoice) => {
+    setCreateNewWallet(false);
+    setAccountTypeChoice(choice);
+    setErrors({});
+    setStep(ACCOUNT_SETUP_STEPS[choice]);
+  };
+  const clearCollectedSecrets = () => {
+    setPrivateKey(""); setDerivedAddress(null); setCollectedMnemonic("");
+    setCollectedSeedIndices([0]); setSeedGroupName(""); setSeedAccountDisplayName("");
+    setApiKey(""); setLedgerSelection(null); setSafeSelection(null); setPassword(""); setConfirmPassword("");
+  };
   const handleBack = () => {
-    switch (step) {
-      case "bankrSetup":
-        setStep("accountType");
-        break;
-      case "privateKey":
-        // Do not retain imported/generated secret material after the user
-        // deliberately leaves this setup path.
-        setPrivateKey("");
-        setDerivedAddress(null);
-        setStep("accountType");
-        break;
-      case "seedPhrase":
-        setCollectedMnemonic("");
-        setCollectedSeedIndices([0]);
-        setSeedGroupName("");
-        setSeedAccountDisplayName("");
-        setStep("accountType");
-        break;
-      case "viewOnly":
-        setStep("accountType");
-        break;
-      case "ledger":
-        setLedgerSelection(null);
-        setStep("accountType");
-        break;
-      case "password":
-        if (accountTypeChoice === "seedPhrase") setStep("seedPhrase");
-        else if (accountTypeChoice === "privateKey") setStep("privateKey");
-        else if (accountTypeChoice === "viewOnly") setStep("viewOnly");
-        else if (accountTypeChoice === "ledger") setStep("ledger");
-        else setStep("bankrSetup");
-        break;
+    if (submittingRef.current) return;
+    setErrors({}); setPassword(""); setConfirmPassword("");
+    if (step === "password" && !createNewWallet) {
+      setStep(ACCOUNT_SETUP_STEPS[accountTypeChoice]);
+    } else {
+      clearCollectedSecrets();
+      setStep(step === "accountType" || createNewWallet ? "welcome" : "accountType");
     }
   };
-
   const handleProgressStepClick = (targetStep: number) => {
-    if (targetStep === 0 && step !== "accountType") {
-      if (accountTypeChoice === "privateKey") {
-        setPrivateKey("");
-        setDerivedAddress(null);
-      } else if (accountTypeChoice === "seedPhrase") {
-        setCollectedMnemonic("");
-        setCollectedSeedIndices([0]);
-        setSeedGroupName("");
-        setSeedAccountDisplayName("");
-      } else if (accountTypeChoice === "ledger") {
-        setLedgerSelection(null);
-      }
-      setErrors({});
-      setStep("accountType");
-      return;
-    }
-
-    if (targetStep === 1 && step === "password") {
-      setErrors({});
-      if (accountTypeChoice === "seedPhrase") setStep("seedPhrase");
-      else if (accountTypeChoice === "privateKey") setStep("privateKey");
-      else if (accountTypeChoice === "viewOnly") setStep("viewOnly");
-      else if (accountTypeChoice === "ledger") setStep("ledger");
-      else setStep("bankrSetup");
-    }
+    if (submittingRef.current) return;
+    if (targetStep === 0) {
+      clearCollectedSecrets(); setErrors({});
+      setStep(createNewWallet ? "welcome" : "accountType");
+    } else if (targetStep === 1 && step === "password") handleBack();
   };
 
   async function handleSubmit() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
       await submitOnboardingAccount({
+        createNewWallet,
         initializationOwnerId: onboardingOwnerIdRef.current,
         accountType: accountTypeChoice,
         password,
@@ -324,6 +296,7 @@ export function useOnboardingController() {
         seedGroupName,
         seedAccountDisplayName,
         ledgerSelection,
+        safeSelection,
         resolveAddress,
       });
       setApiKey("");
@@ -343,12 +316,13 @@ export function useOnboardingController() {
             : "Failed to save configuration",
       });
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   }
 
   return {
-    step, setStep, isCheckingSetup, accountTypeChoice, setAccountTypeChoice,
+    step, setStep, createNewWallet, handleCreateNew, handleChooseExisting, isCheckingSetup, accountTypeChoice, setAccountTypeChoice,
     apiKey, setApiKey, showApiKey, setShowApiKey, privateKey, setPrivateKey,
     derivedAddress, pkDisplayName, setPkDisplayName, walletAddress,
     setWalletAddress, bankrDisplayName, setBankrDisplayName, password,
@@ -357,7 +331,7 @@ export function useOnboardingController() {
     setPassword, confirmPassword, setConfirmPassword, showPassword,
     setShowPassword, isSubmitting, isResolvingAddress, setCollectedMnemonic,
     setCollectedSeedIndices, setSeedGroupName, setSeedAccountDisplayName,
-    ledgerSelection, setLedgerSelection,
+    ledgerSelection, setLedgerSelection, safeSelection, setSafeSelection,
     errors, setErrors, handleContinue, handleBack, handleProgressStepClick,
     setupRecoveryError,
   };

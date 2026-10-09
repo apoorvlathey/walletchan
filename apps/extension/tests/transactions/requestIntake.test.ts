@@ -120,10 +120,12 @@ test("request intake persists exact transaction and signature account context", 
     name: "intake-result-transport",
     enforce: "pre",
     resolveId(source, importer) {
+      if (source === "./onchainState" && importer?.endsWith("/safe/proposalLifecycle.ts")) return "\0intake-safe-nonce";
       if (source === "../walletConnect/resultBridge" && importer?.endsWith("/transactions/runtime.ts")) return "\0intake-result-transport";
       return null;
     },
     load(id) {
+      if (id === "\0intake-safe-nonce") return "export const readSafeDraftNonce = async () => 4n; export const verifySafeOnchainState = async () => { throw new Error('Draft intake must not sign or execute'); };";
       if (id === "\0intake-result-transport") return "export const completeWalletConnectRequestIfNeeded = async () => {};";
       return null;
     },
@@ -249,6 +251,35 @@ test("request intake persists exact transaction and signature account context", 
         assert.ok((local.pendingSignatureRequests as Array<any>).some((pending) => pending.walletConnect?.requestId === requestId && pending.accountType === type));
       }
     }
+    local.accounts = [{ id: "safe-1", type: "safe", address, createdAt: 1 }];
+    sync.activeAccountId = "safe-1";
+    local.pendingSignatureRequests = [];
+    const beforeSafePopup = popupCreates.length;
+    handleSignatureRequest({ type: "signatureRequest", signature: { method: "personal_sign", params: ["0x1234", address], chainId: 1 }, origin: "https://dapp.test" }, "safe-review", 1, "https://dapp.test");
+    await waitFor(() => (local.pendingSignatureRequests as any[]).some((pending) => pending.id === "safe-review"));
+    await waitFor(() => popupCreates.length > beforeSafePopup);
+    const safeReview = (local.pendingSignatureRequests as any[]).find((pending) => pending.id === "safe-review");
+    assert.equal(safeReview.accountType, "safe");
+    assert.equal(safeReview.accountId, "safe-1");
+    assert.equal(local["sigResult:safe-review"], undefined);
+    assert.equal(session["sigResult:safe-review"], undefined);
+    const policy = await server.ssrLoadModule("/src/chrome/signatures/confirmationPolicy.ts");
+    const confirmation = await policy.prepareSignatureConfirmation("safe-review");
+    assert.equal(confirmation.ok, false, "review-only Safe request must never reach a direct signer");
+    local.safeAccounts = { version: 1, records: [{ version: 1, accountId: "safe-1", address, importedBy: "manual", chains: { "1": {
+      chainId: 1, verifiedAtBlock: "12", configEpoch: `0x${"12".repeat(32)}`,
+      singleton: "0x3333333333333333333333333333333333333333", version: "1.4.1",
+      owners: ["0x4444444444444444444444444444444444444444"], contractOwners: [], threshold: 1, nonce: "4", modules: [],
+      guard: "0x0000000000000000000000000000000000000000", fallbackHandler: "0x0000000000000000000000000000000000000000",
+      transactionService: "supported", capability: "observe",
+    } } }] };
+    const beforeSafeTransactionPopup = popupCreates.length;
+    handleTransactionRequest({ type: "transactionRequest", tx: { chainId: 1, from: address, to: "0x2222222222222222222222222222222222222222", value: "0", data: "0x" }, origin: "https://dapp.test" }, "safe-tx-review", 1, "https://dapp.test");
+    await waitFor(() => runtimeMessages.some((message: any) => message.type === "newSafeProposalRequest"));
+    await waitFor(() => popupCreates.length > beforeSafeTransactionPopup);
+    assert.equal(local["txResult:safe-tx-review"], undefined);
+    assert.equal(session["txResult:safe-tx-review"], undefined);
+
   } finally {
     await server.close();
     if (originalChrome) {

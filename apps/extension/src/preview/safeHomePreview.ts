@@ -10,7 +10,8 @@ export function resolveSafeHomePreviewAccount(
   route: PreviewRoute,
   scenario: string,
 ): Account | null {
-  if (route !== "home" || scenario !== "safe-account") return null;
+  if (route !== "home" || !["safe-account", "safe-no-owner"].includes(scenario)) return null;
+  if (scenario === "safe-no-owner") accounts.splice(0);
   const account: Account = {
     id: "preview-safe",
     type: "safe",

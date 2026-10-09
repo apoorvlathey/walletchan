@@ -1,3 +1,4 @@
+import { previewSeedGroups, previewCreateSeedAccount, previewConfirmSeedBackup } from "./previewSeedBackup";
 import { DEFAULT_NETWORKS } from "@/constants/networks";
 import type { CompletedTransaction } from "@/chrome/txHistoryStorage";
 import type { Account } from "@/chrome/types";
@@ -392,8 +393,20 @@ export function responseForPreviewMessage(
       return { success: true, hasUnresolved: false };
     case "acknowledgeSponsoredTransfer":
       return { success: true };
+    case "probeSafeAddress": {
+      if (!/(?:^|:)(0x[0-9a-fA-F]{40})$/.test(message.address)) return { success: false, error: "Invalid Safe address" };
+      if (message.address.slice(-42).toLowerCase() !== previewSafeAccountRecords[0].address) return { address: message.address.slice(-42), snapshots: [], verificationIds: [] };
+      return { address: message.address.slice(-42), snapshots: Object.values(previewSafeAccountRecords[0].chains).map((snapshot) => ({ ...snapshot, capability: "observe" })), verificationIds: ["preview-safe-verification"] };
+    }
+    case "importSafeAccount": {
+      const account: Account = { id: "preview-imported-safe", type: "safe", address: message.address, displayName: "Safe", createdAt: PREVIEW_EPOCH_MS };
+      environment.accounts = [account];
+      return { success: true, account };
+    }
+    case "createOnboardingSeedAccount": return previewCreateSeedAccount(environment);
+    case "confirmSeedBackup": return previewConfirmSeedBackup(environment, message);
     case "getSeedGroups":
-      return environment.seedGroups;
+      return previewSeedGroups(environment);
     case "generateMnemonic":
       return {
         success: true,

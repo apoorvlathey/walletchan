@@ -57,7 +57,6 @@ import LoadingFallback from "@/app/LoadingFallback";
 import AppFeatureFrame from "@/app/AppFeatureFrame";
 import { isArcBrowser } from "@/app/isArcBrowser";
 import { findPendingShieldConfirmation } from "@/components/Shield/model/pendingShield";
-
 // Eager load components needed immediately
 import UnlockScreen from "@/components/UnlockScreen";
 import { ScreenStack, type AppView } from "@/components/ScreenTransition";
@@ -90,7 +89,6 @@ import type {
   WalletConnectRetryNotice,
   WalletConnectSessionSummary,
 } from "@/types/walletConnect";
-
 import { WALLETCHAN_OS_URL } from "@/constants/externalUrls";
 import {
   getDefaultChainName,
@@ -134,6 +132,7 @@ import {
 } from "@/app/unlockRouting";
 import { SafeApprovalsSurface, SafeFeatureUnavailable, SafeHomeActivity, SafeHomeApprovalRail, SafeHomeQuickActions } from "@/app/SafeAppSurfaces";
 import { toLegacyAccountType } from "@/app/safeAccountType";
+import { HomeBackupReminder } from "@/app/home/HomeBackupReminder";
 import { PrivatePortfolioHome, useWalletHomeMode, WalletModeToggle } from "@/app/home";
 import type { UnshieldOperation } from "@/components/Shield/model/unshield";
 import PrivacyActionRoute from "@/app/screens/PrivacyActionRoute";
@@ -231,7 +230,7 @@ function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [activeAccount, setActiveAccount] = useState<Account | null>(null);
   const [settingsAccount, setSettingsAccount] = useState<Account | null>(null);
-  const [accountSettingsReturnTarget, setAccountSettingsReturnTarget] = useState<"home" | "settingsAccounts">("home");
+  const [accountSettingsReturnTarget, setAccountSettingsReturnTarget] = useState<"home" | "settingsAccounts" | "backup">("home");
   const [isAccountPickerOpen, setIsAccountPickerOpen] = useState(false);
   const [accountSettingsInitialView, setAccountSettingsInitialView] =
     useState<AccountSettingsSubView>("settings");
@@ -2359,7 +2358,7 @@ function App() {
                 setAccountSettingsInitialView("settings");
                 setAccountSettingsApiKeyDraft(null);
                 if (accountSettingsReturnTarget === "settingsAccounts") { setSettingsInitialTab("accounts"); setView("settings"); }
-                else { setIsAccountPickerOpen(true); setView("main"); }
+                else { setIsAccountPickerOpen(accountSettingsReturnTarget !== "backup"); setView("main"); }
               }}
               onAccountUpdated={loadAccounts}
               accounts={accounts}
@@ -3478,11 +3477,12 @@ function App() {
               onAccountPickerOpenChange={setIsAccountPickerOpen}
               onAccountsReordered={setAccounts}
             />}
+            <HomeBackupReminder accounts={accounts} onBackup={(account) => { setSettingsAccount(account); setAccountSettingsReturnTarget("backup"); setAccountSettingsInitialView("revealSeedPhrase"); setAccountSettingsApiKeyDraft(null); setView("accountSettings"); }} />
 
             {walletHomeMode === "public" && activeAccount?.type === "safe" && (
               <SafeHomeApprovalRail
-                accountId={activeAccount.id}
-                onOpen={() => openSafeApprovals(null)}
+                accountId={activeAccount.id} accounts={accounts}
+                onAddOwner={() => setView("addAccount")} onOpen={() => openSafeApprovals(null)}
               />
             )}
 

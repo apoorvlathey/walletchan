@@ -18,6 +18,7 @@ export async function getSeedGroups(): Promise<SeedGroup[]> {
 export async function addSeedGroup(
   name?: string,
   expectedAuthEpoch?: string,
+  backupPending = false,
 ): Promise<SeedGroup> {
   return withStorageLock(SEED_GROUPS_LOCK_KEY, async () => {
     const groups = await getSeedGroups();
@@ -27,6 +28,7 @@ export async function addSeedGroup(
       name: name || `Seed #${groups.length + 1}`,
       createdAt: Date.now(),
       accountCount: 0,
+      ...(backupPending ? { backupPending: true as const } : {}),
     };
     groups.push(group);
     assertAccountStorageAuthorized(expectedAuthEpoch);
@@ -75,5 +77,22 @@ export async function removeSeedGroup(
     const filtered = groups.filter((group) => group.id !== seedGroupId);
     assertAccountStorageAuthorized(expectedAuthEpoch);
     await chrome.storage.local.set({ [SEED_GROUPS_KEY]: filtered });
+  });
+}
+
+/** Clear only this group's reminder; callers must hold the wallet operation lock. */
+export async function confirmSeedGroupBackup(
+  seedGroupId: string,
+  expectedAuthEpoch: string,
+): Promise<void> {
+  await withStorageLock(SEED_GROUPS_LOCK_KEY, async () => {
+    const groups = await getSeedGroups();
+    assertAccountStorageAuthorized(expectedAuthEpoch);
+    const group = groups.find((candidate) => candidate.id === seedGroupId);
+    if (!group) throw new Error("Seed group not found");
+    if (group.backupPending !== true) return;
+    delete group.backupPending;
+    assertAccountStorageAuthorized(expectedAuthEpoch);
+    await chrome.storage.local.set({ [SEED_GROUPS_KEY]: groups });
   });
 }

@@ -36,6 +36,8 @@ export const WALLET_UI_MESSAGE_TYPES = [
   "completeOnboardingInitialization",
   "rollbackOnboardingInitialization",
   "onboardingComplete",
+  "createOnboardingSeedAccount",
+  "confirmSeedBackup",
 
   // Privacy Pools identity
   ...PRIVACY_WALLET_UI_MESSAGE_TYPES,

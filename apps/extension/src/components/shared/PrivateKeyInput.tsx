@@ -25,10 +25,9 @@ import { generatePrivateKey } from "@/utils/privateKeyUtils";
 import MiddleTruncatedAddress from "@/components/MiddleTruncatedAddress";
 import { CopyButton } from "@/components/CopyButton";
 import { BackupConfirmationCheckbox } from "./BackupConfirmationCheckbox";
-
 type PkMode = "import" | "generate";
-
 interface PrivateKeyInputProps {
+  allowGenerate?: boolean;
   privateKey: string;
   onPrivateKeyChange: (key: string) => void;
   derivedAddress: string | null;
@@ -48,6 +47,7 @@ interface PrivateKeyInputProps {
 }
 
 export default function PrivateKeyInput({
+  allowGenerate = true,
   privateKey,
   onPrivateKeyChange,
   derivedAddress,
@@ -136,7 +136,7 @@ export default function PrivateKeyInput({
 
   return (
     <>
-      <HStack
+      {allowGenerate && <HStack
         spacing={1}
         mb={4}
         p={1}
@@ -182,7 +182,7 @@ export default function PrivateKeyInput({
         >
           Generate new
         </Button>
-      </HStack>
+      </HStack>}
 
       {pkMode === "import" ? (
         <VStack spacing={3} align="stretch">

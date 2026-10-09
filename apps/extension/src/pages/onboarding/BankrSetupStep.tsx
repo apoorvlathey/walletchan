@@ -76,9 +76,6 @@ export function BankrSetupStep({
           <Text as="h1" fontSize="2xl" fontWeight="700" letterSpacing="-0.02em">
             Connect your Bankr account
           </Text>
-          <Text color="fg.secondary" fontSize="sm" lineHeight="1.5">
-            WalletChan uses your Bankr API key to request account actions. Your key is encrypted before it is stored.
-          </Text>
         </VStack>
 
         <VStack align="stretch" spacing={5}>
@@ -112,11 +109,6 @@ export function BankrSetupStep({
               </InputRightElement>
             </InputGroup>
             <FormErrorMessage color="chart.negative">{errors.apiKey}</FormErrorMessage>
-            {!errors.apiKey && (
-              <Text fontSize="xs" color="fg.muted" mt={1.5}>
-                Stored locally with password-based encryption.
-              </Text>
-            )}
           </FormControl>
 
           <FormControl isInvalid={!!errors.walletAddress}>
@@ -125,7 +117,7 @@ export function BankrSetupStep({
             </FormLabel>
             <Input
               value={walletAddress}
-              placeholder="0x… or a supported name"
+              placeholder="0x… or vitalik.eth"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
@@ -133,11 +125,6 @@ export function BankrSetupStep({
               onKeyDown={submitOnEnter}
             />
             <FormErrorMessage color="chart.negative">{errors.walletAddress}</FormErrorMessage>
-            {!errors.walletAddress && (
-              <Text fontSize="xs" color="fg.muted" mt={1.5}>
-                ENS, Basenames, WNS, and GNS names are supported.
-              </Text>
-            )}
           </FormControl>
 
           <FormControl>
@@ -154,7 +141,6 @@ export function BankrSetupStep({
         </VStack>
 
         <Box borderTop="1px solid" borderColor="border.subtle" pt={4}>
-          <Text fontSize="sm" fontWeight="600" mb={2}>Need your Bankr details?</Text>
           <VStack align="stretch" spacing={2}>
             <Link href={BANKR_BOT_API_PAGE} isExternal color="accent.secondary" fontSize="sm">
               Create or copy an API key <ExternalLinkIcon mx="2px" />

@@ -1,11 +1,12 @@
-import { useEffect } from "react";
-import { Box, HStack, Image, Spinner, Text, VStack } from "@chakra-ui/react";
+import { useEffect, useRef, useState } from "react";
+import { Box, Button, HStack, Image, Spinner, Text, VStack } from "@chakra-ui/react";
 import { WarningIcon } from "@chakra-ui/icons";
 import { keyframes } from "@emotion/react";
 import BrandWordmark from "@/components/BrandWordmark";
 import UnlockMascot from "@/components/UnlockMascot";
 import { playInteractionSound } from "@/sounds/soundManager";
 import { OnboardingCanvas, OnboardingHeader } from "./OnboardingShell";
+import { getOnboardingWalletTarget, openOnboardingWallet, type OnboardingWalletTarget } from "./openOnboardingWallet";
 
 const floatPinPrompt = keyframes`
   0%, 100% { transform: translate(0, 0); }
@@ -124,14 +125,38 @@ export function OnboardingRecoveryError({ message }: { message: string }) {
 }
 
 export function SuccessStep() {
+  const [target, setTarget] = useState<OnboardingWalletTarget | null>(null);
+  const [isOpening, setIsOpening] = useState(false);
+  const [openError, setOpenError] = useState("");
+  const openingRef = useRef(false);
   useEffect(() => {
     void playInteractionSound("unlockSuccess");
+    let disposed = false;
+    getOnboardingWalletTarget()
+      .catch(() => ({ sidePanelSupported: false }))
+      .then((nextTarget) => { if (!disposed) setTarget(nextTarget); });
+    return () => { disposed = true; };
   }, []);
+
+  const handleOpenWallet = async () => {
+    if (!target || openingRef.current) return;
+    openingRef.current = true;
+    setIsOpening(true);
+    setOpenError("");
+    try {
+      await openOnboardingWallet(target);
+    } catch (error) {
+      setOpenError(error instanceof Error ? error.message : "Could not open wallet. Try again.");
+    } finally {
+      openingRef.current = false;
+      setIsOpening(false);
+    }
+  };
 
   return (
     <>
       <PinExtensionPrompt />
-      <OnboardingCanvas currentStep={3} header={<OnboardingHeader />}>
+      <OnboardingCanvas header={<OnboardingHeader />}>
         <VStack minH={{ base: "420px", sm: "520px" }} justify="center" spacing={5} textAlign="center">
           <Box
             w="140px"
@@ -144,21 +169,10 @@ export function SuccessStep() {
           <Text as="h1" fontSize="2xl" fontWeight="700" letterSpacing="-0.02em">
             Your wallet is ready
           </Text>
-          <Box
-            w="full"
-            maxW="320px"
-            p={4}
-            bg="surface.raised"
-            border="1px solid"
-            borderColor="border.default"
-            borderRadius="lg"
-            textAlign="left"
-          >
-            <Text fontWeight="600" fontSize="sm">Next step</Text>
-            <Text color="fg.secondary" fontSize="sm" mt={1}>
-              Open your browser’s extension menu, pin WalletChan, and click its icon.
-            </Text>
-          </Box>
+          <Button variant="brand" size="lg" w="full" maxW="320px" isDisabled={!target} isLoading={isOpening} loadingText="Opening wallet…" onClick={handleOpenWallet}>
+            Open wallet
+          </Button>
+          {openError && <Text role="alert" color="status.error.emphasis" fontSize="sm">{openError}</Text>}
         </VStack>
       </OnboardingCanvas>
     </>

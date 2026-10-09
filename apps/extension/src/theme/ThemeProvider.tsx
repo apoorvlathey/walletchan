@@ -71,11 +71,27 @@ export function useTheme(): ThemeContextValue {
 
 interface ThemeProviderProps {
   children: ReactNode;
+  fixedThemeId?: ThemeId;
 }
 
-export function ThemeProvider({ children }: ThemeProviderProps) {
-  const { themeId, setThemeId } = useThemeSelection();
+export function ThemeProvider({ children, fixedThemeId }: ThemeProviderProps) {
+  return fixedThemeId
+    ? <ThemeContextProvider themeId={fixedThemeId} setThemeId={keepFixedTheme}>{children}</ThemeContextProvider>
+    : <SelectedThemeProvider>{children}</SelectedThemeProvider>;
+}
 
+const keepFixedTheme = async () => undefined;
+
+function SelectedThemeProvider({ children }: { children: ReactNode }) {
+  const { themeId, setThemeId } = useThemeSelection();
+  return <ThemeContextProvider themeId={themeId} setThemeId={setThemeId}>{children}</ThemeContextProvider>;
+}
+
+function ThemeContextProvider({ children, themeId, setThemeId }: {
+  children: ReactNode;
+  themeId: ThemeId;
+  setThemeId: (id: ThemeId) => Promise<void>;
+}) {
   const tokens = themes[themeId] ?? themes[DEFAULT_THEME_ID];
 
   // Rebuild the Chakra theme only when the active theme ID changes.

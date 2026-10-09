@@ -45,10 +45,6 @@ export function LedgerOnboardingStep({
               >
                 Connect your Ledger
               </Text>
-              <Text color="fg.secondary" fontSize="sm" lineHeight="1.5">
-                Unlock your device and open the Ethereum app, then choose the
-                first accounts to add.
-              </Text>
             </VStack>
             {content}
           </VStack>

@@ -9,4 +9,9 @@
   are required to clear a confirmed warning.
 
 Home components receive state and callbacks from `App.tsx`. They do not own
-request routing, account selection, tab resolution, or storage subscriptions.
+request routing, account selection, or tab resolution. The backup reminder uses
+its focused metadata adapter for storage subscriptions.
+
+- `HomeBackupReminder.tsx` reads non-secret seed-group backup metadata through
+  the SeedBackup adapter and opens the existing account-specific phrase screen.
+  It never reads a mnemonic or chooses signing authority.

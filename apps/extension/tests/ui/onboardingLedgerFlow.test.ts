@@ -5,13 +5,13 @@ import test from "node:test";
 const readSource = (path: string) =>
   readFile(new URL(`../../src/${path}`, import.meta.url), "utf8");
 
-test("onboarding offers Ledger after View-only only when WebHID is available", async () => {
+test("onboarding groups Ledger and Bankr under Connect before the import choices", async () => {
   const source = await readSource("pages/onboarding/AccountTypeStep.tsx");
-  const viewOnly = source.indexOf('title="View-only"');
-  const ledger = source.indexOf('title="Ledger"');
-  const bankr = source.indexOf('title="Bankr API"');
+  const viewOnly = source.indexOf('title: "View-only"');
+  const ledger = source.indexOf('title: "Ledger"');
+  const bankr = source.indexOf('title: "Bankr API"');
 
-  assert.ok(viewOnly >= 0 && ledger > viewOnly && bankr > ledger);
+  assert.ok(ledger >= 0 && bankr > ledger && viewOnly > bankr);
   assert.match(source, /"hid" in navigator/);
   assert.match(source, /"offscreen" in chrome/);
   assert.match(source, /LedgerLogo variant="lettermark"/);

@@ -1,9 +1,12 @@
 import type { LedgerAccountSelection } from "@/components/Ledger/AddLedgerFlow";
 import { validateAndDeriveAddress } from "@/utils/privateKeyUtils";
 import { ONBOARDING_OWNER_SESSION_KEY } from "./onboardingEnvironment";
+import { CHAIN_REGISTRY } from "@/constants/chainRegistry";
+import { refreshOnboardingSafe, type SafeOnboardingSelection } from "./safeOnboarding";
 import type { AccountTypeChoice } from "./onboardingTypes";
 
 interface OnboardingSubmissionInput {
+  createNewWallet?: boolean;
   initializationOwnerId: string;
   accountType: AccountTypeChoice;
   password: string;
@@ -19,6 +22,7 @@ interface OnboardingSubmissionInput {
   seedGroupName: string;
   seedAccountDisplayName: string;
   ledgerSelection: LedgerAccountSelection | null;
+  safeSelection?: SafeOnboardingSelection | null;
   resolveAddress(input: string): Promise<string | null>;
 }
 
@@ -36,6 +40,7 @@ export async function submitOnboardingAccount(
 ): Promise<void> {
   let initializationId: string | null = null;
   try {
+    let finalChainName = "Base";
     let finalAddress: string;
     let finalDisplayAddress: string;
     let resolvedBankrAddress: string | null = null;
@@ -47,7 +52,7 @@ export async function submitOnboardingAccount(
         throw new Error(result.error || "Invalid private key");
       }
     } else if (input.accountType === "seedPhrase") {
-      if (!input.mnemonic.trim()) throw new Error("Seed phrase is required");
+      if (!input.createNewWallet && !input.mnemonic.trim()) throw new Error("Seed phrase is required");
     } else if (input.accountType === "bankr") {
       resolvedBankrAddress = await input.resolveAddress(
         input.walletAddress.trim(),
@@ -58,6 +63,8 @@ export async function submitOnboardingAccount(
         input.viewOnlyAddress.trim(),
       );
       if (!resolvedViewOnlyAddress) throw new Error("Invalid address or name");
+    } else if (input.accountType === "safe") {
+      if (!input.safeSelection?.snapshots.length) throw new Error("Go back and verify your Safe first");
     } else if (!input.ledgerSelection) {
       throw new Error("Connect your Ledger and select at least one account");
     }
@@ -105,11 +112,13 @@ export async function submitOnboardingAccount(
         account?: { address?: string; displayName?: string };
       }>(
         {
-          type: "addSeedPhraseGroup",
+          type: input.createNewWallet ? "createOnboardingSeedAccount" : "addSeedPhraseGroup",
+          ...(input.createNewWallet ? { initializationId } : {
           mnemonic: input.mnemonic,
           indices: input.seedIndices,
           name: input.seedGroupName || undefined,
           accountDisplayName: input.seedAccountDisplayName || undefined,
+          }),
         },
         "Failed to create seed phrase account",
       );
@@ -162,6 +171,18 @@ export async function submitOnboardingAccount(
       );
       finalAddress = resolvedAddress;
       finalDisplayAddress = input.bankrDisplayName.trim() || input.walletAddress.trim();
+    } else if (input.accountType === "safe") {
+      await initializeCredential("pk-only-mode");
+      const verified = await refreshOnboardingSafe(input.safeSelection!);
+      const response = await requireSuccess<{ success: boolean; account?: { address?: string; displayName?: string }; error?: string }>(
+        { type: "importSafeAccount", address: verified.address, chainIds: verified.snapshots.map((snapshot) => snapshot.chainId), verificationIds: verified.verificationIds, importedBy: "manual" },
+        "Failed to import Safe",
+      );
+      if (!response.account?.address) throw new Error("Safe account was not committed safely");
+      finalAddress = response.account.address;
+      finalDisplayAddress = response.account.displayName || finalAddress;
+      const network = CHAIN_REGISTRY.find((chain) => verified.snapshots.some((snapshot) => snapshot.chainId === chain.chainId));
+      finalChainName = network?.name || "Base";
     } else {
       await initializeCredential("pk-only-mode");
       const response = await requireSuccess<{
@@ -182,7 +203,7 @@ export async function submitOnboardingAccount(
     await chrome.storage.sync.set({
       address: finalAddress,
       displayAddress: finalDisplayAddress,
-      chainName: "Base",
+      chainName: finalChainName,
     });
     await requireSuccess(
       { type: "completeOnboardingInitialization", initializationId },

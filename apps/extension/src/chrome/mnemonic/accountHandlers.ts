@@ -18,6 +18,7 @@ import {
   refreshSeedSigningCacheBestEffort,
   type SeedAccountCandidate,
 } from "./accountPersistence";
+import { isOnboardingInitializationOwner } from "../onboarding/state";
 import { normalizeMnemonicForPersistence } from "./derivation";
 import {
   WALLET_SECRET_OPERATION_LOCK_KEY,
@@ -62,13 +63,15 @@ function notifyAccountsUpdated(): void {
 /** Persist a renderer-staged phrase and its selected derived accounts. */
 export async function addSeedPhraseGroup(
   request: AddSeedPhraseGroupRequest,
+  onboardingOwnerId?: string,
 ): Promise<AddSeedPhraseGroupResult> {
   try {
     const access = await resolveMasterMnemonicAccess();
     if (!access.success) return access;
 
-    // Phrase generation/import and backup acknowledgement happen in the
-    // renderer. This persistence boundary never creates a hidden phrase.
+    // Imported and Settings-generated phrases are staged in the renderer.
+    // Fresh-wallet generation is owned by onboarding/seedAccount.ts and binds
+    // the pending-backup metadata to the same group commit.
     const mnemonic = normalizeMnemonicForPersistence(request.mnemonic);
     if (!mnemonic) {
       return {
@@ -89,6 +92,13 @@ export async function addSeedPhraseGroup(
       WALLET_SECRET_OPERATION_LOCK_KEY,
       async () => {
         assertCurrentMasterAuthorization(access.authEpoch);
+        if (onboardingOwnerId !== undefined &&
+            !(await isOnboardingInitializationOwner(onboardingOwnerId))) {
+          return { success: false as const, error: "Wallet setup session is no longer valid" };
+        }
+        if (onboardingOwnerId !== undefined && (await getAccounts()).length > 0) {
+          return { success: false as const, error: "Wallet is already configured" };
+        }
         const candidates = await findImportableSeedCandidates(
           mnemonic,
           indices,
@@ -100,7 +110,7 @@ export async function addSeedPhraseGroup(
           };
         }
 
-        const group = await addSeedGroup(request.name, access.authEpoch);
+        const group = await addSeedGroup(request.name, access.authEpoch, onboardingOwnerId !== undefined);
         let mnemonicStored = false;
         try {
           await storeMnemonic(

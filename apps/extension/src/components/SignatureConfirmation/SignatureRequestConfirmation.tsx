@@ -40,7 +40,7 @@ interface SignatureRequestConfirmationProps {
   currentIndex: number;
   totalCount: number;
   isInSidePanel: boolean;
-  accountType?: "bankr" | "privateKey" | "seedPhrase" | "ledger" | "impersonator";
+  accountType?: "bankr" | "privateKey" | "seedPhrase" | "ledger" | "impersonator" | "safe";
   onBack: () => void;
   onCancelled: () => void;
   onRejectAll: () => void;
@@ -305,7 +305,7 @@ function SignatureRequestConfirmation({
     >
       Sign
     </Button>
-  ) : (
+  ) : accountType === "safe" ? <Button variant="brand" isDisabled>Sign</Button> : (
     <Button
       variant="danger"
       onClick={handleCancel}
@@ -341,7 +341,7 @@ function SignatureRequestConfirmation({
       intentDescription={intent.description}
       intentStatus={
         !canSign
-          ? { label: "View only", variant: "warning" }
+          ? { label: accountType === "safe" ? "Signing unavailable" : "View only", variant: "warning" }
           : siweBlockingError
             ? { label: "Validation failed", variant: "error" }
             : undefined
@@ -388,11 +388,11 @@ function SignatureRequestConfirmation({
       }
       actionNotice={<VStack align="stretch" spacing={2}>
         <SafeRiskDecision decision={safeDecision} isDisabled={isSubmitting || isRejecting} />
-        {accountType === "impersonator" ? <ViewOnlySigningNotice /> : accountType === "ledger" ? <LedgerSigningStatus active={isLedgerWaiting} /> : null}
+        {accountType === "safe" ? <ViewOnlySigningNotice message="Safe message signing is not supported yet. Use an owner account to sign as that owner." /> : accountType === "impersonator" ? <ViewOnlySigningNotice /> : accountType === "ledger" ? <LedgerSigningStatus active={isLedgerWaiting} /> : null}
       </VStack>}
       isInteractionLocked={isLedgerWaiting}
       confirmAction={confirmButton}
-      rejectAction={canSign ? rejectButton : undefined}
+      rejectAction={canSign || accountType === "safe" ? rejectButton : undefined}
     />
   );
 }

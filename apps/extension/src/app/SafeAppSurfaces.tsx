@@ -1,7 +1,8 @@
-import { Box, Button, Text } from "@chakra-ui/react";
+import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import type { Account, SafeAccount } from "@/chrome/types";
 import SafeApprovalsScreen from "@/components/SafeApprovals/SafeApprovalsScreen";
 import { SafeProposalActivity } from "@/components/SafeApprovals/SafeProposalActivity";
+import { SafeOwnerReminder } from "@/components/SafeAccount/SafeOwnerReminder";
 import { SafeHomeAlert } from "@/components/SafeAccount/SafeHomeAlert";
 import { SafeQuickActions } from "@/components/SafeAccount/SafeQuickActions";
 
@@ -17,8 +18,8 @@ export function SafeApprovalsSurface({ account, chainId, accounts, proposalId, f
   return <Box bg="bg.base" h="100%" display="flex" flexDirection="column"><Box maxW={fullscreen ? "480px" : "100%"} mx="auto" w="100%" h="100%"><SafeApprovalsScreen safeAccount={account} chainId={chainId} accounts={accounts} initialProposalId={proposalId} onBack={onBack} onProposalBack={onProposalBack} onExecutionSubmitted={onExecutionSubmitted} onExecutionConfirmed={onExecutionConfirmed} /></Box></Box>;
 }
 
-export function SafeHomeApprovalRail({ accountId, onOpen }: { accountId: string; onOpen: () => void }) {
-  return <SafeHomeAlert safeAccountId={accountId} onOpen={onOpen} />;
+export function SafeHomeApprovalRail({ accountId, accounts, onOpen, onAddOwner }: { accountId: string; accounts: Account[]; onOpen: () => void; onAddOwner: () => void }) {
+  return <VStack align="stretch" spacing={2}><SafeOwnerReminder accountId={accountId} accounts={accounts} onAddOwner={onAddOwner} /><SafeHomeAlert safeAccountId={accountId} onOpen={onOpen} /></VStack>;
 }
 
 export function SafeHomeQuickActions({ hasConnectedApps, onSend, onSwap, onMore }: { hasConnectedApps?: boolean; onSend: () => void; onSwap: () => void; onMore: () => void }) {

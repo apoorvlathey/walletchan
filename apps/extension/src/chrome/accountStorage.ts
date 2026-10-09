@@ -47,6 +47,7 @@ export {
 } from "./accounts/seedStorage";
 export {
   addSeedGroup,
+  confirmSeedGroupBackup,
   getSeedGroups,
   removeSeedGroup,
   renameSeedGroup,

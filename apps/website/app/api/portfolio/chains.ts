@@ -1,3 +1,5 @@
+import { mainnet, base, polygon, unichain, arbitrum, optimism, bsc, avalanche, megaeth, monad } from "viem/chains";
+
 /**
  * Single source of truth for portfolio fallback-provider chain support and
  * per-provider addressing. Zerion is the primary provider and is intentionally
@@ -19,6 +21,7 @@
 
 export interface ChainSupport {
   chainId: number;
+  nativeCurrency: { name: string; symbol: string; decimals: number };
   /** Human-friendly name for logs / debugging. */
   name: string;
   /** Alchemy `network` slug. null = not supported by Alchemy at any tier. */
@@ -30,16 +33,16 @@ export interface ChainSupport {
 }
 
 export const PORTFOLIO_CHAINS: readonly ChainSupport[] = [
-  { chainId: 1,     name: "Ethereum",  alchemyNetwork: "eth-mainnet",      octavName: "ethereum" },
-  { chainId: 8453,  name: "Base",      alchemyNetwork: "base-mainnet",     octavName: "base" },
-  { chainId: 137,   name: "Polygon",   alchemyNetwork: "matic-mainnet",    octavName: "polygon" },
-  { chainId: 130,   name: "Unichain",  alchemyNetwork: "unichain-mainnet", alchemyRequiresPaidPlan: true, octavName: "unichain" },
-  { chainId: 42161, name: "Arbitrum",  alchemyNetwork: "arb-mainnet",      octavName: "arbitrum" },
-  { chainId: 10,    name: "Optimism",  alchemyNetwork: "opt-mainnet",      octavName: "optimism" },
-  { chainId: 56,    name: "BSC",       alchemyNetwork: "bnb-mainnet",      octavName: "bsc" },
-  { chainId: 43114, name: "Avalanche", alchemyNetwork: "avax-mainnet",     octavName: "avalanche-c-chain" },
-  { chainId: 4326,  name: "MegaETH",   alchemyNetwork: "megaeth-mainnet",  alchemyRequiresPaidPlan: true, octavName: null },
-  { chainId: 143,   name: "Monad",     alchemyNetwork: "monad-mainnet",    alchemyRequiresPaidPlan: true, octavName: null },
+  { chainId: 1,     name: "Ethereum", nativeCurrency: mainnet.nativeCurrency,  alchemyNetwork: "eth-mainnet",      octavName: "ethereum" },
+  { chainId: 8453,  name: "Base", nativeCurrency: base.nativeCurrency,      alchemyNetwork: "base-mainnet",     octavName: "base" },
+  { chainId: 137,   name: "Polygon", nativeCurrency: polygon.nativeCurrency,   alchemyNetwork: "matic-mainnet",    octavName: "polygon" },
+  { chainId: 130,   name: "Unichain", nativeCurrency: unichain.nativeCurrency,  alchemyNetwork: "unichain-mainnet", alchemyRequiresPaidPlan: true, octavName: "unichain" },
+  { chainId: 42161, name: "Arbitrum", nativeCurrency: arbitrum.nativeCurrency,  alchemyNetwork: "arb-mainnet",      octavName: "arbitrum" },
+  { chainId: 10,    name: "Optimism", nativeCurrency: optimism.nativeCurrency,  alchemyNetwork: "opt-mainnet",      octavName: "optimism" },
+  { chainId: 56,    name: "BSC", nativeCurrency: bsc.nativeCurrency,       alchemyNetwork: "bnb-mainnet",      octavName: "bsc" },
+  { chainId: 43114, name: "Avalanche", nativeCurrency: avalanche.nativeCurrency, alchemyNetwork: "avax-mainnet",     octavName: "avalanche-c-chain" },
+  { chainId: 4326,  name: "MegaETH", nativeCurrency: megaeth.nativeCurrency,   alchemyNetwork: "megaeth-mainnet",  alchemyRequiresPaidPlan: true, octavName: null },
+  { chainId: 143,   name: "Monad", nativeCurrency: monad.nativeCurrency,     alchemyNetwork: "monad-mainnet",    alchemyRequiresPaidPlan: true, octavName: null },
 ];
 
 export const SUPPORTED_CHAIN_IDS: readonly number[] = PORTFOLIO_CHAINS.map(
