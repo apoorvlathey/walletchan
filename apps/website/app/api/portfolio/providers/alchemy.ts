@@ -1,3 +1,4 @@
+import { formatUnits } from "viem";
 import { CHAIN_BY_ID, ChainSupport, PORTFOLIO_CHAINS } from "../chains";
 import {
   PortfolioProvider,
@@ -5,6 +6,7 @@ import {
   ProviderResult,
   formatBalance,
   normalizeContractAddress,
+  NATIVE_SENTINEL,
 } from "./types";
 
 interface AlchemyTokenPrice {
@@ -99,20 +101,33 @@ export const alchemyProvider: PortfolioProvider = {
       const chainId = NETWORK_TO_CHAIN_ID[t.network];
       if (!chainId) continue;
       const meta = t.tokenMetadata;
-      const decimals = typeof meta?.decimals === "number" ? meta.decimals : 18;
-      const balance = parseFloat(t.tokenBalance || "0");
-      if (!isFinite(balance) || balance === 0) continue;
+      const contractAddress = normalizeContractAddress(t.tokenAddress);
+      const nativeCurrency = contractAddress === NATIVE_SENTINEL
+        ? CHAIN_BY_ID.get(chainId)?.nativeCurrency
+        : undefined;
+      const decimals = typeof meta?.decimals === "number" ? meta.decimals : (nativeCurrency?.decimals ?? 18);
+      if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255 ||
+          typeof t.tokenBalance !== "string" || !/^(?:0x[0-9a-f]+|[0-9]+)$/i.test(t.tokenBalance)) {
+        throw new Error("Alchemy returned an invalid token balance");
+      }
+      // Portfolio API balances are raw integer units (normally hex), not
+      // decimal token amounts. parseFloat("0x…") silently discards every asset.
+      const rawBalance = BigInt(t.tokenBalance);
+      if (rawBalance === 0n) continue;
+      const exactBalance = formatUnits(rawBalance, decimals);
+      const balance = Number(exactBalance);
+      if (!Number.isFinite(balance) || balance <= 0) throw new Error("Alchemy returned an invalid token balance");
 
-      const priceUsd = parseFloat(t.tokenPrices?.[0]?.value || "0");
+      const priceUsd = parseFloat(t.tokenPrices?.find((price) => price.currency.toLowerCase() === "usd")?.value || "0");
       const valueUsd = balance * priceUsd;
 
       tokens.push({
-        symbol: meta?.symbol || "???",
-        name: meta?.name || meta?.symbol || "Unknown",
-        contractAddress: normalizeContractAddress(t.tokenAddress),
+        symbol: meta?.symbol || nativeCurrency?.symbol || "???",
+        name: meta?.name || nativeCurrency?.name || meta?.symbol || "Unknown",
+        contractAddress,
         chainId,
         decimals,
-        balance: balance.toString(),
+        balance: exactBalance,
         balanceFormatted: formatBalance(balance),
         priceUsd,
         valueUsd,

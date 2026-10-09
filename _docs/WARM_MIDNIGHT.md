@@ -815,6 +815,10 @@ Recommended immediate order:
 
 ## 8. One-surface session protocol
 
+This protocol is for extension UI work. For website-only changes, follow the
+application-scoped validation guidance in `AGENTS.md` and `_docs/DEVELOPMENT.md`;
+do not run extension builds during website iteration.
+
 Each fresh chat should own one surface, not an entire phase.
 
 1. Read the authority stack in section 1.

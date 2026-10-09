@@ -16,6 +16,8 @@
   copy, explorer, and contact editing. Previously imported Safes replace the
   capability badge with an Already added status.
 - `SafeHomeAlert.tsx`: actionable home rail for proposals that need attention.
+- `SafeOwnerReminder.tsx`: amber Home reminder when no eligible signing owner
+  matches the Safe; opens Add account and updates with current public metadata.
   Mounting the active Safe rail immediately starts a targeted request refresh,
   so popup/sidepanel open and account switching do not wait for the alarm. Its
   subtitle uses the shared unresolved-request count, including blocked items.

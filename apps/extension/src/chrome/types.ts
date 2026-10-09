@@ -82,6 +82,8 @@ export interface SeedGroup {
   name: string; // "Seed #1", "Seed #2"
   createdAt: number;
   accountCount: number;
+  /** Present only for a newly created wallet whose phrase has not been backed up. */
+  backupPending?: true;
 }
 
 /**

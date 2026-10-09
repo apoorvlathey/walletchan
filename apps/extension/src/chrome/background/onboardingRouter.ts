@@ -13,6 +13,8 @@ import {
   initializeOnboardingCredential,
   rollbackOnboardingInitialization,
 } from "../onboardingInitialization";
+import { createOnboardingSeedAccount } from "../onboarding/seedAccount";
+import { confirmSeedBackup } from "../mnemonic/backup";
 import { runSerializedAuthTransition } from "../authTransition";
 
 export const BACKGROUND_ONBOARDING_MESSAGE_TYPES = [
@@ -22,6 +24,8 @@ export const BACKGROUND_ONBOARDING_MESSAGE_TYPES = [
   "completeOnboardingInitialization",
   "rollbackOnboardingInitialization",
   "onboardingComplete",
+  "createOnboardingSeedAccount",
+  "confirmSeedBackup",
 ] as const;
 
 export type BackgroundOnboardingRouteResult =
@@ -29,6 +33,8 @@ export type BackgroundOnboardingRouteResult =
   | { handled: true; keepChannelOpen: boolean };
 
 type Dependencies = {
+  createOnboardingSeedAccount: typeof createOnboardingSeedAccount;
+  confirmSeedBackup: typeof confirmSeedBackup;
   beginOnboardingInitialization: typeof beginOnboardingInitialization;
   completeOnboardingInitialization: typeof completeOnboardingInitialization;
   getOnboardingInitializationStatus: typeof getOnboardingInitializationStatus;
@@ -51,6 +57,8 @@ const productionDomainDependencies: Omit<
   Dependencies,
   keyof EnvironmentDependencies
 > = {
+  createOnboardingSeedAccount,
+  confirmSeedBackup,
   beginOnboardingInitialization,
   completeOnboardingInitialization,
   getOnboardingInitializationStatus,
@@ -147,6 +155,25 @@ export function createBackgroundOnboardingMessageRouter(
               ),
             }),
           );
+        return HANDLED_ASYNC;
+      }
+
+      case "createOnboardingSeedAccount": {
+        dependencies.runSerializedAuthTransition(() =>
+          dependencies.createOnboardingSeedAccount(initializationId(message.initializationId)),
+        ).then(sendResponse).catch((error) => sendResponse({
+          success: false, error: errorMessage(error, "Could not create wallet"),
+        }));
+        return HANDLED_ASYNC;
+      }
+      case "confirmSeedBackup": {
+        if (message.confirmed !== true || typeof message.seedGroupId !== "string" ||
+            !message.seedGroupId || message.seedGroupId.length > 128) {
+          sendResponse({ success: false, error: "Backup confirmation is required" });
+          return HANDLED_SYNC;
+        }
+        dependencies.confirmSeedBackup(message.seedGroupId).then(sendResponse)
+          .catch((error) => sendResponse({ success: false, error: errorMessage(error, "Could not confirm backup") }));
         return HANDLED_ASYNC;
       }
 

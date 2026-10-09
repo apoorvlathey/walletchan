@@ -22,7 +22,8 @@ import {
   LockIcon,
 } from "@chakra-ui/icons";
 import type { Account, PasswordType } from "@/chrome/types";
-import { truncateAddress } from "@/lib/addressUtils";
+import { useSeedBackupState } from "./SeedBackup/useSeedBackupState";
+import { SeedBackupConfirmation } from "./SeedBackup/SeedBackupConfirmation";
 import {
   AppHeader,
   AppScreen,
@@ -37,6 +38,9 @@ interface Props {
 }
 
 function RevealSeedPhrase({ account, onBack }: Props) {
+  const backup = useSeedBackupState(account?.type === "seedPhrase" ? account.seedGroupId : undefined);
+  const mountedRef = useRef(true);
+  const revealRevision = useRef(0);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showPhrase, setShowPhrase] = useState(false);
@@ -49,6 +53,16 @@ function RevealSeedPhrase({ account, onBack }: Props) {
   const [isAgentPasswordEnabled, setIsAgentPasswordEnabled] = useState(false);
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    mountedRef.current = true;
+    revealRevision.current++;
+    setMnemonic(""); setPassword(""); setShowPhrase(false);
+    const onLock = (message: { type?: string }) => {
+      if (message.type === "walletLockedExternal" || message.type === "walletLockFailedExternal") { revealRevision.current++; setMnemonic(""); setPassword(""); setShowPhrase(false); }
+    };
+    chrome.runtime.onMessage.addListener(onLock);
+    return () => { mountedRef.current = false; chrome.runtime.onMessage.removeListener(onLock); };
+  }, [account?.id]);
   useEffect(() => {
     setIsCheckingSession(true);
     chrome.runtime.sendMessage(
@@ -70,15 +84,18 @@ function RevealSeedPhrase({ account, onBack }: Props) {
   }, []);
 
   const handleReveal = () => {
-    if (!password || !account || account.type !== "seedPhrase") return;
+    if (!password || !account || account.type !== "seedPhrase" || backup.isLoading || backup.error) return;
+    const revision = ++revealRevision.current;
     setError("");
     setIsLoading(true);
 
     chrome.runtime.sendMessage(
       { type: "revealSeedPhrase", seedGroupId: account.seedGroupId, password },
       (result: { success: boolean; mnemonic?: string; error?: string }) => {
+        if (!mountedRef.current || revision !== revealRevision.current) return;
         setIsLoading(false);
         if (result.success && result.mnemonic) {
+          setPassword("");
           setMnemonic(result.mnemonic);
         } else {
           setError(result.error || "Failed to reveal seed phrase");
@@ -109,9 +126,10 @@ function RevealSeedPhrase({ account, onBack }: Props) {
 
   return (
     <AppScreen>
-      <AppHeader title="Reveal seed phrase" onBack={onBack} />
+      <AppHeader title={backup.pending ? "Back up your wallet" : "Reveal seed phrase"} onBack={onBack} />
       <ScreenBody pt={5}>
-        {isCheckingSession ? (
+        {backup.error && !revealed && <Text role="alert" color="status.error.emphasis" fontSize="sm">{backup.error}. Reopen this screen to retry.</Text>}
+        {isCheckingSession || backup.isLoading ? (
           <Text color="fg.secondary" fontSize="sm" aria-live="polite">
             Checking your session…
           </Text>
@@ -148,38 +166,16 @@ function RevealSeedPhrase({ account, onBack }: Props) {
           </VStack>
         ) : !revealed ? (
           <VStack spacing={5} align="stretch">
-            <Box
-              w="full"
-              p={3}
-              bg="status.error.bg"
-              border="1px solid"
-              borderColor="status.error.border"
-              borderRadius="md"
-            >
-              <Text color="status.error.fg" fontSize="sm" fontWeight="600">
-                Never share your seed phrase. Anyone with it has full control of
-                every account derived from it.
-              </Text>
-            </Box>
-
             <ScreenSection
               title="Verify it’s you"
-              description={
-                <>
-                  Enter your {isAgentPasswordEnabled ? "master " : ""}password
-                  to reveal the phrase for{" "}
-                  <Text as="span" color="fg.primary" fontWeight="600">
-                    {account?.displayName || truncateAddress(account?.address || "")}
-                  </Text>
-                  .
-                </>
-              }
             >
               <FormControl isInvalid={!!error}>
-                <FormLabel>Password</FormLabel>
+                <FormLabel fontSize="sm" color="fg.secondary">Password</FormLabel>
                 <InputGroup>
                   <Input
                     ref={passwordInputRef}
+                    _focusVisible={{ borderColor: "accent.highlight", boxShadow: "0 0 0 1px var(--chakra-colors-accent-highlight)" }}
+                    autoComplete="current-password"
                     type={showPassword ? "text" : "password"}
                     placeholder={
                       isAgentPasswordEnabled ? "Enter master password" : "Enter password"
@@ -206,28 +202,27 @@ function RevealSeedPhrase({ account, onBack }: Props) {
                   </InputRightElement>
                 </InputGroup>
                 {error && (
-                  <Text mt={2} color="status.error.fg" fontSize="sm" fontWeight="600" aria-live="polite">
+                  <Text mt={2} color="status.error.emphasis" fontSize="sm" fontWeight="600" aria-live="polite">
                     {error}
                   </Text>
                 )}
               </FormControl>
             </ScreenSection>
+            <HStack spacing={3} align="start" p={3} bg="surface.raised" borderRadius="lg">
+              <LockIcon color="accent.highlight" boxSize={4} mt={0.5} flexShrink={0} aria-hidden="true" />
+              <Text fontSize="sm" color="fg.secondary" lineHeight="1.5">
+                Keep your recovery phrase private. Anyone with it can control your wallet.
+              </Text>
+            </HStack>
           </VStack>
         ) : (
           <VStack spacing={5} align="stretch">
-            <Box
-              w="full"
-              p={3}
-              bg="status.error.bg"
-              border="1px solid"
-              borderColor="status.error.border"
-              borderRadius="md"
-            >
-              <Text color="status.error.fg" fontSize="sm" fontWeight="600">
-                Keep these words private and in order. Anyone who has them can
-                recover every account in this seed group.
+            <HStack spacing={3} align="start" p={3} bg="surface.raised" borderRadius="lg">
+              <LockIcon color="accent.highlight" boxSize={4} mt={0.5} flexShrink={0} aria-hidden="true" />
+              <Text fontSize="sm" color="fg.secondary" lineHeight="1.5">
+                Save these words in order somewhere safe. Never share them.
               </Text>
-            </Box>
+            </HStack>
 
             <ScreenSection title="Recovery phrase">
               <Box
@@ -292,20 +287,21 @@ function RevealSeedPhrase({ account, onBack }: Props) {
           secondaryAction={<Button variant="secondary" onClick={onBack}>Cancel</Button>}
           primaryAction={
             <Button
-              variant="primary"
+              variant="brand"
               onClick={handleReveal}
               isLoading={isLoading}
               loadingText="Verifying…"
-              isDisabled={!password}
+              isDisabled={!password || backup.isLoading || !!backup.error}
             >
               Reveal phrase
             </Button>
           }
         />
       )}
-      {revealed && (
+      {revealed && backup.pending && <SeedBackupConfirmation isSaving={backup.isSaving} error={backup.error} onConfirm={() => { void backup.confirm().then((success) => { if (success && mountedRef.current) onBack(); }); }} />}
+      {revealed && !backup.pending && (
         <StickyActionBar
-          primaryAction={<Button variant="primary" onClick={onBack}>Done</Button>}
+          primaryAction={<Button variant="brand" onClick={onBack}>Done</Button>}
         />
       )}
     </AppScreen>

@@ -10,7 +10,8 @@
  * `accountType` — is a TypeScript error.
  *
  * Tx and signature factories accept impersonator accounts because their
- * requests are queued for review. Signing helpers continue to exclude them;
+ * requests are queued for review. Safe signatures are also review-only.
+ * Signing helpers continue to exclude them;
  * the separate per-endpoint developer path may only submit an unsigned RPC
  * transaction.
  */
@@ -56,7 +57,7 @@ export function pinnedTxRequest(
 }
 
 export function pinnedSignatureRequest(
-  account: ProviderRequestAccount,
+  account: Account,
   base: SigBase,
 ): PinnedSignatureRequest {
   return {

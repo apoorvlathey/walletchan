@@ -31,7 +31,6 @@ import SeedAddressPicker from "./SeedAddressPicker";
 import {
   ListItem,
   ListItemContent,
-  ListItemDescription,
   ListItemMedia,
   ListItemTitle,
   ListSurface,
@@ -42,6 +41,7 @@ import type { Account } from "@/chrome/types";
 type Mode = "choose" | "nameGenerated" | "import" | "pick";
 
 interface SeedPhraseSetupProps {
+  initialMode?: "choose" | "import";
   onBack: () => void;
   onComplete: (account: Account) => void;
   /** Reassert a live mnemonic capability after a passkey Never-session restore. */
@@ -56,6 +56,7 @@ interface SeedPhraseSetupProps {
 }
 
 function SeedPhraseSetup({
+  initialMode = "choose",
   onBack,
   onComplete,
   ensureMnemonicAccess,
@@ -70,7 +71,7 @@ function SeedPhraseSetup({
   // keep the existing scrollable full-height panel.
   const isOnboarding = !!onCollect;
 
-  const [mode, setMode] = useState<Mode>("choose");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [generatedMnemonic, setGeneratedMnemonic] = useState<string | null>(null);
   const [importedMnemonic, setImportedMnemonic] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -370,7 +371,7 @@ function SeedPhraseSetup({
   if (mode === "choose") {
     return (
       <SetupFrame isOnboarding={isOnboarding} title="Seed phrase" onBack={onBack}>
-        <ScreenSection title="Choose how to continue">
+        <ScreenSection>
           <ListSurface>
             <ListItem
               interactive
@@ -389,9 +390,6 @@ function SeedPhraseSetup({
               </ListItemMedia>
               <ListItemContent>
                 <ListItemTitle>Generate new phrase</ListItemTitle>
-                <ListItemDescription>
-                  Create 12 recovery words and your first account
-                </ListItemDescription>
               </ListItemContent>
               {isSubmitting && <Spinner size="sm" color="accent.primary" flexShrink={0} />}
             </ListItem>
@@ -413,9 +411,6 @@ function SeedPhraseSetup({
               </ListItemMedia>
               <ListItemContent>
                 <ListItemTitle>Import existing phrase</ListItemTitle>
-                <ListItemDescription>
-                  Add 12 recovery words from another wallet
-                </ListItemDescription>
               </ListItemContent>
             </ListItem>
           </ListSurface>
@@ -451,10 +446,7 @@ function SeedPhraseSetup({
           </Button>
         }
       >
-          <ScreenSection
-            title="Name your seed group"
-            description="Both names are optional and can be changed later."
-          >
+          <ScreenSection>
             <VStack spacing={4} align="stretch">
               <FormControl>
                 <FormLabel>Group name (optional)</FormLabel>
@@ -472,9 +464,6 @@ function SeedPhraseSetup({
                   value={accountDisplayName}
                   onChange={(e) => setAccountDisplayName(e.target.value)}
                 />
-                <FormHelperText>
-                  This names the first account generated from this seed phrase.
-                </FormHelperText>
               </FormControl>
             </VStack>
           </ScreenSection>
@@ -528,7 +517,7 @@ function SeedPhraseSetup({
     <SetupFrame
       isOnboarding={isOnboarding}
       title="Import seed phrase"
-      onBack={() => setMode("choose")}
+      onBack={initialMode === "import" ? onBack : () => setMode("choose")}
       action={
         <Button
           variant="brand"
@@ -542,10 +531,7 @@ function SeedPhraseSetup({
         </Button>
       }
     >
-        <ScreenSection
-          title="Enter your recovery phrase"
-          description="Use the exact 12 words in the original order."
-        >
+        <ScreenSection>
           <VStack spacing={4} align="stretch">
             <FormControl isInvalid={!!error}>
               <FormLabel>12-word seed phrase</FormLabel>
@@ -605,7 +591,7 @@ function SeedPhraseSetup({
           p={3}
         >
           <Text fontSize="sm" color="status.warning.fg" fontWeight="600">
-            Your seed phrase will be encrypted and stored locally. Never share it with anyone.
+            Never share your seed phrase. Anyone with it can control your accounts.
           </Text>
         </Box>
     </SetupFrame>

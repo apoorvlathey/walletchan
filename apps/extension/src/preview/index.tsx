@@ -12,19 +12,22 @@ import "../index.css";
 import "./preview.css";
 
 const parsedPreviewState = parsePreviewState(window.location.href);
+const previewTheme = parsedPreviewState.state.route === "onboarding"
+  ? "midnight"
+  : parsedPreviewState.state.theme;
 window.localStorage.setItem(
   SELECTED_THEME_STORAGE_KEY,
-  parsedPreviewState.state.theme,
+  previewTheme,
 );
 installPreviewChrome();
 void chrome.storage.local.set({
-  [SELECTED_THEME_STORAGE_KEY]: parsedPreviewState.state.theme,
+  [SELECTED_THEME_STORAGE_KEY]: previewTheme,
 });
 document.body.classList.toggle("preview-canvas", parsedPreviewState.canvas);
 bootstrapThemeAttribute();
 
 createRoot(document.getElementById("preview-root")!).render(
-  <ThemeProvider>
+  <ThemeProvider fixedThemeId={parsedPreviewState.state.route === "onboarding" ? "midnight" : undefined}>
     <NetworksProvider>
       <ColorModeScript />
       <PreviewApp />

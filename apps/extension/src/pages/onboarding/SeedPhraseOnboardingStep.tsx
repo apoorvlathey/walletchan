@@ -1,6 +1,5 @@
 import { Box, Flex } from "@chakra-ui/react";
 import SeedPhraseSetup from "@/components/SeedPhraseSetup";
-import ThemeSwitcher from "@/components/shared/ThemeSwitcher";
 import { OnboardingFrame } from "./OnboardingShell";
 
 export function SeedPhraseOnboardingStep({
@@ -28,11 +27,9 @@ export function SeedPhraseOnboardingStep({
           pb={6}
           position="relative"
         >
-          <Box position="absolute" top={3} right={{ base: 3, sm: 5 }} zIndex={2}>
-            <ThemeSwitcher size="sm" ariaLabel="Choose appearance" />
-          </Box>
-          <Box pt={12}>
+          <Box>
             <SeedPhraseSetup
+              initialMode="import"
               onBack={onBack}
               onComplete={() => {}}
               onCollect={onCollect}

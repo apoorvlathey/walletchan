@@ -31,3 +31,8 @@ The storage key and marker shape remain exactly
 `onboardingInitialization: { version: 1, id, startedAt }`. Missing markers on
 older installs remain normal; this file move introduces no migration and does
 not alter any message or storage schema.
+
+`seedAccount.ts` owns explicit worker-generated fresh-wallet creation. It delegates
+to the mnemonic persistence boundary with the marker ID; that boundary rechecks
+owner/master authority and creates pending-backup metadata before encrypted keys.
+It returns only the public account and cannot mutate an already populated wallet.

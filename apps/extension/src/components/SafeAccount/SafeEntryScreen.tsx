@@ -27,6 +27,7 @@ import { SafeVerificationCard } from "./SafeVerificationCard";
 import { DiscoveredSafeRow } from "./DiscoveredSafeRow";
 import type { Account } from "@/chrome/types";
 import { isSafeOwnerAccount } from "@/chrome/safe/accountTypePolicy";
+import { safePortfolioBalances } from "@/components/SafeAccount/portfolioBalances";
 import { fetchPortfolio } from "@/chrome/portfolio/api";
 import { useNetworks } from "@/contexts/NetworksContext";
 import { getResolvedChains } from "@/lib/chains";
@@ -103,13 +104,10 @@ export function SafeEntryScreen({
     }
     const controller = new AbortController();
     void fetchPortfolio(probe.address, controller.signal).then((portfolio) => {
-      const totals: Record<number, number> = {};
-      for (const token of portfolio.tokens) totals[token.chainId] = (totals[token.chainId] || 0) + token.valueUsd;
-      for (const position of portfolio.defiPositions) totals[position.chainId] = (totals[position.chainId] || 0) + position.valueUsd;
-      setBalances(totals);
+      setBalances(safePortfolioBalances(portfolio));
     }).catch(() => setBalances({}));
     return () => controller.abort();
-  }, [probe?.address, probe?.snapshots?.length]);
+  }, [probe?.address, probe?.snapshots]);
 
   useEffect(() => {
     if (!probe?.address || !probe.snapshots?.length) return;

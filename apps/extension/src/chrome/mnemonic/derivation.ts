@@ -3,9 +3,10 @@
  * 12-word mnemonics only (128-bit entropy)
  *
  * CRITICAL: Generation, validation, derivation, and persistence are invoked
- * through extension-only handlers. A newly generated phrase is returned only
- * to the trusted extension renderer so the user can back it up; it is not
- * persisted until explicit confirmation and is never forwarded to a webpage.
+ * through extension-only handlers. Settings generation returns the phrase to
+ * trusted UI for backup before persistence. Fresh-wallet onboarding generates
+ * and encrypts it in the worker with durable pending-backup metadata. Neither
+ * path forwards recovery material to a webpage.
  */
 
 import { generateMnemonic, mnemonicToSeedSync, validateMnemonic } from "@scure/bip39";
@@ -32,9 +33,8 @@ export function isValidMnemonic(mnemonic: string): boolean {
 }
 
 /**
- * Persistence requires a phrase that the trusted renderer already generated
- * or collected and presented to the user. Background handlers must never
- * silently generate and save an unacknowledged recovery phrase.
+ * Validate explicit phrase input. Only the dedicated owner-bound onboarding
+ * creation route supplies a worker-generated phrase with deferred backup.
  */
 export function normalizeMnemonicForPersistence(value: unknown): string | null {
   if (typeof value !== "string" || value.length === 0 || value.length > 1024) {

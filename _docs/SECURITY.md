@@ -197,6 +197,8 @@ The agent password model restricts what operations are available when the wallet
 | Add Bankr account (with API key) | Yes    | **BLOCKED** | `background/accountManagementRouter.ts` + `auth/bankrCredentialUpdate.ts`      |
 | Add private key account          | Yes    | **BLOCKED** | `background/accountManagementRouter.ts` + the private-key vault boundary       |
 | Add impersonator account         | Yes    | **BLOCKED** | `background/accountManagementRouter.ts`                                        |
+| Create onboarding seed account   | Yes    | **BLOCKED** | `onboarding/seedAccount.ts` requires the live marker owner and zero accounts; seed persistence rechecks live master authorization and marks deferred backup |
+| Confirm seed backup              | Yes    | **BLOCKED** | `mnemonic/backup.ts` clears only group reminder metadata under master/operation/storage locks; no secret response |
 | Add seed phrase group            | Yes    | **BLOCKED** | `background/accountManagementRouter.ts` → `mnemonic/accountHandlers.ts`        |
 | Derive seed account              | Yes    | **BLOCKED** | `background/accountManagementRouter.ts` → `mnemonic/accountHandlers.ts`        |
 | Reveal seed phrase               | Yes    | **BLOCKED** | `background/secretManagementRouter.ts` transport + `secrets/revealHandlers.ts` |
@@ -2275,6 +2277,29 @@ These must always hold true. Violations indicate a security bug.
 
 ---
 
+## Deferred onboarding backup
+
+`createOnboardingSeedAccount` and `confirmSeedBackup` are exact wallet-UI-only
+messages in the exhaustive audience policy, never forwarded by the content
+bridge. Fresh creation binds to `onboardingInitialization`, checks ownership
+again inside the wallet-secret operation lock, rejects nonempty accounts, and
+uses the existing master-only mnemonic persistence/encryption path. The initial
+seed-group write includes non-secret `backupPending: true`; encrypted recovery
+and the derived key remain present before structural completion. No plaintext
+phrase or private key is returned to onboarding or stored in synced metadata.
+Failures preserve the existing marker-owned compensation and complete-wallet
+recovery rules. Imports and Settings generation retain their existing backup
+behavior.
+
+The home reminder reads public group metadata only. Its destination reuses
+explicit master-password-gated `revealSeedPhrase`; agent sessions remain blocked.
+The saved-words acknowledgment plus Finish backup sends `confirmed: true` for
+one exact group. The background requires live master authority, rechecks its
+epoch at the group write, and removes only `backupPending`; it grants no signing
+or reveal capability. Failed writes leave the reminder pending. The reveal UI
+ignores responses after unmount or a wallet-lock event and clears its plaintext
+state on lock. Copying/showing alone never marks a backup complete.
+
 ## Pre-Commit Security Checklist
 
 When reviewing or making changes to extension code, verify the following:
@@ -2916,3 +2941,10 @@ See [local evidence and manual QA](./LEGACY_APPROVAL_PADDING.md).
 ### Public DeFi debt accounting
 
 Only net position and portfolio USD totals accept signed finite values, bounded to the existing USD magnitude ceiling. Individual wallet-token, supply, reward and debt legs remain non-negative; explicit provider loan/borrow direction owns classification, not symbol or arbitrary lending text. Each debt collection retains the existing 50-leg bound, chain/address validation and safe image/navigation policies. Cache V4 invalidates disposable old gross-valued snapshots through the existing reset-aware pruner. No secrets, signing routes, message audiences, permissions or credential storage change.
+
+Safe accounts without local owners may hold unsigned dapp transaction drafts
+for review; draft creation is not approval authority. Blocked configurations
+still reject creation. Injected Safe signature requests can enter the durable
+review queue but remain excluded from direct signing and release; the disabled
+UI action does not replace backend enforcement. No signature, submission, or
+ERC-5792 acknowledgement occurs from queuing alone.

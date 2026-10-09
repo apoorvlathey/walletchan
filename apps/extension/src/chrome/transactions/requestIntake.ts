@@ -187,14 +187,8 @@ export function handleSignatureRequest(
       });
       return;
     }
-    if (activeAccount.type === "safe") {
-      await writeResultToStorage(`sigResult:${sigId}`, {
-        success: false,
-        error: "Safe message signing is not supported yet",
-      });
-      return;
-    }
 
+    if (activeAccount.type === "safe") requireSafeFeature("injectedDapp");
     const signerParam = extractSignerParam(
       signature.method,
       signature.params,

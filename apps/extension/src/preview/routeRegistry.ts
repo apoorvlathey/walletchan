@@ -31,6 +31,7 @@ export const PREVIEW_ROUTE_REGISTRY: Record<
     label: "Home",
     defaultScenario: "default",
     scenarios: [
+      "backup-pending",
       "default",
       "portfolio-loading",
       "portfolio-empty",
@@ -40,7 +41,7 @@ export const PREVIEW_ROUTE_REGISTRY: Record<
       "private",
       "private-ready",
       "stress",
-      "safe-account",
+      "safe-account", "safe-no-owner",
     ],
     wallets: ALL_WALLETS,
     fidelity: "production",
@@ -88,7 +89,7 @@ export const PREVIEW_ROUTE_REGISTRY: Record<
   signature: {
     label: "Signature",
     defaultScenario: "personal-sign",
-    scenarios: [
+    scenarios: ["safe-no-owner",
       "personal-sign",
       "typed-data-long",
       "safe-warnings",

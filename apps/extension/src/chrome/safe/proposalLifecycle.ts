@@ -85,9 +85,11 @@ export async function createReviewedSafeProposal(input: {
   const safe = await getSafeAccountRecord(input.safeAccountId);
   const snapshot = safe?.chains[String(input.chainId)];
   if (!safe || !snapshot) throw new Error("Safe is not verified on this network");
-  if (snapshot.capability === "observe" || snapshot.capability === "blocked") {
+  if (snapshot.capability === "blocked") {
     throw new Error(snapshot.blockedReason || "No linked Safe owner can approve");
   }
+  // Missing local owners prevents approval, not review of an incoming draft.
+  // Owner authorization is still enforced at signing/execution.
   // A draft is bound to the imported authority snapshot. Full live verification
   // runs after the screen paints and again before any owner signature/execution.
   const onchainNonce = await dependencies.readSafeDraftNonce({

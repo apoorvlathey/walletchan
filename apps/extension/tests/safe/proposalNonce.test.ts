@@ -532,3 +532,22 @@ test("a failed live nonce read does not queue a stale Safe draft", async () => {
   }, { readSafeDraftNonce: async () => { throw new Error("RPC unavailable"); } }), /RPC unavailable/);
   assert.deepEqual(await getSafeProposals(), []);
 });
+
+test("an observer Safe can queue an unsigned dapp draft for review, while blocked Safes still reject", async () => {
+  const observer = structuredClone(safeRecord);
+  observer.chains["8453"].capability = "observe";
+  const storage = installNativeSessionStorage({ local: { safeAccounts: { version: 1, records: [observer] } } });
+  installed.push(storage);
+  const input = { safeAccountId: "safe-account", chainId: 8453,
+    calls: [{ to: target, value: "0", data: "0x" as const, operation: 0 as const }],
+    route: { kind: "injected" as const, origin: "https://dapp.test", requestId: "observer-tx" } };
+  const result = await createReviewedSafeProposal(input, { readSafeDraftNonce: async () => 4n });
+  assert.equal(result.state, "draft");
+  assert.deepEqual(result.confirmations, []);
+  assert.equal(result.route.requestId, "observer-tx");
+  assert.equal((await getSafeProposal(result.id))?.safeAccountId, "safe-account");
+  observer.chains["8453"].capability = "blocked";
+  observer.chains["8453"].blockedReason = "Unsupported Safe configuration";
+  await chrome.storage.local.set({ safeAccounts: { version: 1, records: [observer] } });
+  await assert.rejects(createReviewedSafeProposal(input, { readSafeDraftNonce: async () => 4n }), /Unsupported Safe configuration/);
+});

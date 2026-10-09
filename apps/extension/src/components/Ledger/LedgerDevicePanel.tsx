@@ -16,14 +16,7 @@ export function LedgerDevicePanel({
   status,
 }: LedgerDevicePanelProps) {
   return (
-    <ScreenSection
-      title="Hardware wallet"
-      description={
-        device
-          ? "The Ethereum app is ready."
-          : "WalletChan stores public addresses and paths only. Your keys stay on the device."
-      }
-    >
+    <ScreenSection>
       <Box
         p={4}
         bg="surface.raised"

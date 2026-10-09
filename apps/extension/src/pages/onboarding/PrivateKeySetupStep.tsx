@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
 import { Box, Button, FormControl, FormLabel, Input, Text, VStack } from "@chakra-ui/react";
-import { WarningIcon } from "@chakra-ui/icons";
+import { LockIcon } from "@chakra-ui/icons";
 import PrivateKeyInput from "@/components/shared/PrivateKeyInput";
-import { OnboardingCanvas, OnboardingFooter, OnboardingHeader } from "./OnboardingShell";
+import { OnboardingCanvas, OnboardingFooter, OnboardingHeader, OnboardingHint } from "./OnboardingShell";
 
 export function PrivateKeySetupStep({
   privateKey,
@@ -55,10 +55,7 @@ export function PrivateKeySetupStep({
       <VStack align="stretch" spacing={6}>
         <VStack align="stretch" spacing={1.5}>
           <Text as="h1" fontSize="2xl" fontWeight="700" letterSpacing="-0.02em">
-            Add a private-key account
-          </Text>
-          <Text color="fg.secondary" fontSize="sm" lineHeight="1.5">
-            Import an existing key or generate a new one. Signing stays local to this device.
+            Import private key
           </Text>
         </VStack>
 
@@ -69,6 +66,7 @@ export function PrivateKeySetupStep({
           }}
         >
           <PrivateKeyInput
+            allowGenerate={false}
             privateKey={privateKey}
             onPrivateKeyChange={onPrivateKeyChange}
             derivedAddress={derivedAddress}
@@ -95,23 +93,12 @@ export function PrivateKeySetupStep({
           />
         </FormControl>
 
-        <Box
-          p={3.5}
-          bg="status.warning.tint"
-          border="1px solid"
-          borderColor="status.warning.border"
-          borderRadius="lg"
-        >
-          <Box display="flex" gap={3} alignItems="flex-start">
-            <WarningIcon color="status.warning.fg" mt={0.5} flexShrink={0} />
-            <VStack align="stretch" spacing={1}>
-              <Text fontSize="sm" fontWeight="600" color="fg.primary">Keep this key private</Text>
-              <Text fontSize="xs" lineHeight="1.5" color="fg.secondary">
-                Anyone with the key can control the account. WalletChan encrypts it and stores it only on this device.
-              </Text>
-            </VStack>
-          </Box>
-        </Box>
+        <OnboardingHint icon={<LockIcon boxSize="18px" />}>
+          <Text fontSize="sm" color="fg.secondary" lineHeight="1.5">
+            <Box as="span" fontWeight="600" color="fg.primary">Keep this key private.</Box>{" "}
+            Anyone with it can control your account.
+          </Text>
+        </OnboardingHint>
       </VStack>
     </OnboardingCanvas>
   );

@@ -12,6 +12,7 @@ import type { Account } from "@/chrome/types";
 import type { SafeChainSnapshot } from "@/chrome/safe/types";
 import ChainIcon from "@/components/ChainIcon";
 import { LabeledAddressPopover } from "@/components/shared/LabeledAddressPopover";
+import { truncateAddress } from "@/lib/addressUtils";
 import { SafeCapabilityBadge } from "./SafeCapabilityBadge";
 
 function walletTypeLabel(account: Account) {
@@ -31,15 +32,19 @@ export function SafeVerificationCard({
   chain,
   safeAddress,
   balanceUsd,
+  isLoadingBalance = false,
   accounts,
   isAlreadyAdded = false,
+  showCapability = true,
 }: {
   snapshot: SafeChainSnapshot;
   chain?: { name: string; explorer: string };
   safeAddress: `0x${string}`;
   balanceUsd?: number;
+  isLoadingBalance?: boolean;
   accounts: Account[];
   isAlreadyAdded?: boolean;
+  showCapability?: boolean;
 }) {
   const chainName = chain?.name ?? `Chain ${snapshot.chainId}`;
 
@@ -65,10 +70,10 @@ export function SafeVerificationCard({
           </Box>
         </HStack>
         <HStack flexShrink={0} spacing={1}>
-          <SafeCapabilityBadge
+          {showCapability && <SafeCapabilityBadge
             capability={snapshot.capability}
             isAlreadyAdded={isAlreadyAdded}
-          />
+          />}
           {chain && (
             <IconButton
               as="a"
@@ -101,7 +106,7 @@ export function SafeVerificationCard({
         <Box textAlign="right">
           <Text color="fg.muted" fontSize="xs">Balance</Text>
           <Text mt={0.5} fontSize="sm" fontWeight="600" sx={{ fontVariantNumeric: "tabular-nums" }}>
-            {formatBalance(balanceUsd)}
+            {isLoadingBalance ? "Loading…" : formatBalance(balanceUsd)}
           </Text>
         </Box>
       </SimpleGrid>
@@ -114,9 +119,6 @@ export function SafeVerificationCard({
               (account) => account.address.toLowerCase() === owner,
             );
             const isContractOwner = snapshot.contractOwners.includes(owner);
-            const ownerTitle = isContractOwner
-              ? "Contract owner"
-              : linked[0]?.displayName || (linked.length ? "Your owner account" : "External owner");
             const ownerType = isContractOwner
               ? "Unsupported"
               : linked.length
@@ -139,7 +141,8 @@ export function SafeVerificationCard({
                   address={owner}
                   contextLabel="Safe owner address"
                   explorer={chain?.explorer}
-                  label={ownerTitle}
+                  label={truncateAddress(owner)}
+                  preferredLabel={truncateAddress(owner)}
                   maxW="260px"
                   showFallbackAvatar
                 />

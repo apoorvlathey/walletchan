@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom";
 import { ThemeProvider } from "@/theme";
-import { bootstrapThemeAttribute, LOCALSTORAGE_THEME_KEY } from "@/theme/bootstrap";
+import { LOCALSTORAGE_THEME_KEY } from "@/theme/bootstrap";
 import { FRESH_INSTALL_THEME_ID, SELECTED_THEME_STORAGE_KEY } from "@/theme/tokens";
 import "./onboarding.css";
 import Onboarding from "./pages/Onboarding";
@@ -13,12 +13,12 @@ if (!window.localStorage.getItem(LOCALSTORAGE_THEME_KEY)) {
   chrome.storage.local.set({ [SELECTED_THEME_STORAGE_KEY]: FRESH_INSTALL_THEME_ID });
 }
 
-// Resolve and apply the active theme to <html data-theme=...> BEFORE React
-// renders so the very first paint matches the user's selection (no flash).
-bootstrapThemeAttribute();
+// Onboarding always uses Midnight, including its first paint. The fixed
+// provider does not hydrate or overwrite an existing wallet theme preference.
+document.documentElement.dataset.theme = "midnight";
 
 ReactDOM.render(
-  <ThemeProvider>
+  <ThemeProvider fixedThemeId="midnight">
     <Onboarding />
   </ThemeProvider>,
   document.getElementById("onboarding-root"),

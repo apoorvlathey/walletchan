@@ -184,3 +184,38 @@ test("completion and rollback retain their distinct failure responses", async ()
   });
   assert.deepEqual(await rollback.response, { success: false });
 });
+
+
+test("worker generation is owner-bound and returns only the domain result", async () => {
+  const capture = responseCapture();
+  const calls: string[] = [];
+  const route = createBackgroundOnboardingMessageRouter(TEST_ENVIRONMENT, {
+    runSerializedAuthTransition: async (operation) => operation(),
+    createOnboardingSeedAccount: async (id) => { calls.push(id); return { success: false, error: "Owner required" }; },
+  });
+  route({ type: "createOnboardingSeedAccount", initializationId: { unsafe: true }, mnemonic: "untrusted input" }, capture.sendResponse);
+  assert.deepEqual(await capture.response, { success: false, error: "Owner required" });
+  assert.deepEqual(calls, [""]);
+});
+
+test("backup transport requires an explicit boolean and bounded exact group id", async () => {
+  let calls = 0;
+  const route = createBackgroundOnboardingMessageRouter(TEST_ENVIRONMENT, {
+    confirmSeedBackup: async () => { calls++; return { success: true }; },
+  });
+  for (const message of [
+    { seedGroupId: "group", confirmed: "true" },
+    { seedGroupId: "group", confirmed: false },
+    { seedGroupId: "x".repeat(129), confirmed: true },
+    { seedGroupId: {}, confirmed: true },
+  ]) {
+    const capture = responseCapture();
+    route({ type: "confirmSeedBackup", ...message }, capture.sendResponse);
+    assert.deepEqual(await capture.response, { success: false, error: "Backup confirmation is required" });
+  }
+  assert.equal(calls, 0);
+  const capture = responseCapture();
+  route({ type: "confirmSeedBackup", seedGroupId: "group", confirmed: true }, capture.sendResponse);
+  assert.deepEqual(await capture.response, { success: true });
+  assert.equal(calls, 1);
+});

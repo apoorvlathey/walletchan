@@ -2298,54 +2298,55 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 ### Onboarding Steps
 
-The onboarding flow varies based on account type selection:
+The opening page reuses the animated unlock mascot with two actions:
+**Create new wallet** and **Import or connect existing account**.
+All onboarding screens use Midnight with no appearance switcher.
 
-**Step 1: Account Type Selection**
+- New wallet: go directly to Password + Confirm password. The usual 8-character
+  minimum, 256-character maximum and common-password policy apply. After the
+  credential is initialized, `createOnboardingSeedAccount` generates a 12-word
+  phrase entirely in the service worker and commits derivation index 0 through
+  the existing seed-account persistence boundary. The phrase never enters the
+  onboarding renderer. Its group is created with `backupPending: true`.
+- Existing account: show Connect (Ledger where WebHID/offscreen is available,
+  Safe, Bankr API) and Import (Private Key, Seed Phrase, View-only). Selecting a row
+  opens its details directly. Seed Phrase starts in import mode and Private Key
+  hides generation in this path. Details then lead to the same password form.
+- Success retains the mascot with an **Open wallet** button.
+  It preloads the existing sidepanel capability check and current window before
+  the click, opens the sidepanel with user activation intact, and reuses the
+  `openPopupWindow` route for unsupported browsers or a rejected panel open.
+  Opening the wallet closes the onboarding tab through the existing App lifecycle.
 
-- Choose one initial account in this order: Seed Phrase, Private Key,
-  View-only, or Bankr API
-- Additional account types can be added later from Settings
-- The full-page layout keeps Choose account, Add details, and Secure wallet
-  visible in a persistent desktop progress rail
+`app/home/HomeBackupReminder.tsx` displays **Back up your wallet** below the account
+switcher on Home when any stored seed group still has `backupPending: true`, regardless of
+which account or public/private mode is selected. It opens that group's existing
+`RevealSeedPhrase` screen via Account Settings. Reveal still requires explicit
+master-password verification and rejects agent sessions. After password verification, the user checks the saved-words acknowledgment and selects **Finish
+backup**. `confirmSeedBackup` removes only that group's non-secret flag under
+live master authorization and the wallet-secret/storage locks. Viewing, copying,
+navigating back, closing, locking, and worker/browser restarts never clear it.
+Imports and older groups with no flag do not display a reminder. The flag is an
+acknowledgment of user backup, not a new signing or recovery capability.
 
-**Step 2a: Bankr Setup** (if Bankr or both selected)
+### Safe onboarding
 
-- API key input field
-- Wallet address input (supports ENS, Basename, WNS `.wei`, GNS `.gwei`, and MegaNames `.mega` resolution)
-- Display name (optional) - allows custom naming like "My Bankr Wallet"
-- Links to bankr.bot for API key and terminal
-
-**Step 2b: Private Key Setup** (if PK selected)
-
-- Uses shared `PrivateKeyInput` component (import existing or generate new)
-- Auto-derives and displays address
-- Display name (optional) - allows custom naming like "My Trading Wallet"
-- Security warning about local storage
-
-**Step 2c: Seed Phrase Setup** (if Seed Phrase selected)
-
-- Uses `SeedPhraseSetup` component (import existing or generate new 12-word mnemonic)
-- Display name (optional) for the first derived account
-
-**Step 2d: View-only Setup** (if View-only selected)
-
-- Address or supported name input (view-only, no signing key stored)
-- Display name (optional)
-- The same master-password vault is initialized with the non-Bankr sentinel so
-  the account-management authorization model remains consistent
-
-**Step 3: Create Password**
-
-- Password + Confirm password fields (shared 8-character minimum,
-  256-character maximum, and common-password rejection policy)
-- Security warning about password recovery
-
-**Step 4: Success**
-
-- Animated green checkmark
-- "You're all set!" message
-- Floating arrow pointing to extension area
-- "Pin & click the extension" instruction
+**Safe** appears under Connect. `SafeOnboardingStep` automatically probes a pasted
+Safe address through the existing `probeSafeAddress` route. Verified networks
+show thresholds and expandable owner/security details, with per-chain portfolio
+balances fetched through the existing bounded portfolio client (including omitted
+token totals and DeFi positions). Missing provider rows do not prove zero holdings; loading and unavailable
+balances remain distinct;
+blocked configurations
+are explicitly view-only and unavailable networks are reported with a retry.
+Only public address/configuration metadata is collected before the password step.
+After the marker-bound credential commit establishes the master session,
+`onboardingSubmission` refreshes worker-owned verification receipts and requires
+each reviewed chain's configuration epoch to match before calling the existing
+master-gated `importSafeAccount` route. Missing/changed configurations fail with
+a review-again instruction; account import failures use normal onboarding rollback.
+No owner key is generated or imported. The Safe starts with its existing derived
+observe/blocked capability until an eligible owner is added through Add account.
 
 ### Tab Auto-Close
 
@@ -2377,8 +2378,8 @@ complete wallet goes directly to success without exposing account secrets.
 The policy-free `onboardingInitialization.ts` facade exposes the focused
 `onboarding/state.ts`, `onboarding/lifecycle.ts`, and
 `onboarding/credential.ts` boundaries. Together they prevent crashes, reloads,
-or two onboarding tabs from leaving an invisible generated key/phrase or a
-half-configured wallet:
+or two onboarding tabs from leaving a half-configured wallet. Fresh creation
+also retains a durable backup reminder:
 
 1. `beginOnboardingInitialization` distinguishes authoritative wallet state
    (credentials, key wrappers, passkey records, PK/mnemonic/privacy vaults,
@@ -2393,9 +2394,13 @@ half-configured wallet:
 2. The initial general vault-key wrapper and encrypted credential commit in one
    `chrome.storage.local.set()`. Subsequent account/seed mutations must still
    own the same initialization ID.
-3. Generated private keys and mnemonics are staged in renderer memory and shown
-   for backup before persistence. The background save routes have no hidden
-   generation fallback.
+3. Settings-generated private keys and mnemonics are staged in renderer memory
+   and shown for backup before persistence. Fresh-wallet creation is the explicit
+   exception: `onboarding/seedAccount.ts` generates in the worker, rechecks the
+   same marker owner and live master session inside the seed mutation lock,
+   requires zero existing accounts, and creates the pending-backup group before
+   persisting its encrypted mnemonic and derived key. Its response contains only
+   the public account. `addSeedPhraseGroup` still has no generation fallback.
 4. Completion removes the marker only after the full wallet is structurally
    complete. If that housekeeping removal fails, later status checks recognize
    the complete wallet and remove only the marker—they never roll keys back.
@@ -7429,3 +7434,18 @@ handler require acknowledgement. `useSafeRiskDecision` synchronously resets it
 for exact payload, chain, request and actor/action changes, including A → B → A.
 The confirmation button shows a warning triangle while acknowledgement is missing.
 The `/test#safe-signatures` playground has V3/V4 controls for both warnings, nested batches and negative controls.
+
+### Safe requests without a local owner
+
+Safes without a linked eligible owner show an amber Add a Safe owner reminder
+below Home's account switcher. It opens the existing Add account flow and
+updates from current Safe metadata and accounts; no onboarding marker is stored.
+Valid observer-Safe transactions (injected, WalletConnect, and ERC-5792) may
+create unsigned review drafts. Approval remains disabled until an eligible owner
+is available; blocked Safe configurations still reject draft creation. Owner
+proof, live authority verification, and final signing/execution gates remain in
+force. Injected Safe message requests are pinned as `accountType: "safe"` in
+`pendingSignatureRequests` for reject-only review: the UI disables Sign and
+explains that Safe message signing is unsupported. Generic direct-signer
+preflight and signature release still reject Safe records. WalletConnect does
+not advertise unsupported Safe signature methods.

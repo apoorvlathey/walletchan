@@ -589,7 +589,7 @@ function AccountSettings({
   }
 
   if (view === "revealSeedPhrase") {
-    return <RevealSeedPhrase account={account} onBack={() => setView("settings")} />;
+    return <RevealSeedPhrase account={account} onBack={initialView === "revealSeedPhrase" ? onClose : () => setView("settings")} />;
   }
 
   if (view === "smartAccount") {

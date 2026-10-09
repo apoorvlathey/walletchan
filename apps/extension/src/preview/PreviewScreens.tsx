@@ -476,7 +476,7 @@ export function PreviewScreen({
             totalCount={5}
             isInSidePanel={mode === "sidepanel"}
             accountType={
-              effectiveWallet === "viewOnly"
+              scenario === "safe-no-owner" ? "safe" : effectiveWallet === "viewOnly"
                 ? "impersonator"
                 : signatureRequest.accountType
             }

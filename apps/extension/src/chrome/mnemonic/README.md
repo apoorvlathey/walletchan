@@ -43,3 +43,6 @@ No implementation in this directory imports `../mnemonicStorage.ts`; that
 root module is an export-only cross-domain compatibility facade. The
 `mnemonicVault`, seed-group, account, and private-key-vault keys and record
 shapes are unchanged by file moves.
+
+`backup.ts` owns master-only acknowledgment of the optional seed-group reminder.
+It uses the existing operation/storage locks and never releases plaintext.

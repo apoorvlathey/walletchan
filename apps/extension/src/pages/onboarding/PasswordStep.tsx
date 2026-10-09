@@ -11,8 +11,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ViewIcon, ViewOffIcon, WarningIcon } from "@chakra-ui/icons";
-import { OnboardingCanvas, OnboardingFooter, OnboardingHeader } from "./OnboardingShell";
+import { ViewIcon, ViewOffIcon } from "@chakra-ui/icons";
+import { OnboardingCanvas, OnboardingFooter, OnboardingHeader, OnboardingHint } from "./OnboardingShell";
 import {
   MAX_PASSWORD_LENGTH,
   MIN_NEW_PASSWORD_LENGTH,
@@ -21,6 +21,7 @@ import {
 type Errors = { password?: string; confirmPassword?: string };
 
 export function PasswordStep({
+  createNewWallet = false,
   password,
   confirmPassword,
   showPassword,
@@ -33,6 +34,7 @@ export function PasswordStep({
   onProgressStepClick,
   onContinue,
 }: {
+  createNewWallet?: boolean;
   password: string;
   confirmPassword: string;
   showPassword: boolean;
@@ -51,9 +53,9 @@ export function PasswordStep({
 
   return (
     <OnboardingCanvas
-      currentStep={2}
-      onStepClick={onProgressStepClick}
-      header={<OnboardingHeader onBack={onBack} step={2} />}
+      currentStep={createNewWallet ? undefined : 2}
+      onStepClick={isSubmitting ? undefined : onProgressStepClick}
+      header={<OnboardingHeader onBack={isSubmitting ? undefined : onBack} step={createNewWallet ? undefined : 2} />}
       footer={
         <OnboardingFooter>
           <Button
@@ -72,10 +74,7 @@ export function PasswordStep({
       <VStack align="stretch" spacing={6}>
         <VStack align="stretch" spacing={1.5}>
           <Text as="h1" fontSize="2xl" fontWeight="700" letterSpacing="-0.02em">
-            Protect your wallet
-          </Text>
-          <Text color="fg.secondary" fontSize="sm" lineHeight="1.5">
-            Create a password to encrypt your WalletChan credentials on this device.
+            Create a password
           </Text>
         </VStack>
 
@@ -124,17 +123,16 @@ export function PasswordStep({
           </FormControl>
         </VStack>
 
-        <Box p={3.5} bg="surface.raised" border="1px solid" borderColor="border.default" borderRadius="lg">
-          <Box display="flex" alignItems="center" gap={3}>
-            <WarningIcon color="accent.highlight" flexShrink={0} />
-            <VStack align="stretch" spacing={1}>
-              <Text fontSize="sm" fontWeight="600">WalletChan cannot recover this password</Text>
-              <Text color="fg.secondary" fontSize="xs" lineHeight="1.5">
-                If you forget it, you will need to reset the extension and import your accounts again.
-              </Text>
-            </VStack>
-          </Box>
-        </Box>
+        <OnboardingHint>
+          <Text fontSize="sm" color="fg.secondary" lineHeight="1.5">
+            <Box as="span" fontWeight="600" color="fg.primary">
+              {createNewWallet ? "Back up your wallet after setup." : "Keep your password safe."}
+            </Box>{" "}
+            {createNewWallet
+              ? "Until then, losing your password means losing access."
+              : "If you forget it, reset the wallet and import your accounts again."}
+          </Text>
+        </OnboardingHint>
       </VStack>
     </OnboardingCanvas>
   );

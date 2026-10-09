@@ -1,3 +1,4 @@
+import { ViewOnlySigningNotice } from "@/components/shared/ViewOnlySigningNotice";
 import { Button, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import type { PendingTxRequest } from "@/chrome/requests/pendingTxStorage";
@@ -99,6 +100,7 @@ export function SafeProposalConfirmation({
     () => new Set(ownerAccounts.map((account) => account.id)),
     [ownerAccounts],
   );
+  const missingOwner = ownerAccounts.length === 0 && ["draft", "approvedLocally", "awaitingApprovals"].includes(proposal.state);
   const availableOwners = useMemo(
     () => getAvailableSafeOwnerAccounts(accounts, snapshot, proposal),
     [accounts, proposal, snapshot],
@@ -211,7 +213,9 @@ export function SafeProposalConfirmation({
   const footerRequiresOnchainRejection = submissionLocked ? submissionFooter.requiresOnchainRejection : requiresOnchainRejection;
   const preparingCombined = combined && !preparationError &&
     (!reviewFresh || !executionPreview || gasLoading || (!isRejection && simulationLoading));
-  const disabledReason = safeRiskDecision.blocked
+  const disabledReason = missingOwner
+    ? "Add a Safe owner account to approve this request"
+    : safeRiskDecision.blocked
     ? "Acknowledge the Safe transaction warnings"
     : !reviewFresh
     ? "Refreshing Safe authority"
@@ -228,7 +232,7 @@ export function SafeProposalConfirmation({
         : primaryActionKind === "execute" && feePaymentToken !== "native" && !feePaymentQuote?.quoteId
           ? "Choose a current fee-token quote"
           : null;
-  const primaryAction = !displayRequestView ? undefined : primaryActionKind || submissionLocked ? (
+  const primaryAction = !displayRequestView ? undefined : primaryActionKind || submissionLocked || missingOwner ? (
     <SafeProposalPrimaryAction
       isPreparing={preparingCombined}
       eligible={combinedEligible} combined={combined}
@@ -375,6 +379,7 @@ export function SafeProposalConfirmation({
       ) : undefined}
       actionNotice={displayRequestView ? <>
         <SafeRiskDecision decision={safeRiskDecision} isDisabled={busy || submissionLocked} />
+        {missingOwner && <ViewOnlySigningNotice message="Add a Safe owner account to approve this request." />}
         {executionBlockedReason ?? (simulationUnavailable
           ? "Simulation is unavailable. Review the call details carefully." : undefined)}
       </> : undefined}
