@@ -10,18 +10,46 @@ To regenerate the `[Unreleased]` section from git diffs, invoke the `/changelog`
 
 ## [Unreleased]
 
-### Security
+_Nothing yet._
 
-- Safe transaction reviews disclose risky delegatecalls, including nested
-  MultiSend delegatecalls, and enabled gas reimbursement. Critical warnings in
-  the bottom decision area require acknowledgement before signing or execution;
-  imported proposals retain their original signed fields and hashes.
+## [4.2.0] - 2026-10-10
+
+### Added
+
+- Force inclusion on Robinhood mainnet and testnet, plus Ledger support for eligible single transactions on supported OP Stack and Arbitrum routes.
+- Editable block explorer URLs for built-in networks, with Monadscan as the default for Monad.
+- Automatic portfolio refresh every 60 seconds while open.
+- Safe import during initial wallet setup, with guidance for adding an eligible owner.
+- Sign & Execute for eligible private-key, seed-phrase, and Ledger Safe owners when their signature completes the threshold for the current nonce.
+
+### Changed
+
+- New-wallet setup separates wallet creation from importing or connecting an account, with a persistent Home reminder to back up newly generated seed phrases.
+- Safe requests are grouped by network and nonce, while submitted and completed transactions appear in Activity.
+- Token-paid gas can select an available funded fee token when native gas is insufficient, preserves manual choices, and refreshes valid quotes before expiry.
+- Approval summaries, advanced signature details, portfolio options, Bankr chat, and the receive QR screen have clearer layouts.
+- Clear-signing descriptions refresh daily.
+
+### Removed
+
+- Built-in same-chain swaps on Berachain, Mantle, Scroll, and Sonic following quote-provider deprecation.
 
 ### Fixed
 
-- Imported Safes can connect to injected-provider dapps independently of their
-  current approval/execution capability, with clearer account selection.
-- MultiSend decoding accepts zero-length calldata at the end of a batch.
+- Imported Safes can connect to injected-provider dapps independently of their current approval or execution capability, with clearer account selection.
+- MultiSend decoding accepts zero-length calldata at the end of a batch, and block-explorer summaries decode supported Safe execution calls.
+- Portfolio refresh requests fresh data, borrowed assets reduce DeFi net worth, and missing WCHAN valuations receive a fallback price lookup.
+- Bankr typed-data signing accepts supported chain ID encodings, and chat explains missing Agent API access and reports failed or empty responses.
+- Shield reports actionable insufficient-ETH errors, and Privacy Pools eligibility checks handle growing membership datasets.
+- Creating a seed wallet during onboarding no longer stalls on authentication.
+- Cached account names and avatars remain visible while refreshing in the background.
+- Enabled confirmation buttons retain readable contrast, and account-type buttons preserve their native accessibility semantics.
+
+### Security
+
+- Safe transaction reviews disclose risky delegatecalls, including nested MultiSend delegatecalls, and enabled gas reimbursement. Critical warnings require acknowledgement before signing or execution; imported proposals retain their original signed fields and hashes.
+- Swap price-impact warnings above 3% require acknowledgement for the current quote, including the final quote and each refresh before submission or Safe proposal creation.
+- Legacy token approvals reject malformed address padding instead of displaying misleading decoded addresses.
 
 ## [4.1.0] - 2026-09-08
 
@@ -839,7 +867,8 @@ This release is a full rebuild of the wallet — multiple account types, a real 
 - View address on Debank from the homepage.
 - Lock-wallet button and footer attribution.
 
-[Unreleased]: https://github.com/apoorvlathey/walletchan/compare/v4.1.0...HEAD
+[Unreleased]: https://github.com/walletchan/walletchan/compare/v4.2.0...HEAD
+[4.2.0]: https://github.com/walletchan/walletchan/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/apoorvlathey/walletchan/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/apoorvlathey/walletchan/compare/v3.19.0...v4.0.0
 [3.19.0]: https://github.com/apoorvlathey/walletchan/compare/v3.18.0...v3.19.0

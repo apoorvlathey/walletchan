@@ -13,8 +13,9 @@ group.
 
 You can:
 
-- Generate a new recovery phrase, reveal it deliberately, and confirm that you
-  saved it.
+- Create a new wallet during first setup, then back up its phrase from Home.
+- Generate a phrase when adding a seed account, reveal it deliberately, and
+  confirm that you saved it.
 - Import an existing phrase after validation.
 - Preview standard derived addresses before storing the account.
 - Select one or more addresses to add.
@@ -40,6 +41,15 @@ selected key from the seed phrase only within the authorized operation.
 Revealing the seed phrase requires current master authorization. An agent
 password is never enough. Anyone with the phrase can control every derived
 account, including addresses you have not added to WalletChan yet.
+
+If you chose **Create new wallet** during setup, Home shows **Back up your
+wallet** until you reveal the phrase, select **I saved these words somewhere
+safe**, and choose **Finish backup**. The reminder remains across browser
+restarts. Closing the reveal screen does not mark the backup complete. Existing
+and imported seed groups do not gain this reminder.
+
+Complete the [offline backup](/security/backups#seed-phrase-account) before
+adding funds.
 
 ## Remove
 

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import path from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 import { chromium } from "@playwright/test";
@@ -9,7 +11,9 @@ const ADDRESS = "0x1111111111111111111111111111111111111111";
 
 test("reopened identities retain expired names and avatars during refresh", async () => {
   const root = fileURLToPath(new URL("../../", import.meta.url));
+  const cacheDir = await mkdtemp(path.join(tmpdir(), "walletchan-identity-vite-"));
   const server = await createServer({
+    cacheDir,
     root, configFile: false, logLevel: "error",
     resolve: { alias: { "@": path.join(root, "src") } },
     server: { host: "127.0.0.1", port: 0 },
@@ -105,5 +109,6 @@ test("reopened identities retain expired names and avatars during refresh", asyn
   } finally {
     await browser?.close();
     await server.close();
+    await rm(cacheDir, {recursive:true,force:true});
   }
 });

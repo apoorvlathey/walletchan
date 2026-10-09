@@ -34,6 +34,13 @@ Compare exact addresses and derive/load later indices. The address may be
 `#1`, `#2`, or later rather than the first previewed derivation. Confirm you
 used the correct 12 words and phrase order.
 
+## Account name or avatar is outdated
+
+WalletChan keeps the cached name and avatar visible while refreshing them.
+Open account settings and choose **Refresh ENS Data** for a fresh lookup.
+Name and image services can be unavailable independently of your wallet; verify
+the full address before sending funds. See [account identity controls](/accounts/manage).
+
 ## Ledger does not connect
 
 1. Use a Chromium browser with WebHID.
@@ -48,7 +55,7 @@ request error; retry only after the previous request terminates.
 ## Balance is missing or stale
 
 - Check account and network filters.
-- Turn off a manually selected filter or **Filter follows dapp chain** if it
+- Turn off a manually selected filter or **Auto filter chain** if it
   moved the portfolio.
 - Expand Low-value assets and check Currently Hidden.
 - Confirm the RPC chain ID and try another trusted saved endpoint.
@@ -95,6 +102,13 @@ The nonce is fixed and cannot be edited in replacement review.
 Check chain/token support, account type, amount, balance, liquidity, token
 metadata, RPC health, slippage, and quote service. Ledger should use a swap
 dapp because the built-in shortcut is disabled for Ledger.
+
+## Swap asks me to acknowledge price impact again
+
+Acknowledgement applies to the quote you reviewed. The final quote and any
+refreshed quote require a new acknowledgement when estimated price impact
+exceeds 3%. Review the amount received before proceeding; see
+[swap quote review](/wallet/swap-and-bridge).
 
 ## Bridge is still pending
 

@@ -34,7 +34,11 @@ token balance while leaving the chosen gas asset separate.
 
 On eligible networks and accounts, open the fee-asset picker. It shows supported
 tokens, balance, maximum quoted fee, logo, and stablecoin fiat equivalent where
-available. Native currency remains the default.
+available. Native currency is the initial selection. If native funds are
+insufficient, WalletChan can select an available fee token with a known positive
+balance once for that request. Your manual selection takes precedence. A
+positive balance does not guarantee it covers the quoted fee; review the final
+quote before confirming.
 
 Token-paid gas uses a bounded ERC-4337/Pimlico route and a compatible
 WalletChan EIP-7702 delegate.
@@ -52,9 +56,12 @@ availability.
 
 ## Quotes and failures
 
-Fee quotes expire and are not silently reused. If a quote or preparation fails,
-choose Retry or return to native gas. An insufficient-token message may suggest
-reducing a transfer amount or choosing the native token.
+Valid fee quotes refresh in the background before expiry, up to five times.
+After that allowance is exhausted, expiry requires **Retry**; provider failures
+also require Retry. Expired quotes cannot authorize submission. Retry resets the
+refresh allowance, and WalletChan never automatically submits or switches back
+to native gas. An insufficient-token message may suggest reducing a transfer
+amount or choosing the native token.
 
 ## L2 fees
 

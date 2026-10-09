@@ -30,7 +30,15 @@ nonce, existing confirmations, threshold, and execution readiness.
 - **Approve** adds the selected owner's confirmation.
 - **Execute** submits after the threshold and current Safe state allow it.
 
-A proposal can be visible before it is executable. Refresh to reconcile
+When only your signature is missing and the proposal's nonce is executable, an
+eligible private-key, seed-phrase, or Ledger owner can choose **Sign & Execute**.
+This pays native execution gas from that owner. The action menu retains
+**Sign offchain**; Bankr owners can approve but cannot use combined execution.
+
+Requests groups pending proposals by network and nonce, including competing
+proposals. Future-nonce requests can collect approvals but wait for earlier
+nonces before execution. Submitted transactions move to Activity, where
+completed entries show read-only transaction details. Refresh to reconcile
 onchain and service state when another owner acts outside WalletChan.
 
 ## Transaction warnings

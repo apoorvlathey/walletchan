@@ -20,7 +20,7 @@ advanced feature supports it.
 | Arbitrum | 42161 | Swaps, EIP-7702, Bankr |
 | Avalanche | 43114 | Swaps |
 | Base | 8453 | Swaps, EIP-7702, Flashblocks, Bankr |
-| Berachain | 80094 | Swaps, EIP-7702 |
+| Berachain | 80094 | EIP-7702; built-in swaps unavailable |
 | Blast | 81457 | Hidden by default |
 | BNB Chain | 56 | Swaps, EIP-7702, Bankr |
 | HyperEVM | 999 | Swaps, EIP-7702 |
@@ -72,8 +72,9 @@ See [Networks and RPCs](/settings/networks-and-rpcs).
 - **Fee tokens** require compatible smart-account/paymaster infrastructure.
 - **EIP-7702** and atomic batches require chain support or an explicitly
   configured delegate.
-- **Force inclusion** applies only to eligible OP Stack routes and account
-  paths.
+- **Force inclusion** applies to eligible OP Stack and Arbitrum parent-chain
+  routes, including Robinhood mainnet/testnet. See [force inclusion account
+  support](/transactions/force-inclusion).
 - **Bankr** remote signing only accepts networks supported by the Bankr API.
 
 WalletChan hides or explains an unavailable action rather than treating the

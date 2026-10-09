@@ -33,6 +33,11 @@ The first paint may use cached portfolio data while WalletChan verifies current
 onchain balances. If a portfolio provider is unavailable, balances can still
 load while prices or DeFi positions remain incomplete.
 
+While the portfolio stays open, WalletChan refreshes it every 60 seconds without
+clearing the displayed balances. To request fresh data sooner, open portfolio
+options and choose **Refresh portfolio**. The action is disabled while a
+refresh is already running.
+
 ## Assets
 
 The Assets tab includes native currency, ERC-20s, recently received tokens,
@@ -44,7 +49,7 @@ custom tokens, and Shielded ETH where relevant.
 - Select an asset to start Send; the Swap shortcut preserves that asset.
 - Enable **Unify balances** to group canonical ETH, USDC, and USDT across
   networks.
-- Enable **Follow dapp network** so Assets and Activity follow the connected
+- Enable **Auto filter chain** so Assets and Activity follow the connected
   tab's chain until you manually choose another filter.
 
 ## Positions
@@ -52,6 +57,11 @@ custom tokens, and Shielded ETH where relevant.
 The Positions tab shows supported DeFi positions. An empty Positions tab can
 mean the account has no detected positions or the data source is temporarily
 unavailable; it does not move or change your positions.
+
+Position values subtract borrowed assets from supplied assets and rewards, so
+a position or portfolio total can be negative. Position details distinguish
+borrowed assets from holdings. WCHAN holdings and position legs use an
+additional price lookup when the portfolio source has no WCHAN price.
 
 ## Activity
 
