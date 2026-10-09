@@ -434,8 +434,15 @@ Relevant files:
   does not become an oversized floating block.
 - The portfolio menu opens a mobile action sheet containing:
   - Refresh portfolio
+  - Unify balances and Auto filter chain
   - Add custom token
-  - Hidden tokens
+  - Hide tokens
+- Group refresh, display preferences, and token management with spacing and
+  dividers between groups. Keep labels and icons at full foreground contrast;
+  actions use semibold labels, preferences use regular weight, and enabled
+  preferences retain amber checkmarks.
+- Use compact sheet density with 44px action targets and 4px on each side of
+  group dividers to keep the five-option menu short.
 - Do not restore separate `+` and reload buttons beside the network filter.
 
 ### 5.9 Asset rows and token action sheet

@@ -32,6 +32,8 @@ export interface ActionSheetChoice {
   description?: ReactNode;
   /** Optional decorative icon. Its accessible name comes from `label`. */
   icon?: ReactElement;
+  /** Adjacent choices with the same group share spacing instead of a divider. */
+  group?: string;
   /** Marks the current choice without changing the button's semantics. */
   isSelected?: boolean;
   /** Keeps selection emphasis on the checkmark instead of tinting the row. */
@@ -48,6 +50,8 @@ export interface ActionSheetProps {
   description?: ReactNode;
   /** Optional non-choice utility content rendered beneath the actions. */
   footer?: ReactNode;
+  /** Compact menus retain 44px targets while reducing surrounding whitespace. */
+  density?: "comfortable" | "compact";
   /**
    * Two through six simple choices. Longer, searchable, or grouped sets belong
    * in a full-screen picker. Kept as an array so mapped domain data needs no
@@ -80,6 +84,7 @@ export const ActionSheet = forwardRef<HTMLElement, ActionSheetProps>(
       title,
       description,
       footer,
+      density = "comfortable",
       choices,
       onSelect,
       finalFocusRef,
@@ -89,6 +94,7 @@ export const ActionSheet = forwardRef<HTMLElement, ActionSheetProps>(
     ref,
   ) {
     const { tokens } = useTheme();
+    const isCompact = density === "compact";
     const prefersReducedMotion = usePrefersReducedMotion();
     useSheetTransitionSound(isOpen);
 
@@ -153,7 +159,7 @@ export const ActionSheet = forwardRef<HTMLElement, ActionSheetProps>(
               boxSize="44px"
             />
 
-            <DrawerHeader px={4} pt={5} pb={description ? 1 : 3} pr={16}>
+            <DrawerHeader px={4} pt={isCompact ? 4 : 5} pb={description ? 1 : isCompact ? 2 : 3} pr={16}>
               <Box as="h2" fontSize="lg" lineHeight="1.3">
                 {title}
               </Box>
@@ -161,8 +167,8 @@ export const ActionSheet = forwardRef<HTMLElement, ActionSheetProps>(
 
             <DrawerBody
               px={4}
-              pt={description ? 2 : 1}
-              pb="calc(16px + env(safe-area-inset-bottom, 0px))"
+              pt={description ? 2 : isCompact ? 0 : 1}
+              pb={`calc(${isCompact ? 12 : 16}px + env(safe-area-inset-bottom, 0px))`}
               overflowY="auto"
               overscrollBehavior="contain"
             >
@@ -177,17 +183,24 @@ export const ActionSheet = forwardRef<HTMLElement, ActionSheetProps>(
                   <Box
                     as="li"
                     key={choice.id}
-                    borderBottomWidth={index < choices.length - 1 ? "1px" : "0"}
+                    borderBottomWidth={
+                      index < choices.length - 1 &&
+                      (!choice.group || choice.group !== choices[index + 1].group)
+                        ? "1px"
+                        : "0"
+                    }
                     borderColor="border.subtle"
+                    pb={choice.group && choice.group !== choices[index + 1]?.group && index < choices.length - 1 ? isCompact ? 1 : 2 : 0}
+                    mb={choice.group && choice.group !== choices[index + 1]?.group && index < choices.length - 1 ? isCompact ? 1 : 2 : 0}
                   >
                     <Button
                       type="button"
                       variant="ghost"
                       w="full"
                       h="auto"
-                      minH={choice.description ? "64px" : "56px"}
+                      minH={choice.description ? "64px" : isCompact ? "44px" : "56px"}
                       px={3}
-                      py={3}
+                      py={isCompact ? 2 : 3}
                       justifyContent="flex-start"
                       borderRadius={tokens.radii.button}
                       color={choice.isDestructive ? "status.error.fg" : "fg.primary"}
