@@ -1,10 +1,6 @@
+import { estimateSingleL2Gas } from "./singleGasEstimation";
 import { writeResultToStorage } from "../transactions/runtime";
-import {
-  createPublicClient,
-  createWalletClient,
-  type Hash,
-  type TransactionReceipt,
-} from "viem";
+import { createWalletClient, type Hash, type TransactionReceipt } from "viem";
 import { localForceInclusionSigner, type RawForceInclusionSigner } from "../forceInclusion/rawSigner";
 import { FORCE_INCLUSION_CHAINS } from "@/constants/chainRegistry";
 import { secureHttpTransport } from "../network/rpcClient";
@@ -17,9 +13,8 @@ import {
   type PendingRequestEffectLease,
 } from "../requests/pendingRequestResolution";
 import type { PendingTxRequest } from "../requests/pendingTxStorage";
-import { getRpcUrl } from "../transactions/rpcConfig";
 import { updateTxInHistory } from "../txHistoryStorage";
-import { buildL1DepositTxParams, DEFAULT_L2_GAS } from "./deposit";
+import { buildL1DepositTxParams } from "./deposit";
 import {
   createL1PublicClient,
   getL1Chain,
@@ -81,28 +76,7 @@ export async function processForceInclusionLocal(
       historyInitialized = true;
     }
     await progress("building");
-    const l2RpcUrl = await getRpcUrl(pending.tx.chainId);
-    if (!l2RpcUrl) throw new Error("No RPC URL for L2 chain");
-    const l2Client = createPublicClient({
-      chain: info.viemChain,
-      transport: secureHttpTransport(l2RpcUrl, { timeout: L1_RPC_TIMEOUT }),
-    });
-    const value =
-      pending.tx.value && pending.tx.value !== "0x0"
-        ? BigInt(pending.tx.value)
-        : 0n;
-    let l2Gas = DEFAULT_L2_GAS;
-    try {
-      const estimated = await l2Client.estimateGas({
-        account: pending.tx.from as `0x${string}`,
-        to: pending.tx.to as `0x${string}` | undefined,
-        value,
-        data: (pending.tx.data as `0x${string}`) || undefined,
-      });
-      l2Gas = (estimated * 120n) / 100n;
-    } catch {
-      // Preserve the conservative default when L2 estimation fails.
-    }
+    const l2Gas = await estimateSingleL2Gas(pending.tx, info.viemChain);
 
     await progress("submitting");
     const l1RpcUrl = await getL1RpcUrl(info.l1ChainId);

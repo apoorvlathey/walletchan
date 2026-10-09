@@ -4,7 +4,10 @@
     "types": ["chrome", "vite/client"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      // Keep transitive JSX declarations on the extension's React 18 contract.
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"]
     },
     "moduleResolution": "bundler",
     "noEmit": true,

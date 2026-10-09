@@ -1,3 +1,4 @@
+export { ERC20_ALLOWANCE_ABI, PERMIT2_ALLOWANCE_ABI } from "./allowanceAbis";
 export const ERC20_MUTATION_ABI = [
   {
     type: "function",
@@ -257,34 +258,3 @@ export const SAFE_MULTISEND_ABI = [
 export const SAFE_MULTISEND_SELECTOR = "0x8d80ff0a";
 export const ERC7821_EXECUTE_SELECTOR = "0xe9ae5c53";
 export const SELF_MULTICALL_SELECTOR = "0xac9650d8";
-
-export const ERC20_ALLOWANCE_ABI = [
-  {
-    type: "function",
-    name: "allowance",
-    stateMutability: "view",
-    inputs: [
-      { name: "owner", type: "address" },
-      { name: "spender", type: "address" },
-    ],
-    outputs: [{ name: "remaining", type: "uint256" }],
-  },
-] as const;
-
-export const PERMIT2_ALLOWANCE_ABI = [
-  {
-    type: "function",
-    name: "allowance",
-    stateMutability: "view",
-    inputs: [
-      { name: "owner", type: "address" },
-      { name: "token", type: "address" },
-      { name: "spender", type: "address" },
-    ],
-    outputs: [
-      { name: "amount", type: "uint160" },
-      { name: "expiration", type: "uint48" },
-      { name: "nonce", type: "uint48" },
-    ],
-  },
-] as const;

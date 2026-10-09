@@ -1,3 +1,4 @@
+import { connectQaDapp } from "./extension-dapp-qa-support";
 import { type Page, type Worker } from "@playwright/test";
 import { access, mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -81,6 +82,7 @@ async function openDapp(profile: WalletProfile, origin: string): Promise<Page> {
   const dapp = await profile.context.newPage();
   await dapp.goto(origin, { waitUntil: "domcontentloaded" });
   await waitForProvider(dapp);
+  await connectQaDapp(dapp, profile.extensionId, "__walletQa");
   return dapp;
 }
 
@@ -97,13 +99,9 @@ async function verifyViewOnlyRequest(
   const popup = await waitForPopup(profile.context, profile.extensionId, ignored);
   const isTx = kind === "tx";
   await popup.getByRole("heading", {
-    name: isTx ? "Transaction request" : "Review signature",
+    name: isTx ? "Transaction request" : "Signature request",
   }).waitFor({ timeout: 20_000 });
-  await popup.getByText(
-    isTx
-      ? /Connected via an impersonated account\. Signing is disabled\./i
-      : /view-only account and cannot create signatures/i,
-  ).waitFor();
+  await popup.getByText("View-only accounts can't sign", { exact: true }).waitFor();
   if (await popup.getByRole("button", { name: isTx ? "Confirm" : "Sign", exact: true }).count()) {
     throw new Error(`${isTx ? "Confirm" : "Sign"} was exposed for a view-only account`);
   }
@@ -204,7 +202,7 @@ async function runBatch(wallet: WalletType, origin: string): Promise<BatchEviden
     }));
     if (!ack.id || ack.settlements !== 1) throw new Error(`Bad batch ack: ${JSON.stringify(ack)}`);
     const initial = await waitForPopup(profile.context, profile.extensionId, ignored);
-    await initial.getByRole("heading", { name: "Review batch" }).waitFor({ timeout: 20_000 });
+    await initial.getByRole("heading", { name: "Batch request" }).waitFor({ timeout: 20_000 });
     await initial.getByRole("button", { name: "Confirm", exact: true }).waitFor();
     await initial.getByRole("button", { name: "Reject", exact: true }).waitFor();
     await assertReviewSurface(initial);
@@ -215,7 +213,7 @@ async function runBatch(wallet: WalletType, origin: string): Promise<BatchEviden
     const pendingAfterClose = await queueLength(profile.worker, "pendingBatchTxRequests");
     if (pendingAfterClose !== 1) throw new Error("Batch disappeared when popup closed");
     const reopened = await reopenPopup(profile);
-    await reopened.getByRole("heading", { name: "Review batch" }).waitFor({ timeout: 20_000 });
+    await reopened.getByRole("heading", { name: "Batch request" }).waitFor({ timeout: 20_000 });
     await reopened.getByRole("button", { name: "Confirm", exact: true }).waitFor();
     await assertReviewSurface(reopened);
     const screenshotPath = path.join(OUTPUT_DIR, `${wallet}-batch.png`);

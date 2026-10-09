@@ -1,3 +1,4 @@
+import { completeQaOnboarding } from "./extension-onboarding-qa-support";
 import {
   chromium,
   type BrowserContext,
@@ -46,16 +47,9 @@ async function onboardPrivateKey(page: Page, extensionId: string) {
   await page.goto(`chrome-extension://${extensionId}/onboarding.html`, {
     waitUntil: "domcontentloaded",
   });
-  await page.getByRole("button", { name: "Set up WalletChan" }).click();
-  await page.getByRole("radio", { name: /^Private key\b/ }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByLabel("Private Key").fill(TEST_PRIVATE_KEY);
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  await page.getByLabel("Confirm password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Create wallet" }).click();
-  await page.getByRole("heading", { name: "Your wallet is ready" }).waitFor({
-    timeout: 40_000,
+  await completeQaOnboarding(page, {
+    wallet: "privateKey", password: PASSWORD, privateKey: TEST_PRIVATE_KEY,
+    bankrApiKey: "walletchan-daily-use-qa-key",
   });
 
   const [mode, networks] = await Promise.all([
@@ -148,41 +142,31 @@ async function openScreen(
 }
 
 async function testNetworkRoundTrip(page: Page, worker: Worker): Promise<string> {
-  const trigger = page.getByRole("button", { name: "Choose network" });
-  const initial = (await trigger.innerText()).trim();
-  const alternate = initial === "Ethereum" ? "Base" : "Ethereum";
-
-  const select = async (name: string) => {
-    await trigger.click();
-    await page.getByRole("heading", { name: "Choose network" }).waitFor();
-    await page.getByRole("button", { name: new RegExp(`^${name}\\b`) }).click();
-    await page.waitForFunction(
-      (expected) =>
-        document.querySelector<HTMLButtonElement>('[aria-label="Choose network"]')
-          ?.innerText.trim() === expected,
-      name,
-    );
-  };
-
-  await select(alternate);
-  const changed = await worker.evaluate(async () =>
+  const walletChain = await worker.evaluate(async () =>
     (await chrome.storage.sync.get("chainName")).chainName,
   );
-  if (changed !== alternate) throw new Error("Network change was not persisted");
-  await select(initial);
-  const restored = await worker.evaluate(async () =>
+  await page.getByRole("button", { name: "All networks", exact: true }).click();
+  await page.getByRole("heading", { name: "Filter by network", exact: true }).waitFor();
+  await page.getByRole("button", { name: /^Ethereum\b/ }).click();
+  const ethereum = page.getByRole("button").filter({ hasText: /^Ethereum$/ });
+  await ethereum.waitFor();
+  await ethereum.click();
+  await page.getByRole("heading", { name: "Filter by network", exact: true }).waitFor();
+  await page.getByRole("button", { name: /^All networks\b/ }).click();
+  await page.getByRole("button", { name: "All networks", exact: true }).waitFor();
+  const walletChainAfter = await worker.evaluate(async () =>
     (await chrome.storage.sync.get("chainName")).chainName,
   );
-  if (restored !== initial) throw new Error("Initial network was not restored");
-  return `${initial} → ${alternate} → ${initial}`;
+  if (walletChainAfter !== walletChain) throw new Error("Portfolio filtering changed the wallet signing network");
+  return "All networks → Ethereum → All networks";
 }
 
 async function testAccountSwitching(page: Page) {
   await page.getByRole("button", { name: "Choose account" }).click();
   await page.getByRole("heading", { name: "Choose account" }).waitFor();
-  await page.getByRole("button", { name: /^Add account\b/ }).click();
+  await page.getByRole("button", { name: "Add account", exact: true }).click();
   await page.getByRole("heading", { name: "Add account" }).waitFor();
-  await page.locator("label").filter({ hasText: "View-only" }).click();
+  await page.getByRole("button", { name: /View-only/ }).click();
   await page
     .getByPlaceholder("0x..., ENS, Basename, .wei, .gwei, or .mega")
     .fill(WATCH_ADDRESS);
@@ -198,12 +182,13 @@ async function testAccountSwitching(page: Page) {
     .filter({ hasText: "QA watch account" })
     .first()
     .click();
-  await page.getByRole("button", { name: "Choose account" }).filter({
-    hasText: "QA watch account",
-  }).waitFor();
-  if (await page.getByRole("navigation", { name: "Wallet actions" }).isVisible()) {
-    throw new Error("View-only account exposed signing actions");
+  await page.getByRole("button", { name: "Choose account" }).waitFor();
+  const selected = await page.evaluate(() => chrome.runtime.sendMessage({ type: "getActiveAccount" }));
+  if (selected?.type !== "impersonator" || selected.address.toLowerCase() !== WATCH_ADDRESS.toLowerCase()) {
+    throw new Error("View-only account selection did not persist");
   }
+  // View-only accounts retain Send/Swap review entrypoints; the background
+  // separately enforces the no-signing policy covered by the security suite.
 
   await page.getByRole("button", { name: "Choose account" }).click();
   await page
@@ -258,8 +243,7 @@ async function run(): Promise<DailyUseResult> {
     }
     await inspectSurface(page, "Home with portfolio services blocked");
 
-    const actions = page.getByRole("navigation", { name: "Wallet actions" });
-    await actions.getByRole("button", { name: "Receive", exact: true }).click();
+    await page.getByRole("button", { name: "Show active address QR code", exact: true }).click();
     const receive = page.getByRole("dialog", { name: "Receive" });
     await receive.waitFor();
     await receive.getByRole("img", { name: "Wallet address QR code" }).waitFor();
@@ -267,7 +251,7 @@ async function run(): Promise<DailyUseResult> {
     destinations.push("Receive");
     await receive.getByRole("button", { name: "Close" }).click();
     await openScreen(page, "Send", "Send", destinations);
-    await openScreen(page, "Swap", "Swap or bridge", destinations);
+    await openScreen(page, "Swap", "Swap", destinations);
     await openScreen(page, "More", "More", destinations);
 
     await testAccountSwitching(page);
@@ -284,7 +268,7 @@ async function run(): Promise<DailyUseResult> {
 
     await page.getByRole("button", { name: "Lock wallet" }).click();
     await page.getByRole("heading", { name: "WalletChan", exact: true }).waitFor();
-    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+    await page.getByLabel("Enter password to unlock", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Unlock", exact: true }).click();
     await waitForHome(page);
     destinations.push("Lock and unlock");

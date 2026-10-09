@@ -76,3 +76,14 @@ export function finalizePortfolioTokens(
     ),
   };
 }
+
+/** Fill missing ERC-20 prices without replacing native or already priced assets. */
+export function applyErc20Prices(tokens: PortfolioToken[], prices: Map<string, number>): PortfolioToken[] {
+  return tokens.map((token) => {
+    if (isNativeToken(token) || token.priceUsd > 0) return token;
+    const price = prices.get(`${token.chainId}-${token.contractAddress.toLowerCase()}`);
+    if (!price || price <= 0) return token;
+    const balance = parseFloat(token.balance || "0");
+    return { ...token, priceUsd: price, valueUsd: balance > 0 ? balance * price : 0 };
+  });
+}

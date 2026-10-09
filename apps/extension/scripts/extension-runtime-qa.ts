@@ -1,3 +1,4 @@
+import { connectQaDapp } from "./extension-dapp-qa-support";
 import AxeBuilder from "@axe-core/playwright";
 import { chromium, type BrowserContext, type Page } from "@playwright/test";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
@@ -197,6 +198,7 @@ async function runWalletScenario(
 
     const dapp = await context.newPage();
     await dapp.goto(dappOrigin, { waitUntil: "domcontentloaded" });
+    await connectQaDapp(dapp, extensionId, "__walletQa");
     await requestTransaction(dapp);
 
     const initialPopup = await waitForPopup(
@@ -232,6 +234,15 @@ async function runWalletScenario(
     await reopened.getByRole("button", { name: "Confirm", exact: true }).waitFor();
     await reopened.waitForTimeout(500);
 
+    const opacityTransition = await reopened.getByRole("button", { name: "Confirm", exact: true }).evaluate((button) => {
+      const style = getComputedStyle(button);
+      const properties = style.transitionProperty.split(",").map((value) => value.trim());
+      const durations = style.transitionDuration.split(",").map((value) => value.trim());
+      const index = Math.max(properties.lastIndexOf("opacity"), properties.lastIndexOf("all"));
+      return index < 0 ? "0s" : durations[index % durations.length];
+    });
+    if (parseFloat(opacityTransition) !== 0) throw new Error("Confirm animates disabled opacity after enabling");
+
     const surfaceFailures = await inspectSurface(reopened);
     if (surfaceFailures.length) throw new Error(surfaceFailures.join(", "));
     const axe = await new AxeBuilder({ page: reopened })
@@ -244,7 +255,7 @@ async function runWalletScenario(
           `${violation.id}: ${violation.nodes
             .map(
               (node) =>
-                `${node.target.map(String).join(" ")} ${node.html.slice(0, 240)}`,
+                `${node.target.map(String).join(" ")} ${node.html.slice(0, 240)} ${node.failureSummary ?? ""}`,
             )
             .join(", ")}`,
       );

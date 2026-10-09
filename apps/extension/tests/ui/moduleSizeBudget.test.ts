@@ -42,9 +42,7 @@ const transitionalBudgets: Record<string, number> = {
   "preview/PreviewScreens.tsx": 752,
   "preview/fixtures.ts": 731,
   "preview/previewChrome.ts": 1_212,
-  "preview/previewEnvironment.ts": 435,
   "theme/recipes/actions.ts": 419,
-  "theme/tokens.ts": 408,
 };
 
 type SourceFile = {

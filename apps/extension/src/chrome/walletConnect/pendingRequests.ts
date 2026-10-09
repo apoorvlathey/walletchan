@@ -1,3 +1,4 @@
+import { assertSupportedSignatureMethod } from "./signatureMethodPolicy";
 /** Creates account-pinned local confirmation prompts for WalletConnect. */
 
 import { getStoredChainName } from "@/lib/chains";
@@ -154,16 +155,7 @@ export async function createPendingSignatureRequest(
   chainId: number,
   remoteClaimId: string,
 ): Promise<void> {
-  if (method === "eth_sign") {
-    throw new Error(
-      "eth_sign is deprecated and unsafe; use personal_sign or eth_signTypedData_v4",
-    );
-  }
-  if (method === "eth_signTypedData") {
-    throw new Error(
-      "eth_signTypedData (v1) is deprecated; please use eth_signTypedData_v4",
-    );
-  }
+  assertSupportedSignatureMethod(method);
 
   const params = [...requestParams];
   if (

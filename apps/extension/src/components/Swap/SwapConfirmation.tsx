@@ -31,12 +31,11 @@ import { useCachedAvatarSrc } from "@/hooks/useCachedAvatarSrc";
 import { isDarkThemeId, useTheme } from "@/theme";
 import { useNetworks } from "@/contexts/NetworksContext";
 import { getNativeAssetMeta } from "@/lib/chains";
-// Theme-aware accent stripes shared with the batch confirmation surfaces, so a
-// multi-step swap reads as the same kind of "stack of independent calls" in
-// either palette (Bauhaus red/blue/yellow, Midnight indigo/cyan/amber).
+// Share theme-aware call accents with batch confirmation.
 import { CALL_ACCENTS, CALL_ACCENT_FGS } from "@/components/BatchCallsList";
 import { AppHeader, StickyActionBar } from "@/components/ui";
 import type { FeePaymentQuoteSummary } from "@/components/FeePaymentSelector";
+import { SwapPriceImpactNotice } from "./SwapPriceImpactNotice";
 import { SwapDecisionSummary } from "./SwapDecisionSummary";
 import type { SwapConfirmationProps } from "./swapViewTypes";
 
@@ -89,7 +88,7 @@ function SwapConfirmation({
   onValidityChange,
   isNativeGasValid = true,
   isConfirmDisabled,
-  bridgeMeta,
+  bridgeMeta, impactReview,
 }: SwapConfirmationProps) {
   const config = getChainConfig(chainId);
   const isBridge = !!bridgeMeta;
@@ -100,7 +99,7 @@ function SwapConfirmation({
     sellToken.contractAddress === "native" ||
     sellToken.contractAddress === "0x0000000000000000000000000000000000000000";
   const buyChainId = bridgeMeta?.destinationChainId ?? chainId;
-  const titleLabel = isBridge ? "Confirm Bridge" : "Confirm Swap";
+  const titleLabel = accountType === "safe" ? "Create swap proposal" : isBridge ? "Confirm Bridge" : "Confirm Swap";
   const overviewLabel = isBridge ? "Bridge Overview" : "Swap Overview";
 
   // Shared data-URL cache used by ENS avatars + batch summary + portfolio.
@@ -686,7 +685,8 @@ function SwapConfirmation({
     </Box>
 
     <StickyActionBar
-      summary={<SwapDecisionSummary
+      notice={<SwapPriceImpactNotice {...impactReview} isSubmitting={isSubmitting} />}
+      summary={accountType === "safe" ? undefined : <SwapDecisionSummary
         requestId={requestId} disabled={isSubmitting} onRefreshQuote={onRefreshQuote}
         transactions={gasTransactions}
         fromAddress={fromAddress}
@@ -722,7 +722,7 @@ function SwapConfirmation({
             >
               <Spinner size="sm" color="accentFg.highlight" />
               <Text fontSize="sm" color="accentFg.highlight" fontWeight="600">
-                {isBridge ? "Bridging..." : "Submitting swap..."}
+                {accountType === "safe" ? "Creating proposal..." : isBridge ? "Bridging..." : "Submitting swap..."}
               </Text>
         </HStack>
       ) : (
@@ -730,7 +730,7 @@ function SwapConfirmation({
           variant="brand"
           onClick={() => onConfirm(feePaymentToken, feePaymentQuote?.quoteId ?? null)}
           isDisabled={
-            isConfirmDisabled ||
+            isConfirmDisabled || impactReview.decision.blocked ||
             (feePaymentToken === "native" && !isNativeGasValid) ||
             (feePaymentToken !== "native" && !feePaymentQuote?.quoteId)
           }

@@ -20,6 +20,10 @@ authoring rules, common patterns, and how to add a new theme.
 
 ---
 
+Button recipes deliberately exclude opacity from animated properties. Disabled
+opacity must clear immediately on enable, so final actions never become clickable
+while their foreground and background are still dimmed below readable contrast.
+
 ## 1. Architecture at a glance
 
 `status.progress` is the orange ongoing-work status pair. Use its `emphasis`
@@ -54,6 +58,7 @@ The pieces:
 
 | Layer | File | Purpose |
 |---|---|---|
+| Legacy compatibility | `theme/legacyTokenTypes.ts` | Legacy palette types, re-exported through the public token contract. |
 | Contract | `theme/tokens.ts` | `ThemeTokens` interface — every theme must satisfy it. The factory refuses to build if a field is missing. |
 | Themes | `theme/themes/{bauhaus,midnight}.ts` | Concrete `ThemeTokens` objects. |
 | Factory | `theme/createTheme.ts` | Translates a `ThemeTokens` into a Chakra `extendTheme` config (Button / Input / Modal / Menu / Popover / Slider / Tooltip / Badge / Alert baseStyles). |

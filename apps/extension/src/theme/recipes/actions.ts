@@ -13,7 +13,6 @@ export function buildButton(t: ThemeTokens) {
     transform: "none",
     boxShadow: "none",
   };
-
   return {
     baseStyle: {
       minH: "44px",
@@ -21,7 +20,7 @@ export function buildButton(t: ThemeTokens) {
       borderRadius: t.radii.button,
       textTransform: t.labelStyle.transform,
       letterSpacing: t.labelStyle.tracking,
-      transition: t.motion.transitionBase,
+      transition: `${t.motion.transitionBase}, opacity 0s`,
       _focusVisible: {
         outline: "none",
         boxShadow: t.shadows.focus,
@@ -289,7 +288,7 @@ function buildBauhausButton(t: ThemeTokens) {
       borderRadius: t.radii.button,
       textTransform: t.labelStyle.transform,
       letterSpacing: t.labelStyle.tracking,
-      transition: t.motion.transitionBase,
+      transition: `${t.motion.transitionBase}, opacity 0s`,
       _focusVisible: {
         outline: "none",
         boxShadow: t.shadows.focus,

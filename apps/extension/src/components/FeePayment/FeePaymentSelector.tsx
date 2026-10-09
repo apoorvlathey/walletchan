@@ -186,7 +186,7 @@ export function FeePaymentSelector({
             <Text
               color={sufficientBalance ? "fg.primary" : "status.error.fg"}
               fontSize="sm" fontWeight="600" lineHeight="short"
-              fontVariantNumeric="tabular-nums" overflowWrap="anywhere"
+              sx={{ fontVariantNumeric: "tabular-nums" }} overflowWrap="anywhere"
             >
               {formattedMaximum}{" "}
               <Text as="span" color="fg.secondary" fontSize="xs" fontWeight="500">
@@ -194,7 +194,7 @@ export function FeePaymentSelector({
               </Text>
             </Text>
             {isStablecoin && (
-              <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums">
+              <Text color="fg.muted" fontSize="2xs" sx={{ fontVariantNumeric: "tabular-nums" }}>
                 {Number(formattedMaximum) > 0 && Number(formattedMaximum) < 0.01
                   ? "< $0.01"
                   : `≈ ${new Intl.NumberFormat("en-US", {

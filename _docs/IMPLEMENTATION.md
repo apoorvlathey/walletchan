@@ -2026,6 +2026,7 @@ src/
 │   │   ├── deposit.ts     # Zero-mint OptimismPortal calldata + separate L1-gas/L2-value balance estimation
 │   │   ├── singleBankr.ts # Remote-signer single-deposit execution
 │   │   ├── singleLocal.ts # Final-authorized sign-once local execution
+│   │   ├── singleGasEstimation.ts # L2 gas estimate and conservative fallback
 │   │   ├── singleOutcome.ts # Durable confirmed/ambiguous/failure outcomes
 │   │   ├── recovery.ts    # Startup L1 and aggregate-bundle reconciliation
 │   │   ├── batch.ts       # Stable ERC-5792 force-inclusion export facade
@@ -2917,8 +2918,15 @@ the UI preparation handler enforce it. `useSwapPriceImpactDecision` resets
 the checkbox/disclosure synchronously for quote, account, token pair, amount,
 price, chain, slippage, loading, or picker changes, including A → B → A.
 This is a renderer review gate, not signing authority. Missing token prices
-still omit price-impact warnings; firm-quote preparation and final transaction
-review retain their existing behavior. Ledger built-in swaps remain unsupported
+still omit price-impact warnings. Confirmation independently reviews the firm
+quote's sell and buy amounts and their USD values; it never reuses indicative
+output valuation or acknowledgement. Every refreshed prepared request resets
+this acknowledgement, including identical quote amounts. The confirmation
+button and preparation hook's final submission handler both enforce the gate;
+refresh, failed refresh, and cancellation invalidate old confirmation callbacks.
+Safe swaps pass this same firm-quote review before creating the proposal, then
+open the existing Safe approval screen for owner signing and execution.
+Ledger built-in swaps remain unsupported
 and view-only accounts cannot submit.
 
 Swap eligibility follows the exact chain IDs checked in 0x's **Swap and

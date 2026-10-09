@@ -14,6 +14,21 @@ bypass its protection. Merge only when explicitly requested. After a merge,
 return to `master` and fast-forward it while preserving uncommitted local work.
 Leave files requested to stay local out of the PR.
 
+## Extension validation types and onboarding
+
+The extension TypeScript paths resolve React declarations through its own
+React 18 dev dependency, including declarations imported by shared UI packages.
+This keeps the renderer contract consistent without changing other workspace
+apps or suppressing JSX errors. Keep these paths when updating tsconfig.
+
+Browser QA uses `scripts/extension-onboarding-qa-support.ts` for the public
+create/import flow. Seed accounts use Create new wallet; private-key and Bankr
+accounts use Import or connect existing account. QA profiles are temporary.
+The Bankr path fulfills only the ownership-verification challenge with a local
+fixture signer; all other Bankr API requests are blocked. This validates the
+real recovered-address check without live credentials or remote submission.
+Keep this helper aligned with the production onboarding screens.
+
 ## Agent instructions
 
 `AGENTS.md` is the shared repository instruction file; do not maintain a
@@ -179,14 +194,23 @@ extension coverage changes.
 package into fresh Chromium profiles, and runs the transaction, signature,
 view-only/batch, daily-use, and authentication suites. The matrix covers Bankr,
 private-key, and seed-phrase accounts. It uses a local dapp and rejects every
-transaction/signature/batch request, so it never signs or broadcasts test work.
+transaction/signature/batch request, so no requested transaction or message is
+signed or broadcast. Bankr onboarding alone uses the local fixture ownership
+signature described above.
 
 The packaged checks include pending-request persistence across UI close/reopen,
 keyboard rejection, exactly-once EIP-1193 responses, view-only restrictions,
-home actions under failed portfolio/RPC traffic, account/network switching,
+home actions under failed portfolio/RPC traffic, account switching and portfolio
+network filtering without changing the signing network,
 manual lock, master/agent unlock, and agent-session secret restrictions. Real
-WebAuthn ceremonies, assistive-technology smoke, and successful onchain sends
+Ledger device signing, WebAuthn ceremonies, assistive-technology smoke, live
+Bankr signing and successful onchain sends
 remain manual release checks.
+
+Existing-profile upgrade coverage has its own command, `qa:extension:upgrade`,
+with `EXTENSION_QA_BASELINE_BUILD` pointing at a released Chrome build. It uses
+only disposable profiles. See [v4.1.0 upgrade acceptance](./UPGRADE_4_1_0.md)
+and [the publishing workflow](./PUBLISHING.md#testing-an-update-locally).
 
 1. `pnpm dev:extension` (for local testing against `pnpm dev:website`) or `pnpm build:extension` (production-mode build)
 2. Go to `chrome://extensions`
