@@ -56,11 +56,9 @@ const FollowDappNetworkIcon = (props: IconProps) => (
   </Icon>
 );
 
-function PreferenceLabel({ label, help, firstLine }: { label: string; help: string; firstLine?: string }) {
+function PreferenceLabel({ label, help }: { label: string; help: string }) {
   return (
-    <Box as="span">
-      {firstLine && <>{firstLine}<br /></>}
-      <Box as="span" display="inline-flex" alignItems="center" whiteSpace="nowrap">
+    <Box as="span" display="inline-flex" alignItems="center" whiteSpace="nowrap" fontWeight="400">
       {label}
       <Tooltip label={help} hasArrow placement="top">
         <Box
@@ -74,7 +72,7 @@ function PreferenceLabel({ label, help, firstLine }: { label: string; help: stri
           color="fg.muted"
           cursor="help"
           tabIndex={0}
-          aria-label={`About ${firstLine ? `${firstLine} ` : ""}${label}`}
+          aria-label={`About ${label}`}
           onClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -87,7 +85,6 @@ function PreferenceLabel({ label, help, firstLine }: { label: string; help: stri
           <InfoOutlineIcon boxSize="12px" aria-hidden />
         </Box>
       </Tooltip>
-      </Box>
     </Box>
   );
 }
@@ -108,34 +105,39 @@ export function PortfolioOptionsSheet({
   const choices: ActionSheetChoice[] = [
     {
       id: "refresh-portfolio",
-      label: "Refresh portfolio",
+      label: <Box as="span" fontWeight="600">Refresh portfolio</Box>,
       icon: <RepeatIcon boxSize="18px" />,
+      group: "refresh",
       isDisabled: !onRefresh || isRefreshing,
     },
     {
       id: "unify-balances",
       label: <PreferenceLabel label="Unify balances" help="Combine matching tokens across networks into one balance." />,
       icon: <UnifyBalancesIcon boxSize="18px" />,
+      group: "display",
       isSelected: unifyBalances,
       selectionVariant: "indicator-only",
     },
     {
       id: "follow-dapp-network",
-      label: <PreferenceLabel firstLine="Auto filter by" label="dapp's active chain" help="Automatically show assets on the connected dapp’s active network." />,
+      label: <PreferenceLabel label="Auto filter chain" help="Automatically show assets on the connected dapp’s active network." />,
       icon: <FollowDappNetworkIcon boxSize="18px" />,
+      group: "display",
       isSelected: followDappNetwork,
       selectionVariant: "indicator-only",
     },
     {
       id: "add-token",
-      label: "Add custom token",
+      label: <Box as="span" fontWeight="600">Add custom token</Box>,
       icon: <AddIcon boxSize="16px" />,
+      group: "tokens",
     },
     ...(onHideTokens
       ? [{
           id: "hide-tokens",
-          label: "Hide tokens",
+          label: <Box as="span" fontWeight="600">Hide tokens</Box>,
           icon: <ViewOffIcon boxSize="18px" />,
+          group: "tokens",
         }]
       : []),
   ];
@@ -145,6 +147,7 @@ export function PortfolioOptionsSheet({
       isOpen={isOpen}
       onClose={onClose}
       title="Portfolio options"
+      density="compact"
       choices={choices}
       onSelect={(choiceId) => {
         if (choiceId === "refresh-portfolio") {
