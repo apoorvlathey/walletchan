@@ -4905,7 +4905,10 @@ AccountSwitcher.tsx
 ### Cache
 
 - **Storage key**: `ensIdentityCache` in `chrome.storage.local`
-- **TTL**: 6 hours per entry
+- **TTL**: 6 hours per entry. Expired complete identities remain visible while
+  the UI refreshes them in the background; expiry does not blank names or avatars.
+  Partial name hints still wait for verification. This display cache does not
+  authorize payment-address resolution.
 - **Schema**: `Record<lowercaseAddress, { name, avatar, resolvedAt, needsAvatar? }>`
 - **Forward-name hint**: Add contact may write `needsAvatar: true`; the next
   batch keeps that name and fetches only its avatar before clearing the flag.
