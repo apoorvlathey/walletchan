@@ -2291,6 +2291,14 @@ Failures preserve the existing marker-owned compensation and complete-wallet
 recovery rules. Imports and Settings generation retain their existing backup
 behavior.
 
+The seed-creation transport does not hold the auth-transition queue while
+resolving mnemonic authorization, because cold-session restoration enters that
+same queue. Mutation serialization remains in the wallet-secret operation lock,
+with live master/auth-epoch and initialization-owner checks before persistence.
+Router regressions cover cold, expired, locked and agent sessions, fail-closed
+creation, subsequent master unlock, creation and manual lock, and a manual lock
+that invalidates authorization during an in-flight mnemonic read.
+
 The home reminder reads public group metadata only. Its destination reuses
 explicit master-password-gated `revealSeedPhrase`; agent sessions remain blocked.
 The saved-words acknowledgment plus Finish backup sends `confirmed: true` for

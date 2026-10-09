@@ -2401,6 +2401,12 @@ also retains a durable backup reminder:
    requires zero existing accounts, and creates the pending-backup group before
    persisting its encrypted mnemonic and derived key. Its response contains only
    the public account. `addSeedPhraseGroup` still has no generation fallback.
+   The creation route delegates without an outer auth-transition queue: mnemonic
+   authorization owns any cold-session restoration through that queue, then the
+   domain rechecks master authority and marker ownership under the wallet-secret
+   operation lock. Locked or expired sessions fail without blocking later auth
+   operations; a cold master session without mnemonic authority requires fresh
+   master-password unlock before creation.
 4. Completion removes the marker only after the full wallet is structurally
    complete. If that housekeeping removal fails, later status checks recognize
    the complete wallet and remove only the marker—they never roll keys back.

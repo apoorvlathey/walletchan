@@ -159,9 +159,11 @@ export function createBackgroundOnboardingMessageRouter(
       }
 
       case "createOnboardingSeedAccount": {
-        dependencies.runSerializedAuthTransition(() =>
-          dependencies.createOnboardingSeedAccount(initializationId(message.initializationId)),
-        ).then(sendResponse).catch((error) => sendResponse({
+        // Mnemonic authorization may restore a cold session through the auth
+        // queue. The domain owns mutation locking and live epoch revalidation;
+        // wrapping it in that queue would deadlock restoration.
+        dependencies.createOnboardingSeedAccount(initializationId(message.initializationId))
+          .then(sendResponse).catch((error) => sendResponse({
           success: false, error: errorMessage(error, "Could not create wallet"),
         }));
         return HANDLED_ASYNC;
